@@ -5,5 +5,7 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra -Werror -g")
 set(SOURCE_FILES
         src/main.cpp
         src/webserv.h
+        src/epoll_kqueue.cpp
+        src/file_descriptor.cpp
 )
 add_executable(42_webserv ${SOURCE_FILES})

@@ -32,7 +32,7 @@ void wrap_up(int) throw();
 
 class InvalidFileDescriptorException : public std::exception {
     public:
-        const char* what() const throw() { return "Invalid file descriptor"; }
+        const char *_Nonnull what() const throw() { return "Invalid file descriptor"; }
 };
 
 /**
@@ -53,10 +53,10 @@ class FileDescriptor {
          * in the FileDescriptor class, ensuring proper management of the file descriptor.
          * Throws an InvalidFileDescriptorException if the provided file descriptor is invalid.
          *
-         * @param fd An integer representing the file descriptor to manage.
+         * @param raw_fd An integer representing the file descriptor to manage.
          * @throw InvalidFileDescriptorException if the provided file descriptor is invalid.
          */
-        explicit FileDescriptor(int) throw(InvalidFileDescriptorException);
+        explicit FileDescriptor(int raw_fd) throw(InvalidFileDescriptorException);
 
         /**
          * @brief Transfers ownership of a FileDescriptor from one instance to another.
@@ -65,11 +65,11 @@ class FileDescriptor {
          * into a new one, leaving the source FileDescriptor in a valid but unspecified state.
          * Use this function to safely transfer the responsibility of managing a file descriptor.
          *
-         * @param fd The source FileDescriptor instance from which the file descriptor will be moved.
+         * @param other The source FileDescriptor instance from which the file descriptor will be moved.
          * @return A new FileDescriptor instance that takes ownership of the file descriptor.
          * @throw InvalidFileDescriptorException if the provided FileDescriptor is invalid or cannot be moved.
          */
-        static FileDescriptor move_from(FileDescriptor&) throw(InvalidFileDescriptorException);
+        static FileDescriptor move_from(FileDescriptor& other) throw(InvalidFileDescriptorException);
 
         /**
          * @brief Destructor that releases the owned file descriptor.
@@ -119,23 +119,24 @@ class FileDescriptor {
          * Exception safety: no-throw.
          *
          * @param blocking If true, set blocking mode; if false, set non-blocking mode.
+         * @return True if the operation was successful, false otherwise.
          */
-        void set_blocking(bool blocking);
+        bool set_blocking(bool blocking) const;
 };
 
 class IteratorEndedException : public std::exception {
     public:
-        const char* what() const throw() { return "Iterator reached end"; }
+        const char *_Nonnull what() const throw() { return "Iterator reached end"; }
 };
 
 class InvariantViolationException : public std::exception {
     public:
-        const char* what() const throw() { return "Invariant violation"; }
+        const char *_Nonnull what() const throw() { return "Invariant violation"; }
 };
 
 class InterruptedException : public std::exception {
     public:
-        const char* what() const throw() { return "Operation interrupted"; }
+        const char *_Nonnull what() const throw() { return "Operation interrupted"; }
 };
 
 #ifdef __APPLE__
@@ -181,7 +182,7 @@ class KQueue {
         Event *_Nonnull _events;
         size_t _len;
         public:
-            explicit Events(size_t );
+            explicit Events(size_t);
             ~Events();
             Events end() const;
             Events& operator++() throw(IteratorEndedException);
@@ -194,7 +195,7 @@ class KQueue {
     FileDescriptor _fd;
     public:
         typedef Event Event;
-        explicit KQueue(size_t );
+        explicit KQueue(size_t);
         ~KQueue();
         void add_event(const Event&);
         void del_event(const Event&);
@@ -243,17 +244,18 @@ class EPoll {
      */
     class Events : public std::iterator<std::input_iterator_tag, Event, long, const Event*, const Event&> {
             size_t _curr;
-            Event *_Nonnull _events;
+            epoll_event *_Nonnull _events;
             size_t _len;
+            Event event_from_raw(const epoll_event&);
             public:
-                explicit Events(size_t);
+                Events(size_t, const epoll_event*);
                 ~Events();
                 Events end() const;
                 Events& operator++() throw(IteratorEndedException);
                 Events operator++(int) throw(IteratorEndedException);
                 bool operator==(const Events&) const;
                 bool operator!=(const Events&) const;
-                const Event& operator*() const;
+                const Event& operator*() throw(IteratorEndedException) const;
     };
     FileDescriptor _fd;
     size_t _size;

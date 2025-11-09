@@ -11,6 +11,7 @@ int main(const int argc, char *argv[]) {
     (void)argv;
     signal(SIGINT, wrap_up);
     #ifdef __APPLE__
+    KQueue k_queue(1000);
     #else
     EPoll e_poll(1000);
     #endif
