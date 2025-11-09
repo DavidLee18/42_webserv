@@ -9,15 +9,15 @@ int main(const int argc, char *argv[]) {
         return 1;
     }
     (void)argv;
+    signal(SIGINT, wrap_up);
     #ifdef __APPLE__
     #else
-    EPoll e_poll;
+    EPoll e_poll(1000);
     #endif
-    signal(SIGINT, wrap_up);
     while (sig == 0) {
         std::cout << "Hello, World!" << std::endl;
     }
     return 0;
 }
 
-void wrap_up(const int signum) { sig = signum; }
+void wrap_up(const int signum) throw() { sig = signum; }
