@@ -121,22 +121,29 @@ class FileDescriptor {
          * @param blocking If true, set blocking mode; if false, set non-blocking mode.
          * @return True if the operation was successful, false otherwise.
          */
-        bool set_blocking(bool blocking) const;
+        bool set_blocking(bool blocking);
+
+        bool operator==(const int& other) const;
+        bool operator!=(const int& other) const { return !(*this == other); }
+        friend bool operator==(const int& lhs, const FileDescriptor& rhs);
+        friend bool operator!=(const int& lhs, const FileDescriptor& rhs);
 };
+
+
 
 class IteratorEndedException : public std::exception {
     public:
         const char *_Nonnull what() const throw() { return "Iterator reached end"; }
 };
 
-class InvariantViolationException : public std::exception {
-    public:
-        const char *_Nonnull what() const throw() { return "Invariant violation"; }
-};
-
 class InterruptedException : public std::exception {
     public:
         const char *_Nonnull what() const throw() { return "Operation interrupted"; }
+};
+
+class FdNotRegisteredException : public std::exception {
+    public:
+        const char *_Nonnull what() const throw() { return "File descriptor not registered"; }
 };
 
 #ifdef __APPLE__
@@ -244,20 +251,19 @@ class EPoll {
      */
     class Events : public std::iterator<std::input_iterator_tag, Event, long, const Event*, const Event&> {
             size_t _curr;
-            epoll_event *_Nonnull _events;
             size_t _len;
-            Event event_from_raw(const epoll_event&);
+            const std::vector<FileDescriptor>& _all_events;
+            const Event *_Nonnull _events;
             public:
-                Events(size_t, const epoll_event*);
+                Events(const std::vector<FileDescriptor>&, size_t, const epoll_event *_Nonnull) throw(FdNotRegisteredException);
                 ~Events();
-                Events end() const;
+                bool is_end() const;
                 Events& operator++() throw(IteratorEndedException);
                 Events operator++(int) throw(IteratorEndedException);
-                bool operator==(const Events&) const;
-                bool operator!=(const Events&) const;
                 const Event& operator*() throw(IteratorEndedException) const;
     };
     FileDescriptor _fd;
+    std::vector<FileDescriptor> _events;
     size_t _size;
     public:
         /**
@@ -281,7 +287,7 @@ class EPoll {
         void add_fd(const FileDescriptor& fd, const Option& option);
         void modify_fd(const FileDescriptor& fd, const Option& option);
         void del_fd(const FileDescriptor& fd, const Option& option);
-        Events& wait(const int timeout_ms) throw(InterruptedException, InvariantViolationException);
+        Events& wait(const int timeout_ms) throw(InterruptedException);
 };
 #endif
 #endif

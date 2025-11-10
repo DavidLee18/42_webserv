@@ -24,6 +24,18 @@ const int& FileDescriptor::operator*() const {
     return _fd;
 }
 
-bool FileDescriptor::set_blocking(const bool blocking) const {
+bool FileDescriptor::set_blocking(const bool blocking) {
     return fcntl(_fd, F_SETFL, blocking ? 0 : O_NONBLOCK) == 0;
+}
+
+bool FileDescriptor::operator==(const int &other) const {
+    return _fd == other;
+}
+
+bool operator==(const int& lhs, const FileDescriptor& rhs) {
+    return lhs == rhs._fd;
+}
+
+bool operator!=(const int& lhs, const FileDescriptor& rhs) {
+    return !(lhs == rhs);
 }
