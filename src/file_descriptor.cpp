@@ -8,15 +8,22 @@ FileDescriptor::FileDescriptor(const int raw_fd) throw(InvalidFileDescriptorExce
     _fd = raw_fd;
 }
 
-FileDescriptor FileDescriptor::move_from(FileDescriptor &other) throw(InvalidFileDescriptorException) {
+FileDescriptor::FileDescriptor(FileDescriptor &other) throw(InvalidFileDescriptorException) : _fd(other._fd) {
     if (other._fd < 0) throw InvalidFileDescriptorException();
-    FileDescriptor fd(other._fd);
     other._fd = -1;
-    return fd;
+}
+
+FileDescriptor& FileDescriptor::operator=(FileDescriptor other) throw(InvalidFileDescriptorException) {
+    if (this != &other) {
+        if (_fd < 0) throw InvalidFileDescriptorException();
+        _fd = other._fd;
+        other._fd = -1;
+    }
+    return *this;
 }
 
 FileDescriptor::~FileDescriptor() {
-    if (_fd >= 0)
+    if (_fd >= 2)
         close(_fd);
 }
 
@@ -26,10 +33,6 @@ const int& FileDescriptor::operator*() const {
 
 bool FileDescriptor::set_blocking(const bool blocking) {
     return fcntl(_fd, F_SETFL, blocking ? 0 : O_NONBLOCK) == 0;
-}
-
-bool FileDescriptor::operator==(const int &other) const {
-    return _fd == other;
 }
 
 bool operator==(const int& lhs, const FileDescriptor& rhs) {
