@@ -6,11 +6,11 @@
 #define INC_42_WEBSERV_EXCEPTIONS_H
 #include <exception>
 
-#define EXCEPTION(name, message) \
-    class name : public std::exception { \
-    public: \
-        const char *_Nonnull what() const throw() { return message; } \
-    };
+#define EXCEPTION(name, message)                                               \
+  class name : public std::exception {                                         \
+  public:                                                                      \
+    const char *_Nonnull what() const throw() { return message; }              \
+  };
 
 EXCEPTION(InvalidFileDescriptorException, "Invalid file descriptor")
 EXCEPTION(IteratorEndedException, "Iterator reached end")
@@ -22,4 +22,4 @@ EXCEPTION(OutOfMemoryException, "Out of memory")
 EXCEPTION(EPollFullException, "EPoll queue is full")
 EXCEPTION(NotSupportedOperationException, "Operation not supported")
 
-#endif //INC_42_WEBSERV_EXCEPTIONS_H
+#endif // INC_42_WEBSERV_EXCEPTIONS_H
