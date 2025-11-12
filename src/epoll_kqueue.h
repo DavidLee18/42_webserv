@@ -167,22 +167,21 @@ class EPoll {
 public:
   EPoll(size_t) throw(InvalidFileDescriptorException);
   Events wait(const int timeout_ms) throw(InterruptedException);
-  friend const FileDescriptor &
-  add_fd(FileDescriptor, EPoll &, const Event &,
+  const FileDescriptor &
+  add_fd(FileDescriptor, const Event &,
          const Option &) throw(InvalidOperationException, EPollLoopException,
                                FdNotRegisteredException, OutOfMemoryException,
                                EPollFullException,
                                NotSupportedOperationException);
-  friend void modify_fd(const FileDescriptor &, EPoll &, const Event &ev,
-                        const Option &op) throw(InvalidOperationException,
-                                                FdNotRegisteredException,
-                                                OutOfMemoryException,
-                                                NotSupportedOperationException);
-  friend void del_fd(const FileDescriptor &fd,
-                     EPoll &ep) throw(InvalidOperationException,
-                                      FdNotRegisteredException,
-                                      OutOfMemoryException,
-                                      NotSupportedOperationException);
+  void modify_fd(const FileDescriptor &, const Event &,
+                 const Option &) throw(InvalidOperationException,
+                                       FdNotRegisteredException,
+                                       OutOfMemoryException,
+                                       NotSupportedOperationException);
+  void del_fd(const FileDescriptor &) throw(InvalidOperationException,
+                                            FdNotRegisteredException,
+                                            OutOfMemoryException,
+                                            NotSupportedOperationException);
 };
 
 #endif

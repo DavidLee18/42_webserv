@@ -77,11 +77,9 @@ EPoll::EPoll(size_t size) throw(InvalidFileDescriptorException)
 }
 
 const FileDescriptor &
-add_fd(FileDescriptor fd, EPoll &ep, const Event &ev,
-       const Option &op) throw(InvalidOperationException, EPollLoopException,
-                               FdNotRegisteredException, OutOfMemoryException,
-                               EPollFullException,
-                               NotSupportedOperationException) {
+EPoll::add_fd(FileDescriptor fd, const Event &ev, const Option &op) throw(
+    InvalidOperationException, EPollLoopException, FdNotRegisteredException,
+    OutOfMemoryException, EPollFullException, NotSupportedOperationException) {
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -104,7 +102,7 @@ add_fd(FileDescriptor fd, EPoll &ep, const Event &ev,
   if (op.exclusive)
     event.events |= EPOLLEXCLUSIVE;
   event.data.fd = *fd;
-  if (epoll_ctl(*(ep._fd), EPOLL_CTL_ADD, *fd, &event) == -1) {
+  if (epoll_ctl(*_fd, EPOLL_CTL_ADD, *fd, &event) == -1) {
     switch (errno) {
     case EEXIST:
       throw InvalidOperationException();
@@ -122,15 +120,15 @@ add_fd(FileDescriptor fd, EPoll &ep, const Event &ev,
       throw NotSupportedOperationException();
     }
   }
-  ep._events.push(fd);
-  return ep._events[ep._events.size() - 1];
+  _events.push(fd);
+  return _events[_events.size() - 1];
 }
 
-void modify_fd(const FileDescriptor &fd, EPoll &ep, const Event &ev,
-               const Option &op) throw(InvalidOperationException,
-                                       FdNotRegisteredException,
-                                       OutOfMemoryException,
-                                       NotSupportedOperationException) {
+void EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,
+                      const Option &op) throw(InvalidOperationException,
+                                              FdNotRegisteredException,
+                                              OutOfMemoryException,
+                                              NotSupportedOperationException) {
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -153,7 +151,7 @@ void modify_fd(const FileDescriptor &fd, EPoll &ep, const Event &ev,
   if (op.exclusive)
     event.events |= EPOLLEXCLUSIVE;
   event.data.fd = *fd;
-  if (epoll_ctl(*(ep._fd), EPOLL_CTL_MOD, *fd, &event) == -1) {
+  if (epoll_ctl(*_fd, EPOLL_CTL_MOD, *fd, &event) == -1) {
     switch (errno) {
     case EINVAL:
       throw InvalidOperationException();
@@ -167,13 +165,12 @@ void modify_fd(const FileDescriptor &fd, EPoll &ep, const Event &ev,
   }
 }
 
-void del_fd(const FileDescriptor &fd,
-            EPoll &ep) throw(InvalidOperationException,
-                             FdNotRegisteredException, OutOfMemoryException,
-                             NotSupportedOperationException) {
+void EPoll::del_fd(const FileDescriptor &fd) throw(
+    InvalidOperationException, FdNotRegisteredException, OutOfMemoryException,
+    NotSupportedOperationException) {
   epoll_event event = {};
   event.data.fd = *fd;
-  if (epoll_ctl(*(ep._fd), EPOLL_CTL_DEL, *fd, &event) == -1) {
+  if (epoll_ctl(*_fd, EPOLL_CTL_DEL, *fd, &event) == -1) {
     switch (errno) {
     case EINVAL:
       throw InvalidOperationException();

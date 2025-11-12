@@ -13,6 +13,20 @@ template <typename T> class Vec {
   size_t _size;
   size_t _cap;
 
+  void alloc() {
+    const size_t new_capacity = _cap == 0 ? 1 : _cap * 2;
+    T *new_data = static_cast<T *>(operator new(new_capacity * sizeof(T)));
+    if (_data != NULL) {
+      for (size_t i = 0; i < _size; ++i) {
+        new (new_data + i) T(_data[i]);
+        _data[i].~T();
+      }
+      operator delete(_data);
+    }
+    _data = new_data;
+    _cap = new_capacity;
+  }
+
 public:
   Vec() : _data(NULL), _size(0), _cap(0) {}
 
@@ -24,18 +38,6 @@ public:
       _data[i].~T();
     }
     operator delete(_data);
-  }
-
-  void alloc() {
-    const size_t new_capacity = _cap == 0 ? 1 : _cap * 2;
-    T *new_data = static_cast<T *>(operator new(new_capacity * sizeof(T)));
-    for (size_t i = 0; i < _size; ++i) {
-      new (new_data + i) T(_data[i]);
-      _data[i].~T();
-    }
-    operator delete(_data);
-    _data = new_data;
-    _cap = new_capacity;
   }
 
   void push(T value) {
