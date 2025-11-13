@@ -1,0 +1,30 @@
+
+types = 
+    html|htm -> text/html
+    css      -> text/css
+    js       -> application/javascript
+    json     -> application/json
+    jpg|jpeg -> image/jpeg
+    png      -> image/png
+    _        -> application/octet-stream
+
+:80 =
+	[] +<= X-Content-Type-Options: "nosniff"
+	+<= Content-Security-Policy: default-src 'self';
+        object-src 'none'; script-src 'sha256-${$HASH($SCRIPT)}';
+        base-uri 'none'; frame-ancestors 'none'
+
+    ...5s
+    
+    /old_stuff/*  =301> /new_stuff/*
+
+    /download/*/mp3/* =301> /*/mp3/*.mp3
+
+    /download/ <i- /spool/www
+
+    *.(jpg|jpeg|gif) <- /spool/www
+
+    / <- /spool/www
+        @auth_info
+        ->{} <= 10MB
+        !404:/404.html
