@@ -21,9 +21,9 @@ types =
 
     GET /download/ <i- /spool/www
 
-    GET *.(jpg|jpeg|gif) <- /spool/www
+    GET *.(jpg|jpeg|gif) <- /spool/www/*.(jpg|jpeg|gif)
 
-    GET|POST|DELETE / <- /spool/www ? index2.html
+    GET|POST|DELETE * <- /spool/www/* ? index2.html
         @auth_info
         ->{} < 10MB
         !404:/404.html
