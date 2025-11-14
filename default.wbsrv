@@ -15,15 +15,15 @@ types =
 
     ...5s
     
-    /old_stuff/*  =301> /new_stuff/*
+    GET /old_stuff/* =301> /new_stuff/*
 
-    /download/*/mp3/* =301> /*/mp3/*.mp3
+    GET /download/*/mp3/* =301> /*/mp3/*.mp3
 
-    /download/ <i- /spool/www
+    GET /download/ <i- /spool/www
 
-    *.(jpg|jpeg|gif) <- /spool/www
+    GET *.(jpg|jpeg|gif) <- /spool/www
 
-    / <- /spool/www ? index2.html
+    GET|POST|DELETE / <- /spool/www ? index2.html
         @auth_info
         ->{} < 10MB
         !404:/404.html
