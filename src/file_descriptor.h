@@ -42,6 +42,12 @@ public:
    */
   explicit FileDescriptor(int raw_fd) throw(InvalidFileDescriptorException);
 
+  static FileDescriptor tcp_socket() throw(AccessDenidedException,
+                                           NotSupportedOperationException,
+                                           InvalidOperationException,
+                                           FdTooManyException,
+                                           OutOfMemoryException);
+
   /**
    * @brief Transfers ownership of a FileDescriptor from one instance to
    * another.

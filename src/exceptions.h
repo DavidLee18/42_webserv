@@ -21,5 +21,8 @@ EXCEPTION(EPollLoopException, "EPoll loop error")
 EXCEPTION(OutOfMemoryException, "Out of memory")
 EXCEPTION(EPollFullException, "EPoll queue is full")
 EXCEPTION(NotSupportedOperationException, "Operation not supported")
+EXCEPTION(AccessDenidedException, "Access denied")
+EXCEPTION(FdTooManyException,
+          "File descriptors are too many, reached to a limit")
 
 #endif // INC_42_WEBSERV_EXCEPTIONS_H
