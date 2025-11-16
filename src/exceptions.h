@@ -21,8 +21,16 @@ EXCEPTION(EPollLoopException, "EPoll loop error")
 EXCEPTION(OutOfMemoryException, "Out of memory")
 EXCEPTION(EPollFullException, "EPoll queue is full")
 EXCEPTION(NotSupportedOperationException, "Operation not supported")
-EXCEPTION(AccessDenidedException, "Access denied")
+EXCEPTION(AccessDeniedException, "Access denied")
 EXCEPTION(FdTooManyException,
           "File descriptors are too many, reached to a limit")
+EXCEPTION(AddressNotAvailableException, "Address not available")
+EXCEPTION(AddressFaultException, "Address memory fault")
+EXCEPTION(AddressLoopException, "Address is behind too many symbolic links")
+EXCEPTION(NameTooLongException, "Name too long")
+EXCEPTION(NotFoundException, "Not found")
+EXCEPTION(ReadOnlyFileSystemException,
+          "The operation is called to execute on a read-only filesystem, but "
+          "is required to write.")
 
 #endif // INC_42_WEBSERV_EXCEPTIONS_H

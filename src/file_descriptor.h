@@ -42,7 +42,21 @@ public:
    */
   explicit FileDescriptor(int raw_fd) throw(InvalidFileDescriptorException);
 
-  static FileDescriptor tcp_socket() throw(AccessDenidedException,
+  /**
+   * makes a new socket.
+   * @return A new FileDescriptor instance, which is a socket.
+   * @throw AccessDeniedException if the current permission is not enough to
+   * execute the operation.
+   * @throw NotSupportedOperationException if the implementation does not
+   * support the specified protocol or the address family.
+   * @throw InvalidOperationException if the operation is using the invalid
+   * protocol or the invalid flag(s).
+   * @throw FdTooManyException if the per-process limit, or the system-wide
+   * limit on the open file descriptors has been reached.
+   * @throw OutOfMemoryException if insufficient memory is available. The socket
+   * cannot be created until sufficient resources are freed.
+   */
+  static FileDescriptor socket_new() throw(AccessDeniedException,
                                            NotSupportedOperationException,
                                            InvalidOperationException,
                                            FdTooManyException,
@@ -138,6 +152,16 @@ public:
    * @return True if the operation was successful, false otherwise.
    */
   bool set_blocking(bool blocking);
+
+  /*
+   * @param addr The IP address to connect.
+   * @param port The port to connect
+   */
+  void socket_bind(struct in_addr addr, unsigned short port) throw(
+      AccessDeniedException, AddressNotAvailableException,
+      InvalidFileDescriptorException, InvalidOperationException,
+      AddressFaultException, AddressLoopException, NameTooLongException,
+      NotFoundException, OutOfMemoryException, ReadOnlyFileSystemException);
 
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {

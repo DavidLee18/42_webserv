@@ -10,6 +10,31 @@ FileDescriptor::FileDescriptor(const int raw_fd) throw(
   _fd = raw_fd;
 }
 
+FileDescriptor FileDescriptor::socket_new() throw(
+    AccessDeniedException, NotSupportedOperationException,
+    InvalidOperationException, FdTooManyException, OutOfMemoryException) {
+  int sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+  if (sock < 0) {
+    switch (errno) {
+    case EACCES:
+      throw AccessDeniedException();
+    case EAFNOSUPPORT:
+    case EPROTONOSUPPORT:
+      throw NotSupportedOperationException();
+    case EINVAL:
+      throw InvalidOperationException();
+    case EMFILE:
+    case ENFILE:
+      throw FdTooManyException();
+    case ENOBUFS:
+    case ENOMEM:
+      throw OutOfMemoryException();
+    }
+  }
+  FileDescriptor fd(sock);
+  return fd;
+}
+
 FileDescriptor::FileDescriptor(FileDescriptor &other) throw(
     InvalidFileDescriptorException)
     : _fd(other._fd) {
@@ -30,7 +55,7 @@ FileDescriptor &FileDescriptor::operator=(FileDescriptor other) throw(
 }
 
 FileDescriptor::~FileDescriptor() {
-  if (_fd >= 2)
+  if (_fd >= 0)
     close(_fd);
 }
 
@@ -38,6 +63,49 @@ const int &FileDescriptor::operator*() const { return _fd; }
 
 bool FileDescriptor::set_blocking(const bool blocking) {
   return fcntl(_fd, F_SETFL, blocking ? 0 : O_NONBLOCK) == 0;
+}
+
+void FileDescriptor::socket_bind(
+    struct in_addr addr,
+    unsigned short port) throw(AccessDeniedException,
+                               AddressNotAvailableException,
+                               InvalidFileDescriptorException,
+                               InvalidOperationException, AddressFaultException,
+                               AddressLoopException, NameTooLongException,
+                               NotFoundException, OutOfMemoryException,
+                               ReadOnlyFileSystemException) {
+  sockaddr_in _addr;
+  std::memset(&_addr, 0, sizeof(_addr));
+  _addr.sin_family = AF_INET;
+  _addr.sin_addr = addr;
+  _addr.sin_port = htons(port);
+  if (bind(_fd, (const sockaddr *)&_addr, sizeof(_addr)) < 0) {
+    switch (errno) {
+    case EACCES:
+      throw AccessDeniedException();
+    case EADDRINUSE:
+    case EADDRNOTAVAIL:
+      throw AddressNotAvailableException();
+    case EBADF:
+    case ENOTSOCK:
+      throw InvalidFileDescriptorException();
+    case EINVAL:
+      throw InvalidOperationException();
+    case EFAULT:
+      throw AddressFaultException();
+    case ELOOP:
+      throw AddressLoopException();
+    case ENAMETOOLONG:
+      throw NameTooLongException();
+    case ENOENT:
+    case ENOTDIR:
+      throw NotFoundException();
+    case ENOMEM:
+      throw OutOfMemoryException();
+    case EROFS:
+      throw ReadOnlyFileSystemException();
+    }
+  }
 }
 
 bool operator==(const int &lhs, const FileDescriptor &rhs) {
