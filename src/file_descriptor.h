@@ -307,31 +307,6 @@ public:
   }
   friend bool operator==(const int &lhs, const FileDescriptor &rhs);
   friend bool operator!=(const int &lhs, const FileDescriptor &rhs);
-
-#ifdef __APPLE__
-  friend const FileDescriptor &
-  add_event(FileDescriptor, const KQueue &,
-            const Event &) throw(InvalidFileDescriptorException);
-  friend void del_event(const FileDescriptor &, KQueue &,
-                        const Event &) throw(InvalidFileDescriptorException);
-#else
-  friend const FileDescriptor &
-  add_fd(FileDescriptor, EPoll &, const Event &,
-         const Option &) throw(InvalidOperationException, EPollLoopException,
-                               FdNotRegisteredException, OutOfMemoryException,
-                               EPollFullException,
-                               NotSupportedOperationException);
-  friend void modify_fd(const FileDescriptor &, EPoll &, const Event &ev,
-                        const Option &op) throw(InvalidOperationException,
-                                                FdNotRegisteredException,
-                                                OutOfMemoryException,
-                                                NotSupportedOperationException);
-  friend void del_fd(const FileDescriptor &fd, EPoll &ep, const Event &ev,
-                     const Option &op) throw(InvalidOperationException,
-                                             FdNotRegisteredException,
-                                             OutOfMemoryException,
-                                             NotSupportedOperationException);
-#endif
 };
 
 #endif // INC_42_WEBSERV_FILE_DESCRIPTOR_H

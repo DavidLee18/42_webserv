@@ -76,11 +76,9 @@ public:
   explicit KQueue(size_t);
   ~KQueue();
   Events wait(int timeout_ms);
-  friend const FileDescriptor &
-  add_event(FileDescriptor, KQueue &,
-            const Event &) throw(InvalidFileDescriptorException);
-  friend void del_event(const FileDescriptor &, KQueue &,
-                        const Event &) throw(InvalidFileDescriptorException);
+  const FileDescriptor &
+  add_event(FileDescriptor, const Event &) throw(InvalidFileDescriptorException);
+  void del_event(const FileDescriptor &, const Event &) throw(InvalidFileDescriptorException);
 };
 #else
 
