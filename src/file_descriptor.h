@@ -297,6 +297,11 @@ public:
       AddressFaultException, AddressLoopException, NameTooLongException,
       NotFoundException, OutOfMemoryException, ReadOnlyFileSystemException);
 
+  void
+  socket_listen(unsigned short backlog) throw(AddressNotAvailableException,
+                                              InvalidFileDescriptorException,
+                                              NotSupportedOperationException);
+
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {
     return _fd == other._fd;
