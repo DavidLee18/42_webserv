@@ -13,7 +13,7 @@ FileDescriptor::FileDescriptor(const int raw_fd) throw(
 FileDescriptor FileDescriptor::socket_new() throw(
     AccessDeniedException, NotSupportedOperationException,
     InvalidOperationException, FdTooManyException, OutOfMemoryException) {
-  int sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+  int sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
     switch (errno) {
     case EACCES:
@@ -131,7 +131,42 @@ FileDescriptor::socket_accept(struct sockaddr *addr, socklen_t *len) throw(
     InvalidFileDescriptorException, std::invalid_argument,
     AddressFaultException, InterruptedException, FdTooManyException,
     OutOfMemoryException, NotSupportedOperationException,
-    AccessDeniedException) {}
+    AccessDeniedException) {
+  int fd = accept(_fd, addr, len);
+  if (fd >= 0) {
+    FileDescriptor fd_(fd);
+    return fd_;
+  }
+  switch (errno) {
+  case EWOULDBLOCK:
+    throw TryAgainException();
+  case EBADF:
+  case ENOTSOCK:
+    throw InvalidFileDescriptorException();
+  case ECONNABORTED:
+    throw ConnectionAbortedException();
+  case EFAULT:
+    throw AddressFaultException();
+  case EINTR:
+    throw InterruptedException();
+  case EINVAL:
+    throw std::invalid_argument(
+        "Socket is not listening for connections, or addrlen is invalid.");
+  case EMFILE:
+  case ENFILE:
+    throw FdTooManyException();
+  case ENOBUFS:
+  case ENOMEM:
+    throw OutOfMemoryException();
+  case EOPNOTSUPP:
+    throw std::invalid_argument(
+        "The referenced socket is not of type SOCK_STREAM.");
+  case EPERM:
+    throw AccessDeniedException();
+  default:
+    throw std::runtime_error("an unknown error occured during accept().");
+  }
+}
 
 bool operator==(const int &lhs, const FileDescriptor &rhs) {
   return lhs == rhs._fd;
