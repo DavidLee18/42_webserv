@@ -108,6 +108,22 @@ void FileDescriptor::socket_bind(
   }
 }
 
+void FileDescriptor::socket_listen(unsigned short backlog) throw(
+    AddressNotAvailableException, InvalidFileDescriptorException,
+    NotSupportedOperationException) {
+  if (listen(_fd, backlog) < 0) {
+    switch (errno) {
+    case EADDRINUSE:
+      throw AddressNotAvailableException();
+    case EBADF:
+    case ENOTSOCK:
+      throw InvalidFileDescriptorException();
+    case EOPNOTSUPP:
+      throw NotSupportedOperationException();
+    }
+  }
+}
+
 bool operator==(const int &lhs, const FileDescriptor &rhs) {
   return lhs == rhs._fd;
 }
