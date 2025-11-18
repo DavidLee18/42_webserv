@@ -79,7 +79,8 @@ void FileDescriptor::socket_bind(
   _addr.sin_family = AF_INET;
   _addr.sin_addr = addr;
   _addr.sin_port = htons(port);
-  if (bind(_fd, reinterpret_cast<const sockaddr *>(&_addr), sizeof(_addr)) < 0) {
+  if (bind(_fd, reinterpret_cast<const sockaddr *>(&_addr), sizeof(_addr)) <
+      0) {
     switch (errno) {
     case EACCES:
       throw AccessDeniedException();
@@ -123,6 +124,14 @@ void FileDescriptor::socket_listen(unsigned short backlog) throw(
     }
   }
 }
+
+FileDescriptor
+FileDescriptor::socket_accept(struct sockaddr *addr, socklen_t *len) throw(
+    TryAgainException, ConnectionAbortedException,
+    InvalidFileDescriptorException, std::invalid_argument,
+    AddressFaultException, InterruptedException, FdTooManyException,
+    OutOfMemoryException, NotSupportedOperationException,
+    AccessDeniedException) {}
 
 bool operator==(const int &lhs, const FileDescriptor &rhs) {
   return lhs == rhs._fd;

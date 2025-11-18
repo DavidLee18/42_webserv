@@ -6,6 +6,8 @@
 #define INC_42_WEBSERV_FILE_DESCRIPTOR_H
 
 #include "exceptions.h"
+#include <stdexcept>
+#include <sys/socket.h>
 
 #ifdef __APPLE__
 class KQueue;
@@ -347,9 +349,17 @@ public:
    * // Now ready to accept connections on *srv
    * ```
    */
-  void socket_listen(unsigned short backlog) throw(
-      AddressNotAvailableException, InvalidFileDescriptorException,
-      NotSupportedOperationException);
+  void
+  socket_listen(unsigned short backlog) throw(AddressNotAvailableException,
+                                              InvalidFileDescriptorException,
+                                              NotSupportedOperationException);
+
+  FileDescriptor socket_accept(struct sockaddr *addr, socklen_t *len) throw(
+      TryAgainException, ConnectionAbortedException,
+      InvalidFileDescriptorException, std::invalid_argument,
+      AddressFaultException, InterruptedException, FdTooManyException,
+      OutOfMemoryException, NotSupportedOperationException,
+      AccessDeniedException);
 
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {

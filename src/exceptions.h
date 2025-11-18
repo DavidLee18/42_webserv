@@ -32,5 +32,7 @@ EXCEPTION(NotFoundException, "Not found")
 EXCEPTION(ReadOnlyFileSystemException,
           "The operation is called to execute on a read-only filesystem, but "
           "is required to write.")
+EXCEPTION(TryAgainException, "Try again next time.")
+EXCEPTION(ConnectionAbortedException, "A connection has been aborted.")
 
 #endif // INC_42_WEBSERV_EXCEPTIONS_H
