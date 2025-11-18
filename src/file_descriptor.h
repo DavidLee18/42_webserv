@@ -297,10 +297,59 @@ public:
       AddressFaultException, AddressLoopException, NameTooLongException,
       NotFoundException, OutOfMemoryException, ReadOnlyFileSystemException);
 
-  void
-  socket_listen(unsigned short backlog) throw(AddressNotAvailableException,
-                                              InvalidFileDescriptorException,
-                                              NotSupportedOperationException);
+  /**
+   * @brief Put the bound socket into a passive listening state.
+   *
+   * Invokes `listen(2)` on the underlying socket so it can accept incoming
+   * connection requests. This should typically be called after a successful
+   * `socket_bind()` for server sockets. On success, the file descriptor moves
+   * into a passive (listening) state and may be used with `accept(2)`.
+   *
+   * Behavior:
+   * - Calls `listen(fd, backlog)` where `backlog` specifies the maximum length
+   *   of the pending connection queue. The effective queue length may be
+   *   capped by the OS (e.g., `SOMAXCONN`).
+   * - Does not modify any socket options; configure them prior to calling this
+   *   method if needed (e.g., `SO_REUSEADDR`).
+   *
+   * Preconditions:
+   * - The underlying fd must be a valid stream socket (e.g., IPv4 TCP).
+   * - For server sockets, `socket_bind()` should have been called first to
+   *   select a local address/port.
+   *
+   * Resource management: no ownership changes occur; this object continues to
+   * manage the fd lifetime.
+   *
+   * Thread-safety: not thread-safe when the same instance is accessed
+   * concurrently.
+   *
+   * Exception safety: strong guarantee. On failure, the socket remains in its
+   * previous state and one of the exceptions below is thrown.
+   *
+   * @param backlog Maximum number of pending connections in the accept queue
+   *                (subject to OS-imposed limits such as `SOMAXCONN`).
+   *
+   * @throw AddressNotAvailableException
+   *   The address is already in use or otherwise unavailable for listening
+   *   (maps from `EADDRINUSE`).
+   * @throw InvalidFileDescriptorException
+   *   The fd is invalid or not a socket (maps from `EBADF`, `ENOTSOCK`).
+   * @throw NotSupportedOperationException
+   *   The socket type does not support listening (maps from `EOPNOTSUPP`).
+   *
+   * Example:
+   * ```cpp
+   * FileDescriptor srv = FileDescriptor::socket_new();
+   * // Optional: set SO_REUSEADDR, etc.
+   * in_addr any; any.s_addr = htonl(INADDR_ANY);
+   * srv.socket_bind(any, 8080);
+   * srv.socket_listen(128);
+   * // Now ready to accept connections on *srv
+   * ```
+   */
+  void socket_listen(unsigned short backlog) throw(
+      AddressNotAvailableException, InvalidFileDescriptorException,
+      NotSupportedOperationException);
 
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {
