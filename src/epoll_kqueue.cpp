@@ -5,8 +5,8 @@
 
 #ifdef __APPLE__
 const FileDescriptor &
-add_event(FileDescriptor fd, KQueue &kq,
-          const Event &ev) throw(InvalidFileDescriptorException) {
+KQueue::add_event(FileDescriptor fd,
+                  const Event &e) throw(InvalidFileDescriptorException) {
   if (fd != ev.fd)
     throw InvalidFileDescriptorException();
   struct kevent event = {};
@@ -17,12 +17,9 @@ add_event(FileDescriptor fd, KQueue &kq,
   return kq._events[kq._events.size() - 1];
 }
 
-void del_event(const FileDescriptor &fd, KQueue &kq,
-               const Event &event) throw(InvalidFileDescriptorException) {
+void KQueue::del_event(const FileDescriptor &fd,
+                       const Event &e) throw(InvalidFileDescriptorException) {
   /* TODO */
-  (void)fd;
-  (void)kq;
-  (void)event;
 }
 #else
 Events::Events(const Vec<FileDescriptor> &all_events, const size_t size,
