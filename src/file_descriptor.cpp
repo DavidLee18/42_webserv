@@ -1,6 +1,3 @@
-//
-// Created by 이재현 on 2025-11-10.
-//
 #include "webserv.h"
 
 FileDescriptor::FileDescriptor(const int raw_fd) throw(

@@ -1,9 +1,5 @@
-//
-// Created by 이재현 on 2025-11-12.
-//
-
-#ifndef INC_42_WEBSERV_EPOLL_KQUEUE_H
-#define INC_42_WEBSERV_EPOLL_KQUEUE_H
+#ifndef EPOLL_KQUEUE_H
+#define EPOLL_KQUEUE_H
 
 #include "file_descriptor.h"
 #include "vec.h"
@@ -80,7 +76,7 @@ public:
   add_event(FileDescriptor, const Event &) throw(InvalidFileDescriptorException);
   void del_event(const FileDescriptor &, const Event &) throw(InvalidFileDescriptorException);
 };
-#else
+#else // __APPLE__
 
 #include <sys/epoll.h>
 
@@ -182,6 +178,6 @@ public:
                                             NotSupportedOperationException);
 };
 
-#endif
+#endif // __APPLE__
 
-#endif // INC_42_WEBSERV_EPOLL_KQUEUE_H
+#endif // EPOLL_KQUEUE_H

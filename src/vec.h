@@ -1,9 +1,5 @@
-//
-// Created by 이재현 on 2025-11-12.
-//
-
-#ifndef INC_42_WEBSERV_VEC_H
-#define INC_42_WEBSERV_VEC_H
+#ifndef VEC_H
+#define VEC_H
 #include <cstddef>
 #include <exception>
 #include <stdexcept>
@@ -69,4 +65,4 @@ public:
   const T &operator[](size_t index) const { return _data[index]; }
 };
 
-#endif // INC_42_WEBSERV_VEC_H
+#endif // VEC_H

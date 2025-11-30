@@ -1,9 +1,5 @@
-//
-// Created by 이재현 on 2025-11-12.
-//
-
-#ifndef INC_42_WEBSERV_EXCEPTIONS_H
-#define INC_42_WEBSERV_EXCEPTIONS_H
+#ifndef WEBSERV_EXCEPTIONS_H
+#define WEBSERV_EXCEPTIONS_H
 #include <exception>
 
 #define EXCEPTION(name, message)                                               \
@@ -35,4 +31,4 @@ EXCEPTION(ReadOnlyFileSystemException,
 EXCEPTION(TryAgainException, "Try again next time.")
 EXCEPTION(ConnectionAbortedException, "A connection has been aborted.")
 
-#endif // INC_42_WEBSERV_EXCEPTIONS_H
+#endif // WEBSERV_EXCEPTIONS_H

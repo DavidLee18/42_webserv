@@ -1,6 +1,3 @@
-//
-// Created by 이재현 on 2025-11-08.
-//
 #include "webserv.h"
 
 volatile sig_atomic_t sig = 0;

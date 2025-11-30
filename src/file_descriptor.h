@@ -1,9 +1,5 @@
-//
-// Created by 이재현 on 2025-11-12.
-//
-
-#ifndef INC_42_WEBSERV_FILE_DESCRIPTOR_H
-#define INC_42_WEBSERV_FILE_DESCRIPTOR_H
+#ifndef FILE_DESCRIPTOR_H
+#define FILE_DESCRIPTOR_H
 
 #include "exceptions.h"
 #include <stdexcept>
@@ -373,4 +369,4 @@ public:
   friend bool operator!=(const int &lhs, const FileDescriptor &rhs);
 };
 
-#endif // INC_42_WEBSERV_FILE_DESCRIPTOR_H
+#endif // FILE_DESCRIPTOR_H
