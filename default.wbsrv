@@ -9,7 +9,7 @@ types =
 
 :80 =
 	[] +<= X-Content-Type-Options: "nosniff"
-	+<= Content-Security-Policy: default-src 'self';
+	[] +<= Content-Security-Policy: default-src 'self';
         object-src 'none'; script-src 'sha256-${$HASH($SCRIPT)}';
         base-uri 'none'; frame-ancestors 'none'
 
