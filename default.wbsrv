@@ -1,4 +1,4 @@
-types = 
+types =
     html|htm -> text/html
     css      -> text/css
     js       -> application/javascript
@@ -14,7 +14,7 @@ types =
         base-uri 'none'; frame-ancestors 'none'
 
     ...5s
-    
+
     GET /old_stuff/* =301> /new_stuff/*
 
     GET /download/*/mp3/* =301> /*/mp3/*.mp3

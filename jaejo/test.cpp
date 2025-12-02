@@ -1,7 +1,7 @@
-#include "Webserver.hpp"
+#include "WebserverConfig.hpp"
 
 int main (int ac, char **av)
 {
     (void)ac;
-    Webserver info(av[1]);
+    WebserverConfig info(av[1]);
 }
