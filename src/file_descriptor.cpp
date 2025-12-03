@@ -1,54 +1,53 @@
 #include "webserv.h"
 
-FileDescriptor::FileDescriptor(const int raw_fd) throw(
-    InvalidFileDescriptorException) {
-  if (raw_fd < 0)
-    throw InvalidFileDescriptorException();
-  _fd = raw_fd;
-}
-
-FileDescriptor FileDescriptor::socket_new() throw(
-    AccessDeniedException, NotSupportedOperationException,
-    InvalidOperationException, FdTooManyException, OutOfMemoryException) {
+Result<FileDescriptor> FileDescriptor::socket_new() {
   int sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
     switch (errno) {
     case EACCES:
-      throw AccessDeniedException();
+      return ERR(FileDescriptor, errors::access_denied);
     case EAFNOSUPPORT:
     case EPROTONOSUPPORT:
-      throw NotSupportedOperationException();
+      return ERR(FileDescriptor, errors::not_supported);
     case EINVAL:
-      throw InvalidOperationException();
+      return ERR(FileDescriptor, errors::invalid_operation);
     case EMFILE:
     case ENFILE:
-      throw FdTooManyException();
+      return ERR(FileDescriptor, errors::fd_too_many);
     case ENOBUFS:
     case ENOMEM:
-      throw OutOfMemoryException();
+      return ERR(FileDescriptor, errors::out_of_mem);
     }
   }
-  FileDescriptor fd(sock);
-  return fd;
+  FileDescriptor *fd = new FileDescriptor();
+  fd->set_fd(sock);
+  return OK(FileDescriptor, fd);
 }
 
-FileDescriptor::FileDescriptor(FileDescriptor &other) throw(
-    InvalidFileDescriptorException)
-    : _fd(other._fd) {
+Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
+  if (raw_fd < 0)
+    return ERR(FileDescriptor, errors::invalid_fd);
+  FileDescriptor *fd = new FileDescriptor();
+  fd->set_fd(raw_fd);
+  return OK(FileDescriptor, fd);
+}
+
+Result<FileDescriptor> FileDescriptor::move_from(FileDescriptor other) {
   if (other._fd < 0)
-    throw InvalidFileDescriptorException();
-  other._fd = -1;
+    return ERR(FileDescriptor, errors::invalid_fd);
+  FileDescriptor *fd = new FileDescriptor();
+  fd->set_fd(other._fd);
+  return OK(FileDescriptor, fd);
 }
 
-FileDescriptor &FileDescriptor::operator=(FileDescriptor other) throw(
-    InvalidFileDescriptorException) {
+Result<Void> FileDescriptor::operator=(FileDescriptor other) {
   if (this != &other) {
     if (_fd < 0)
-      throw InvalidFileDescriptorException();
+      return ERR(Void, errors::invalid_fd);
     _fd = other._fd;
     other._fd = -1;
   }
-  return *this;
+  return OK(Void, void_);
 }
 
 FileDescriptor::~FileDescriptor() {
@@ -56,21 +55,8 @@ FileDescriptor::~FileDescriptor() {
     close(_fd);
 }
 
-const int &FileDescriptor::operator*() const { return _fd; }
-
-bool FileDescriptor::set_blocking(const bool blocking) {
-  return fcntl(_fd, F_SETFL, blocking ? 0 : O_NONBLOCK) == 0;
-}
-
-void FileDescriptor::socket_bind(
-    struct in_addr addr,
-    unsigned short port) throw(AccessDeniedException,
-                               AddressNotAvailableException,
-                               InvalidFileDescriptorException,
-                               InvalidOperationException, AddressFaultException,
-                               AddressLoopException, NameTooLongException,
-                               NotFoundException, OutOfMemoryException,
-                               ReadOnlyFileSystemException) {
+Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
+                                         unsigned short port) {
   sockaddr_in _addr;
   std::memset(&_addr, 0, sizeof(_addr));
   _addr.sin_family = AF_INET;
@@ -80,88 +66,85 @@ void FileDescriptor::socket_bind(
       0) {
     switch (errno) {
     case EACCES:
-      throw AccessDeniedException();
+      return ERR(Void, errors::access_denied);
     case EADDRINUSE:
     case EADDRNOTAVAIL:
-      throw AddressNotAvailableException();
+      return ERR(Void, errors::addr_not_available);
     case EBADF:
     case ENOTSOCK:
-      throw InvalidFileDescriptorException();
+      return ERR(Void, errors::invalid_fd);
     case EINVAL:
-      throw InvalidOperationException();
+      return ERR(Void, errors::invalid_operation);
     case EFAULT:
-      throw AddressFaultException();
+      return ERR(Void, errors::address_fault);
     case ELOOP:
-      throw AddressLoopException();
+      return ERR(Void, errors::addr_loop);
     case ENAMETOOLONG:
-      throw NameTooLongException();
+      return ERR(Void, errors::name_too_long);
     case ENOENT:
     case ENOTDIR:
-      throw NotFoundException();
+      return ERR(Void, errors::not_found);
     case ENOMEM:
-      throw OutOfMemoryException();
+      return ERR(Void, errors::out_of_mem);
     case EROFS:
-      throw ReadOnlyFileSystemException();
+      return ERR(Void, errors::readonly_filesys);
     }
   }
+  return OK(Void, new Void);
 }
 
-void FileDescriptor::socket_listen(unsigned short backlog) throw(
-    AddressNotAvailableException, InvalidFileDescriptorException,
-    NotSupportedOperationException) {
+Result<Void> FileDescriptor::socket_listen(unsigned short backlog) {
   if (listen(_fd, backlog) < 0) {
     switch (errno) {
     case EADDRINUSE:
-      throw AddressNotAvailableException();
+      return ERR(Void, errors::addr_not_available);
     case EBADF:
     case ENOTSOCK:
-      throw InvalidFileDescriptorException();
+      return ERR(Void, errors::invalid_fd);
     case EOPNOTSUPP:
-      throw NotSupportedOperationException();
+      return ERR(Void, errors::not_supported);
     }
   }
+  return OK(Void, new Void);
 }
 
-FileDescriptor
-FileDescriptor::socket_accept(struct sockaddr *addr, socklen_t *len) throw(
-    TryAgainException, ConnectionAbortedException,
-    InvalidFileDescriptorException, std::invalid_argument,
-    AddressFaultException, InterruptedException, FdTooManyException,
-    OutOfMemoryException, NotSupportedOperationException,
-    AccessDeniedException) {
+Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
+                                                     socklen_t *len) {
   int fd = accept(_fd, addr, len);
   if (fd >= 0) {
-    FileDescriptor fd_(fd);
-    return fd_;
+    FileDescriptor *fd_ = new FileDescriptor();
+    fd_->set_fd(fd);
+    return OK(FileDescriptor, fd_);
   }
   switch (errno) {
   case EWOULDBLOCK:
-    throw TryAgainException();
+    return ERR(FileDescriptor, errors::try_again);
   case EBADF:
   case ENOTSOCK:
-    throw InvalidFileDescriptorException();
+    return ERR(FileDescriptor, errors::invalid_fd);
   case ECONNABORTED:
-    throw ConnectionAbortedException();
+    return ERR(FileDescriptor, errors::conn_aborted);
   case EFAULT:
-    throw AddressFaultException();
+    return ERR(FileDescriptor, errors::address_fault);
   case EINTR:
-    throw InterruptedException();
+    return ERR(FileDescriptor, errors::interrupted);
   case EINVAL:
-    throw std::invalid_argument(
+    return ERR(
+        FileDescriptor,
         "Socket is not listening for connections, or addrlen is invalid.");
   case EMFILE:
   case ENFILE:
-    throw FdTooManyException();
+    return ERR(FileDescriptor, errors::fd_too_many);
   case ENOBUFS:
   case ENOMEM:
-    throw OutOfMemoryException();
+    return ERR(FileDescriptor, errors::out_of_mem);
   case EOPNOTSUPP:
-    throw std::invalid_argument(
-        "The referenced socket is not of type SOCK_STREAM.");
+    return ERR(FileDescriptor,
+               "The referenced socket is not of type SOCK_STREAM.");
   case EPERM:
-    throw AccessDeniedException();
+    return ERR(FileDescriptor, errors::access_denied);
   default:
-    throw std::runtime_error("an unknown error occured during accept().");
+    return ERR(FileDescriptor, "an unknown error occured during accept().");
   }
 }
 

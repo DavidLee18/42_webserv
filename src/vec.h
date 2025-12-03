@@ -1,8 +1,7 @@
 #ifndef VEC_H
 #define VEC_H
+#include "result.h"
 #include <cstddef>
-#include <exception>
-#include <stdexcept>
 
 template <typename T> class Vec {
   T *_data;
@@ -42,27 +41,29 @@ public:
     new (_data + _size++) T(value);
   }
 
-  T pop() throw(std::out_of_range) {
+  Result<T> pop() {
     if (_size == 0)
-      throw std::out_of_range("Cannot pop from empty vector");
-    T value(_data[--_size]);
+      return ERR(T, "Cannot pop from empty vector");
+    T *value = new T(_data[--_size]);
     _data[_size].~T();
-    return value;
+    return OK(T, value);
   }
 
-  template <typename U> const T &find(const U &other) const {
+  template <typename U> const Result<T> find(const U &other) const {
     for (size_t i = 0; i < _size; ++i) {
       if (_data[i] == other)
-        return _data[i];
+        return OK(T, _data + i);
     }
-    throw std::runtime_error("not found");
+    return ERR(T, "not found");
   }
 
   size_t size() const { return _size; }
   size_t cap() const { return _cap; }
   bool empty() const { return _size == 0; }
 
-  const T &operator[](size_t index) const { return _data[index]; }
+  const Result<T> get(size_t index) const {
+    return index >= _size ? ERR(T, "Out of index") : OK(T, _data + index);
+  }
 };
 
 #endif // VEC_H

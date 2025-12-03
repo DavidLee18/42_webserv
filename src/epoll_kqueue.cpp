@@ -1,6 +1,3 @@
-//
-// Created by 이재현 on 2025-11-10.
-//
 #include "webserv.h"
 
 #ifdef __APPLE__
@@ -22,55 +19,44 @@ void KQueue::del_event(const FileDescriptor &fd,
   /* TODO */
 }
 #else
-Events::Events(const Vec<FileDescriptor> &all_events, const size_t size,
-               const epoll_event *events) throw(FdNotRegisteredException)
-    : _curr(0), _len(size),
-      _events(static_cast<Event *>(operator new(sizeof(Event) * size))) {
-  try {
-    for (size_t i = 0; i < size; i++) {
-      new ((void *)(_events + i)) Event(all_events.find(events[i].data.fd),
-                                        (events[i].events & EPOLLIN) == 1,
-                                        (events[i].events & EPOLLOUT) == 1,
-                                        (events[i].events & EPOLLRDHUP) == 1,
-                                        (events[i].events & EPOLLPRI) == 1,
-                                        (events[i].events & EPOLLERR) == 1,
-                                        (events[i].events & EPOLLHUP) == 1);
-    }
-    delete[] events;
-  } catch (std::exception) {
-    delete[] events;
-    throw FdNotRegisteredException();
+Result<Events> Events::init(const Vec<FileDescriptor> &all_events, size_t size,
+                            const epoll_event *events) {
+  Events *es = new Events();
+  es->_events = static_cast<Event *>(operator new(sizeof(Event) * size));
+  FileDescriptor *fd = NULL;
+  for (size_t i = 0; i < size; i++) {
+    TRY(Events, fd, all_events.find(events[i].data.fd))
+    new ((void *)(es->_events + i)) Event(fd, (events[i].events & EPOLLIN) == 1,
+                                          (events[i].events & EPOLLOUT) == 1,
+                                          (events[i].events & EPOLLRDHUP) == 1,
+                                          (events[i].events & EPOLLPRI) == 1,
+                                          (events[i].events & EPOLLERR) == 1,
+                                          (events[i].events & EPOLLHUP) == 1);
   }
+  delete[] events;
+  return OK(Events, es);
 }
 
 Events::~Events() {
-  for (size_t i = 0; i < _len; i++)
-    _events[i].~Event();
+  // for (size_t i = 0; i < _len; i++)
+  // _events[i].~Event();
   operator delete((void *)_events);
 }
 
 bool Events::is_end() const { return _curr >= _len; }
 
-Events &Events::operator++() throw(IteratorEndedException) {
-  if (_curr >= _len) {
-    throw IteratorEndedException();
-  }
+Result<Void> Events::operator++() {
+  if (_curr >= _len)
+    return ERR(Void, errors::iter_ended);
   ++_curr;
-  return *this;
+  return OK(Void, new Void);
 }
 
-const Event &Events::operator*() const throw(IteratorEndedException) {
+const Result<Event> Events::operator*() const {
   if (_curr >= _len) {
-    throw IteratorEndedException();
+    return ERR(Event, errors::iter_ended);
   }
-  return _events[_curr];
-}
-
-EPoll::EPoll(size_t size) throw(InvalidFileDescriptorException)
-    : _fd(epoll_create(size)), _events(), _size(size) {
-  if (*_fd == -1) {
-    throw InvalidFileDescriptorException();
-  }
+  return OK(Event, _events + _curr);
 }
 
 const FileDescriptor &

@@ -6,6 +6,7 @@
 #define WEBSERV_H
 
 #include "epoll_kqueue.h"
+#include "errors.h"
 #include <arpa/inet.h>
 #include <cerrno>
 #include <csignal>

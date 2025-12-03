@@ -1,8 +1,7 @@
 #ifndef FILE_DESCRIPTOR_H
 #define FILE_DESCRIPTOR_H
 
-#include "exceptions.h"
-#include <stdexcept>
+#include "result.h"
 #include <sys/socket.h>
 
 #ifdef __APPLE__
@@ -69,20 +68,11 @@ class Event;
 class FileDescriptor {
   int _fd;
 
+  void set_fd(int fd) { _fd = fd; }
+  FileDescriptor() { _fd = -1; }
+
 public:
-  /**
-   * @brief Constructs a FileDescriptor with the given file descriptor value.
-   *
-   * This constructor takes an integer representing a file descriptor and wraps
-   * it in the FileDescriptor class, ensuring proper management of the file
-   * descriptor. Throws an InvalidFileDescriptorException if the provided file
-   * descriptor is invalid.
-   *
-   * @param raw_fd An integer representing the file descriptor to manage.
-   * @throw InvalidFileDescriptorException if the provided file descriptor is
-   * invalid.
-   */
-  explicit FileDescriptor(int raw_fd) throw(InvalidFileDescriptorException);
+  static Result<FileDescriptor> from_raw(int);
 
   /**
    * @brief Create a new non-blocking IPv4 TCP socket and wrap it in a
@@ -126,11 +116,7 @@ public:
    * // Optionally set additional options, then bind/listen...
    * ```
    */
-  static FileDescriptor socket_new() throw(AccessDeniedException,
-                                           NotSupportedOperationException,
-                                           InvalidOperationException,
-                                           FdTooManyException,
-                                           OutOfMemoryException);
+  static Result<FileDescriptor> socket_new();
 
   /**
    * @brief Transfers ownership of a FileDescriptor from one instance to
@@ -148,7 +134,7 @@ public:
    * @throw InvalidFileDescriptorException if the provided FileDescriptor is
    * invalid or cannot be moved.
    */
-  FileDescriptor(FileDescriptor &other) throw(InvalidFileDescriptorException);
+  static Result<FileDescriptor> move_from(FileDescriptor);
 
   /**
    * @brief Transfers ownership of a FileDescriptor from one instance to
@@ -166,8 +152,7 @@ public:
    * @throw InvalidFileDescriptorException if the provided FileDescriptor is
    * invalid or cannot be moved.
    */
-  FileDescriptor &
-  operator=(FileDescriptor other) throw(InvalidFileDescriptorException);
+  Result<Void> operator=(FileDescriptor);
 
   /**
    * @brief Destructor that releases the owned file descriptor.
@@ -183,45 +168,6 @@ public:
    * Exception safety: no-throw.
    */
   ~FileDescriptor();
-
-  /**
-   * @brief Returns a const reference to the underlying file descriptor.
-   *
-   * Use this to get the raw integer file descriptor for interoperability
-   * with low-level system calls (e.g., read(2), write(2), epoll_ctl(2),
-   * kevent(2)). The returned reference remains valid for the lifetime of
-   * this FileDescriptor instance. Do not call close(2) on the value
-   * obtained via this operator; ownership and lifetime are managed by
-   * FileDescriptor.
-   *
-   * Thread-safety: not thread-safe if the same FileDescriptor instance is
-   * accessed concurrently.
-   *
-   * Exception safety: no-throw.
-   *
-   * @return Const reference to the managed file descriptor integer.
-   */
-  const int &operator*() const;
-
-  /**
-   * @brief Sets blocking or non-blocking mode on the underlying file
-   * descriptor.
-   *
-   * When @p blocking is false, the function enables O_NONBLOCK; when true,
-   * it clears O_NONBLOCK to restore blocking behavior. On failure, the
-   * descriptor's previous mode is left unchanged and errno is set by the
-   * underlying system calls (e.g., fcntl(2)).
-   *
-   * Thread-safety: not thread-safe if multiple threads manipulate the same
-   * FileDescriptor instance concurrently.
-   *
-   * Exception safety: no-throw.
-   *
-   * @param blocking If true, set blocking mode; if false, set non-blocking
-   * mode.
-   * @return True if the operation was successful, false otherwise.
-   */
-  bool set_blocking(bool blocking);
 
   /**
    * @brief Bind the underlying IPv4 socket to a specific address and port.
@@ -289,11 +235,7 @@ public:
    * // Now: listen(...);
    * ```
    */
-  void socket_bind(struct in_addr addr, unsigned short port) throw(
-      AccessDeniedException, AddressNotAvailableException,
-      InvalidFileDescriptorException, InvalidOperationException,
-      AddressFaultException, AddressLoopException, NameTooLongException,
-      NotFoundException, OutOfMemoryException, ReadOnlyFileSystemException);
+  Result<Void> socket_bind(struct in_addr addr, unsigned short port);
 
   /**
    * @brief Put the bound socket into a passive listening state.
@@ -345,17 +287,9 @@ public:
    * // Now ready to accept connections on *srv
    * ```
    */
-  void
-  socket_listen(unsigned short backlog) throw(AddressNotAvailableException,
-                                              InvalidFileDescriptorException,
-                                              NotSupportedOperationException);
+  Result<Void> socket_listen(unsigned short backlog);
 
-  FileDescriptor socket_accept(struct sockaddr *addr, socklen_t *len) throw(
-      TryAgainException, ConnectionAbortedException,
-      InvalidFileDescriptorException, std::invalid_argument,
-      AddressFaultException, InterruptedException, FdTooManyException,
-      OutOfMemoryException, NotSupportedOperationException,
-      AccessDeniedException);
+  Result<FileDescriptor> socket_accept(struct sockaddr *addr, socklen_t *len);
 
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {
@@ -367,6 +301,8 @@ public:
   }
   friend bool operator==(const int &lhs, const FileDescriptor &rhs);
   friend bool operator!=(const int &lhs, const FileDescriptor &rhs);
+
+  friend class EPoll;
 };
 
 #endif // FILE_DESCRIPTOR_H
