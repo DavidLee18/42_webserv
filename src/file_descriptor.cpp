@@ -37,6 +37,7 @@ Result<FileDescriptor> FileDescriptor::move_from(FileDescriptor other) {
     return ERR(FileDescriptor, errors::invalid_fd);
   FileDescriptor *fd = new FileDescriptor();
   fd->set_fd(other._fd);
+  other._fd = -1;
   return OK(FileDescriptor, fd);
 }
 
@@ -47,7 +48,7 @@ Result<Void> FileDescriptor::operator=(FileDescriptor other) {
     _fd = other._fd;
     other._fd = -1;
   }
-  return OK(Void, void_);
+  return OKV;
 }
 
 FileDescriptor::~FileDescriptor() {
@@ -90,7 +91,7 @@ Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
       return ERR(Void, errors::readonly_filesys);
     }
   }
-  return OK(Void, new Void);
+  return OKV;
 }
 
 Result<Void> FileDescriptor::socket_listen(unsigned short backlog) {
@@ -105,7 +106,7 @@ Result<Void> FileDescriptor::socket_listen(unsigned short backlog) {
       return ERR(Void, errors::not_supported);
     }
   }
-  return OK(Void, new Void);
+  return OKV;
 }
 
 Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,

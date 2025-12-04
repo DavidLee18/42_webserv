@@ -64,8 +64,13 @@ public:
   size_t cap() const { return _cap; }
   bool empty() const { return _size == 0; }
 
-  const Result<T> get(size_t index) const {
-    return index >= _size ? ERR(T, "Out of index") : OK(T, _data + index);
+  const Result<T *> get(size_t index) const {
+    if (index >= _size) {
+      return ERR(T, "Out of index");
+    }
+    T **res = new T *;
+    *res = _data + index;
+    OK(T, res);
   }
 };
 

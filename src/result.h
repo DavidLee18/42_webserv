@@ -24,8 +24,18 @@ template <typename T> struct Result {
     v = (r).val;                                                               \
   }
 
+#define TRYF(t, v, r, f)                                                       \
+  if ((r).err != NULL) {                                                       \
+    f return (Result<t>){.val = reinterpret_cast<t *>((r).val),                \
+                         .err = (r).err};                                      \
+  } else {                                                                     \
+    v = (r).val;                                                               \
+  }
+
 struct Void {};
 
-static Void *void_ = new Void;
+#define VOID new Void
+
+#define OKV OK(Void, VOID)
 
 #endif // RESULT_H

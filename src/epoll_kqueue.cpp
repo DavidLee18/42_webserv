@@ -18,14 +18,16 @@ void KQueue::del_event(const FileDescriptor &fd,
                        const Event &e) throw(InvalidFileDescriptorException) {
   /* TODO */
 }
-#else
+#else // LINUX
 Result<Events> Events::init(const Vec<FileDescriptor> &all_events, size_t size,
                             const epoll_event *events) {
   Events *es = new Events();
   es->_events = static_cast<Event *>(operator new(sizeof(Event) * size));
   for (size_t i = 0; i < size; i++) {
     const FileDescriptor **fd;
-    TRY(Events, fd, all_events.find(events[i].data.fd))
+    TRYF(Events, fd, all_events.find(events[i].data.fd),
+                     operator delete((void *)es->_events);
+         delete es;)
     new ((void *)(es->_events + i)) Event(
         *fd, (events[i].events & EPOLLIN) == 1,
         (events[i].events & EPOLLOUT) == 1,
