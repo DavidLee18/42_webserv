@@ -59,10 +59,29 @@ const Result<Event> Events::operator*() const {
   return OK(Event, _events + _curr);
 }
 
-const FileDescriptor &
-EPoll::add_fd(FileDescriptor fd, const Event &ev, const Option &op) throw(
-    InvalidOperationException, EPollLoopException, FdNotRegisteredException,
-    OutOfMemoryException, EPollFullException, NotSupportedOperationException) {
+Result<EPoll> EPoll::create(unsigned short sz) {
+  int fd = epoll_create(static_cast<int>(sz));
+  if (fd < 0) {
+    switch (fd) {
+    case EINVAL:
+      return ERR(EPoll, "the epoll size is zero");
+    case EMFILE:
+    case ENFILE:
+      return ERR(EPoll, errors::fd_too_many);
+    case ENOMEM:
+      return ERR(EPoll, errors::out_of_mem);
+    default:
+      return ERR(EPoll, "an unknown epoll error occured");
+    }
+  }
+  EPoll *ep = new EPoll();
+  ep->_size = sz;
+  TRY(EPoll, ep->_fd, FileDescriptor::from_raw(fd))
+  return OK(EPoll, ep);
+}
+
+const Result<FileDescriptor> EPoll::add_fd(FileDescriptor fd, const Event &ev,
+                                           const Option &op) {
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -84,27 +103,30 @@ EPoll::add_fd(FileDescriptor fd, const Event &ev, const Option &op) throw(
     event.events |= EPOLLWAKEUP;
   if (op.exclusive)
     event.events |= EPOLLEXCLUSIVE;
-  event.data.fd = *fd;
-  if (epoll_ctl(*_fd, EPOLL_CTL_ADD, *fd, &event) == -1) {
+  event.data.fd = fd._fd;
+  if (epoll_ctl(_fd->_fd, EPOLL_CTL_ADD, fd._fd, &event) == -1) {
     switch (errno) {
     case EEXIST:
-      throw InvalidOperationException();
+      return ERR(FileDescriptor, "this fd is already registered to this epoll");
     case EINVAL:
-      throw InvalidOperationException();
+      return ERR(FileDescriptor, errors::invalid_fd);
     case ELOOP:
-      throw EPollLoopException();
-    case ENOENT:
-      throw FdNotRegisteredException();
+      return ERR(FileDescriptor, errors::epoll_loop);
     case ENOMEM:
-      throw OutOfMemoryException();
+      return ERR(FileDescriptor, errors::out_of_mem);
     case ENOSPC:
-      throw EPollFullException();
+      return ERR(FileDescriptor, errors::epoll_full);
     case EPERM:
-      throw NotSupportedOperationException();
+      return ERR(FileDescriptor, errors::not_supported);
+    default:
+      return ERR(FileDescriptor,
+                 "an unknown error occured during EPOLL_CTL_ADD");
     }
   }
   _events.push(fd);
-  return _events[_events.size() - 1];
+  FileDescriptor *fd_in;
+  TRY(FileDescriptor, fd_in, _events.find(fd))
+  return OK(FileDescriptor, fd_in);
 }
 
 void EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,

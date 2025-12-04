@@ -3,6 +3,7 @@
 
 #include "file_descriptor.h"
 #include "vec.h"
+#include <cstddef>
 #include <iterator>
 
 #ifdef __APPLE__
@@ -159,15 +160,15 @@ public:
 class EPoll {
   FileDescriptor *_fd;
   Vec<FileDescriptor> _events;
-  size_t _size;
+  unsigned short _size;
   EPoll() : _fd(NULL), _events(), _size(0) {}
   Result<Void> init();
 
 public:
-  static Result<EPoll> epoll_new();
+  static Result<EPoll> create(unsigned short);
   Result<Events> wait(const int timeout_ms);
-  const Result<FileDescriptor *> add_fd(FileDescriptor, const Event &,
-                                        const Option &);
+  const Result<FileDescriptor> add_fd(FileDescriptor, const Event &,
+                                      const Option &);
   Result<Void> modify_fd(const FileDescriptor &, const Event &, const Option &);
   Result<Void> del_fd(const FileDescriptor &);
 };
