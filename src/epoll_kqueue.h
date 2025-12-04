@@ -147,10 +147,11 @@ class Events : public std::iterator<std::input_iterator_tag, Event, long,
 
 public:
   ~Events();
-  Result<Events> init(const Vec<FileDescriptor> &, size_t, const epoll_event *);
+  static Result<Events> init(const Vec<FileDescriptor> &, size_t,
+                             const epoll_event *);
   bool is_end() const;
   Result<Void> operator++();
-  const Result<Event> operator*() const;
+  Result<const Event *> operator*() const;
 };
 
 /**
@@ -167,8 +168,8 @@ class EPoll {
 public:
   static Result<EPoll> create(unsigned short);
   Result<Events> wait(const int timeout_ms);
-  const Result<FileDescriptor> add_fd(FileDescriptor, const Event &,
-                                      const Option &);
+  Result<const FileDescriptor *> add_fd(FileDescriptor, const Event &,
+                                        const Option &);
   Result<Void> modify_fd(const FileDescriptor &, const Event &, const Option &);
   Result<Void> del_fd(const FileDescriptor &);
 };

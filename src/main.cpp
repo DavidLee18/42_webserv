@@ -12,11 +12,32 @@ int main(const int argc, char *argv[]) {
 #ifdef __APPLE__
   KQueue k_queue(1000);
 #else
-  EPoll e_poll(1000);
-#endif
+  EPoll *ep;
+  Result<EPoll> rep = EPoll::create(1000);
+  if (rep.err != NULL) {
+    std::cerr << rep.err << std::endl;
+    return 1;
+  }
+  ep = rep.val;
+  // add the events
+  Result<Events> w;
   while (sig == 0) {
     std::cout << "Hello, World!" << std::endl;
+    w = ep->wait(100);
+    if (w.err != NULL) {
+      std::cerr << w.err << std::endl;
+      return 1;
+    }
+    for (Events *evs = w.val; !evs->is_end(); ++(*evs)) {
+      Result<const Event *> re = **evs;
+      if (re.err != NULL) {
+        std::cerr << re.err << std::endl;
+        return 1;
+      }
+      // process events
+    }
   }
+#endif
   return 0;
 }
 

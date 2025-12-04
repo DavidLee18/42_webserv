@@ -49,10 +49,13 @@ public:
     return OK(T, value);
   }
 
-  template <typename U> const Result<T> find(const U &other) const {
+  template <typename U> Result<const T *> find(const U &other) const {
     for (size_t i = 0; i < _size; ++i) {
-      if (_data[i] == other)
-        return OK(T, _data + i);
+      if (_data[i] == other) {
+        T *const *t = new const T *;
+        *t = _data + i;
+        return OK(T, t);
+      }
     }
     return ERR(T, "not found");
   }

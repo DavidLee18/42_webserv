@@ -10,7 +10,8 @@ set(SOURCE_FILES
         src/epoll_kqueue.cpp
         src/file_descriptor.cpp
         src/vec.h
-        src/exceptions.h
+        src/errors.h
+        src/result.h
         src/file_descriptor.h
         src/epoll_kqueue.h
 )
