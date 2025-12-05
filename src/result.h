@@ -38,4 +38,10 @@ struct Void {};
 
 #define OKV OK(Void, VOID)
 
+#define PANIC(e)                                                               \
+  if ((e).err != NULL) {                                                       \
+    std::cerr << (e).err << std::endl;                                         \
+    return 1;                                                                  \
+  }
+
 #endif // RESULT_H

@@ -7,7 +7,7 @@ int main(const int argc, char *argv[]) {
     std::cerr << "Usage: webserv <config_file>" << std::endl;
     return 1;
   }
-  (void)argv;
+  std::string config_path(argv[1]);
   signal(SIGINT, wrap_up);
 #ifdef __APPLE__
   KQueue k_queue(1000);
@@ -24,16 +24,11 @@ int main(const int argc, char *argv[]) {
   while (sig == 0) {
     std::cout << "Hello, World!" << std::endl;
     w = ep->wait(100);
-    if (w.err != NULL) {
-      std::cerr << w.err << std::endl;
-      return 1;
-    }
-    for (Events *evs = w.val; !evs->is_end(); ++(*evs)) {
-      Result<const Event *> re = **evs;
-      if (re.err != NULL) {
-        std::cerr << re.err << std::endl;
-        return 1;
-      }
+    PANIC(w)
+    for (Events evs = *w.val; !evs.is_end(); ++evs) {
+      Result<const Event *> re = *evs;
+      PANIC(re)
+      const Event **ev = re.val;
       // process events
     }
   }
