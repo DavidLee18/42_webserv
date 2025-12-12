@@ -1,29 +1,60 @@
 #include "WebserverConfig.hpp"
 
-// bool is_server(const std::string& line)
-// {
-//     std::size_t i = 1;
+WebserverConfig::WebserverConfig(std::string config_file_name)
+{
+    if (config_file_name == "../default.wbsrv")
+    {
+        std::ifstream file(config_file_name.c_str());
+        if (!file.is_open())
+        {
+            std::cerr   << "Error: Config file open err" << std::endl;
+            return;
+        }
+        if (!this->file_parsing(file))
+        {
+            std::cerr   << "error while parsing the file." << std::endl;
+            return;
+        }
+        file.close();
+        std::cout   << "Config file parsing succeeded." << std::endl;
+        return;
+    }
+    std::cerr   << "Error: This is not a config file." << std::endl;
+}
 
-//     if (line.empty())
-//         return false;
-//     if (line[0] != ':')
-//         return false;
-//     if (i >= line.size() || !std::isdigit(static_cast<unsigned char>(line[i])))
-//         return false;
-//     while (i < line.size() && std::isdigit(static_cast<unsigned char>(line[i])))
-//         ++i;
-//     if (i < line.size() && line[i] == ' ')
-//     {
-//         ++i;
-//         if (i < line.size() && line[i] == ' ')
-//             return false;
-//     }
-//     if (i >= line.size() || line[i] != '=')
-//         return false;
-//     ++i;
-//     return (i == line.size());
-// }
+bool WebserverConfig::file_parsing(std::ifstream& file)
+{
+    std::string line;
 
+    while (std::getline(file, line) && is_tab_or_space(line, 0))
+    {
+        if (line == "types =" || line == "types=")
+        {
+            if (!set_type_map(file))
+                return (false);
+        }
+        else if (is_ServerConfig(line))
+        {
+            if (!set_ServerConfig_map(file, line))
+                return (false);
+        }
+    }
+    if (this->type_map.empty() || this->default_mime.length() == 0)
+        return (false);
+    return (true);
+}
+    // for (std::map<std::string, std::string>::iterator it = this->type_map.begin();
+    //      it != this->type_map.end();
+    //      ++it)
+    // {
+    //     std::cout << it->first << " = " << it->second << std::endl;
+    // }
+    // std::cout << default_mime << std::endl;
+    
+WebserverConfig::~WebserverConfig() {};
+
+
+//type_map method
 std::vector<std::string> WebserverConfig::is_typeKey(const std::string& key)
 {
     int number_of_key = 0;
@@ -127,50 +158,54 @@ bool WebserverConfig::set_type_map(std::ifstream& file)
     return (true);
 }
 
-WebserverConfig::WebserverConfig(std::string config_file_name)
+
+
+
+//ServerConfig method
+bool WebserverConfig::is_ServerConfig(const std::string& line)
 {
-    if (config_file_name == "../default.wbsrv")
+    std::size_t i = 1;
+
+    if (line.empty())
+        return false;
+    if (line[0] != ':')
+        return false;
+    if (i >= line.size() || !std::isdigit(static_cast<unsigned char>(line[i])))
+        return false;
+    while (i < line.size() && std::isdigit(static_cast<unsigned char>(line[i])))
+        ++i;
+    if (i < line.size() && line[i] == ' ')
     {
-        std::ifstream file(config_file_name.c_str());
-        if (!file.is_open())
-        {
-            std::cerr   << "Error: Config file open err" << std::endl;
-            return;
-        }
-        if (!this->file_parsing(file))
-        {
-            std::cerr   << "error while parsing the file." << std::endl;
-            return;
-        }
-        file.close();
-        std::cout   << "Config file parsing succeeded." << std::endl;
-        return;
+        ++i;
+        if (i < line.size() && line[i] == ' ')
+            return false;
     }
-    std::cerr   << "Error: This is not a config file." << std::endl;
+    if (i >= line.size() || line[i] != '=')
+        return false;
+    ++i;
+    return (i == line.size());
 }
 
-WebserverConfig::~WebserverConfig() {};
-
-bool WebserverConfig::file_parsing(std::ifstream& file)
+bool WebserverConfig::set_ServerConfig_map(std::ifstream& file, const std::string& line)
 {
-    std::string line;
+    std::string key(line);
+    ServerConfig config(file);
 
-    while (std::getline(file, line) && is_tab_or_space(line, 0))
-    {
-        if (line == "types =" || line == "types=")
-            if (!set_type_map(file))
-                return (false);
-        // else if (is_server(line))
-            // ;
-    }
-    if (this->type_map.empty() || this->default_mime.length() == 0)
+    key = parse_ServerConfig_key(key);
+    if (config.getis_succes() != true)
         return (false);
-    for (std::map<std::string, std::string>::iterator it = this->type_map.begin();
-         it != this->type_map.end();
-         ++it)
-    {
-        std::cout << it->first << " = " << it->second << std::endl;
-    }
-    std::cout << default_mime << std::endl;
+    if (ServerConfig_map.find(key) != ServerConfig_map.end())
+        return (false);
+    ServerConfig_map[key] = config;
     return (true);
+}
+
+std::string WebserverConfig::parse_ServerConfig_key(std::string& key)
+{
+    std::size_t i = 1;
+    std::size_t start = i;
+
+    while (i < key.size() && std::isdigit(static_cast<unsigned char>(key[i])))
+        ++i;
+    return (key.substr(start, i - start));
 }
