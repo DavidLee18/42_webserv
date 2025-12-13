@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 bool is_have_space(const std::string& line);
 std::string trim_space(const std::string &s);

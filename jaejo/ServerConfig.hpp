@@ -45,14 +45,19 @@ class ServerConfig
         bool is_success;
         int serverResponseTime;
         std::vector<RouteRule> routes;
+        std::vector<std::string> err_line;
         
         bool set_ServerConfig(std::ifstream& file);
         //header method
         bool is_header(const std::string& line);
-        void parse_header_line(std::ifstream& file, std::string line);
-        bool is_header_line(std::ifstream& file, std::string line);
+        bool parse_header_line(std::ifstream& file, std::string line);
         bool is_header_key(std::string& key);
         bool parse_header_value(std::string value, const std::string key);
+        //serverResponseTime method
+        bool is_serverResponseTime(std::string& line);
+        void parse_serverResponseTime(std::string line);
+        //RouteRule method
+        bool is_RouteRule(std::string line);
     public:
         ServerConfig();
         ServerConfig(std::ifstream& file);
