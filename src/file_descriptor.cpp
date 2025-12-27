@@ -149,6 +149,39 @@ Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
   }
 }
 
+Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) {
+  ssize_t res = recv(_fd, buf, size, 0);
+  if (res < 0)
+    return ERR(ssize_t, "`recv` failed");
+  ssize_t *r = new ssize_t(res);
+  return OK(ssize_t, r);
+}
+
+Result<PartialString> FileDescriptor::try_read_to_end() {
+  std::stringstream ss;
+  char buf[BUFFER_SIZE];
+
+  Result<ssize_t> bytes = this->sock_recv(buf, BUFFER_SIZE);
+  while (bytes.err == NULL && *bytes.val > 0) {
+    ssize_t *bs;
+    TRY(PartialString, bs, bytes)
+    char *s = new char[*bs + 1];
+    s = std::strncpy(s, buf, *bs + 1);
+    if (!(ss << s))
+      return ERR(PartialString, "string concat failed");
+    delete[] s;
+    bytes = this->sock_recv(buf, BUFFER_SIZE);
+  }
+  if (bytes.err != NULL)
+    return ERR(PartialString, bytes.err);
+  char *s = new char[ss.str().length()];
+  s = std::strcpy(s, ss.str().c_str());
+  if (*bytes.val == 0) {
+    return OK(PartialString, PartialString::full(s));
+  }
+  return OK(PartialString, PartialString::partial(s));
+}
+
 bool operator==(const int &lhs, const FileDescriptor &rhs) {
   return lhs == rhs._fd;
 }

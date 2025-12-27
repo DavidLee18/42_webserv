@@ -23,6 +23,9 @@ const char *readonly_filesys =
     "is required to write.";
 const char *try_again = "Try again next time.";
 const char *conn_aborted = "A connection has been aborted.";
+const char *unknown_char = "Unknown character";
+const char *invalid_format = "Invalid Format";
+const char *too_long_num = "Too long numbers";
 } // namespace errors
 
 #endif // ERRORS_H
