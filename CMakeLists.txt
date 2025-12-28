@@ -14,5 +14,9 @@ set(SOURCE_FILES
         src/result.h
         src/file_descriptor.h
         src/epoll_kqueue.h
+        src/http_1_1.h
+        src/json.cpp
+        src/json.h
+        src/map_record.h
 )
 add_executable(42_webserv ${SOURCE_FILES})
