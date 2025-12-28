@@ -52,4 +52,21 @@ struct Json {
   };
 };
 
+#define TRY_PARSE(f, r, rs, i, s)                                              \
+  r = f(s + i);                                                                \
+  if (r.err == NULL) {                                                         \
+    rs.push(*r.val->key);                                                      \
+    delete r.val->key;                                                         \
+    i += r.val->value;                                                         \
+    continue;                                                                  \
+  }
+
+#define TRY_PARSE_REC(f, k, r, rs, i, s)                                       \
+  r = f(s + i);                                                                \
+  if (r.err == NULL) {                                                         \
+    rs.push(MapRecord<std::string, Json>(k, *r.val->key));                     \
+    delete r.val->key;                                                         \
+    i += r.val->value;                                                         \
+    continue;                                                                  \
+  }
 #endif

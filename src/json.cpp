@@ -66,6 +66,7 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_arr(const char *raw) {
           Json **jsp;
           TRYFREC(MapRecord, Json *, size_t, jsp, res, delete[] jss;)
           *(jss + (j * sizeof(Json))) = **jsp;
+          delete *jsp;
         }
         return OKREC(MapRecord, Json *, size_t,
                      Json::arr((Jsons){.ptr = jss, .size = recs.size()}),
@@ -75,47 +76,48 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_arr(const char *raw) {
     } else if (recs.empty() && raws[i] == ']')
       return OKREC(MapRecord, Json *, size_t,
                    Json::arr((Jsons){.ptr = NULL, .size = 0}), i + 1);
+    i++;
     while (std::isspace(raws[i]))
       i++;
-    Result<MapRecord<Json *, size_t> > rec = null_or_undef(raw + i);
-    if (rec.err == NULL) {
-      recs.push(*rec.val->key);
-      i += rec.val->value;
-      continue;
-    }
-    rec = _boolean(raw + i);
-    if (rec.err == NULL) {
-      recs.push(*rec.val->key);
-      i += rec.val->value;
-      continue;
-    }
-    rec = _num(raw + i);
-    if (rec.err == NULL) {
-      recs.push(*rec.val->key);
-      i += rec.val->value;
-      continue;
-    }
-    rec = _str(raw + i);
-    if (rec.err == NULL) {
-      recs.push(*rec.val->key);
-      i += rec.val->value;
-      continue;
-    }
-    rec = _arr(raw + i);
-    if (rec.err == NULL) {
-      recs.push(*rec.val->key);
-      i += rec.val->value;
-      continue;
-    }
-    rec = _obj(raw + i);
-    if (rec.err == NULL) {
-      recs.push(*rec.val->key);
-      i += rec.val->value;
-      continue;
-    }
+    Result<MapRecord<Json *, size_t> > TRY_PARSE(null_or_undef, rec, recs, i, raw)
+    TRY_PARSE(_boolean, rec, recs, i, raw)
+    TRY_PARSE(_num, rec, recs, i, raw)
+    TRY_PARSE(_str, rec, recs, i, raw)
+    TRY_PARSE(_arr, rec, recs, i, raw)
+    TRY_PARSE(_obj, rec, recs, i, raw)
     return ERREC(MapRecord, Json *, size_t, errors::invalid_format);
   }
   return ERREC(MapRecord, Json *, size_t, errors::invalid_format);
 }
 
-Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {}
+Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {
+  std::string raws(raw);
+
+  if (raws[0] != '{')
+    return ERREC(MapRecord, Json *, size_t, errors::invalid_format);
+  Vec<MapRecord<std::string, Json> > recs;
+  for (size_t i = 1; i < raws.length();) {
+    while (std::isspace(raws[i]))
+      i++;
+    Result<MapRecord<Json *, size_t> > rec = _str(raw + i);
+    MapRecord<Json *, size_t> *k;
+    TRYREC(MapRecord, Json *, size_t, k, rec);
+    i += k->value;
+    std::string _k(k->key->value._str.ptr);
+    delete k->key;
+    while (std::isspace(raws[i]))
+      i++;
+    if (raws[i] != ':')
+      return (delete k->key,
+              ERREC(MapRecord, Json *, size_t, errors::invalid_format));
+    i++;
+    while (std::isspace(raws[i]))
+      i++;
+    TRY_PARSE_REC(null_or_undef, _k, rec, recs, i, raw)
+    TRY_PARSE_REC(_boolean, _k, rec, recs, i, raw)
+    TRY_PARSE_REC(_num, _k, rec, recs, i, raw)
+    TRY_PARSE_REC(_str, _k, rec, recs, i, raw)
+    TRY_PARSE_REC(_arr, _k, rec, recs, i, raw)
+    TRY_PARSE_REC(_obj, _k, rec, recs, i, raw)
+  }
+}
