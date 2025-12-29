@@ -49,14 +49,14 @@ bool Events::is_end() const { return _curr >= _len; }
 
 Result<Void> Events::operator++() {
   if (_curr >= _len)
-    return ERR(Void, errors::iter_ended);
+    return ERR(Void, Errors::iter_ended);
   ++_curr;
   return OK(Void, new Void);
 }
 
 Result<const Event *> Events::operator*() const {
   if (_curr >= _len) {
-    return ERR(const Event *, errors::iter_ended);
+    return ERR(const Event *, Errors::iter_ended);
   }
   const Event **evpp = new const Event *;
   *evpp = _events + _curr;
@@ -71,9 +71,9 @@ Result<EPoll> EPoll::create(unsigned short sz) {
       return ERR(EPoll, "the epoll size is zero");
     case EMFILE:
     case ENFILE:
-      return ERR(EPoll, errors::fd_too_many);
+      return ERR(EPoll, Errors::fd_too_many);
     case ENOMEM:
-      return ERR(EPoll, errors::out_of_mem);
+      return ERR(EPoll, Errors::out_of_mem);
     default:
       return ERR(EPoll, "an unknown epoll error occured");
     }
@@ -114,15 +114,15 @@ Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
       return ERR(FileDescriptor *,
                  "this fd is already registered to this epoll");
     case EINVAL:
-      return ERR(FileDescriptor *, errors::invalid_fd);
+      return ERR(FileDescriptor *, Errors::invalid_fd);
     case ELOOP:
-      return ERR(FileDescriptor *, errors::epoll_loop);
+      return ERR(FileDescriptor *, Errors::epoll_loop);
     case ENOMEM:
-      return ERR(FileDescriptor *, errors::out_of_mem);
+      return ERR(FileDescriptor *, Errors::out_of_mem);
     case ENOSPC:
-      return ERR(FileDescriptor *, errors::epoll_full);
+      return ERR(FileDescriptor *, Errors::epoll_full);
     case EPERM:
-      return ERR(FileDescriptor *, errors::not_supported);
+      return ERR(FileDescriptor *, Errors::not_supported);
     default:
       return ERR(FileDescriptor *,
                  "an unknown error occured during EPOLL_CTL_ADD");
@@ -161,13 +161,13 @@ Result<Void> EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,
   if (epoll_ctl(_fd->_fd, EPOLL_CTL_MOD, fd._fd, &event) == -1) {
     switch (errno) {
     case EINVAL:
-      return ERR(Void, errors::invalid_operation);
+      return ERR(Void, Errors::invalid_operation);
     case ENOENT:
-      return ERR(Void, errors::fd_not_registered);
+      return ERR(Void, Errors::fd_not_registered);
     case ENOMEM:
-      return ERR(Void, errors::out_of_mem);
+      return ERR(Void, Errors::out_of_mem);
     case EPERM:
-      return ERR(Void, errors::not_supported);
+      return ERR(Void, Errors::not_supported);
     default:
       return ERR(Void, "an unknown error occured during EPOLL_CTL_MOD");
     }
@@ -181,13 +181,13 @@ Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
   if (epoll_ctl(_fd->_fd, EPOLL_CTL_DEL, fd._fd, &event) == -1) {
     switch (errno) {
     case EINVAL:
-      return ERR(Void, errors::invalid_operation);
+      return ERR(Void, Errors::invalid_operation);
     case ENOENT:
-      return ERR(Void, errors::fd_not_registered);
+      return ERR(Void, Errors::fd_not_registered);
     case ENOMEM:
-      return ERR(Void, errors::out_of_mem);
+      return ERR(Void, Errors::out_of_mem);
     case EPERM:
-      return ERR(Void, errors::not_supported);
+      return ERR(Void, Errors::not_supported);
     default:
       return ERR(Void, "an unknown error occured during EPOLL_CTL_DEL");
     }
@@ -199,7 +199,7 @@ Result<Events> EPoll::wait(const int timeout_ms) {
   struct epoll_event *events = new struct epoll_event[_size];
   int n = epoll_wait(_fd->_fd, events, _size, timeout_ms);
   if (n == -1) {
-    return ERR(Events, errors::interrupted);
+    return ERR(Events, Errors::interrupted);
   }
   return Events::init(_events, n, events);
 }

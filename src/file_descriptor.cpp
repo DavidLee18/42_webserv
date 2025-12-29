@@ -5,18 +5,18 @@ Result<FileDescriptor> FileDescriptor::socket_new() {
   if (sock < 0) {
     switch (errno) {
     case EACCES:
-      return ERR(FileDescriptor, errors::access_denied);
+      return ERR(FileDescriptor, Errors::access_denied);
     case EAFNOSUPPORT:
     case EPROTONOSUPPORT:
-      return ERR(FileDescriptor, errors::not_supported);
+      return ERR(FileDescriptor, Errors::not_supported);
     case EINVAL:
-      return ERR(FileDescriptor, errors::invalid_operation);
+      return ERR(FileDescriptor, Errors::invalid_operation);
     case EMFILE:
     case ENFILE:
-      return ERR(FileDescriptor, errors::fd_too_many);
+      return ERR(FileDescriptor, Errors::fd_too_many);
     case ENOBUFS:
     case ENOMEM:
-      return ERR(FileDescriptor, errors::out_of_mem);
+      return ERR(FileDescriptor, Errors::out_of_mem);
     }
   }
   FileDescriptor *fd = new FileDescriptor();
@@ -26,7 +26,7 @@ Result<FileDescriptor> FileDescriptor::socket_new() {
 
 Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
   if (raw_fd < 0)
-    return ERR(FileDescriptor, errors::invalid_fd);
+    return ERR(FileDescriptor, Errors::invalid_fd);
   FileDescriptor *fd = new FileDescriptor();
   fd->set_fd(raw_fd);
   return OK(FileDescriptor, fd);
@@ -34,7 +34,7 @@ Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
 
 Result<FileDescriptor> FileDescriptor::move_from(FileDescriptor other) {
   if (other._fd < 0)
-    return ERR(FileDescriptor, errors::invalid_fd);
+    return ERR(FileDescriptor, Errors::invalid_fd);
   FileDescriptor *fd = new FileDescriptor();
   fd->set_fd(other._fd);
   other._fd = -1;
@@ -44,7 +44,7 @@ Result<FileDescriptor> FileDescriptor::move_from(FileDescriptor other) {
 Result<Void> FileDescriptor::operator=(FileDescriptor other) {
   if (this != &other) {
     if (_fd < 0)
-      return ERR(Void, errors::invalid_fd);
+      return ERR(Void, Errors::invalid_fd);
     _fd = other._fd;
     other._fd = -1;
   }
@@ -67,28 +67,28 @@ Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
       0) {
     switch (errno) {
     case EACCES:
-      return ERR(Void, errors::access_denied);
+      return ERR(Void, Errors::access_denied);
     case EADDRINUSE:
     case EADDRNOTAVAIL:
-      return ERR(Void, errors::addr_not_available);
+      return ERR(Void, Errors::addr_not_available);
     case EBADF:
     case ENOTSOCK:
-      return ERR(Void, errors::invalid_fd);
+      return ERR(Void, Errors::invalid_fd);
     case EINVAL:
-      return ERR(Void, errors::invalid_operation);
+      return ERR(Void, Errors::invalid_operation);
     case EFAULT:
-      return ERR(Void, errors::address_fault);
+      return ERR(Void, Errors::address_fault);
     case ELOOP:
-      return ERR(Void, errors::addr_loop);
+      return ERR(Void, Errors::addr_loop);
     case ENAMETOOLONG:
-      return ERR(Void, errors::name_too_long);
+      return ERR(Void, Errors::name_too_long);
     case ENOENT:
     case ENOTDIR:
-      return ERR(Void, errors::not_found);
+      return ERR(Void, Errors::not_found);
     case ENOMEM:
-      return ERR(Void, errors::out_of_mem);
+      return ERR(Void, Errors::out_of_mem);
     case EROFS:
-      return ERR(Void, errors::readonly_filesys);
+      return ERR(Void, Errors::readonly_filesys);
     }
   }
   return OKV;
@@ -98,12 +98,12 @@ Result<Void> FileDescriptor::socket_listen(unsigned short backlog) {
   if (listen(_fd, backlog) < 0) {
     switch (errno) {
     case EADDRINUSE:
-      return ERR(Void, errors::addr_not_available);
+      return ERR(Void, Errors::addr_not_available);
     case EBADF:
     case ENOTSOCK:
-      return ERR(Void, errors::invalid_fd);
+      return ERR(Void, Errors::invalid_fd);
     case EOPNOTSUPP:
-      return ERR(Void, errors::not_supported);
+      return ERR(Void, Errors::not_supported);
     }
   }
   return OKV;
@@ -119,31 +119,31 @@ Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
   }
   switch (errno) {
   case EWOULDBLOCK:
-    return ERR(FileDescriptor, errors::try_again);
+    return ERR(FileDescriptor, Errors::try_again);
   case EBADF:
   case ENOTSOCK:
-    return ERR(FileDescriptor, errors::invalid_fd);
+    return ERR(FileDescriptor, Errors::invalid_fd);
   case ECONNABORTED:
-    return ERR(FileDescriptor, errors::conn_aborted);
+    return ERR(FileDescriptor, Errors::conn_aborted);
   case EFAULT:
-    return ERR(FileDescriptor, errors::address_fault);
+    return ERR(FileDescriptor, Errors::address_fault);
   case EINTR:
-    return ERR(FileDescriptor, errors::interrupted);
+    return ERR(FileDescriptor, Errors::interrupted);
   case EINVAL:
     return ERR(
         FileDescriptor,
         "Socket is not listening for connections, or addrlen is invalid.");
   case EMFILE:
   case ENFILE:
-    return ERR(FileDescriptor, errors::fd_too_many);
+    return ERR(FileDescriptor, Errors::fd_too_many);
   case ENOBUFS:
   case ENOMEM:
-    return ERR(FileDescriptor, errors::out_of_mem);
+    return ERR(FileDescriptor, Errors::out_of_mem);
   case EOPNOTSUPP:
     return ERR(FileDescriptor,
                "The referenced socket is not of type SOCK_STREAM.");
   case EPERM:
-    return ERR(FileDescriptor, errors::access_denied);
+    return ERR(FileDescriptor, Errors::access_denied);
   default:
     return ERR(FileDescriptor, "an unknown error occured during accept().");
   }
@@ -162,7 +162,7 @@ Result<PartialString> FileDescriptor::try_read_to_end() {
   char buf[BUFFER_SIZE];
 
   Result<ssize_t> bytes = this->sock_recv(buf, BUFFER_SIZE);
-  while (bytes.err == NULL && *bytes.val > 0) {
+  while (bytes.err.empty() && *bytes.val > 0) {
     ssize_t *bs;
     TRY(PartialString, bs, bytes)
     char *s = new char[*bs + 1];
@@ -172,7 +172,7 @@ Result<PartialString> FileDescriptor::try_read_to_end() {
     delete[] s;
     bytes = this->sock_recv(buf, BUFFER_SIZE);
   }
-  if (bytes.err != NULL)
+  if (!bytes.err.empty())
     return ERR(PartialString, bytes.err);
   char *s = new char[ss.str().length()];
   s = std::strcpy(s, ss.str().c_str());

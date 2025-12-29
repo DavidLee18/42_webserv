@@ -43,19 +43,21 @@ struct Json {
 
   class Parser {
     virtual void phantom() = 0;
-    public:
     static Result<MapRecord<Json *, size_t> > null_or_undef(const char *);
     static Result<MapRecord<Json *, size_t> > _boolean(const char *);
     static Result<MapRecord<Json *, size_t> > _num(const char *);
     static Result<MapRecord<Json *, size_t> > _str(const char *);
     static Result<MapRecord<Json *, size_t> > _arr(const char *);
     static Result<MapRecord<Json *, size_t> > _obj(const char *);
+
+  public:
+    static Result<MapRecord<Json *, size_t> > parse(const char *);
   };
 };
 
 #define TRY_PARSE(f, r, rs, i, s)                                              \
   r = f(s + i);                                                                \
-  if (r.err == NULL) {                                                         \
+  if (r.err.empty()) {                                                         \
     rs.push(*r.val->key);                                                      \
     delete r.val->key;                                                         \
     i += r.val->value;                                                         \
@@ -64,7 +66,7 @@ struct Json {
 
 #define TRY_PARSE_REC(f, k, r, rs, i, s)                                       \
   r = f(s + i);                                                                \
-  if (r.err == NULL) {                                                         \
+  if (r.err.empty()) {                                                         \
     rs.push(MapRecord<std::string, Json>(k, *r.val->key));                     \
     delete r.val->key;                                                         \
     i += r.val->value;                                                         \

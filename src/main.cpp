@@ -7,9 +7,34 @@ int main(const int argc, char *argv[]) {
     std::cerr << "Usage: webserv <config_file>" << std::endl;
     return 1;
   }
-  Result<MapRecord<Json *, size_t> > res = Json::Parser::null_or_undef(argv[1]);
+  Result<MapRecord<Json *, size_t> > res = Json::Parser::parse(argv[1]);
   PANIC(res)
-  std::cout << res.val->key->value._null << std::endl;
+  Json *js = res.val->key;
+  switch (js->type) {
+  case Json::JsonNull:
+    std::cout << "null" << std::endl;
+    break;
+  case Json::JsonBool:
+    std::cout << js->value._bool << std::endl;
+    break;
+  case Json::JsonNum:
+    std::cout << js->value.num << std::endl;
+    break;
+  case Json::JsonStr:
+    std::cout << js->value._str.ptr << std::endl;
+    break;
+  case Json::JsonArr:
+    std::cout << '[';
+    for (size_t i = 0; i < js->value.arr.size; i++) {
+      if (i != 0)
+        std::cout << ", ";
+      std::cout << "*";
+    }
+    std::cout << ']' << std::endl;
+    break;
+  case Json::JsonObj:
+    std::cout << "Object" << std::endl;
+  }
   return 0;
   // std::string config_path(argv[1]);
   // signal(SIGINT, wrap_up);

@@ -2,10 +2,11 @@
 #define RESULT_H
 
 #include <cstddef>
+#include <string>
 
 template <typename T> struct Result {
   T *val;
-  const char *err;
+  std::string err;
 
   ~Result() {
     if (val != NULL)
@@ -13,19 +14,19 @@ template <typename T> struct Result {
   }
 };
 
-#define OK(t, v) ((Result<t>){.val = v, .err = NULL})
+#define OK(t, v) ((Result<t>){.val = v, .err = ""})
 
 #define ERR(t, e) ((Result<t>){.val = NULL, .err = e})
 
 #define TRY(t, v, r)                                                           \
-  if ((r).err != NULL) {                                                       \
+  if (!(r).err.empty()) {                                                      \
     return (Result<t>){.val = reinterpret_cast<t *>((r).val), .err = (r).err}; \
   } else {                                                                     \
     v = (r).val;                                                               \
   }
 
 #define TRYF(t, v, r, f)                                                       \
-  if ((r).err != NULL) {                                                       \
+  if (!(r).err.empty()) {                                                      \
     f return (Result<t>){.val = reinterpret_cast<t *>((r).val),                \
                          .err = (r).err};                                      \
   } else {                                                                     \
@@ -39,7 +40,7 @@ struct Void {};
 #define OKV OK(Void, VOID)
 
 #define PANIC(e)                                                               \
-  if ((e).err != NULL) {                                                       \
+  if (!(e).err.empty()) {                                                      \
     std::cerr << (e).err << std::endl;                                         \
     return 1;                                                                  \
   }
