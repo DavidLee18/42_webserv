@@ -43,6 +43,7 @@ struct Json {
 
   class Parser {
     virtual void phantom() = 0;
+    public:
     static Result<MapRecord<Json *, size_t> > null_or_undef(const char *);
     static Result<MapRecord<Json *, size_t> > _boolean(const char *);
     static Result<MapRecord<Json *, size_t> > _num(const char *);

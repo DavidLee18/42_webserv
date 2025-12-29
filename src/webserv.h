@@ -11,6 +11,7 @@
 #include "epoll_kqueue.h"
 #include "errors.h"
 #include "http_1_1.h"
+#include "json.h"
 #include <arpa/inet.h>
 #include <cerrno>
 #include <csignal>

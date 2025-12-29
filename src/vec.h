@@ -49,28 +49,28 @@ public:
     return OK(T, value);
   }
 
-  template <typename U> Result<const T *> find(const U &other) const {
+  template <typename U> Result<T *> find(const U &other) const {
     for (size_t i = 0; i < _size; ++i) {
       if (_data[i] == other) {
-        T *const *t = new const T *;
+        T **t = new T *;
         *t = _data + i;
-        return OK(T, t);
+        return OK(T *, t);
       }
     }
-    return ERR(T, "not found");
+    return ERR(T *, "not found");
   }
 
   size_t size() const { return _size; }
   size_t cap() const { return _cap; }
   bool empty() const { return _size == 0; }
 
-  const Result<T *> get(size_t index) const {
+  Result<T *> get(size_t index) const {
     if (index >= _size) {
-      return ERR(T, "Out of index");
+      return ERR(T *, "Out of index");
     }
     T **res = new T *;
     *res = _data + index;
-    OK(T, res);
+    return OK(T *, res);
   }
 };
 

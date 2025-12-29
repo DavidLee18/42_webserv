@@ -65,7 +65,7 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_arr(const char *raw) {
       jss = new Json[recs.size()];
       size_t j;
       for (j = 0; j < recs.size(); j++) {
-        const Result<Json *> res = recs.get(j);
+        Result<Json *> res = recs.get(j);
         Json **jsp;
         TRYFREC(MapRecord, Json *, size_t, jsp, res, delete[] jss;)
         *(jss + (j * sizeof(Json))) = **jsp;
@@ -109,7 +109,7 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {
       rs = reinterpret_cast<MapRecord<std::string, Json> *>(operator new(
           sizeof(MapRecord<std::string, Json>) * recs.size()));
       for (size_t j = 0; j < recs.size(); j++) {
-        const Result<MapRecord<std::string, Json> *> r = recs.get(j);
+        Result<MapRecord<std::string, Json> *> r = recs.get(j);
         MapRecord<std::string, Json> **_r;
         TRYFREC(MapRecord, Json *, size_t, _r, r, operator delete(rs);)
         *(rs + (j * sizeof(MapRecord<std::string, Json>))) = **_r;
