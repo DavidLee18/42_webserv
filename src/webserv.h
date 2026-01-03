@@ -15,6 +15,7 @@
 #include <arpa/inet.h>
 #include <cerrno>
 #include <csignal>
+#include <cstdlib>
 #include <cstring>
 #include <dirent.h>
 #include <fcntl.h>

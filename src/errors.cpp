@@ -26,3 +26,4 @@ const std::string Errors::conn_aborted = "A connection has been aborted.";
 const std::string Errors::unknown_char = "Unknown character";
 const std::string Errors::invalid_format = "Invalid Format";
 const std::string Errors::too_long_num = "Too long numbers";
+const std::string Errors::out_of_rng = "value out of range";
