@@ -71,15 +71,15 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_boolean(const char *raw) {
   return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
 }
 
-Result<MapRecord<Json *, size_t> > Json::Parser::_num(const char *raw) {
+Result<MapRecord<Json *, size_t> > Json::Parser::_num(const char *raw, char end) {
   char *endptr;
   errno = 0;
   long l = std::strtol(raw, &endptr, 10);
-  if (endptr != raw && *endptr == '\0' && errno != ERANGE)
+  if (endptr != raw && *endptr == end && errno != ERANGE)
     return OK_REC(MapRecord, Json *, size_t,
                   Json::num(static_cast<long double>(l)), std::strlen(raw));
   long double ld = std::strtold(raw, &endptr);
-  if (endptr == raw || *endptr != '\0')
+  if (endptr == raw || *endptr != end)
     return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
   if (errno == ERANGE)
     return ERR_REC(MapRecord, Json *, size_t, Errors::out_of_rng);
@@ -94,8 +94,11 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_str(const char *raw) {
   const size_t pos = raws.find("\"", 1);
   if (pos == std::string::npos)
     return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
-  char *str = new char[pos - 1];
-  str = std::strncpy(str, raw + 1, pos - 1);
+  char *cs = new char[pos];
+  cs = std::strncpy(cs, raw + 1, pos - 1);
+  cs[pos - 1] = '\0';
+  std::string str(cs);
+  delete[] cs;
   return OK_REC(MapRecord, Json *, size_t, Json::str(str), pos + 1);
 }
 
@@ -113,20 +116,27 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_arr(const char *raw) {
             (static_cast<size_t>(raws[i] == ']'))) {
     case 1:
       return OK_REC(MapRecord, Json *, size_t, Json::arr(recs), i + 1);
+    case 2:
+      i++;
+      break;
+    case 4:
+      break;
     case 5:
       return OK_REC(MapRecord, Json *, size_t, Json::arr(recs), i + 1);
     default:
       return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
     }
-    i++;
     while (std::isspace(raws[i]))
       i++;
-    Result<MapRecord<Json *, size_t> > TRY_PARSE(
-        null_or_undef, rec, recs, i, raw) TRY_PARSE(_boolean, rec, recs, i, raw)
-        TRY_PARSE(_num, rec, recs, i, raw) TRY_PARSE(_str, rec, recs, i, raw)
-            TRY_PARSE(_arr, rec, recs, i, raw)
-                TRY_PARSE(_obj, rec, recs, i, raw) return ERR_REC(
-                    MapRecord, Json *, size_t, Errors::invalid_format);
+    TRY_PARSE(null_or_undef, rec, recs, i, raw)
+    TRY_PARSE(_boolean, rec1, recs, i, raw)
+    TRY_PARSE_NUM(_num, rec2_0, recs, i, raw, ' ')
+    TRY_PARSE_NUM(_num, rec2, recs, i, raw, ',')
+    TRY_PARSE_NUM(_num, rec2_1, recs, i, raw, ']')
+    TRY_PARSE(_str, rec3, recs, i, raw)
+    TRY_PARSE(_arr, rec4, recs, i, raw)
+    TRY_PARSE(_obj, rec5, recs, i, raw)
+    return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
   }
   return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
 }
@@ -168,7 +178,7 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {
       i++;
     TRY_PARSE_REC(null_or_undef, _k, rec, recs, i, raw)
     TRY_PARSE_REC(_boolean, _k, rec, recs, i, raw)
-    TRY_PARSE_REC(_num, _k, rec, recs, i, raw)
+    // TRY_PARSE_REC(_num, _k, rec, recs, i, raw)
     TRY_PARSE_REC(_str, _k, rec, recs, i, raw)
     TRY_PARSE_REC(_arr, _k, rec, recs, i, raw)
     TRY_PARSE_REC(_obj, _k, rec, recs, i, raw)
@@ -177,7 +187,7 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {
   return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
 }
 
-Result<MapRecord<Json *, size_t> > Json::Parser::parse(const char *raw) {
+Result<MapRecord<Json *, size_t> > Json::Parser::parse(const char *raw, char num_end) {
   std::string raws(raw);
   Result<MapRecord<Json *, size_t> > res = null_or_undef(raw);
   if (res.error().empty() && !raws[res.value()->value])
@@ -187,7 +197,7 @@ Result<MapRecord<Json *, size_t> > Json::Parser::parse(const char *raw) {
   if (res1.error().empty() && !raws[res1.value()->value])
     return OK_REC(MapRecord, Json *, size_t, res1.value()->key,
                   res1.value()->value);
-  Result<MapRecord<Json *, size_t> > res2 = _num(raw);
+  Result<MapRecord<Json *, size_t> > res2 = _num(raw, num_end);
   if (res2.error().empty() && !raws[res2.value()->value])
     return OK_REC(MapRecord, Json *, size_t, res2.value()->key,
                   res2.value()->value);

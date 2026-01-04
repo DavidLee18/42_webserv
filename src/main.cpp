@@ -7,7 +7,7 @@ int main(const int argc, char *argv[]) {
     std::cerr << "Usage: webserv <config_file>" << std::endl;
     return 1;
   }
-  Result<MapRecord<Json *, size_t> > res = Json::Parser::parse(argv[1]);
+  Result<MapRecord<Json *, size_t> > res = Json::Parser::parse(argv[1], '\0');
   PANIC(res)
   Json *js = res.value()->key;
   std::cout << *js << std::endl;

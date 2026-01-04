@@ -30,26 +30,50 @@ public:
   Json() : type(JsonNull), value((JsonValue){._null = NULL}) {}
   Json(JsonType ty, JsonValue val) : type(ty), value(val) {}
   Json(const Json &other);
+  ~Json() {
+    switch (type) {
+    case JsonStr:
+      delete value._str;
+      break;
+    case JsonArr:
+      delete value.arr;
+      break;
+    case JsonObj:
+      delete value.obj;
+      break;
+    default:
+      break;
+    }
+  }
   const JsonType &ty() { return type; }
   const JsonValue &val() { return value; }
   friend std::ostream &operator<<(std::ostream &os, Json &js);
-  
-class Parser {
+
+  class Parser {
     virtual void phantom() = 0;
     static Result<MapRecord<Json *, size_t> > null_or_undef(const char *);
     static Result<MapRecord<Json *, size_t> > _boolean(const char *);
-    static Result<MapRecord<Json *, size_t> > _num(const char *);
+    static Result<MapRecord<Json *, size_t> > _num(const char *, char end);
     static Result<MapRecord<Json *, size_t> > _str(const char *);
     static Result<MapRecord<Json *, size_t> > _arr(const char *);
     static Result<MapRecord<Json *, size_t> > _obj(const char *);
 
   public:
-    static Result<MapRecord<Json *, size_t> > parse(const char *);
+    static Result<MapRecord<Json *, size_t> > parse(const char *, char);
   };
 };
 
 #define TRY_PARSE(f, r, rs, i, s)                                              \
-  r = f(s + i);                                                                \
+  Result<MapRecord<Json *, size_t> > r = f(s + i);                              \
+  if (r.error().empty()) {                                                     \
+    rs.push(*r.value()->key);                                                  \
+    delete r.value()->key;                                                     \
+    i += r.value()->value;                                                     \
+    continue;                                                                  \
+  }
+
+#define TRY_PARSE_NUM(f, r, rs, i, s, ed)                                      \
+  Result<MapRecord<Json *, size_t> > r = f(s + i, ed);                          \
   if (r.error().empty()) {                                                     \
     rs.push(*r.value()->key);                                                  \
     delete r.value()->key;                                                     \
