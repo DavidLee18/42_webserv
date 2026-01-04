@@ -10,14 +10,11 @@ template <typename T> class Result {
   std::string err;
 
 public:
-  Result(T *v, std::string e) : val(v), err(e) {
-    std::cout << "Result(" << v << ", \"" << e << "\")" << std::endl;
-  }
+  Result(T *v, std::string e) : val(v), err(e) {}
   const T *const value() { return val; }
   const std::string &error() { return err; }
 
   ~Result() {
-    std::cout << "~Result(" << val << ", \"" << err << "\")" << std::endl;
     if (val != NULL)
       delete val;
   }
@@ -27,18 +24,18 @@ public:
 
 #define ERR(t, e) (Result<t>(NULL, e))
 
-#define TRY(t, v, r)                                                           \
-  if (!(r).err.empty()) {                                                      \
-    return (Result<t>(reinterpret_cast<t *>((r).val), (r).err));               \
+#define TRY(t, vt, v, r)                                                       \
+  if (!(r).error().empty()) {                                                  \
+    return Result<t>(NULL, (r).error());                                       \
   } else {                                                                     \
-    v = (r).val;                                                               \
+    v = const_cast<vt *>((r).value());                                         \
   }
 
-#define TRYF(t, v, r, f)                                                       \
-  if (!(r).err.empty()) {                                                      \
-    f return (Result<t>(reinterpret_cast<t *>((r).val), (r).err));             \
+#define TRYF(t, vt, v, r, f)                                                   \
+  if (!(r).error().empty()) {                                                  \
+    f return Result<t>(NULL, (r).error());                                     \
   } else {                                                                     \
-    v = (r).val;                                                               \
+    v = const_cast<vt *>((r).value());                                         \
   }
 
 struct Void {};
@@ -48,8 +45,8 @@ struct Void {};
 #define OKV OK(Void, VOID)
 
 #define PANIC(e)                                                               \
-  if (!(e).err.empty()) {                                                      \
-    std::cerr << (e).err << std::endl;                                         \
+  if (!(e).error().empty()) {                                                  \
+    std::cerr << (e).error() << std::endl;                                     \
     return 1;                                                                  \
   }
 

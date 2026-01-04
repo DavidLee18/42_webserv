@@ -88,6 +88,18 @@ public:
     *res = _data + index;
     return OK(T *, res);
   }
+
+  friend std::ostream &operator<<(std::ostream &os, Vec<T> &vec) {
+    os << '[';
+    for (size_t i = 0; i < vec._size; i++) {
+      if (i != 0) {
+        os << ", ";
+      }
+      os << vec._data[i];
+    }
+    os << ']';
+    return os;
+  }
 };
 
 #endif // VEC_H

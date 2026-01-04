@@ -25,8 +25,8 @@ Result<Events> Events::init(const Vec<FileDescriptor> &all_events, size_t size,
   es->_events = static_cast<Event *>(operator new(sizeof(Event) * size));
   for (size_t i = 0; i < size; i++) {
     FileDescriptor **fd;
-    TRYF(Events, fd, all_events.find(events[i].data.fd),
-                     operator delete((void *)es->_events);
+    TRYF(Events, FileDescriptor *, fd, all_events.find(events[i].data.fd),
+                                       operator delete((void *)es->_events);
          delete es;)
     new ((void *)(es->_events + i)) Event(
         *fd, (events[i].events & EPOLLIN) == 1,
@@ -80,7 +80,7 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   }
   EPoll *ep = new EPoll();
   ep->_size = sz;
-  TRY(EPoll, ep->_fd, FileDescriptor::from_raw(fd))
+  TRY(EPoll, FileDescriptor, ep->_fd, FileDescriptor::from_raw(fd))
   return OK(EPoll, ep);
 }
 
@@ -130,7 +130,7 @@ Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   }
   _events.push(fd);
   FileDescriptor **fd_in;
-  TRY(FileDescriptor *, fd_in, _events.find(fd))
+  TRY(FileDescriptor *, FileDescriptor *, fd_in, _events.find(fd))
   return OK(FileDescriptor *, fd_in);
 }
 

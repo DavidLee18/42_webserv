@@ -32,8 +32,9 @@ public:
   Json(const Json &other);
   const JsonType &ty() { return type; }
   const JsonValue &val() { return value; }
-
-  class Parser {
+  friend std::ostream &operator<<(std::ostream &os, Json &js);
+  
+class Parser {
     virtual void phantom() = 0;
     static Result<MapRecord<Json *, size_t> > null_or_undef(const char *);
     static Result<MapRecord<Json *, size_t> > _boolean(const char *);

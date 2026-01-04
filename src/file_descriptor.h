@@ -13,7 +13,7 @@ class Option;
 #endif
 
 class Event;
-struct PartialString;
+class PartialString;
 
 class FileDescriptor {
   int _fd;

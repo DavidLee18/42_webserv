@@ -162,9 +162,9 @@ Result<PartialString> FileDescriptor::try_read_to_end() {
   char buf[BUFFER_SIZE];
 
   Result<ssize_t> bytes = this->sock_recv(buf, BUFFER_SIZE);
-  while (bytes.err.empty() && *bytes.val > 0) {
+  while (bytes.error().empty() && *bytes.value() > 0) {
     ssize_t *bs;
-    TRY(PartialString, bs, bytes)
+    TRY(PartialString, ssize_t, bs, bytes)
     char *s = new char[*bs + 1];
     s = std::strncpy(s, buf, *bs + 1);
     if (!(ss << s))
@@ -172,11 +172,11 @@ Result<PartialString> FileDescriptor::try_read_to_end() {
     delete[] s;
     bytes = this->sock_recv(buf, BUFFER_SIZE);
   }
-  if (!bytes.err.empty())
-    return ERR(PartialString, bytes.err);
+  if (!bytes.error().empty())
+    return ERR(PartialString, bytes.error());
   char *s = new char[ss.str().length()];
   s = std::strcpy(s, ss.str().c_str());
-  if (*bytes.val == 0) {
+  if (*bytes.value() == 0) {
     return OK(PartialString, PartialString::full(s));
   }
   return OK(PartialString, PartialString::partial(s));

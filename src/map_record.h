@@ -11,20 +11,18 @@ template <typename K, typename V> struct MapRecord {
 
 #define ERR_REC(t, t1, t2, e) (Result<t<t1, t2> >(NULL, e))
 
-#define TRY_REC(t, t1, t2, v, r)                                               \
-  if (!(r).err.empty()) {                                                      \
-    return (                                                                   \
-        Result<t<t1, t2> >(reinterpret_cast<t<t1, t2> *>((r).val), (r).err));   \
+#define TRY_REC(t, t1, t2, vt, vt1, vt2, v, r)                                 \
+  if (!(r).error().empty()) {                                                  \
+    return (Result<t<t1, t2> >(NULL, (r).error()));                            \
   } else {                                                                     \
-    v = (r).val;                                                               \
+    v = const_cast<vt<vt1, vt2> *>((r).value());                               \
   }
 
-#define TRYF_REC(t, t1, t2, v, r, f)                                           \
-  if (!(r).err.empty()) {                                                      \
-    f return (                                                                 \
-        Result<t<t1, t2> >(reinterpret_cast<t<t1, t2> *>((r).val), (r).err));  \
+#define TRYF_REC(t, t1, t2, vt, vt1, vt2, v, r, f)                             \
+  if (!(r).error().empty()) {                                                  \
+    f return (Result<t<t1, t2> >(NULL, (r).error()));                          \
   } else {                                                                     \
-    v = (r).val;                                                               \
+    v = const_cast<vt<vt1, vt2> *>((r).value());                               \
   }
 
 #endif

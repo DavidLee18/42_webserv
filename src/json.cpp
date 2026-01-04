@@ -112,21 +112,9 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_arr(const char *raw) {
             (static_cast<size_t>(raws[i] == ',') << 1) +
             (static_cast<size_t>(raws[i] == ']'))) {
     case 1:
-      Json *jss;
-      jss = new Json[recs.size()];
-      size_t j;
-      for (j = 0; j < recs.size(); j++) {
-        Result<Json *> res = recs.get(j);
-        Json **jsp;
-        TRYF_REC(MapRecord, Json *, size_t, jsp, res, delete[] jss;)
-        *(jss + (j * sizeof(Json))) = **jsp;
-        delete *jsp;
-      }
-      return OK_REC(MapRecord, Json *, size_t,
-                    Json::arr((Jsons){.ptr = jss, .size = recs.size()}), i + 1);
+      return OK_REC(MapRecord, Json *, size_t, Json::arr(recs), i + 1);
     case 5:
-      return OK_REC(MapRecord, Json *, size_t,
-                    Json::arr((Jsons){.ptr = NULL, .size = 0}), i + 1);
+      return OK_REC(MapRecord, Json *, size_t, Json::arr(recs), i + 1);
     default:
       return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
     }
@@ -156,21 +144,9 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {
             (static_cast<size_t>(raws[i] == ',') << 1) +
             (static_cast<size_t>(raws[i] == ']'))) {
     case 1:
-      MapRecord<std::string, Json> *rs;
-      rs = reinterpret_cast<MapRecord<std::string, Json> *>(operator new(
-          sizeof(MapRecord<std::string, Json>) * recs.size()));
-      for (size_t j = 0; j < recs.size(); j++) {
-        Result<MapRecord<std::string, Json> *> r = recs.get(j);
-        MapRecord<std::string, Json> **_r;
-        TRYF_REC(MapRecord, Json *, size_t, _r, r, operator delete(rs);)
-        *(rs + (j * sizeof(MapRecord<std::string, Json>))) = **_r;
-        delete *_r;
-      }
-      return OK_REC(MapRecord, Json *, size_t,
-                    Json::obj((Map){.ptr = rs, .size = recs.size()}), i + 1);
+      return OK_REC(MapRecord, Json *, size_t, Json::obj(recs), i + 1);
     case 5:
-      return OK_REC(MapRecord, Json *, size_t,
-                    Json::obj((Map){.ptr = NULL, .size = 0}), i + 1);
+      return OK_REC(MapRecord, Json *, size_t, Json::obj(recs), i + 1);
     default:
       return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
     }
@@ -178,9 +154,9 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {
       i++;
     Result<MapRecord<Json *, size_t> > rec = _str(raw + i);
     MapRecord<Json *, size_t> *k;
-    TRY_REC(MapRecord, Json *, size_t, k, rec);
+    TRY_REC(MapRecord, Json *, size_t, MapRecord, Json *, size_t, k, rec);
     i += k->value;
-    std::string _k(k->key->value._str.ptr);
+    std::string _k(*k->key->value._str);
     delete k->key;
     while (std::isspace(raws[i]))
       i++;
@@ -201,31 +177,54 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {
   return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
 }
 
-Result<MapRecord<Json *, size_t>> Json::Parser::parse(const char *raw) {
+Result<MapRecord<Json *, size_t> > Json::Parser::parse(const char *raw) {
   std::string raws(raw);
-  Result<MapRecord<Json *, size_t>> res = null_or_undef(raw);
-  if (res.err.empty() && !raws[res.val->value])
-    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
-                  res.val->value);
-  res = _boolean(raw);
-  if (res.err.empty() && !raws[res.val->value])
-    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
-                  res.val->value);
-  res = _num(raw);
-  if (res.err.empty() && !raws[res.val->value])
-    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
-                  res.val->value);
-  res = _str(raw);
-  if (res.err.empty() && !raws[res.val->value])
-    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
-                  res.val->value);
-  res = _arr(raw);
-  if (res.err.empty() && !raws[res.val->value])
-    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
-                  res.val->value);
-  res = _obj(raw);
-  if (res.err.empty() && !raws[res.val->value])
-    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
-                  res.val->value);
+  Result<MapRecord<Json *, size_t> > res = null_or_undef(raw);
+  if (res.error().empty() && !raws[res.value()->value])
+    return OK_REC(MapRecord, Json *, size_t, res.value()->key,
+                  res.value()->value);
+  Result<MapRecord<Json *, size_t> > res1 = _boolean(raw);
+  if (res1.error().empty() && !raws[res1.value()->value])
+    return OK_REC(MapRecord, Json *, size_t, res1.value()->key,
+                  res1.value()->value);
+  Result<MapRecord<Json *, size_t> > res2 = _num(raw);
+  if (res2.error().empty() && !raws[res2.value()->value])
+    return OK_REC(MapRecord, Json *, size_t, res2.value()->key,
+                  res2.value()->value);
+  Result<MapRecord<Json *, size_t> > res3 = _str(raw);
+  if (res3.error().empty() && !raws[res3.value()->value])
+    return OK_REC(MapRecord, Json *, size_t, res3.value()->key,
+                  res3.value()->value);
+  Result<MapRecord<Json *, size_t> > res4 = _arr(raw);
+  if (res4.error().empty() && !raws[res4.value()->value])
+    return OK_REC(MapRecord, Json *, size_t, res4.value()->key,
+                  res4.value()->value);
+  Result<MapRecord<Json *, size_t> > res5 = _obj(raw);
+  if (res5.error().empty() && !raws[res5.value()->value])
+    return OK_REC(MapRecord, Json *, size_t, res5.value()->key,
+                  res5.value()->value);
   return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_json);
+}
+
+std::ostream &operator<<(std::ostream &os, Json &js) {
+  switch (js.type) {
+  case Json::JsonNull:
+    os << "null";
+    break;
+  case Json::JsonBool:
+    os << js.value._bool;
+    break;
+  case Json::JsonNum:
+    os << js.value.num;
+    break;
+  case Json::JsonStr:
+    os << *js.value._str;
+    break;
+  case Json::JsonArr:
+    os << "JsonArr " << *js.value.arr;
+    break;
+  case Json::JsonObj:
+    os << "Object";
+  }
+  return os;
 }
