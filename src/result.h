@@ -5,13 +5,16 @@
 #include <iostream>
 #include <string>
 
-template <typename T> struct Result {
+template <typename T> class Result {
   T *val;
   std::string err;
 
+public:
   Result(T *v, std::string e) : val(v), err(e) {
     std::cout << "Result(" << v << ", \"" << e << "\")" << std::endl;
   }
+  const T *const value() { return val; }
+  const std::string &error() { return err; }
 
   ~Result() {
     std::cout << "~Result(" << val << ", \"" << err << "\")" << std::endl;

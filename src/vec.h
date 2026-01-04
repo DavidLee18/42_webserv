@@ -28,6 +28,22 @@ public:
   explicit Vec(const size_t capacity)
       : _data(operator new(capacity * sizeof(T))), _size(0), _cap(capacity) {}
 
+  Vec(const Vec<T> &other) {
+    _cap = other._cap;
+    _size = other._size;
+
+    if (other._data != NULL && other._cap != 0) {
+      _data = static_cast<T *>(operator new(_cap * sizeof(T)));
+      for (size_t i = 0; i < _size; ++i) {
+        new (_data + i) T(other._data[i]);
+        other._data[i].~T();
+      }
+      operator delete(other._data);
+    } else {
+      _data = NULL;
+    }
+  }
+
   ~Vec() {
     for (size_t i = 0; i < _size; ++i) {
       _data[i].~T();

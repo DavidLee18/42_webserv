@@ -18,9 +18,13 @@ enum HttpMethod {
   PATCH
 };
 
-struct PartialString {
+class PartialString {
   enum { Partial, Full } kind;
   char *part;
+
+  PartialString() : kind(PartialString::Partial), part(NULL) {}
+
+public:
   static PartialString *partial(char *input) {
     PartialString *p = new PartialString();
     p->part = input;
@@ -32,24 +36,28 @@ struct PartialString {
     p->part = input;
     return p;
   }
-
-private:
-  PartialString() : kind(PartialString::Partial), part(NULL) {}
 };
 
-struct HttpBody {
-  enum { HttpJson, HttpFormUrlEncoded } type;
-  union {
-    Json json;
+class HttpBody {
+  enum HttpBodyType { HttpJson, HttpFormUrlEncoded } type;
+  union HttpBodyValue {
+    Json *json;
     MapRecord<std::string, std::string> *form;
   } value;
+
+public:
+  HttpBody(HttpBodyType t, HttpBodyValue v) : type(t), value(v) {}
 };
 
-struct HttpRequest {
+class HttpReq {
   HttpMethod method;
   std::map<std::string, Json> headers;
   std::string path;
   HttpBody body;
+
+public:
+  HttpReq(HttpMethod m, std::string p, HttpBody b)
+      : method(m), headers(), path(p), body(b) {}
 };
 
 #endif

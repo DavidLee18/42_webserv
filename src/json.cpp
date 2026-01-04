@@ -1,48 +1,50 @@
 #include "webserv.h"
-#include <ostream>
 
-Json *Json::null() {
-  Json *js = new Json;
-  js->type = JsonNull;
-  js->value._null = NULL;
-  return js;
+Json::Json(const Json &other) : type(other.type) {
+  switch (other.type) {
+  case JsonNull:
+    value = (JsonValue){._null = NULL};
+    break;
+  case JsonBool:
+    value = (JsonValue){._bool = other.value._bool};
+    break;
+  case JsonNum:
+    value = (JsonValue){.num = other.value.num};
+    break;
+  case JsonStr:
+    value = (JsonValue){._str = new std::string(*other.value._str)};
+    break;
+  case JsonArr:
+    value = (JsonValue){.arr = new Vec<Json>(*other.value.arr)};
+    break;
+  case JsonObj:
+    value = (JsonValue){
+        .obj = new Vec<MapRecord<std::string, Json> >(*other.value.obj)};
+    break;
+  }
 }
 
+Json *Json::null() { return new Json(JsonNull, (JsonValue){._null = NULL}); }
+
 Json *Json::_bool(bool b) {
-  Json *js = new Json;
-  js->type = JsonBool;
-  js->value._bool = b;
-  return js;
+  return new Json(JsonBool, (JsonValue){._bool = b});
 }
 
 Json *Json::num(long double ld) {
-  Json *js = new Json;
-  js->type = JsonNum;
-  js->value.num = ld;
-  return js;
+  return new Json(JsonNum, (JsonValue){.num = ld});
 }
 
 Json *Json::str(std::string s) {
-  Json *js = new Json;
-  js->type = JsonStr;
-  chars cs = (chars){.ptr = new char[s.length() + 1], .size = s.length()};
-  cs.ptr = std::strncpy(cs.ptr, s.c_str(), s.length());
-  js->value._str = cs;
-  return js;
+  return new Json(JsonStr, (JsonValue){._str = new std::string(s)});
 }
 
-Json *Json::arr(Jsons js) {
-  Json *jss = new Json;
-  jss->type = JsonArr;
-  jss->value.arr = js;
-  return jss;
+Json *Json::arr(Vec<Json> js) {
+  return new Json(JsonArr, (JsonValue){.arr = new Vec<Json>(js)});
 }
 
-Json *Json::obj(Map m) {
-  Json *js = new Json;
-  js->type = JsonObj;
-  js->value.obj = m;
-  return js;
+Json *Json::obj(Vec<MapRecord<std::string, Json> > m) {
+  return new Json(JsonObj,
+                  (JsonValue){.obj = new Vec<MapRecord<std::string, Json> >(m)});
 }
 
 Result<MapRecord<Json *, size_t> > Json::Parser::null_or_undef(const char *raw) {
@@ -199,28 +201,31 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {
   return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
 }
 
-Result<MapRecord<Json *, size_t> > Json::Parser::parse(const char *raw) {
+Result<MapRecord<Json *, size_t>> Json::Parser::parse(const char *raw) {
   std::string raws(raw);
-  Result<MapRecord<Json *, size_t> > res = null_or_undef(raw);
+  Result<MapRecord<Json *, size_t>> res = null_or_undef(raw);
   if (res.err.empty() && !raws[res.val->value])
-    return res;
+    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
+                  res.val->value);
   res = _boolean(raw);
   if (res.err.empty() && !raws[res.val->value])
-    return res;
+    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
+                  res.val->value);
   res = _num(raw);
-  std::cout << "[num] Error: \"" << res.err << "\"" << std::endl;
-  std::cout << std::hex << std::showbase << res.val->value << std::endl;
-  std::flush(std::cout);
   if (res.err.empty() && !raws[res.val->value])
-    return res;
+    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
+                  res.val->value);
   res = _str(raw);
   if (res.err.empty() && !raws[res.val->value])
-    return res;
+    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
+                  res.val->value);
   res = _arr(raw);
   if (res.err.empty() && !raws[res.val->value])
-    return res;
+    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
+                  res.val->value);
   res = _obj(raw);
   if (res.err.empty() && !raws[res.val->value])
-    return res;
-  return res;
+    return OK_REC(MapRecord, Json *, size_t, res.val->key->clone(),
+                  res.val->value);
+  return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_json);
 }

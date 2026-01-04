@@ -12,6 +12,7 @@
 #include "errors.h"
 #include "http_1_1.h"
 #include "json.h"
+#include "map_record.h"
 #include <arpa/inet.h>
 #include <cerrno>
 #include <csignal>

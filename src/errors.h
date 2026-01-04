@@ -30,6 +30,7 @@ public:
   const static std::string invalid_format;
   const static std::string too_long_num;
   const static std::string out_of_rng;
+  const static std::string invalid_json;
 };
 
 #endif // ERRORS_H

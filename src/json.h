@@ -3,43 +3,35 @@
 
 #include "map_record.h"
 #include "result.h"
+#include "vec.h"
 #include <string>
 
-struct Json;
+class Json;
 
-struct Jsons {
-  Json *ptr;
-  size_t size;
-};
-
-struct chars {
-  char *ptr;
-  size_t size;
-};
-
-struct Map {
-  MapRecord<std::string, Json> *ptr;
-  size_t size;
-};
-
-struct Json {
-  enum { JsonNull, JsonBool, JsonNum, JsonStr, JsonArr, JsonObj } type;
-  union {
+class Json {
+  enum JsonType { JsonNull, JsonBool, JsonNum, JsonStr, JsonArr, JsonObj } type;
+  union JsonValue {
     void *_null;
     bool _bool;
     long double num;
-    chars _str;
-    Jsons arr;
-    Map obj;
+    std::string *_str;
+    Vec<Json> *arr;
+    Vec<MapRecord<std::string, Json> > *obj;
   } value;
-  static Result<Json> from_raw(const char *raw);
 
+public:
   static Json *null();
   static Json *_bool(bool);
   static Json *num(long double);
   static Json *str(std::string);
-  static Json *arr(Jsons);
-  static Json *obj(Map);
+  static Json *arr(Vec<Json>);
+  static Json *obj(Vec<MapRecord<std::string, Json> >);
+
+  Json() : type(JsonNull), value((JsonValue){._null = NULL}) {}
+  Json(JsonType ty, JsonValue val) : type(ty), value(val) {}
+  Json(const Json &other);
+  const JsonType &ty() { return type; }
+  const JsonValue &val() { return value; }
 
   class Parser {
     virtual void phantom() = 0;
@@ -57,19 +49,19 @@ struct Json {
 
 #define TRY_PARSE(f, r, rs, i, s)                                              \
   r = f(s + i);                                                                \
-  if (r.err.empty()) {                                                         \
-    rs.push(*r.val->key);                                                      \
-    delete r.val->key;                                                         \
-    i += r.val->value;                                                         \
+  if (r.error().empty()) {                                                     \
+    rs.push(*r.value()->key);                                                  \
+    delete r.value()->key;                                                     \
+    i += r.value()->value;                                                     \
     continue;                                                                  \
   }
 
 #define TRY_PARSE_REC(f, k, r, rs, i, s)                                       \
   r = f(s + i);                                                                \
-  if (r.err.empty()) {                                                         \
-    rs.push(MapRecord<std::string, Json>(k, *r.val->key));                     \
-    delete r.val->key;                                                         \
-    i += r.val->value;                                                         \
+  if (r.error().empty()) {                                                     \
+    rs.push(MapRecord<std::string, Json>(k, *r.value()->key));                 \
+    delete r.value()->key;                                                     \
+    i += r.value()->value;                                                     \
     continue;                                                                  \
   }
 #endif
