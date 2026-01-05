@@ -36,19 +36,22 @@ public:
       _data = static_cast<T *>(operator new(_cap * sizeof(T)));
       for (size_t i = 0; i < _size; ++i) {
         new (_data + i) T(other._data[i]);
-        other._data[i].~T();
       }
-      operator delete(other._data);
     } else {
       _data = NULL;
     }
   }
 
   ~Vec() {
-    for (size_t i = 0; i < _size; ++i) {
-      _data[i].~T();
+    if (_data != NULL) {
+      for (size_t i = 0; i < _size; ++i) {
+        _data[i].~T();
+      }
+      operator delete(_data);
+      _data = NULL;
+      _size = 0;
+      _cap = 0;
     }
-    operator delete(_data);
   }
 
   void push(T value) {
