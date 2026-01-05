@@ -64,7 +64,7 @@ public:
 };
 
 #define TRY_PARSE(f, r, rs, i, s)                                              \
-  Result<MapRecord<Json *, size_t> > r = f(s + i);                              \
+  Result<MapRecord<Json *, size_t> > r = f(s + i);                             \
   if (r.error().empty()) {                                                     \
     rs.push(*r.value()->key);                                                  \
     delete r.value()->key;                                                     \
@@ -72,8 +72,8 @@ public:
     continue;                                                                  \
   }
 
-#define TRY_PARSE_NUM(f, r, rs, i, s, ed)                                      \
-  Result<MapRecord<Json *, size_t> > r = f(s + i, ed);                          \
+#define TRY_PARSE_NUM(r, rs, i, s, ed)                                         \
+  Result<MapRecord<Json *, size_t> > r = _num(s + i, ed);                      \
   if (r.error().empty()) {                                                     \
     rs.push(*r.value()->key);                                                  \
     delete r.value()->key;                                                     \
@@ -82,11 +82,20 @@ public:
   }
 
 #define TRY_PARSE_REC(f, k, r, rs, i, s)                                       \
-  r = f(s + i);                                                                \
+  Result<MapRecord<Json *, size_t> > r = f(s + i);                             \
   if (r.error().empty()) {                                                     \
     rs.push(MapRecord<std::string, Json>(k, *r.value()->key));                 \
     delete r.value()->key;                                                     \
     i += r.value()->value;                                                     \
     continue;                                                                  \
   }
+#define TRY_PARSE_REC_NUM(k, r, rs, i, s, ed)                                  \
+  Result<MapRecord<Json *, size_t> > r = _num(s + i, ed);                      \
+  if (r.error().empty()) {                                                     \
+    rs.push(MapRecord<std::string, Json>(k, *r.value()->key));                 \
+    delete r.value()->key;                                                     \
+    i += r.value()->value;                                                     \
+    continue;                                                                  \
+  }
+
 #endif

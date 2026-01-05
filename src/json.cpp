@@ -69,7 +69,8 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_boolean(const char *raw) {
   return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
 }
 
-Result<MapRecord<Json *, size_t> > Json::Parser::_num(const char *raw, char end) {
+Result<MapRecord<Json *, size_t> > Json::Parser::_num(const char *raw,
+                                                     char end) {
   char *endptr;
   errno = 0;
   long l = std::strtol(raw, &endptr, 10);
@@ -125,9 +126,9 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_arr(const char *raw) {
       i++;
     TRY_PARSE(null_or_undef, rec, recs, i, raw)
     TRY_PARSE(_boolean, rec1, recs, i, raw)
-    TRY_PARSE_NUM(_num, rec2_0, recs, i, raw, ' ')
-    TRY_PARSE_NUM(_num, rec2, recs, i, raw, ',')
-    TRY_PARSE_NUM(_num, rec2_1, recs, i, raw, ']')
+    TRY_PARSE_NUM(rec2_0, recs, i, raw, ' ')
+    TRY_PARSE_NUM(rec2, recs, i, raw, ',')
+    TRY_PARSE_NUM(rec2_1, recs, i, raw, ']')
     TRY_PARSE(_str, rec3, recs, i, raw)
     TRY_PARSE(_arr, rec4, recs, i, raw)
     TRY_PARSE(_obj, rec5, recs, i, raw)
@@ -145,9 +146,14 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {
       i++;
     switch ((static_cast<size_t>(recs.empty()) << 2) +
             (static_cast<size_t>(raw[i] == ',') << 1) +
-            (static_cast<size_t>(raw[i] == ']'))) {
+            (static_cast<size_t>(raw[i] == '}'))) {
     case 1:
       return OK_REC(MapRecord, Json *, size_t, Json::obj(recs), i + 1);
+    case 2:
+      i++;
+      break;
+    case 4:
+      break;
     case 5:
       return OK_REC(MapRecord, Json *, size_t, Json::obj(recs), i + 1);
     default:
@@ -158,6 +164,9 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {
     Result<MapRecord<Json *, size_t> > rec = _str(raw + i);
     MapRecord<Json *, size_t> *k;
     TRY_REC(MapRecord, Json *, size_t, MapRecord, Json *, size_t, k, rec);
+    if (k->key->ty() != Json::JsonStr)
+      return (delete k->key,
+              ERR_REC(MapRecord, Json *, size_t, Errors::invalid_json));
     i += k->value;
     std::string _k(*k->key->value._str);
     delete k->key;
@@ -169,18 +178,21 @@ Result<MapRecord<Json *, size_t> > Json::Parser::_obj(const char *raw) {
     i++;
     while (std::isspace(raw[i]))
       i++;
-    TRY_PARSE_REC(null_or_undef, _k, rec, recs, i, raw)
-    TRY_PARSE_REC(_boolean, _k, rec, recs, i, raw)
-    // TRY_PARSE_REC(_num, _k, rec, recs, i, raw)
-    TRY_PARSE_REC(_str, _k, rec, recs, i, raw)
-    TRY_PARSE_REC(_arr, _k, rec, recs, i, raw)
-    TRY_PARSE_REC(_obj, _k, rec, recs, i, raw)
+    TRY_PARSE_REC(null_or_undef, _k, rec0, recs, i, raw)
+    TRY_PARSE_REC(_boolean, _k, rec1, recs, i, raw)
+    TRY_PARSE_REC_NUM(_k, rec2, recs, i, raw, ' ')
+    TRY_PARSE_REC_NUM(_k, rec2_0, recs, i, raw, ',')
+    TRY_PARSE_REC_NUM(_k, rec2_1, recs, i, raw, '}')
+    TRY_PARSE_REC(_str, _k, rec3, recs, i, raw)
+    TRY_PARSE_REC(_arr, _k, rec4, recs, i, raw)
+    TRY_PARSE_REC(_obj, _k, rec5, recs, i, raw)
     return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
   }
   return ERR_REC(MapRecord, Json *, size_t, Errors::invalid_format);
 }
 
-Result<MapRecord<Json *, size_t> > Json::Parser::parse(const char *raw, char num_end) {
+Result<MapRecord<Json *, size_t> > Json::Parser::parse(const char *raw,
+                                                      char num_end) {
   Result<MapRecord<Json *, size_t> > res = null_or_undef(raw);
   if (res.error().empty() && !raw[res.value()->value])
     return OK_REC(MapRecord, Json *, size_t, res.value()->key,
@@ -226,7 +238,22 @@ std::ostream &operator<<(std::ostream &os, Json &js) {
     os << "JsonArr " << *js.value.arr;
     break;
   case Json::JsonObj:
-    os << "Object";
+    os << '{';
+    for (size_t i = 0; i < js.value.obj->size(); i++) {
+      if (i != 0) {
+        os << ", ";
+      }
+      Result<MapRecord<std::string, Json> *> res = js.value.obj->get(i);
+      MapRecord<std::string, Json> *const *line;
+      if (!res.error().empty()) {
+        std::cerr << res.error() << std::endl;
+        return os;
+      }
+      line = res.value();
+      os << **line;
+    }
+    os << '}';
+    break;
   }
   return os;
 }
