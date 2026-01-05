@@ -39,14 +39,32 @@ public:
 };
 
 class HttpBody {
-  enum HttpBodyType { HttpJson, HttpFormUrlEncoded } type;
+  enum HttpBodyType { Empty, HttpJson, HttpFormUrlEncoded, Html } type;
   union HttpBodyValue {
+    void *_null;
     Json *json;
-    MapRecord<std::string, std::string> *form;
+    std::map<std::string, std::string> *form;
+    std::string *html_raw;
   } value;
 
 public:
   HttpBody(HttpBodyType t, HttpBodyValue v) : type(t), value(v) {}
+  HttpBody(const HttpBody &other) : type(other.type) {
+    switch (type) {
+    case Empty:
+      value._null = NULL;
+      break;
+    case HttpJson:
+      value.json = new Json(*other.value.json);
+      break;
+    case HttpFormUrlEncoded:
+      value.form = new std::map<std::string, std::string>(*other.value.form);
+      break;
+    case Html:
+      value.html_raw = new std::string(*other.value.html_raw);
+      break;
+    }
+  }
   const HttpBodyType &ty() { return type; }
   const HttpBodyValue &val() { return value; }
 };
