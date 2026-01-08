@@ -7,11 +7,12 @@ int main(const int argc, char *argv[]) {
     std::cerr << "Usage: webserv <config_file>" << std::endl;
     return 1;
   }
-  Result<MapRecord<Json *, size_t> > res = Json::Parser::parse(argv[1], '\0');
-  PANIC(res)
-  Json *js = res.value()->key;
-  std::cout << *js << std::endl;
-  delete js;
+  // Result<MapRecord<Json *, size_t> > res = Json::Parser::parse(argv[2], '\0');
+  // PANIC(res)
+  // Json *js = res.value()->key;
+  // std::cout << *js << std::endl;
+  // delete js;
+  WebserverConfig config(argv[1]);
   return 0;
   // std::string config_path(argv[1]);
   // signal(SIGINT, wrap_up);

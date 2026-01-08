@@ -8,6 +8,7 @@
 #define BUFFER_SIZE 42
 #define LONG_DOUBLE_DIGITS 37
 
+#include "WebserverConfig.hpp"
 #include "cgi.h"
 #include "epoll_kqueue.h"
 #include "errors.h"

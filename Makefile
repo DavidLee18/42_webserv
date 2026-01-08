@@ -7,6 +7,7 @@ BUILD_DIR := build
 SRC_DIR := src
 
 SRCS := src/errors.cpp src/epoll_kqueue.cpp \
+	src/ParsingUtils.cpp src/ServerConfig.cpp src/WebserverConfig.cpp \
 	src/file_descriptor.cpp src/json.cpp src/main.cpp
 OBJS := $(patsubst src/%.cpp, build/%.o, $(SRCS))
 
