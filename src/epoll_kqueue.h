@@ -2,9 +2,9 @@
 #define EPOLL_KQUEUE_H
 
 #include "file_descriptor.h"
-#include "vec.h"
 #include <cstddef>
 #include <iterator>
+#include <vector>
 
 #ifdef __APPLE__
 #include <sys/event.h>
@@ -147,7 +147,7 @@ class Events : public std::iterator<std::input_iterator_tag, Event, long,
 
 public:
   ~Events();
-  static Result<Events> init(const Vec<FileDescriptor> &, size_t,
+  static Result<Events> init(const std::vector<FileDescriptor> &, size_t,
                              const epoll_event *);
   bool is_end() const;
   Result<Void> operator++();
@@ -160,7 +160,7 @@ public:
  */
 class EPoll {
   FileDescriptor *_fd;
-  Vec<FileDescriptor> _events;
+  std::vector<FileDescriptor> _events;
   unsigned short _size;
   EPoll() : _fd(NULL), _events(), _size(0) {}
   Result<Void> init();
@@ -168,8 +168,8 @@ class EPoll {
 public:
   static Result<EPoll> create(unsigned short);
   Result<Events> wait(const int timeout_ms);
-  Result<FileDescriptor *> add_fd(FileDescriptor, const Event &,
-                                  const Option &);
+  Result<const FileDescriptor *> add_fd(FileDescriptor, const Event &,
+                                        const Option &);
   Result<Void> modify_fd(const FileDescriptor &, const Event &, const Option &);
   Result<Void> del_fd(const FileDescriptor &);
 };

@@ -19,15 +19,23 @@ void KQueue::del_event(const FileDescriptor &fd,
   /* TODO */
 }
 #else // LINUX
-Result<Events> Events::init(const Vec<FileDescriptor> &all_events, size_t size,
-                            const epoll_event *events) {
+Result<Events> Events::init(const std::vector<FileDescriptor> &all_events,
+                            size_t size, const epoll_event *events) {
   Events *es = new Events();
   es->_events = static_cast<Event *>(operator new(sizeof(Event) * size));
   for (size_t i = 0; i < size; i++) {
-    FileDescriptor **fd;
-    TRYF(Events, FileDescriptor *, fd, all_events.find(events[i].data.fd),
-                                       operator delete((void *)es->_events);
-         delete es;)
+    FileDescriptor const **fd = NULL;
+    for (size_t j = 0; j < all_events.size(); i++) {
+      if (events[i].data.fd == all_events.at(j)) {
+        fd = new const FileDescriptor *;
+        *fd = FileDescriptor::from_raw(events[i].data.fd).value();
+      }
+    }
+    if (fd == NULL) {
+      operator delete((void *)es->_events);
+      delete es;
+      return ERR(Events, Errors::not_found);
+    }
     new ((void *)(es->_events + i)) Event(
         *fd, (events[i].events & EPOLLIN) == 1,
         (events[i].events & EPOLLOUT) == 1,
@@ -84,8 +92,8 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   return OK(EPoll, ep);
 }
 
-Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
-                                       const Option &op) {
+Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
+                                             const Option &op) {
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -111,27 +119,34 @@ Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   if (epoll_ctl(_fd->_fd, EPOLL_CTL_ADD, fd._fd, &event) == -1) {
     switch (errno) {
     case EEXIST:
-      return ERR(FileDescriptor *,
+      return ERR(const FileDescriptor *,
                  "this fd is already registered to this epoll");
     case EINVAL:
-      return ERR(FileDescriptor *, Errors::invalid_fd);
+      return ERR(const FileDescriptor *, Errors::invalid_fd);
     case ELOOP:
-      return ERR(FileDescriptor *, Errors::epoll_loop);
+      return ERR(const FileDescriptor *, Errors::epoll_loop);
     case ENOMEM:
-      return ERR(FileDescriptor *, Errors::out_of_mem);
+      return ERR(const FileDescriptor *, Errors::out_of_mem);
     case ENOSPC:
-      return ERR(FileDescriptor *, Errors::epoll_full);
+      return ERR(const FileDescriptor *, Errors::epoll_full);
     case EPERM:
-      return ERR(FileDescriptor *, Errors::not_supported);
+      return ERR(const FileDescriptor *, Errors::not_supported);
     default:
-      return ERR(FileDescriptor *,
+      return ERR(const FileDescriptor *,
                  "an unknown error occured during EPOLL_CTL_ADD");
     }
   }
-  _events.push(fd);
-  FileDescriptor **fd_in;
-  TRY(FileDescriptor *, FileDescriptor *, fd_in, _events.find(fd))
-  return OK(FileDescriptor *, fd_in);
+  _events.push_back(fd);
+  FileDescriptor const **fd_in;
+
+  for (size_t i = 0; i < _events.size(); i++) {
+    if (fd == _events.at(i)) {
+      fd_in = new const FileDescriptor *();
+      *fd_in = FileDescriptor::move_from(fd).value();
+      return OK(const FileDescriptor *, fd_in);
+    }
+  }
+  return ERR(const FileDescriptor *, Errors::not_found);
 }
 
 Result<Void> EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,

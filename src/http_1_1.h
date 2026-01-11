@@ -2,7 +2,6 @@
 #define HTTP_1_1_H
 
 #include "json.h"
-#include "map_record.h"
 #include <map>
 #include <string>
 
