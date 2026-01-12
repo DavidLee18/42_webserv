@@ -45,8 +45,8 @@ public:
       break;
     }
   }
-  const JsonType &ty() { return type; }
-  const JsonValue &val() { return value; }
+  const JsonType &ty() const { return type; }
+  const JsonValue &val() const { return value; }
   friend std::ostream &operator<<(std::ostream &os, Json &js);
 
   class Parser {

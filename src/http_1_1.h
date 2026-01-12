@@ -64,8 +64,8 @@ public:
       break;
     }
   }
-  const HttpBodyType &ty() { return type; }
-  const HttpBodyValue &val() { return value; }
+  const HttpBodyType &ty() const { return type; }
+  const HttpBodyValue &val() const { return value; }
 };
 
 class HttpReq {
@@ -77,10 +77,11 @@ class HttpReq {
 public:
   HttpReq(HttpMethod m, std::string p, HttpBody b)
       : method(m), headers(), path(p), body(b) {}
-  const HttpMethod &mthd() { return method; }
-  const std::map<std::string, Json> &hds() { return headers; }
-  const std::string &pth() { return path; }
-  const HttpBody &bdy() { return body; }
+  const HttpMethod &mthd() const { return method; }
+  const std::map<std::string, Json> &hds() const { return headers; }
+  const std::string &pth() const { return path; }
+  const HttpBody &bdy() const { return body; }
+  static Result<std::pair<HttpReq *, size_t> > parse(const char *, char);
 };
 
 #endif
