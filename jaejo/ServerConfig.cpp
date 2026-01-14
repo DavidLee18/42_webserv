@@ -172,12 +172,10 @@ void ServerConfig::parse_serverResponseTime(std::string line)
 
 
 
-
-
-
 //RouteRule method
 bool ServerConfig::is_RouteRule(std::string line)
 {
-    (void)line;
+    if (line == "GET" || line == "POST" || line == "DELETE")
+        return (true);
     return (false);
 }
