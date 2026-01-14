@@ -1,43 +1,185 @@
-//
-// Created by 이재현 on 2025-11-10.
-//
 #include "webserv.h"
 
-FileDescriptor::FileDescriptor(const int raw_fd) throw(
-    InvalidFileDescriptorException) {
+Result<FileDescriptor> FileDescriptor::socket_new() {
+  int sock = socket(AF_INET, SOCK_STREAM, 0);
+  if (sock < 0) {
+    switch (errno) {
+    case EACCES:
+      return ERR(FileDescriptor, Errors::access_denied);
+    case EAFNOSUPPORT:
+    case EPROTONOSUPPORT:
+      return ERR(FileDescriptor, Errors::not_supported);
+    case EINVAL:
+      return ERR(FileDescriptor, Errors::invalid_operation);
+    case EMFILE:
+    case ENFILE:
+      return ERR(FileDescriptor, Errors::fd_too_many);
+    case ENOBUFS:
+    case ENOMEM:
+      return ERR(FileDescriptor, Errors::out_of_mem);
+    }
+  }
+  FileDescriptor *fd = new FileDescriptor();
+  fd->set_fd(sock);
+  return OK(FileDescriptor, fd);
+}
+
+Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
   if (raw_fd < 0)
-    throw InvalidFileDescriptorException();
-  _fd = raw_fd;
+    return ERR(FileDescriptor, Errors::invalid_fd);
+  FileDescriptor *fd = new FileDescriptor();
+  fd->set_fd(raw_fd);
+  return OK(FileDescriptor, fd);
 }
 
-FileDescriptor::FileDescriptor(FileDescriptor &other) throw(
-    InvalidFileDescriptorException)
-    : _fd(other._fd) {
+Result<FileDescriptor> FileDescriptor::move_from(FileDescriptor other) {
   if (other._fd < 0)
-    throw InvalidFileDescriptorException();
+    return ERR(FileDescriptor, Errors::invalid_fd);
+  FileDescriptor *fd = new FileDescriptor();
+  fd->set_fd(other._fd);
   other._fd = -1;
+  return OK(FileDescriptor, fd);
 }
 
-FileDescriptor &FileDescriptor::operator=(FileDescriptor other) throw(
-    InvalidFileDescriptorException) {
+Result<Void> FileDescriptor::operator=(FileDescriptor other) {
   if (this != &other) {
     if (_fd < 0)
-      throw InvalidFileDescriptorException();
+      return ERR(Void, Errors::invalid_fd);
     _fd = other._fd;
     other._fd = -1;
   }
-  return *this;
+  return OKV;
 }
 
 FileDescriptor::~FileDescriptor() {
-  if (_fd >= 2)
+  if (_fd >= 0)
     close(_fd);
 }
 
-const int &FileDescriptor::operator*() const { return _fd; }
+Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
+                                         unsigned short port) {
+  sockaddr_in _addr;
+  std::memset(&_addr, 0, sizeof(_addr));
+  _addr.sin_family = AF_INET;
+  _addr.sin_addr = addr;
+  _addr.sin_port = htons(port);
+  if (bind(_fd, reinterpret_cast<const sockaddr *>(&_addr), sizeof(_addr)) <
+      0) {
+    switch (errno) {
+    case EACCES:
+      return ERR(Void, Errors::access_denied);
+    case EADDRINUSE:
+    case EADDRNOTAVAIL:
+      return ERR(Void, Errors::addr_not_available);
+    case EBADF:
+    case ENOTSOCK:
+      return ERR(Void, Errors::invalid_fd);
+    case EINVAL:
+      return ERR(Void, Errors::invalid_operation);
+    case EFAULT:
+      return ERR(Void, Errors::address_fault);
+    case ELOOP:
+      return ERR(Void, Errors::addr_loop);
+    case ENAMETOOLONG:
+      return ERR(Void, Errors::name_too_long);
+    case ENOENT:
+    case ENOTDIR:
+      return ERR(Void, Errors::not_found);
+    case ENOMEM:
+      return ERR(Void, Errors::out_of_mem);
+    case EROFS:
+      return ERR(Void, Errors::readonly_filesys);
+    }
+  }
+  return OKV;
+}
 
-bool FileDescriptor::set_blocking(const bool blocking) {
-  return fcntl(_fd, F_SETFL, blocking ? 0 : O_NONBLOCK) == 0;
+Result<Void> FileDescriptor::socket_listen(unsigned short backlog) {
+  if (listen(_fd, backlog) < 0) {
+    switch (errno) {
+    case EADDRINUSE:
+      return ERR(Void, Errors::addr_not_available);
+    case EBADF:
+    case ENOTSOCK:
+      return ERR(Void, Errors::invalid_fd);
+    case EOPNOTSUPP:
+      return ERR(Void, Errors::not_supported);
+    }
+  }
+  return OKV;
+}
+
+Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
+                                                     socklen_t *len) {
+  int fd = accept(_fd, addr, len);
+  if (fd >= 0) {
+    FileDescriptor *fd_ = new FileDescriptor();
+    fd_->set_fd(fd);
+    return OK(FileDescriptor, fd_);
+  }
+  switch (errno) {
+  case EWOULDBLOCK:
+    return ERR(FileDescriptor, Errors::try_again);
+  case EBADF:
+  case ENOTSOCK:
+    return ERR(FileDescriptor, Errors::invalid_fd);
+  case ECONNABORTED:
+    return ERR(FileDescriptor, Errors::conn_aborted);
+  case EFAULT:
+    return ERR(FileDescriptor, Errors::address_fault);
+  case EINTR:
+    return ERR(FileDescriptor, Errors::interrupted);
+  case EINVAL:
+    return ERR(
+        FileDescriptor,
+        "Socket is not listening for connections, or addrlen is invalid.");
+  case EMFILE:
+  case ENFILE:
+    return ERR(FileDescriptor, Errors::fd_too_many);
+  case ENOBUFS:
+  case ENOMEM:
+    return ERR(FileDescriptor, Errors::out_of_mem);
+  case EOPNOTSUPP:
+    return ERR(FileDescriptor,
+               "The referenced socket is not of type SOCK_STREAM.");
+  case EPERM:
+    return ERR(FileDescriptor, Errors::access_denied);
+  default:
+    return ERR(FileDescriptor, "an unknown error occured during accept().");
+  }
+}
+
+Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) {
+  ssize_t res = recv(_fd, buf, size, 0);
+  if (res < 0)
+    return ERR(ssize_t, "`recv` failed");
+  ssize_t *r = new ssize_t(res);
+  return OK(ssize_t, r);
+}
+
+Result<PartialString> FileDescriptor::try_read_to_end() {
+  std::stringstream ss;
+  char buf[BUFFER_SIZE];
+
+  Result<ssize_t> bytes = this->sock_recv(buf, BUFFER_SIZE);
+  while (bytes.error().empty() && *bytes.value() > 0) {
+    ssize_t *bs;
+    TRY(PartialString, ssize_t, bs, bytes)
+    char *s = new char[*bs + 1];
+    s = std::strncpy(s, buf, *bs + 1);
+    if (!(ss << s))
+      return ERR(PartialString, "string concat failed");
+    delete[] s;
+    bytes = this->sock_recv(buf, BUFFER_SIZE);
+  }
+  if (!bytes.error().empty())
+    return ERR(PartialString, bytes.error());
+  char *s = new char[ss.str().length()];
+  s = std::strcpy(s, ss.str().c_str());
+  if (*bytes.value() == 0) {
+    return OK(PartialString, PartialString::full(s));
+  }
+  return OK(PartialString, PartialString::partial(s));
 }
 
 bool operator==(const int &lhs, const FileDescriptor &rhs) {

@@ -40,3 +40,10 @@
 # debug information files
 *.dwo
 /cmake-build-debug/
+
+# macOS
+.DS_Store
+
+build/
+.cache/
+.idea/

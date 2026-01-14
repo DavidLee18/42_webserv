@@ -1,15 +1,12 @@
-//
-// Created by 이재현 on 2025-11-12.
-//
-
-#ifndef INC_42_WEBSERV_EPOLL_KQUEUE_H
-#define INC_42_WEBSERV_EPOLL_KQUEUE_H
+#ifndef EPOLL_KQUEUE_H
+#define EPOLL_KQUEUE_H
 
 #include "file_descriptor.h"
-#include "vec.h"
+#include <cstddef>
+#include <iterator>
+#include <vector>
 
 #ifdef __APPLE__
-#include <iterator>
 #include <sys/event.h>
 #include <sys/time.h>
 
@@ -76,13 +73,13 @@ public:
   explicit KQueue(size_t);
   ~KQueue();
   Events wait(int timeout_ms);
-  friend const FileDescriptor &
-  add_event(FileDescriptor, KQueue &,
+  const FileDescriptor &
+  add_event(FileDescriptor,
             const Event &) throw(InvalidFileDescriptorException);
-  friend void del_event(const FileDescriptor &, KQueue &,
-                        const Event &) throw(InvalidFileDescriptorException);
+  void del_event(const FileDescriptor &,
+                 const Event &) throw(InvalidFileDescriptorException);
 };
-#else
+#else // __APPLE__
 
 #include <sys/epoll.h>
 
@@ -116,10 +113,10 @@ public:
  */
 class Event {
 public:
-  Event(const FileDescriptor &fd, const bool in, const bool out,
+  Event(const FileDescriptor *fd, const bool in, const bool out,
         const bool rdhup, const bool pri, const bool err, const bool hup)
       : fd(fd), in(in), out(out), rdhup(rdhup), pri(pri), err(err), hup(hup) {}
-  const FileDescriptor &fd;
+  const FileDescriptor *fd;
   const bool in;
   const bool out;
   const bool rdhup;
@@ -144,15 +141,17 @@ class Events : public std::iterator<std::input_iterator_tag, Event, long,
                                     const Event *, const Event &> {
   size_t _curr;
   size_t _len;
-  const Event *_Nonnull _events;
+  Event *_events;
+
+  Events() : _curr(0), _len(0), _events(NULL) {}
 
 public:
-  Events(const Vec<FileDescriptor> &, size_t,
-         const epoll_event *_Nonnull) throw(FdNotRegisteredException);
   ~Events();
+  static Result<Events> init(const std::vector<FileDescriptor> &, size_t,
+                             const epoll_event *);
   bool is_end() const;
-  Events &operator++() throw(IteratorEndedException);
-  const Event &operator*() const throw(IteratorEndedException);
+  Result<Void> operator++();
+  Result<const Event *> operator*() const;
 };
 
 /**
@@ -160,30 +159,21 @@ public:
  * @brief A simple epoll wrapper class.
  */
 class EPoll {
-  FileDescriptor _fd;
-  Vec<FileDescriptor> _events;
-  size_t _size;
+  FileDescriptor *_fd;
+  std::vector<FileDescriptor> _events;
+  unsigned short _size;
+  EPoll() : _fd(NULL), _events(), _size(0) {}
+  Result<Void> init();
 
 public:
-  EPoll(size_t) throw(InvalidFileDescriptorException);
-  Events wait(const int timeout_ms) throw(InterruptedException);
-  const FileDescriptor &
-  add_fd(FileDescriptor, const Event &,
-         const Option &) throw(InvalidOperationException, EPollLoopException,
-                               FdNotRegisteredException, OutOfMemoryException,
-                               EPollFullException,
-                               NotSupportedOperationException);
-  void modify_fd(const FileDescriptor &, const Event &,
-                 const Option &) throw(InvalidOperationException,
-                                       FdNotRegisteredException,
-                                       OutOfMemoryException,
-                                       NotSupportedOperationException);
-  void del_fd(const FileDescriptor &) throw(InvalidOperationException,
-                                            FdNotRegisteredException,
-                                            OutOfMemoryException,
-                                            NotSupportedOperationException);
+  static Result<EPoll> create(unsigned short);
+  Result<Events> wait(const int timeout_ms);
+  Result<const FileDescriptor *> add_fd(FileDescriptor, const Event &,
+                                        const Option &);
+  Result<Void> modify_fd(const FileDescriptor &, const Event &, const Option &);
+  Result<Void> del_fd(const FileDescriptor &);
 };
 
-#endif
+#endif // __APPLE__
 
-#endif // INC_42_WEBSERV_EPOLL_KQUEUE_H
+#endif // EPOLL_KQUEUE_H
