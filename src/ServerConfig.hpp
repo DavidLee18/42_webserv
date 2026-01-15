@@ -8,15 +8,14 @@ typedef std::map<std::string, std::map<std::string, std::string> > Header;
 
 enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
 
+
 struct RouteRule {
-  RouteType type;
+  HttpMethod method; // GET | POST | DELETE 등
+  std::vector<std::string> path;          // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
 
-  std::vector<HttpMethod> methods; // GET | POST | DELETE 등
-  std::string urlPattern;          // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
-
-  // 리다이렉트 전용
-  int redirectStatus;         // 301
-  std::string redirectTarget; // "/new_stuff/*", "/*/mp3/*.mp3"
+  // 상태코드
+  int status_code;
+  std::string redirectTarget;
 
   // 정적 파일 전용
   std::string root;                      // "/spool/www"
@@ -45,6 +44,7 @@ private:
   void parse_serverResponseTime(std::string line);
   // RouteRule method
   bool is_RouteRule(std::string line);
+  bool parse_GET(std::vector<std::string>);
 
 public:
   ServerConfig();

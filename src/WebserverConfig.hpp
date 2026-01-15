@@ -7,7 +7,7 @@ class WebserverConfig {
 private:
   std::string default_mime;
   std::map<std::string, std::string> type_map;
-  std::map<std::string, ServerConfig> ServerConfig_map;
+  std::map<std::string, ServerConfig> ServerConfig_map; // key unsigned int로 변환
 
   bool file_parsing(std::ifstream &file);
   // type_map method

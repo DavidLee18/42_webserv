@@ -4,8 +4,6 @@ ServerConfig::ServerConfig() : is_success(false) {}
 
 ServerConfig::ServerConfig(std::ifstream &file) : serverResponseTime(3) {
   is_success = set_ServerConfig(file);
-  (void)serverResponseTime;
-  (void)routes;
 }
 
 ServerConfig::~ServerConfig() {}
@@ -27,6 +25,16 @@ bool ServerConfig::set_ServerConfig(std::ifstream &file) {
         err_line.push_back(trim_space(line));
     } else
       break;
+  }
+  for (size_t i = 0; i < routes.size(); ++i)
+  {
+    std::cout << "routes: " << routes[i].method << std::endl;
+    std::cout << "path: ";
+    for (size_t j = 0; j < routes[i].path.size(); ++j)
+    {
+      std::cout << routes[i].path[j] << " ";
+    }
+    std::cout << std::endl;
   }
   for (size_t i = 0; i < err_line.size(); ++i) {
     std::cout << "err_line: " << err_line[i] << std::endl;
@@ -89,7 +97,7 @@ bool ServerConfig::parse_header_value(std::string value,
   for (size_t i = 0; i < values.size(); i++) {
     values[i] = trim_space(values[i]);
     temp = string_split(values[i], " ");
-    if (temp.size() == 1 && temp[0] == "\'nosniff\'")
+    if (temp.size() == 1 && temp[0] == "\"nosniff\"")
       header[key];
     else if (temp.size() == 2) {
       if (temp[1].size() < 2)
@@ -100,8 +108,6 @@ bool ServerConfig::parse_header_value(std::string value,
         if (temp[1][j] == '\'')
           return false;
       header[key][temp[0]] = temp[1];
-      // std::cout << "key: [" << key << "] value_key: [" << temp[0] << "]
-      // value: [" << header[key][temp[0]] << "]" << std::endl;
     } else {
       err_line.push_back(trim_space(value));
       return (false);
@@ -123,9 +129,9 @@ bool ServerConfig::is_serverResponseTime(std::string &line) {
     if (!std::isdigit(static_cast<unsigned char>(line[i])))
       return (false);
     data = data * 10 + (line[i] - '0');
-    if (data > 900)
-      return (false);
   }
+  if (data > 900 || 0 >= data)
+    return (false);
   return (true);
 }
 
@@ -136,8 +142,29 @@ void ServerConfig::parse_serverResponseTime(std::string line) {
   oss >> serverResponseTime;
 }
 
+
+
+
 // RouteRule method
 bool ServerConfig::is_RouteRule(std::string line) {
-  (void)line;
-  return (false);
+  std::vector<std::string> Route = string_split(line, " ");
+  if (Route[0] == "GET")
+    return (parse_GET(Route));
+  else if(Route[0] == "POST")
+    return (true);
+  else if (Route[0] == "DELETE")
+    return (true);
+  else if (Route[0] == "GET|POST|DELETE")
+    return (true);
+  else
+    return (false);
+}
+
+bool ServerConfig::parse_GET(std::vector<std::string> line) {
+  RouteRule get;
+  
+  get.method = GET;
+  get.path = string_split(line[1], "/");
+  routes.push_back(get);
+  return (true);
 }
