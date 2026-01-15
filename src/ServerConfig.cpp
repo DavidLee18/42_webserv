@@ -163,8 +163,36 @@ bool ServerConfig::is_RouteRule(std::string line) {
 bool ServerConfig::parse_GET(std::vector<std::string> line) {
   RouteRule get;
   
+  if (line.size() != 4)
+    return (false);
   get.method = GET;
   get.path = string_split(line[1], "/");
+  get.status_code = is_indicator(line[2]);
+  get.root = string_split(line[3], "/");
   routes.push_back(get);
   return (true);
+}
+
+int ServerConfig::is_indicator(std::string indicator)
+{
+  if (indicator == "<-")
+    return (0);
+  else if (indicator == "<i-")
+    return (0);
+  else if (indicator == "=300>")
+    return (300);
+  else if (indicator == "=301>")
+    return (301);
+  else if (indicator == "=302>")
+    return (302);
+  else if (indicator == "=303>")
+    return (303);
+  else if (indicator == "=304>")
+    return (304);
+  else if (indicator == "=307>")
+    return (307);
+  else if (indicator == "=308>")
+    return (308);
+  else
+    return (-1);
 }

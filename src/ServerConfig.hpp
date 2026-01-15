@@ -18,7 +18,7 @@ struct RouteRule {
   std::string redirectTarget;
 
   // 정적 파일 전용
-  std::string root;                      // "/spool/www"
+  std::vector<std::string> root;                      // "/spool/www"
   std::string index;                     // "index2.html" (있으면)
   std::string authInfo;                  // "@auth_info"에서 추출
   long maxBodyBytes;                     // "< 10MB" → 10 * 1024 * 1024
@@ -45,6 +45,7 @@ private:
   // RouteRule method
   bool is_RouteRule(std::string line);
   bool parse_GET(std::vector<std::string>);
+  int is_indicator(std::string indicator);
 
 public:
   ServerConfig();
