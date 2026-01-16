@@ -20,25 +20,25 @@ bool ServerConfig::set_ServerConfig(std::ifstream &file) {
       else if (is_serverResponseTime(line))
         parse_serverResponseTime(line);
       else if (is_RouteRule(line))
-        ;
+        parse_RouteRule(file);
       else
         err_line.push_back(trim_space(line));
     } else
       break;
   }
-  for (size_t i = 0; i < routes.size(); ++i)
-  {
-    std::cout << "routes: " << routes[i].method << std::endl;
-    std::cout << "path: ";
-    for (size_t j = 0; j < routes[i].path.size(); ++j)
-    {
-      std::cout << routes[i].path[j] << " ";
-    }
-    std::cout << std::endl;
-  }
-  for (size_t i = 0; i < err_line.size(); ++i) {
-    std::cout << "err_line: " << err_line[i] << std::endl;
-  }
+  // for (size_t i = 0; i < routes.size(); ++i)
+  // {
+  //   std::cout << "routes: " << routes[i].method << std::endl;
+  //   std::cout << "path: ";
+  //   for (size_t j = 0; j < routes[i].path.size(); ++j)
+  //   {
+  //     std::cout << routes[i].path[j] << " ";
+  //   }
+  //   std::cout << std::endl;
+  // }
+  // for (size_t i = 0; i < err_line.size(); ++i) {
+  //   std::cout << "err_line: " << err_line[i] << std::endl;
+  // }
   return (true);
 }
 
@@ -160,6 +160,19 @@ bool ServerConfig::is_RouteRule(std::string line) {
     return (false);
 }
 
+bool ServerConfig::parse_RouteRule(std::ifstream &file) {
+  std::string line;
+
+  while (std::getline(file, line))
+  {
+    if (is_tab_or_space(line, 0))
+      break;
+    else if (is_tab_or_space(line, 2) != false)
+      return (false);
+  }
+  return (true);
+}
+
 bool ServerConfig::parse_GET(std::vector<std::string> line) {
   RouteRule get;
   
@@ -173,12 +186,38 @@ bool ServerConfig::parse_GET(std::vector<std::string> line) {
   return (true);
 }
 
+bool ServerConfig::parse_POST(std::vector<std::string> line) {
+  RouteRule post;
+  
+  if (line.size() != 4)
+    return (false);
+  post.method = POST;
+  post.path = string_split(line[1], "/");
+  post.status_code = is_indicator(line[2]);
+  post.root = string_split(line[3], "/");
+  routes.push_back(post);
+  return (true);
+}
+
+bool ServerConfig::parse_DELETE(std::vector<std::string> line) {
+  RouteRule del;
+  
+  if (line.size() != 4)
+    return (false);
+  del.method = POST;
+  del.path = string_split(line[1], "/");
+  del.status_code = is_indicator(line[2]);
+  del.root = string_split(line[3], "/");
+  routes.push_back(del);
+  return (true);
+}
+
 int ServerConfig::is_indicator(std::string indicator)
 {
   if (indicator == "<-")
     return (0);
   else if (indicator == "<i-")
-    return (0);
+    return (1);
   else if (indicator == "=300>")
     return (300);
   else if (indicator == "=301>")

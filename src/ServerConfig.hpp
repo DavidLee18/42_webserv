@@ -44,7 +44,10 @@ private:
   void parse_serverResponseTime(std::string line);
   // RouteRule method
   bool is_RouteRule(std::string line);
+  bool parse_RouteRule(std::ifstream &file);
   bool parse_GET(std::vector<std::string>);
+  bool parse_POST(std::vector<std::string>);
+  bool parse_DELETE(std::vector<std::string>);
   int is_indicator(std::string indicator);
 
 public:
