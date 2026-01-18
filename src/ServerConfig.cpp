@@ -151,9 +151,9 @@ bool ServerConfig::is_RouteRule(std::string line) {
   if (Route[0] == "GET")
     return (parse_GET(Route));
   else if(Route[0] == "POST")
-    return (true);
+    return (parse_POST(Route));
   else if (Route[0] == "DELETE")
-    return (true);
+    return (parse_DELETE(Route));
   else if (Route[0] == "GET|POST|DELETE")
     return (true);
   else
@@ -180,7 +180,7 @@ bool ServerConfig::parse_GET(std::vector<std::string> line) {
     return (false);
   get.method = GET;
   get.path = string_split(line[1], "/");
-  get.status_code = is_indicator(line[2]);
+  get.status_code = is_RuleOperator(line[2]);
   get.root = string_split(line[3], "/");
   routes.push_back(get);
   return (true);
@@ -193,7 +193,7 @@ bool ServerConfig::parse_POST(std::vector<std::string> line) {
     return (false);
   post.method = POST;
   post.path = string_split(line[1], "/");
-  post.status_code = is_indicator(line[2]);
+  post.status_code = is_RuleOperator(line[2]);
   post.root = string_split(line[3], "/");
   routes.push_back(post);
   return (true);
@@ -204,34 +204,36 @@ bool ServerConfig::parse_DELETE(std::vector<std::string> line) {
   
   if (line.size() != 4)
     return (false);
-  del.method = POST;
+  del.method = DELETE;
   del.path = string_split(line[1], "/");
-  del.status_code = is_indicator(line[2]);
+  del.op = is_RuleOperator(line[2]);
   del.root = string_split(line[3], "/");
   routes.push_back(del);
   return (true);
 }
 
-int ServerConfig::is_indicator(std::string indicator)
+RuleOperator ServerConfig::is_RuleOperator(std::string indicator)
 {
   if (indicator == "<-")
-    return (0);
+    return (SEREVEFROM);
+  else if (indicator == "->")
+    return (POINT);
   else if (indicator == "<i-")
-    return (1);
-  else if (indicator == "=300>")
-    return (300);
+    return (AUTOINDEX);
+  // else if (indicator == "=300>")
+    // return (300);
   else if (indicator == "=301>")
-    return (301);
-  else if (indicator == "=302>")
-    return (302);
-  else if (indicator == "=303>")
-    return (303);
-  else if (indicator == "=304>")
-    return (304);
-  else if (indicator == "=307>")
-    return (307);
-  else if (indicator == "=308>")
-    return (308);
+    return (REDIRECT);
+  // else if (indicator == "=302>")
+  //   return (302);
+  // else if (indicator == "=303>")
+  //   return (303);
+  // else if (indicator == "=304>")
+  //   return (304);
+  // else if (indicator == "=307>")
+  //   return (307);
+  // else if (indicator == "=308>")
+  //   return (308);
   else
-    return (-1);
+    return (UNDEFINE);
 }

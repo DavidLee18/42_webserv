@@ -12,9 +12,9 @@ enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
 struct RouteRule {
   HttpMethod method; // GET | POST | DELETE 등
   std::vector<std::string> path;          // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
+  int status_code;  // 상태코드
 
-  // 상태코드
-  int status_code;
+  RuleOperator op;
   std::string redirectTarget;
 
   // 정적 파일 전용
@@ -48,7 +48,7 @@ private:
   bool parse_GET(std::vector<std::string>);
   bool parse_POST(std::vector<std::string>);
   bool parse_DELETE(std::vector<std::string>);
-  int is_indicator(std::string indicator);
+  RuleOperator is_RuleOperator(std::string indicator);
 
 public:
   ServerConfig();

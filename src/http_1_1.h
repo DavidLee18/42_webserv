@@ -17,6 +17,20 @@ enum HttpMethod {
   PATCH
 };
 
+enum RuleOperator {
+  MULTIPLECHOICES, // 300
+  REDIRECT, // 301
+  FOUND, // 302
+  SEEOTHER, // 303
+  NOTMODIFIED, // 304
+  TEMPORARYREDIRECT, // 307
+  PERMANENTREDIRECT, // 308
+  AUTOINDEX, // <i-
+  POINT, // ->
+  SEREVEFROM, // <-
+  UNDEFINE,
+};
+
 class PartialString {
   enum { Partial, Full } kind;
   char *part;
