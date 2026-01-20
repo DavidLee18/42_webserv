@@ -18,69 +18,79 @@ enum HttpMethod {
 };
 
 class PartialString {
-  enum { Partial, Full } kind;
-  char *part;
+  enum PartStrType { Partial, Full } _kind;
+  char *_part;
 
-  PartialString() : kind(PartialString::Partial), part(NULL) {}
+  PartialString() : _kind(PartialString::Partial), _part(NULL) {}
 
 public:
   static PartialString *partial(char *input) {
     PartialString *p = new PartialString();
-    p->part = input;
+    p->_part = input;
     return p;
   }
   static PartialString *full(char *input) {
     PartialString *p = new PartialString();
-    p->kind = PartialString::Full;
-    p->part = input;
+    p->_kind = PartialString::Full;
+    p->_part = input;
     return p;
   }
+  PartStrType const &kind() const { return _kind; }
+  PartStrType &kind_mut() { return _kind; }
+  char const *part() { return _part; }
+  char *part_mut() { return _part; }
 };
 
 class HttpBody {
-  enum HttpBodyType { Empty, HttpJson, HttpFormUrlEncoded, Html } type;
+  enum HttpBodyType { Empty, HttpJson, HttpFormUrlEncoded, Html } _type;
   union HttpBodyValue {
     void *_null;
     Json *json;
     std::map<std::string, std::string> *form;
     std::string *html_raw;
-  } value;
+  } _value;
 
 public:
-  HttpBody(HttpBodyType t, HttpBodyValue v) : type(t), value(v) {}
-  HttpBody(const HttpBody &other) : type(other.type) {
-    switch (type) {
+  HttpBody(HttpBodyType t, HttpBodyValue v) : _type(t), _value(v) {}
+  HttpBody(const HttpBody &other) : _type(other._type) {
+    switch (_type) {
     case Empty:
-      value._null = NULL;
+      _value._null = NULL;
       break;
     case HttpJson:
-      value.json = new Json(*other.value.json);
+      _value.json = new Json(*other._value.json);
       break;
     case HttpFormUrlEncoded:
-      value.form = new std::map<std::string, std::string>(*other.value.form);
+      _value.form = new std::map<std::string, std::string>(*other._value.form);
       break;
     case Html:
-      value.html_raw = new std::string(*other.value.html_raw);
+      _value.html_raw = new std::string(*other._value.html_raw);
       break;
     }
   }
-  const HttpBodyType &ty() const { return type; }
-  const HttpBodyValue &val() const { return value; }
+  static HttpBody *empty() {
+    return new HttpBody(Empty, (HttpBodyValue){._null = NULL});
+  }
+  static HttpBody *json(Json *json) {
+    return new HttpBody(HttpJson, (HttpBodyValue){.json = json});
+  }
+  const HttpBodyType &type() const { return _type; }
+  const HttpBodyValue &value() const { return _value; }
 };
 
 class HttpReq {
-  HttpMethod method;
-  std::map<std::string, Json> headers;
-  std::string path;
-  HttpBody body;
+  HttpMethod _method;
+  std::map<std::string, Json> _headers;
+  std::string _path;
+  HttpBody _body;
 
 public:
   HttpReq(HttpMethod m, std::string p, HttpBody b)
-      : method(m), headers(), path(p), body(b) {}
-  const HttpMethod &mthd() const { return method; }
-  const std::map<std::string, Json> &hds() const { return headers; }
-  const std::string &pth() const { return path; }
-  const HttpBody &bdy() const { return body; }
+      : _method(m), _headers(), _path(p), _body(b) {}
+  const HttpMethod &method() const { return _method; }
+  const std::map<std::string, Json> &headers() const { return _headers; }
+  const std::string &path() const { return _path; }
+  const HttpBody &body() const { return _body; }
   static Result<std::pair<HttpReq *, size_t> > parse(const char *, char);
 };
 

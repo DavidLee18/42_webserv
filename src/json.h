@@ -9,7 +9,7 @@
 class Json;
 
 class Json {
-  enum JsonType { JsonNull, JsonBool, JsonNum, JsonStr, JsonArr, JsonObj } type;
+  enum JsonType { JsonNull, JsonBool, JsonNum, JsonStr, JsonArr, JsonObj } _type;
   union JsonValue {
     void *_null;
     bool _bool;
@@ -17,7 +17,7 @@ class Json {
     std::string *_str;
     std::vector<Json> *arr;
     std::vector<std::pair<std::string, Json> > *obj;
-  } value;
+  } _value;
 
 public:
   static Json *null();
@@ -27,26 +27,26 @@ public:
   static Json *arr(std::vector<Json>);
   static Json *obj(std::vector<std::pair<std::string, Json> >);
 
-  Json() : type(JsonNull), value((JsonValue){._null = NULL}) {}
-  Json(JsonType ty, JsonValue val) : type(ty), value(val) {}
+  Json() : _type(JsonNull), _value((JsonValue){._null = NULL}) {}
+  Json(JsonType ty, JsonValue val) : _type(ty), _value(val) {}
   Json(const Json &other);
   ~Json() {
-    switch (type) {
+    switch (_type) {
     case JsonStr:
-      delete value._str;
+      delete _value._str;
       break;
     case JsonArr:
-      delete value.arr;
+      delete _value.arr;
       break;
     case JsonObj:
-      delete value.obj;
+      delete _value.obj;
       break;
     default:
       break;
     }
   }
-  const JsonType &ty() const { return type; }
-  const JsonValue &val() const { return value; }
+  const JsonType &type() const { return _type; }
+  const JsonValue &value() const { return _value; }
   friend std::ostream &operator<<(std::ostream &os, Json &js);
 
   class Parser {
