@@ -49,17 +49,22 @@ private:
 
 enum GatewayInterface { Cgi_1_1 };
 
-enum ServerNameType {
-  Host,
-  Ipv4,
-};
-
 struct ServerName {
-  ServerNameType type;
+  enum ServerNameType {
+    Host,
+    Ipv4,
+  } type;
   union ServerNameVal {
     std::list<std::string> *host_name;
     unsigned char ipv4[4];
   } val;
+
+  ServerName *host(std::string);
+  ServerName *ipv4(unsigned char, unsigned char, unsigned char, unsigned char);
+  Result<ServerName *> ipv4(std::string);
+
+private:
+  ServerName(ServerNameType ty, ServerNameVal v) : type(ty), val(v) {}
 };
 
 enum ServerProtocol { Http_1_1 };
@@ -84,7 +89,7 @@ struct CgiMetaVar {
     std::string *remote_user;
     HttpMethod request_method;
     std::list<std::string> *script_name;
-    ServerName server_name;
+    ServerName *server_name;
     unsigned short server_port;
     ServerProtocol server_protocol;
     ServerSoftware server_software;
