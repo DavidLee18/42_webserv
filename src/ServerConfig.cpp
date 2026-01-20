@@ -1,4 +1,4 @@
-#include "ServerConfig.hpp"
+#include "webserv.h"
 
 ServerConfig::ServerConfig() : is_success(false) {}
 

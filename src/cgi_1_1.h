@@ -1,7 +1,6 @@
 #ifndef CGI_1_1_H
 #define CGI_1_1_H
 
-#include "WebserverConfig.hpp"
 #include "http_1_1.h"
 #include "result.h"
 #include <list>

@@ -1,13 +1,11 @@
-//
-// Created by 이재현 on 2025-11-08.
-//
-
 #ifndef WEBSERV_H
 #define WEBSERV_H
 
 #define BUFFER_SIZE 42
 #define LONG_DOUBLE_DIGITS 37
 
+#include "ParsingUtils.hpp"
+#include "ServerConfig.hpp"
 #include "WebserverConfig.hpp"
 #include "cgi_1_1.h"
 #include "epoll_kqueue.h"
@@ -21,6 +19,7 @@
 #include <cstring>
 #include <dirent.h>
 #include <fcntl.h>
+#include <fstream>
 #include <iostream>
 #include <netdb.h>
 #include <sstream>

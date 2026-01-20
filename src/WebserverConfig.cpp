@@ -1,4 +1,4 @@
-#include "WebserverConfig.hpp"
+#include "webserv.h"
 
 WebserverConfig::WebserverConfig(std::string config_file_name) {
   if (config_file_name == "default.wbsrv") {
