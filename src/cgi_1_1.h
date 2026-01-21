@@ -35,21 +35,20 @@ enum CgiAuthType {
   Token_,
 };
 
-struct ContentType {
+class ContentType {
   std::string type;
   std::string subtype;
+  std::map<std::string, std::string> params;
 
+public:
   ContentType(std::string ty, std::string subty)
       : type(ty), subtype(subty), params() {}
-  void add_param(std::string, std::string);
-
-private:
-  std::map<std::string, std::string> params;
+  Result<Void> add_param(std::string, std::string);
 };
 
 enum GatewayInterface { Cgi_1_1 };
 
-struct ServerName {
+class ServerName {
   enum ServerNameType {
     Host,
     Ipv4,
@@ -59,12 +58,12 @@ struct ServerName {
     unsigned char ipv4[4];
   } val;
 
+  ServerName(ServerNameType ty, ServerNameVal v) : type(ty), val(v) {}
+
+public:
   ServerName *host(std::string);
   ServerName *ipv4(unsigned char, unsigned char, unsigned char, unsigned char);
   Result<ServerName *> ipv4(std::string);
-
-private:
-  ServerName(ServerNameType ty, ServerNameVal v) : type(ty), val(v) {}
 };
 
 enum ServerProtocol { Http_1_1 };
@@ -73,7 +72,7 @@ enum ServerSoftware { Webserv };
 
 enum EtcMetaVarType { Http, Custom };
 
-struct CgiMetaVar {
+class CgiMetaVar {
   CgiMetaVarName name;
   union CgiMetaVar_ {
     CgiAuthType auth_type;
@@ -96,7 +95,7 @@ struct CgiMetaVar {
     struct EtcMetaVar {
       EtcMetaVarType type;
       std::string name;
-      void *val;
+      std::string value;
     } *etc_val;
   } val;
 };
