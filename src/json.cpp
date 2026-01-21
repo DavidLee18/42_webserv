@@ -1,25 +1,25 @@
 #include "webserv.h"
 
-Json::Json(const Json &other) : type(other.type) {
-  switch (other.type) {
+Json::Json(const Json &other) : _type(other._type) {
+  switch (other._type) {
   case JsonNull:
-    value = (JsonValue){._null = NULL};
+    _value = (JsonValue){._null = NULL};
     break;
   case JsonBool:
-    value = (JsonValue){._bool = other.value._bool};
+    _value = (JsonValue){._bool = other._value._bool};
     break;
   case JsonNum:
-    value = (JsonValue){.num = other.value.num};
+    _value = (JsonValue){.num = other._value.num};
     break;
   case JsonStr:
-    value = (JsonValue){._str = new std::string(*other.value._str)};
+    _value = (JsonValue){._str = new std::string(*other._value._str)};
     break;
   case JsonArr:
-    value = (JsonValue){.arr = new std::vector<Json>(*other.value.arr)};
+    _value = (JsonValue){.arr = new std::vector<Json>(*other._value.arr)};
     break;
   case JsonObj:
-    value = (JsonValue){
-        .obj = new std::vector<std::pair<std::string, Json> >(*other.value.obj)};
+    _value = (JsonValue){.obj = new std::vector<std::pair<std::string, Json> >(
+                             *other._value.obj)};
     break;
   }
 }
@@ -165,10 +165,10 @@ Result<std::pair<Json *, size_t> > Json::Parser::_obj(const char *raw) {
     Result<std::pair<Json *, size_t> > rec = _str(raw + i);
     std::pair<Json *, size_t> const *k;
     TRY_PAIR(Json *, size_t, k, rec);
-    if (k->first->ty() != Json::JsonStr)
+    if (k->first->type() != Json::JsonStr)
       return (delete k->first, ERR_PAIR(Json *, size_t, Errors::invalid_json));
     i += k->second;
-    std::string _k(*k->first->value._str);
+    std::string _k(*k->first->value()._str);
     delete k->first;
     while (std::isspace(raw[i]))
       i++;
@@ -216,30 +216,30 @@ Result<std::pair<Json *, size_t> > Json::Parser::parse(const char *raw,
 }
 
 std::ostream &operator<<(std::ostream &os, Json &js) {
-  switch (js.type) {
+  switch (js._type) {
   case Json::JsonNull:
     os << "null";
     break;
   case Json::JsonBool:
-    os << js.value._bool;
+    os << js._value._bool;
     break;
   case Json::JsonNum:
-    os << js.value.num;
+    os << js._value.num;
     break;
   case Json::JsonStr:
-    os << '\"' << *js.value._str << '\"';
+    os << '\"' << *js._value._str << '\"';
     break;
   case Json::JsonArr:
-    os << "JsonArr " << *js.value.arr;
+    os << "JsonArr " << *js._value.arr;
     break;
   case Json::JsonObj:
     os << '{';
-    for (size_t i = 0; i < js.value.obj->size(); i++) {
+    for (size_t i = 0; i < js._value.obj->size(); i++) {
       if (i != 0) {
         os << ", ";
       }
       try {
-        os << js.value.obj->at(i);
+        os << js._value.obj->at(i);
       } catch (std::out_of_range e) {
         std::cerr << e.what() << std::endl;
         return os;
