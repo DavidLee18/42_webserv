@@ -155,7 +155,7 @@ bool ServerConfig::is_RouteRule(std::string line) {
   else if (Route[0] == "DELETE")
     return (parse_DELETE(Route));
   else if (Route[0] == "GET|POST|DELETE")
-    return (true);
+    return (parse_all(Route));
   else
     return (false);
 }
@@ -169,6 +169,10 @@ bool ServerConfig::parse_RouteRule(std::ifstream &file) {
       break;
     else if (is_tab_or_space(line, 2) != false)
       return (false);
+    else if (parse_Rule(line))
+      continue ;
+    else
+      return (false);
   }
   return (true);
 }
@@ -180,8 +184,11 @@ bool ServerConfig::parse_GET(std::vector<std::string> line) {
     return (false);
   get.method = GET;
   get.path = string_split(line[1], "/");
-  get.status_code = is_RuleOperator(line[2]);
+  get.op = is_RuleOperator(line[2]);
   get.root = string_split(line[3], "/");
+  get.index = "";
+  get.authInfo = "";
+  get.maxBodyMB = 1;
   routes.push_back(get);
   return (true);
 }
@@ -193,8 +200,11 @@ bool ServerConfig::parse_POST(std::vector<std::string> line) {
     return (false);
   post.method = POST;
   post.path = string_split(line[1], "/");
-  post.status_code = is_RuleOperator(line[2]);
+  post.op = is_RuleOperator(line[2]);
   post.root = string_split(line[3], "/");
+  post.index = "";
+  post.authInfo = "";
+  post.maxBodyMB = 1;
   routes.push_back(post);
   return (true);
 }
@@ -208,7 +218,31 @@ bool ServerConfig::parse_DELETE(std::vector<std::string> line) {
   del.path = string_split(line[1], "/");
   del.op = is_RuleOperator(line[2]);
   del.root = string_split(line[3], "/");
+  del.index = "";
+  del.authInfo = "";
+  del.maxBodyMB = 1;
   routes.push_back(del);
+  return (true);
+}
+
+bool ServerConfig::parse_all(std::vector<std::string> line) {
+  RouteRule all;
+  
+  if (line.size() != 4)
+    return (false);
+  all.method = GET_POST_DELETE;
+  all.path = string_split(line[1], "/");
+  all.op = is_RuleOperator(line[2]);
+  all.root = string_split(line[3], "/");
+  all.index = "";
+  all.authInfo = "";
+  all.maxBodyMB = 1;
+  routes.push_back(all);
+  return (true);
+}
+
+bool ServerConfig::parse_Rule(std::string line) {
+  (void)line;
   return (true);
 }
 
@@ -220,20 +254,20 @@ RuleOperator ServerConfig::is_RuleOperator(std::string indicator)
     return (POINT);
   else if (indicator == "<i-")
     return (AUTOINDEX);
-  // else if (indicator == "=300>")
-    // return (300);
+  else if (indicator == "=300>")
+    return (MULTIPLECHOICES);
   else if (indicator == "=301>")
     return (REDIRECT);
-  // else if (indicator == "=302>")
-  //   return (302);
-  // else if (indicator == "=303>")
-  //   return (303);
-  // else if (indicator == "=304>")
-  //   return (304);
-  // else if (indicator == "=307>")
-  //   return (307);
-  // else if (indicator == "=308>")
-  //   return (308);
+  else if (indicator == "=302>")
+    return (FOUND);
+  else if (indicator == "=303>")
+    return (SEEOTHER);
+  else if (indicator == "=304>")
+    return (NOTMODIFIED);
+  else if (indicator == "=307>")
+    return (TEMPORARYREDIRECT);
+  else if (indicator == "=308>")
+    return (PERMANENTREDIRECT);
   else
     return (UNDEFINE);
 }

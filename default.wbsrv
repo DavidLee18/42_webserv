@@ -25,6 +25,6 @@ types =
 
     GET|POST|DELETE * <- /spool/www/*
         ? index2.html
-        @auth_info
-        ->{} < 10MB
-        !404:/404.html
+        @ auth_info
+        ->{} 10MB
+        ! 404:/404.html

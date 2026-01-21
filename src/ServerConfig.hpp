@@ -11,7 +11,7 @@ enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
 
 struct RouteRule {
   HttpMethod method; // GET | POST | DELETE 등
-  std::vector<std::string> path;          // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
+  std::vector<std::string> path; // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
   int status_code;  // 상태코드
 
   RuleOperator op;
@@ -21,7 +21,7 @@ struct RouteRule {
   std::vector<std::string> root;                      // "/spool/www"
   std::string index;                     // "index2.html" (있으면)
   std::string authInfo;                  // "@auth_info"에서 추출
-  long maxBodyBytes;                     // "< 10MB" → 10 * 1024 * 1024
+  long maxBodyMB;                     // "< 10MB" → 10 * 1024 * 1024
   std::map<int, std::string> errorPages; // 404 → "/404.html"
 };
 
@@ -48,6 +48,8 @@ private:
   bool parse_GET(std::vector<std::string>);
   bool parse_POST(std::vector<std::string>);
   bool parse_DELETE(std::vector<std::string>);
+  bool parse_all(std::vector<std::string> line);
+  bool parse_Rule(std::string line);
   RuleOperator is_RuleOperator(std::string indicator);
 
 public:

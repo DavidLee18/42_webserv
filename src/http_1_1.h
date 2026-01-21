@@ -6,6 +6,7 @@
 #include <string>
 
 enum HttpMethod {
+  GET_POST_DELETE,
   GET,
   HEAD,
   OPTIONS,
