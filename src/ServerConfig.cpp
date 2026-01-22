@@ -20,7 +20,7 @@ bool ServerConfig::set_ServerConfig(std::ifstream &file) {
       else if (is_serverResponseTime(line))
         parse_serverResponseTime(line);
       else if (is_RouteRule(line))
-        parse_RouteRule(file);
+        parse_RouteRule(line, file); // line을 같이 넘겨서 등록 추가
       else
         err_line.push_back(trim_space(line));
     } else
@@ -155,13 +155,15 @@ bool ServerConfig::is_RouteRule(std::string line) {
   else if (Route[0] == "DELETE")
     return (parse_DELETE(Route));
   else if (Route[0] == "GET|POST|DELETE")
-    return (parse_all(Route));
+    return (true);
   else
     return (false);
 }
 
-bool ServerConfig::parse_RouteRule(std::ifstream &file) {
+bool ServerConfig::parse_RouteRule(std::string method, std::ifstream &file) {
   std::string line;
+  std::vector<std::string> met = string_split(string_split(method, " ")[0], "|");
+  std::string key = string_split(method, " ")[1];
 
   while (std::getline(file, line))
   {
@@ -169,7 +171,7 @@ bool ServerConfig::parse_RouteRule(std::ifstream &file) {
       break;
     else if (is_tab_or_space(line, 2) != false)
       return (false);
-    else if (parse_Rule(line))
+    else if (parse_Rule(met, key, line))
       continue ;
     else
       return (false);
@@ -189,7 +191,6 @@ bool ServerConfig::parse_GET(std::vector<std::string> line) {
   get.index = "";
   get.authInfo = "";
   get.maxBodyMB = 1;
-  routes.push_back(get);
   return (true);
 }
 
@@ -205,7 +206,6 @@ bool ServerConfig::parse_POST(std::vector<std::string> line) {
   post.index = "";
   post.authInfo = "";
   post.maxBodyMB = 1;
-  routes.push_back(post);
   return (true);
 }
 
@@ -221,28 +221,23 @@ bool ServerConfig::parse_DELETE(std::vector<std::string> line) {
   del.index = "";
   del.authInfo = "";
   del.maxBodyMB = 1;
-  routes.push_back(del);
   return (true);
 }
 
-bool ServerConfig::parse_all(std::vector<std::string> line) {
-  RouteRule all;
-  
-  if (line.size() != 4)
+bool ServerConfig::parse_Rule(std::vector<std::string> met, std::string key, std::string line) {
+  (void)met;
+  (void)key;
+  std::vector<std::string> rule = string_split(line, " ");
+  if (rule[0] == "?")
+    ;
+  else if (rule[0] == "@")
+    ;
+  else if (rule[0] == "->{}")
+    ;
+  else if (rule[0] == "!")
+    ;
+  else
     return (false);
-  all.method = GET_POST_DELETE;
-  all.path = string_split(line[1], "/");
-  all.op = is_RuleOperator(line[2]);
-  all.root = string_split(line[3], "/");
-  all.index = "";
-  all.authInfo = "";
-  all.maxBodyMB = 1;
-  routes.push_back(all);
-  return (true);
-}
-
-bool ServerConfig::parse_Rule(std::string line) {
-  (void)line;
   return (true);
 }
 
