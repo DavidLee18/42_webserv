@@ -56,10 +56,10 @@ struct Void {};
 #define ERR_PAIR(t1, t2, e) Result<std::pair<t1, t2> >(NULL, e)
 
 #define TRY_PAIR(t1, t2, v, r)                                                 \
-  if (r.error().empty()) {                                                     \
-    v = r.value();                                                             \
+  if ((r).error().empty()) {                                                   \
+    v = const_cast<std::pair<t1, t2> *>((r).value());                          \
   } else {                                                                     \
-    return r;                                                                  \
+    return (r);                                                                \
   }
 
 #endif // RESULT_H

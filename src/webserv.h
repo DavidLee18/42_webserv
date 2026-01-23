@@ -14,7 +14,9 @@
 #include "errors.h"
 #include "http_1_1.h"
 #include "json.h"
+#include <algorithm>
 #include <arpa/inet.h>
+#include <cctype>
 #include <cerrno>
 #include <csignal>
 #include <cstdlib>

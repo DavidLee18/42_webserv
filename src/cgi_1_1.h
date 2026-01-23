@@ -32,7 +32,7 @@ enum CgiMetaVarName {
 enum CgiAuthType {
   Basic,
   Digest,
-  Token_,
+  CgiAuthOther,
 };
 
 class ContentType {
@@ -83,6 +83,18 @@ enum ServerSoftware { Webserv };
 
 enum EtcMetaVarType { Http, Custom };
 
+class EtcMetaVar {
+  EtcMetaVarType type;
+  std::string name;
+  std::string value;
+
+public:
+  EtcMetaVar(EtcMetaVarType ty, std::string n, std::string v)
+      : type(ty), name(n), value(v) {}
+  EtcMetaVar(EtcMetaVar const &other)
+      : type(other.type), name(other.name), value(other.value) {}
+};
+
 union CgiMetaVar_ {
   CgiAuthType auth_type;
   unsigned int content_length;
@@ -101,36 +113,37 @@ union CgiMetaVar_ {
   unsigned short server_port;
   ServerProtocol server_protocol;
   ServerSoftware server_software;
-  struct EtcMetaVar {
-    EtcMetaVarType type;
-    std::string name;
-    std::string value;
-  } *etc_val;
+  EtcMetaVar *etc_val;
 };
 class CgiMetaVar {
   CgiMetaVarName name;
   CgiMetaVar_ val;
   CgiMetaVar(CgiMetaVarName n, CgiMetaVar_ v) : name(n), val(v) {}
-
-public:
   static CgiMetaVar *auth_type(CgiAuthType);
   static CgiMetaVar *content_length(unsigned int);
   static CgiMetaVar *content_type(ContentType);
   static CgiMetaVar *gateway_interface(GatewayInterface);
-  static Result<CgiMetaVar *> path_info(std::string);
+  static CgiMetaVar *path_info(std::list<std::string>);
   static CgiMetaVar *path_translated(std::string);
-  static Result<CgiMetaVar *> query_string(std::string);
-  static Result<CgiMetaVar *> remote_addr(std::string);
-  static CgiMetaVar *remote_host(std::string);
+  static CgiMetaVar *query_string(std::map<std::string, std::string>);
+  static CgiMetaVar *remote_addr(unsigned char, unsigned char, unsigned char,
+                                 unsigned char);
+  static CgiMetaVar *remote_host(std::list<std::string>);
   static CgiMetaVar *remote_ident(std::string);
   static CgiMetaVar *remote_user(std::string);
   static CgiMetaVar *request_method(HttpMethod);
-  static CgiMetaVar *script_name(std::string);
+  static CgiMetaVar *script_name(std::list<std::string>);
   static CgiMetaVar *server_name(ServerName *);
   static CgiMetaVar *server_port(unsigned short);
   static CgiMetaVar *server_protocol(ServerProtocol);
   static CgiMetaVar *server_software(ServerSoftware);
   static CgiMetaVar *custom_var(EtcMetaVarType, std::string, std::string);
+
+public:
+  class Parser {
+    virtual void phantom() = 0;
+    static Result<std::pair<CgiMetaVar *, size_t> > parse_auth_type(std::string);
+  };
 };
 
 class CgiInput {
@@ -152,5 +165,9 @@ class CgiDelegate {
 public:
   ~CgiDelegate();
 };
+
+unsigned char to_upper(unsigned char c) {
+  return static_cast<unsigned char>(std::tolower(static_cast<int>(c)));
+}
 
 #endif
