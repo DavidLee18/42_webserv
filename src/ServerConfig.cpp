@@ -155,7 +155,11 @@ bool ServerConfig::is_RouteRule(std::string line) {
   else if (Route[0] == "DELETE")
     return (parse_DELETE(Route));
   else if (Route[0] == "GET|POST|DELETE")
-    return (true);
+  {
+    if (parse_GET(Route) && parse_POST(Route) && parse_DELETE(Route))
+      return (true);
+    return (false);
+  }
   else
     return (false);
 }
@@ -191,6 +195,7 @@ bool ServerConfig::parse_GET(std::vector<std::string> line) {
   get.index = "";
   get.authInfo = "";
   get.maxBodyMB = 1;
+  routes[std::make_pair(get.method, get.path)] = get;
   return (true);
 }
 
@@ -206,6 +211,7 @@ bool ServerConfig::parse_POST(std::vector<std::string> line) {
   post.index = "";
   post.authInfo = "";
   post.maxBodyMB = 1;
+  routes[std::make_pair(post.method, post.path)] = post;
   return (true);
 }
 
@@ -221,6 +227,7 @@ bool ServerConfig::parse_DELETE(std::vector<std::string> line) {
   del.index = "";
   del.authInfo = "";
   del.maxBodyMB = 1;
+  routes[std::make_pair(del.method, del.path)] = del;
   return (true);
 }
 
