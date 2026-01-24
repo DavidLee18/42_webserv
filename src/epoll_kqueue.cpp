@@ -216,6 +216,6 @@ Result<Events> EPoll::wait(const int timeout_ms) {
   if (n == -1) {
     return ERR(Events, Errors::interrupted);
   }
-  return Events::init(_events, n, events);
+  return Events::init(_events, static_cast<size_t>(n), events);
 }
 #endif

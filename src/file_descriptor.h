@@ -2,6 +2,7 @@
 #define FILE_DESCRIPTOR_H
 
 // #include "http_1_1.h"
+#include "http_1_1.h"
 #include "result.h"
 #include <sys/socket.h>
 
@@ -13,7 +14,6 @@ class Option;
 #endif
 
 class Event;
-class PartialString;
 
 class FileDescriptor {
   int _fd;
@@ -40,7 +40,7 @@ public:
 
   Result<ssize_t> sock_recv(void *buf, size_t size);
 
-  Result<PartialString> try_read_to_end();
+  Result<Http::PartialString> try_read_to_end();
 
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {

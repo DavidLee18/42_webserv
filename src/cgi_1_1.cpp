@@ -11,13 +11,14 @@ Result<Void> ContentType::add_param(std::string k, std::string v) {
 ServerName *ServerName::host(std::list<std::string> hostparts) {
   return new ServerName(
       Host,
-      (ServerNameVal){.host_name = new std::list<std::string>(hostparts)});
+      (ServerName::Val){.host_name = new std::list<std::string>(hostparts)});
 }
 
 ServerName *ServerName::ipv4(unsigned char b1, unsigned char b2,
                              unsigned char b3, unsigned char b4) {
-  return new ServerName(Ipv4, (ServerNameVal){.ipv4 = {b1, b2, b3, b4}});
+  return new ServerName(Ipv4, (ServerName::Val){.ipv4 = {b1, b2, b3, b4}});
 }
+
 Result<std::pair<ServerName *, size_t> >
 ServerName::Parser::parse_host(std::string raw) {
   std::stringstream ss(raw);
@@ -53,6 +54,7 @@ ServerName::Parser::parse_host(std::string raw) {
   return OK_PAIR(ServerName *, size_t, ServerName::host(parts),
                  j + part.size());
 }
+
 Result<std::pair<ServerName *, size_t> >
 ServerName::Parser::parse_ipv4(std::string raw) {
   std::stringstream ss(raw);
@@ -99,96 +101,99 @@ ServerName::Parser::parse(std::string raw) {
 }
 
 CgiMetaVar *CgiMetaVar::auth_type(CgiAuthType ty) {
-  return new CgiMetaVar(AUTH_TYPE, (CgiMetaVar_){.auth_type = ty});
+  return new CgiMetaVar(AUTH_TYPE,
+                        (CgiMetaVar::Val){.auth_type = new CgiAuthType(ty)});
 }
 
 CgiMetaVar *CgiMetaVar::content_length(unsigned int l) {
-  return new CgiMetaVar(CONTENT_LENGTH, (CgiMetaVar_){.content_length = l});
+  return new CgiMetaVar(CONTENT_LENGTH, (CgiMetaVar::Val){.content_length = l});
 }
 
 CgiMetaVar *CgiMetaVar::content_type(ContentType ty) {
   return new CgiMetaVar(CONTENT_TYPE,
-                        (CgiMetaVar_){.content_type = new ContentType(ty)});
+                        (CgiMetaVar::Val){.content_type = new ContentType(ty)});
 }
 
 CgiMetaVar *CgiMetaVar::gateway_interface(GatewayInterface i) {
   return new CgiMetaVar(GATEWAY_INTERFACE,
-                        (CgiMetaVar_){.gateway_interface = i});
+                        (CgiMetaVar::Val){.gateway_interface = i});
 }
 
 CgiMetaVar *CgiMetaVar::path_info(std::list<std::string> parts) {
   return new CgiMetaVar(
-      PATH_INFO, (CgiMetaVar_){.path_info = new std::list<std::string>(parts)});
+      PATH_INFO,
+      (CgiMetaVar::Val){.path_info = new std::list<std::string>(parts)});
 }
 
 CgiMetaVar *CgiMetaVar::path_translated(std::string path) {
   return new CgiMetaVar(
-      PATH_TRANSLATED, (CgiMetaVar_){.path_translated = new std::string(path)});
+      PATH_TRANSLATED,
+      (CgiMetaVar::Val){.path_translated = new std::string(path)});
 }
 
 CgiMetaVar *
 CgiMetaVar::query_string(std::map<std::string, std::string> query_map) {
   return new CgiMetaVar(
       QUERY_STRING,
-      (CgiMetaVar_){.query_string =
-                        new std::map<std::string, std::string>(query_map)});
+      (CgiMetaVar::Val){.query_string =
+                            new std::map<std::string, std::string>(query_map)});
 }
 
 CgiMetaVar *CgiMetaVar::remote_addr(unsigned char a, unsigned char b,
                                     unsigned char c, unsigned char d) {
   return new CgiMetaVar(REMOTE_ADDR,
-                        (CgiMetaVar_){.remote_addr = {a, b, c, d}});
+                        (CgiMetaVar::Val){.remote_addr = {a, b, c, d}});
 }
 
 CgiMetaVar *CgiMetaVar::remote_host(std::list<std::string> parts) {
   return new CgiMetaVar(
       REMOTE_HOST,
-      (CgiMetaVar_){.remote_host = new std::list<std::string>(parts)});
+      (CgiMetaVar::Val){.remote_host = new std::list<std::string>(parts)});
 }
 
 CgiMetaVar *CgiMetaVar::remote_ident(std::string id) {
   return new CgiMetaVar(REMOTE_IDENT,
-                        (CgiMetaVar_){.remote_ident = new std::string(id)});
+                        (CgiMetaVar::Val){.remote_ident = new std::string(id)});
 }
 
 CgiMetaVar *CgiMetaVar::remote_user(std::string user) {
-  return new CgiMetaVar(REMOTE_USER,
-                        (CgiMetaVar_){.remote_user = new std::string(user)});
+  return new CgiMetaVar(
+      REMOTE_USER, (CgiMetaVar::Val){.remote_user = new std::string(user)});
 }
 
 CgiMetaVar *CgiMetaVar::request_method(HttpMethod method) {
   return new CgiMetaVar(REQUEST_METHOD,
-                        (CgiMetaVar_){.request_method = method});
+                        (CgiMetaVar::Val){.request_method = method});
 }
 
 CgiMetaVar *CgiMetaVar::script_name(std::list<std::string> parts) {
   return new CgiMetaVar(
       SCRIPT_NAME,
-      (CgiMetaVar_){.script_name = new std::list<std::string>(parts)});
+      (CgiMetaVar::Val){.script_name = new std::list<std::string>(parts)});
 }
 
 CgiMetaVar *CgiMetaVar::server_name(ServerName *srv) {
-  return new CgiMetaVar(SERVER_NAME, (CgiMetaVar_){.server_name = srv});
+  return new CgiMetaVar(SERVER_NAME, (CgiMetaVar::Val){.server_name = srv});
 }
 
 CgiMetaVar *CgiMetaVar::server_port(unsigned short port) {
-  return new CgiMetaVar(SERVER_PORT, (CgiMetaVar_){.server_port = port});
+  return new CgiMetaVar(SERVER_PORT, (CgiMetaVar::Val){.server_port = port});
 }
 
 CgiMetaVar *CgiMetaVar::server_protocol(ServerProtocol proto) {
   return new CgiMetaVar(SERVER_PROTOCOL,
-                        (CgiMetaVar_){.server_protocol = proto});
+                        (CgiMetaVar::Val){.server_protocol = proto});
 }
 
 CgiMetaVar *CgiMetaVar::server_software(ServerSoftware soft) {
   return new CgiMetaVar(SERVER_SOFTWARE,
-                        (CgiMetaVar_){.server_software = soft});
+                        (CgiMetaVar::Val){.server_software = soft});
 }
 
-CgiMetaVar *CgiMetaVar::custom_var(EtcMetaVarType ty, std::string name,
+CgiMetaVar *CgiMetaVar::custom_var(EtcMetaVar::Type ty, std::string name,
                                    std::string value) {
   return new CgiMetaVar(
-      X_, (CgiMetaVar_){.etc_val = new EtcMetaVar(ty, name, value)});
+      X_, (CgiMetaVar::Val){.etc_val = new EtcMetaVar(ty, name, value)});
 }
 
 Result<std::pair<CgiMetaVar *, size_t> >
@@ -200,9 +205,17 @@ CgiMetaVar::Parser::parse_auth_type(std::string raw) {
     return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
   std::transform(ty.begin(), ty.end(), ty.begin(), to_upper);
   if (ty == "basic")
-    return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::auth_type(Basic), 5);
+    return OK_PAIR(CgiMetaVar *, size_t,
+                   CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::Basic)), 5);
   if (ty == "digest")
-    return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::auth_type(Digest), 6);
-  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::auth_type(CgiAuthOther),
-                 ty.size());
+    return OK_PAIR(CgiMetaVar *, size_t,
+                   CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::Digest)), 6);
+  return OK_PAIR(
+      CgiMetaVar *, size_t,
+      CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::CgiAuthOther, ty)),
+      ty.size());
+}
+
+unsigned char to_upper(unsigned char c) {
+  return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
 }

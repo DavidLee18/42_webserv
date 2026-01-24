@@ -1,6 +1,7 @@
 CXX := c++
-CXXFLAGS := -Wall -Werror -Wextra -O2 -foptimize-sibling-calls
-DEBUG_CXXFLAGS := -Wall -Werror -Wextra -g3 -O0 #-fsanitize=address -fno-omit-frame-pointer
+CXXFLAGS_COMMON := -Wall -Werror -Wextra -Wconversion -Wassign-enum -std=c++98
+CXXFLAGS := -O2 -foptimize-sibling-calls
+DEBUG_CXXFLAGS := -g3 -O0 #-fsanitize=address -fno-omit-frame-pointer
 NAME := webserv
 
 BUILD_DIR := build
@@ -14,11 +15,11 @@ OBJS := $(patsubst src/%.cpp, build/%.o, $(SRCS))
 all: $(NAME)
 
 $(NAME): $(OBJS)
-	$(CXX) $(OBJS) $(DEBUG_CXXFLAGS) -o $(NAME)
+	$(CXX) $(OBJS) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(NAME)
 
 build/%.o: src/%.cpp
 	mkdir -p $(BUILD_DIR)
-	$(CXX) $(DEBUG_CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -c $< -o $@
 
 $(SRCS): $(SRC_DIR)/webserv.h
 

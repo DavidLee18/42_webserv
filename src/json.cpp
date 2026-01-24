@@ -2,50 +2,45 @@
 
 Json::Json(const Json &other) : _type(other._type) {
   switch (other._type) {
-  case JsonNull:
-    _value = (JsonValue){._null = NULL};
+  case Null:
+    _value = (Value){._null = NULL};
     break;
-  case JsonBool:
-    _value = (JsonValue){._bool = other._value._bool};
+  case Bool:
+    _value = (Value){._bool = other._value._bool};
     break;
-  case JsonNum:
-    _value = (JsonValue){.num = other._value.num};
+  case Num:
+    _value = (Value){.num = other._value.num};
     break;
-  case JsonStr:
-    _value = (JsonValue){._str = new std::string(*other._value._str)};
+  case Str:
+    _value = (Value){._str = new std::string(*other._value._str)};
     break;
-  case JsonArr:
-    _value = (JsonValue){.arr = new std::vector<Json>(*other._value.arr)};
+  case Arr:
+    _value = (Value){.arr = new std::vector<Json>(*other._value.arr)};
     break;
-  case JsonObj:
-    _value = (JsonValue){.obj = new std::vector<std::pair<std::string, Json> >(
-                             *other._value.obj)};
+  case Obj:
+    _value = (Value){.obj = new std::vector<std::pair<std::string, Json> >(
+                         *other._value.obj)};
     break;
   }
 }
 
-Json *Json::null() { return new Json(JsonNull, (JsonValue){._null = NULL}); }
+Json *Json::null() { return new Json(Null, (Value){._null = NULL}); }
 
-Json *Json::_bool(bool b) {
-  return new Json(JsonBool, (JsonValue){._bool = b});
-}
+Json *Json::_bool(bool b) { return new Json(Bool, (Value){._bool = b}); }
 
-Json *Json::num(long double ld) {
-  return new Json(JsonNum, (JsonValue){.num = ld});
-}
+Json *Json::num(long double ld) { return new Json(Num, (Value){.num = ld}); }
 
 Json *Json::str(std::string s) {
-  return new Json(JsonStr, (JsonValue){._str = new std::string(s)});
+  return new Json(Str, (Value){._str = new std::string(s)});
 }
 
 Json *Json::arr(std::vector<Json> js) {
-  return new Json(JsonArr, (JsonValue){.arr = new std::vector<Json>(js)});
+  return new Json(Arr, (Value){.arr = new std::vector<Json>(js)});
 }
 
 Json *Json::obj(std::vector<std::pair<std::string, Json> > m) {
   return new Json(
-      JsonObj,
-      (JsonValue){.obj = new std::vector<std::pair<std::string, Json> >(m)});
+      Obj, (Value){.obj = new std::vector<std::pair<std::string, Json> >(m)});
 }
 
 Result<std::pair<Json *, size_t> > Json::Parser::null_or_undef(const char *raw) {
@@ -92,8 +87,8 @@ Result<std::pair<Json *, size_t> > Json::Parser::_str(const char *raw) {
   const char *pos = std::strchr(raw + 1, '\"');
   if (pos == NULL)
     return ERR_PAIR(Json *, size_t, Errors::invalid_format);
-  char *cs = new char[pos - raw];
-  cs = std::strncpy(cs, raw + 1, pos - raw - 1);
+  char *cs = new char[static_cast<size_t>(pos - raw)];
+  cs = std::strncpy(cs, raw + 1, static_cast<size_t>(pos - raw - 1));
   cs[pos - raw - 1] = '\0';
   std::string str(cs);
   delete[] cs;
@@ -165,7 +160,7 @@ Result<std::pair<Json *, size_t> > Json::Parser::_obj(const char *raw) {
     Result<std::pair<Json *, size_t> > rec = _str(raw + i);
     std::pair<Json *, size_t> const *k;
     TRY_PAIR(Json *, size_t, k, rec);
-    if (k->first->type() != Json::JsonStr)
+    if (k->first->type() != Json::Str)
       return (delete k->first, ERR_PAIR(Json *, size_t, Errors::invalid_json));
     i += k->second;
     std::string _k(*k->first->value()._str);
@@ -217,22 +212,22 @@ Result<std::pair<Json *, size_t> > Json::Parser::parse(const char *raw,
 
 std::ostream &operator<<(std::ostream &os, Json &js) {
   switch (js._type) {
-  case Json::JsonNull:
+  case Json::Null:
     os << "null";
     break;
-  case Json::JsonBool:
+  case Json::Bool:
     os << js._value._bool;
     break;
-  case Json::JsonNum:
+  case Json::Num:
     os << js._value.num;
     break;
-  case Json::JsonStr:
+  case Json::Str:
     os << '\"' << *js._value._str << '\"';
     break;
-  case Json::JsonArr:
+  case Json::Arr:
     os << "JsonArr " << *js._value.arr;
     break;
-  case Json::JsonObj:
+  case Json::Obj:
     os << '{';
     for (size_t i = 0; i < js._value.obj->size(); i++) {
       if (i != 0) {
