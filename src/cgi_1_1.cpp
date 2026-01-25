@@ -1,5 +1,8 @@
 #include "webserv.h"
 
+// Forward declaration
+unsigned char to_upper(unsigned char);
+
 Result<Void> ContentType::add_param(std::string k, std::string v) {
   std::map<std::string, std::string>::iterator iter = params.find(k);
   if (iter == params.end())
@@ -539,11 +542,11 @@ CgiMetaVar::Parser::parse_server_port(std::string raw) {
   char *ptr = NULL;
   const char *str = raw.c_str();
   unsigned long port = std::strtoul(str, &ptr, 10);
-  if (ptr == NULL || *ptr != '\0' || port > 65535)
+  if (ptr == str || *ptr != '\0' || port > 65535)
     return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
   return OK_PAIR(CgiMetaVar *, size_t,
                  CgiMetaVar::server_port(static_cast<unsigned short>(port)),
-                 ptr - str);
+                 raw.length());
 }
 
 Result<std::pair<CgiMetaVar *, size_t> >
