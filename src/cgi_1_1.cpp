@@ -228,6 +228,122 @@ CgiMetaVar::Parser::parse_content_length(std::string raw) {
                  ptr - str);
 }
 
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_content_type(std::string raw) {
+  size_t consumed = 0;
+  size_t slash_pos = raw.find('/');
+  if (slash_pos == std::string::npos)
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  
+  std::string type_str = raw.substr(0, slash_pos);
+  // Convert to lowercase for comparison
+  std::transform(type_str.begin(), type_str.end(), type_str.begin(), ::tolower);
+  
+  // Parse main type
+  ContentType::Type type;
+  if (type_str == "application")
+    type = ContentType::application;
+  else if (type_str == "audio")
+    type = ContentType::audio;
+  else if (type_str == "example")
+    type = ContentType::example;
+  else if (type_str == "font")
+    type = ContentType::font;
+  else if (type_str == "haptics")
+    type = ContentType::haptics;
+  else if (type_str == "image")
+    type = ContentType::image;
+  else if (type_str == "message")
+    type = ContentType::message;
+  else if (type_str == "model")
+    type = ContentType::model;
+  else if (type_str == "multipart")
+    type = ContentType::multipart;
+  else if (type_str == "text")
+    type = ContentType::text;
+  else if (type_str == "video")
+    type = ContentType::video;
+  else
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  
+  consumed = slash_pos + 1;
+  
+  // Parse subtype (everything until semicolon or end of string)
+  size_t semicolon_pos = raw.find(';', consumed);
+  std::string subtype;
+  if (semicolon_pos == std::string::npos) {
+    subtype = raw.substr(consumed);
+    consumed = raw.length();
+  } else {
+    subtype = raw.substr(consumed, semicolon_pos - consumed);
+    consumed = semicolon_pos;
+  }
+  
+  // Trim whitespace from subtype
+  size_t start = subtype.find_first_not_of(" \t");
+  size_t end = subtype.find_last_not_of(" \t");
+  if (start == std::string::npos)
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  subtype = subtype.substr(start, end - start + 1);
+  
+  ContentType ct(type, subtype);
+  
+  // Parse parameters if present
+  while (consumed < raw.length() && raw[consumed] == ';') {
+    consumed++; // skip semicolon
+    
+    // Skip whitespace
+    while (consumed < raw.length() && (raw[consumed] == ' ' || raw[consumed] == '\t'))
+      consumed++;
+    
+    if (consumed >= raw.length())
+      break;
+    
+    // Find parameter name
+    size_t eq_pos = raw.find('=', consumed);
+    if (eq_pos == std::string::npos)
+      break;
+    
+    std::string param_name = raw.substr(consumed, eq_pos - consumed);
+    // Trim whitespace from param name
+    start = param_name.find_first_not_of(" \t");
+    end = param_name.find_last_not_of(" \t");
+    if (start != std::string::npos)
+      param_name = param_name.substr(start, end - start + 1);
+    
+    consumed = eq_pos + 1;
+    
+    // Skip whitespace after =
+    while (consumed < raw.length() && (raw[consumed] == ' ' || raw[consumed] == '\t'))
+      consumed++;
+    
+    // Find parameter value (until semicolon or end)
+    size_t next_semi = raw.find(';', consumed);
+    std::string param_value;
+    if (next_semi == std::string::npos) {
+      param_value = raw.substr(consumed);
+      consumed = raw.length();
+    } else {
+      param_value = raw.substr(consumed, next_semi - consumed);
+      consumed = next_semi;
+    }
+    
+    // Trim whitespace from param value
+    start = param_value.find_first_not_of(" \t");
+    end = param_value.find_last_not_of(" \t");
+    if (start != std::string::npos) {
+      param_value = param_value.substr(start, end - start + 1);
+      // Remove quotes if present
+      if (param_value.length() >= 2 && param_value[0] == '"' && param_value[param_value.length() - 1] == '"')
+        param_value = param_value.substr(1, param_value.length() - 2);
+    }
+    
+    ct.params[param_name] = param_value;
+  }
+  
+  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::content_type(ct), consumed);
+}
+
 unsigned char to_upper(unsigned char c) {
   return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
 }
