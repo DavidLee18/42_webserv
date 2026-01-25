@@ -85,6 +85,7 @@ public:
   public:
     class Parser {
       virtual void phantom() = 0;
+      
       static Result<std::pair<Request *, size_t> > parse_request_line(const char *, size_t);
       static Result<std::pair<Method, size_t> > parse_method(const char *, size_t);
       static Result<std::pair<std::string, size_t> > parse_path(const char *, size_t);
@@ -95,6 +96,8 @@ public:
     public:
       static Result<std::pair<Request *, size_t> > parse(const char *, size_t);
     };
+    
+    friend class Parser;
 
     Request(Method m, std::string p, Body b)
         : _method(m), _headers(), _path(p), _body(b) {}

@@ -109,8 +109,9 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   Http::Method method = method_res.value()->first;
   offset += method_res.value()->second;
   
-  // Skip space
-  offset = skip_whitespace(input, offset, offset + 100);
+  // Skip space (limited search)
+  size_t space_limit = offset + 10; // reasonable limit for spaces
+  offset = skip_whitespace(input, offset, space_limit);
   
   // Parse path
   Result<std::pair<std::string, size_t> > path_res = parse_path(input, offset);
@@ -121,8 +122,9 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   std::string path = path_res.value()->first;
   offset += path_res.value()->second;
   
-  // Skip space
-  offset = skip_whitespace(input, offset, offset + 100);
+  // Skip space (limited search)
+  space_limit = offset + 10; // reasonable limit for spaces
+  offset = skip_whitespace(input, offset, space_limit);
   
   // Parse HTTP version
   Result<std::pair<std::string, size_t> > version_res = parse_http_version(input, offset);
@@ -176,8 +178,9 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
     }
     offset++; // skip ':'
     
-    // Skip whitespace after colon
-    offset = skip_whitespace(input, offset, offset + 100);
+    // Skip whitespace after colon (limited search)
+    size_t ws_limit = offset + 10; // reasonable limit for whitespace
+    offset = skip_whitespace(input, offset, ws_limit);
     
     // Parse header value
     std::string header_value;
