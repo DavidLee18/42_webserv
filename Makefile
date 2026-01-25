@@ -1,5 +1,5 @@
 CXX := c++
-CXXFLAGS_COMMON := -Wall -Werror -Wextra -Wconversion -Wassign-enum -std=c++98
+CXXFLAGS_COMMON := -Wall -Werror -Wextra -Wconversion -std=c++98
 CXXFLAGS := -O2 -foptimize-sibling-calls
 DEBUG_CXXFLAGS := -g3 -O0 #-fsanitize=address -fno-omit-frame-pointer
 NAME := webserv
@@ -9,7 +9,7 @@ SRC_DIR := src
 
 SRCS := src/errors.cpp src/epoll_kqueue.cpp \
 	src/ParsingUtils.cpp src/ServerConfig.cpp src/WebserverConfig.cpp \
-	src/file_descriptor.cpp src/json.cpp src/main.cpp
+	src/file_descriptor.cpp src/json.cpp src/cgi_1_1.cpp src/main.cpp
 OBJS := $(patsubst src/%.cpp, build/%.o, $(SRCS))
 
 all: $(NAME)

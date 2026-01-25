@@ -1,5 +1,8 @@
 #include "webserv.h"
 
+// Forward declaration
+unsigned char to_upper(unsigned char);
+
 Result<Void> ContentType::add_param(std::string k, std::string v) {
   std::map<std::string, std::string>::iterator iter = params.find(k);
   if (iter == params.end())
@@ -226,6 +229,355 @@ CgiMetaVar::Parser::parse_content_length(std::string raw) {
   return OK_PAIR(CgiMetaVar *, size_t,
                  CgiMetaVar::content_length(static_cast<unsigned int>(l)),
                  ptr - str);
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_content_type(std::string raw) {
+  size_t consumed = 0;
+  size_t slash_pos = raw.find('/');
+  if (slash_pos == std::string::npos)
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  
+  std::string type_str = raw.substr(0, slash_pos);
+  // Convert to lowercase for comparison
+  std::transform(type_str.begin(), type_str.end(), type_str.begin(), ::tolower);
+  
+  // Parse main type
+  ContentType::Type type;
+  if (type_str == "application")
+    type = ContentType::application;
+  else if (type_str == "audio")
+    type = ContentType::audio;
+  else if (type_str == "example")
+    type = ContentType::example;
+  else if (type_str == "font")
+    type = ContentType::font;
+  else if (type_str == "haptics")
+    type = ContentType::haptics;
+  else if (type_str == "image")
+    type = ContentType::image;
+  else if (type_str == "message")
+    type = ContentType::message;
+  else if (type_str == "model")
+    type = ContentType::model;
+  else if (type_str == "multipart")
+    type = ContentType::multipart;
+  else if (type_str == "text")
+    type = ContentType::text;
+  else if (type_str == "video")
+    type = ContentType::video;
+  else
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  
+  consumed = slash_pos + 1;
+  
+  // Parse subtype (everything until semicolon or end of string)
+  size_t semicolon_pos = raw.find(';', consumed);
+  std::string subtype;
+  if (semicolon_pos == std::string::npos) {
+    subtype = raw.substr(consumed);
+    consumed = raw.length();
+  } else {
+    subtype = raw.substr(consumed, semicolon_pos - consumed);
+    consumed = semicolon_pos;
+  }
+  
+  // Trim whitespace from subtype
+  size_t start = subtype.find_first_not_of(" \t");
+  size_t end = subtype.find_last_not_of(" \t");
+  if (start == std::string::npos)
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  subtype = subtype.substr(start, end - start + 1);
+  
+  ContentType ct(type, subtype);
+  
+  // Parse parameters if present
+  while (consumed < raw.length() && raw[consumed] == ';') {
+    consumed++; // skip semicolon
+    
+    // Skip whitespace
+    while (consumed < raw.length() && (raw[consumed] == ' ' || raw[consumed] == '\t'))
+      consumed++;
+    
+    if (consumed >= raw.length())
+      break;
+    
+    // Find parameter name
+    size_t eq_pos = raw.find('=', consumed);
+    if (eq_pos == std::string::npos)
+      break;
+    
+    std::string param_name = raw.substr(consumed, eq_pos - consumed);
+    // Trim whitespace from param name
+    start = param_name.find_first_not_of(" \t");
+    end = param_name.find_last_not_of(" \t");
+    if (start != std::string::npos)
+      param_name = param_name.substr(start, end - start + 1);
+    
+    consumed = eq_pos + 1;
+    
+    // Skip whitespace after =
+    while (consumed < raw.length() && (raw[consumed] == ' ' || raw[consumed] == '\t'))
+      consumed++;
+    
+    // Find parameter value (until semicolon or end)
+    size_t next_semi = raw.find(';', consumed);
+    std::string param_value;
+    if (next_semi == std::string::npos) {
+      param_value = raw.substr(consumed);
+      consumed = raw.length();
+    } else {
+      param_value = raw.substr(consumed, next_semi - consumed);
+      consumed = next_semi;
+    }
+    
+    // Trim whitespace from param value
+    start = param_value.find_first_not_of(" \t");
+    end = param_value.find_last_not_of(" \t");
+    if (start != std::string::npos) {
+      param_value = param_value.substr(start, end - start + 1);
+      // Remove quotes if present
+      if (param_value.length() >= 2 && param_value[0] == '"' && param_value[param_value.length() - 1] == '"')
+        param_value = param_value.substr(1, param_value.length() - 2);
+    }
+    
+    ct.params[param_name] = param_value;
+  }
+  
+  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::content_type(ct), consumed);
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_gateway_interface(std::string raw) {
+  std::string norm = raw;
+  std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
+  if (norm == "cgi/1.1" || norm == "cgi-1.1")
+    return OK_PAIR(CgiMetaVar *, size_t,
+                   CgiMetaVar::gateway_interface(Cgi_1_1), raw.length());
+  return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_path_info(std::string raw) {
+  if (raw.empty() || raw[0] != '/')
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  
+  std::list<std::string> parts;
+  std::stringstream ss(raw.substr(1)); // skip leading slash
+  std::string part;
+  
+  while (std::getline(ss, part, '/')) {
+    parts.push_back(part);
+  }
+  
+  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::path_info(parts),
+                 raw.length());
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_path_translated(std::string raw) {
+  if (raw.empty())
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::path_translated(raw),
+                 raw.length());
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_query_string(std::string raw) {
+  std::map<std::string, std::string> query_map;
+  
+  if (raw.empty()) {
+    return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::query_string(query_map),
+                   0);
+  }
+  
+  std::stringstream ss(raw);
+  std::string pair;
+  
+  while (std::getline(ss, pair, '&')) {
+    size_t eq_pos = pair.find('=');
+    if (eq_pos == std::string::npos) {
+      query_map[pair] = "";
+    } else {
+      std::string key = pair.substr(0, eq_pos);
+      std::string value = pair.substr(eq_pos + 1);
+      query_map[key] = value;
+    }
+  }
+  
+  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::query_string(query_map),
+                 raw.length());
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_remote_addr(std::string raw) {
+  std::stringstream ss(raw);
+  std::vector<unsigned char> octets;
+  std::string octet;
+  
+  while (std::getline(ss, octet, '.')) {
+    if (octet.empty() || octet.length() > 3)
+      return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+    
+    for (size_t i = 0; i < octet.length(); i++) {
+      if (octet[i] < '0' || octet[i] > '9')
+        return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+    }
+    
+    long val = std::atol(octet.c_str());
+    if (val < 0 || val > 255)
+      return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+    
+    octets.push_back(static_cast<unsigned char>(val));
+  }
+  
+  if (octets.size() != 4)
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  
+  return OK_PAIR(CgiMetaVar *, size_t,
+                 CgiMetaVar::remote_addr(octets[0], octets[1], octets[2],
+                                        octets[3]),
+                 raw.length());
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_remote_host(std::string raw) {
+  Result<std::pair<ServerName *, size_t> > server_res =
+      ServerName::Parser::parse(raw);
+  if (!server_res.error().empty())
+    return ERR_PAIR(CgiMetaVar *, size_t, server_res.error());
+  
+  // ServerName parser returns a ServerName, but we need a list of strings
+  // For simplicity, we'll parse it as a hostname
+  std::list<std::string> parts;
+  std::stringstream ss(raw);
+  std::string part;
+  
+  while (std::getline(ss, part, '.')) {
+    parts.push_back(part);
+  }
+  
+  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::remote_host(parts),
+                 server_res.value()->second);
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_remote_ident(std::string raw) {
+  if (raw.empty())
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::remote_ident(raw),
+                 raw.length());
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_remote_user(std::string raw) {
+  if (raw.empty())
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::remote_user(raw),
+                 raw.length());
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_request_method(std::string raw) {
+  std::string method = raw;
+  std::transform(method.begin(), method.end(), method.begin(), to_upper);
+  
+  Http::Method m;
+  if (method == "GET")
+    m = Http::GET;
+  else if (method == "HEAD")
+    m = Http::HEAD;
+  else if (method == "OPTIONS")
+    m = Http::OPTIONS;
+  else if (method == "POST")
+    m = Http::POST;
+  else if (method == "DELETE")
+    m = Http::DELETE;
+  else if (method == "PUT")
+    m = Http::PUT;
+  else if (method == "CONNECT")
+    m = Http::CONNECT;
+  else if (method == "TRACE")
+    m = Http::TRACE;
+  else if (method == "PATCH")
+    m = Http::PATCH;
+  else
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  
+  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::request_method(m),
+                 raw.length());
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_script_name(std::string raw) {
+  if (raw.empty() || raw[0] != '/')
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  
+  std::list<std::string> parts;
+  std::stringstream ss(raw.substr(1)); // skip leading slash
+  std::string part;
+  
+  while (std::getline(ss, part, '/')) {
+    parts.push_back(part);
+  }
+  
+  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::script_name(parts),
+                 raw.length());
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_server_name(std::string raw) {
+  Result<std::pair<ServerName *, size_t> > res =
+      ServerName::Parser::parse(raw);
+  if (!res.error().empty())
+    return ERR_PAIR(CgiMetaVar *, size_t, res.error());
+  
+  return OK_PAIR(CgiMetaVar *, size_t,
+                 CgiMetaVar::server_name(res.value()->first),
+                 res.value()->second);
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_server_port(std::string raw) {
+  char *ptr = NULL;
+  const char *str = raw.c_str();
+  unsigned long port = std::strtoul(str, &ptr, 10);
+  if (ptr == str || *ptr != '\0' || port > 65535)
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  return OK_PAIR(CgiMetaVar *, size_t,
+                 CgiMetaVar::server_port(static_cast<unsigned short>(port)),
+                 raw.length());
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_server_protocol(std::string raw) {
+  std::string norm = raw;
+  std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
+  if (norm == "http/1.1" || norm == "http-1.1")
+    return OK_PAIR(CgiMetaVar *, size_t,
+                   CgiMetaVar::server_protocol(Http_1_1), raw.length());
+  return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_server_software(std::string raw) {
+  std::string norm = raw;
+  std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
+  if (norm == "webserv")
+    return OK_PAIR(CgiMetaVar *, size_t,
+                   CgiMetaVar::server_software(Webserv), raw.length());
+  return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_custom_var(std::string name, std::string value) {
+  EtcMetaVar::Type type = EtcMetaVar::Custom;
+  if (name.length() >= 5 && name.substr(0, 5) == "HTTP_") {
+    type = EtcMetaVar::Http;
+  }
+  return OK_PAIR(CgiMetaVar *, size_t,
+                 CgiMetaVar::custom_var(type, name, value),
+                 name.length() + value.length());
 }
 
 unsigned char to_upper(unsigned char c) {

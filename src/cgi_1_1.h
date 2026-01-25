@@ -157,6 +157,36 @@ public:
         parse_content_length(std::string);
     static Result<std::pair<CgiMetaVar *, size_t> >
         parse_content_type(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_gateway_interface(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_path_info(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_path_translated(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_query_string(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_remote_addr(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_remote_host(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_remote_ident(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_remote_user(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_request_method(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_script_name(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_server_name(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_server_port(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_server_protocol(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_server_software(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_custom_var(std::string, std::string);
   };
 
 private:
