@@ -161,7 +161,7 @@ CgiMetaVar *CgiMetaVar::remote_user(std::string user) {
       REMOTE_USER, (CgiMetaVar::Val){.remote_user = new std::string(user)});
 }
 
-CgiMetaVar *CgiMetaVar::request_method(HttpMethod method) {
+CgiMetaVar *CgiMetaVar::request_method(Http::Method method) {
   return new CgiMetaVar(REQUEST_METHOD,
                         (CgiMetaVar::Val){.request_method = method});
 }
@@ -214,6 +214,18 @@ CgiMetaVar::Parser::parse_auth_type(std::string raw) {
       CgiMetaVar *, size_t,
       CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::CgiAuthOther, ty)),
       ty.size());
+}
+
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse_content_length(std::string raw) {
+  char *ptr = NULL;
+  const char *str = raw.c_str();
+  unsigned long l = std::strtoul(str, &ptr, 10);
+  if (ptr == NULL || *ptr != '\0' || l > UINT32_MAX)
+    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  return OK_PAIR(CgiMetaVar *, size_t,
+                 CgiMetaVar::content_length(static_cast<unsigned int>(l)),
+                 ptr - str);
 }
 
 unsigned char to_upper(unsigned char c) {

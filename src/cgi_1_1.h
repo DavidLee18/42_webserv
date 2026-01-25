@@ -27,16 +27,30 @@ private:
 };
 
 class ContentType {
-  std::string type;
-  std::string subtype;
-  std::map<std::string, std::string> params;
-
 public:
-  ContentType(std::string ty, std::string subty)
+  enum Type {
+    application,
+    audio,
+    example,
+    font,
+    haptics,
+    image,
+    message,
+    model,
+    multipart,
+    text,
+    video
+  };
+  ContentType(Type ty, std::string subty)
       : type(ty), subtype(subty), params() {}
   ContentType(ContentType const &other)
       : type(other.type), subtype(other.subtype), params(other.params) {}
   Result<Void> add_param(std::string, std::string);
+
+public:
+  Type type;
+  std::string subtype;
+  std::map<std::string, std::string> params;
 };
 
 enum GatewayInterface { Cgi_1_1 };
@@ -51,10 +65,12 @@ public:
   public:
     static Result<std::pair<ServerName *, size_t> > parse(std::string);
   };
+
   enum Type {
     Host,
     Ipv4,
   };
+
   union Val {
     std::list<std::string> *host_name;
     unsigned char ipv4[4];
@@ -112,6 +128,7 @@ public:
     SERVER_SOFTWARE,
     X_, // Custom var
   };
+
   union Val {
     CgiAuthType *auth_type;
     unsigned int content_length;
@@ -132,9 +149,14 @@ public:
     ServerSoftware server_software;
     EtcMetaVar *etc_val;
   };
+
   class Parser {
     virtual void phantom() = 0;
     static Result<std::pair<CgiMetaVar *, size_t> > parse_auth_type(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_content_length(std::string);
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse_content_type(std::string);
   };
 
 private:
