@@ -1,5 +1,34 @@
 #include "webserv.h"
 
+// Helper function to normalize header field names to lowercase
+// RFC 2616 §4.2: Field names are case-insensitive
+static std::string normalize_header_name(const std::string &name) {
+  std::string normalized = name;
+  for (size_t i = 0; i < normalized.length(); i++) {
+    normalized[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(normalized[i])));
+  }
+  return normalized;
+}
+
+// Helper function to trim whitespace from both ends of a string
+// RFC 2616 §4.2: LWS before/after field-content may be removed
+static std::string trim_whitespace(const std::string &str) {
+  size_t start = 0;
+  size_t end = str.length();
+  
+  // Trim leading whitespace
+  while (start < end && (str[start] == ' ' || str[start] == '\t')) {
+    start++;
+  }
+  
+  // Trim trailing whitespace
+  while (end > start && (str[end - 1] == ' ' || str[end - 1] == '\t')) {
+    end--;
+  }
+  
+  return str.substr(start, end - start);
+}
+
 // Helper function to skip whitespace
 static size_t skip_whitespace(const char *input, size_t offset, size_t max_len) {
   while (offset < max_len && (input[offset] == ' ' || input[offset] == '\t')) {
@@ -9,6 +38,7 @@ static size_t skip_whitespace(const char *input, size_t offset, size_t max_len) 
 }
 
 // Parse HTTP method (GET, POST, etc.)
+// RFC 2616 §5.1.1: Method is case-sensitive
 Result<std::pair<Http::Method, size_t> >
 Http::Request::Parser::parse_method(const char *input, size_t offset) {
   std::string method_str;
@@ -24,9 +54,7 @@ Http::Request::Parser::parse_method(const char *input, size_t offset) {
     return ERR_PAIR(Http::Method, size_t, Errors::invalid_format);
   }
   
-  // Convert to uppercase for comparison
-  std::transform(method_str.begin(), method_str.end(), method_str.begin(), to_upper);
-  
+  // RFC 2616 §5.1.1: Methods are case-sensitive, no conversion
   Http::Method method;
   if (method_str == "GET")
     method = Http::GET;
@@ -72,6 +100,7 @@ Http::Request::Parser::parse_path(const char *input, size_t offset) {
 }
 
 // Parse HTTP version (HTTP/1.1)
+// RFC 2616 §3.1: HTTP-Version = "HTTP" "/" 1*DIGIT "." 1*DIGIT
 Result<std::pair<std::string, size_t> >
 Http::Request::Parser::parse_http_version(const char *input, size_t offset) {
   std::string version;
@@ -87,8 +116,31 @@ Http::Request::Parser::parse_http_version(const char *input, size_t offset) {
     return ERR_PAIR(std::string, size_t, Errors::invalid_format);
   }
   
-  // Verify it's HTTP/1.1 or similar
-  if (version.find("HTTP/") != 0) {
+  // RFC 2616 §3.1: Verify format HTTP/digit.digit
+  if (version.find("HTTP/") != 0 || version.length() < 8) {
+    return ERR_PAIR(std::string, size_t, Errors::invalid_format);
+  }
+  
+  // Validate version format: HTTP/x.y where x and y are digits
+  size_t slash_pos = 5; // Position after "HTTP/"
+  if (slash_pos >= version.length() || !std::isdigit(version[slash_pos])) {
+    return ERR_PAIR(std::string, size_t, Errors::invalid_format);
+  }
+  
+  // Skip major version digits
+  size_t dot_pos = slash_pos;
+  while (dot_pos < version.length() && std::isdigit(version[dot_pos])) {
+    dot_pos++;
+  }
+  
+  // Check for dot separator
+  if (dot_pos >= version.length() || version[dot_pos] != '.') {
+    return ERR_PAIR(std::string, size_t, Errors::invalid_format);
+  }
+  
+  // Check minor version has at least one digit
+  dot_pos++;
+  if (dot_pos >= version.length() || !std::isdigit(version[dot_pos])) {
     return ERR_PAIR(std::string, size_t, Errors::invalid_format);
   }
   
@@ -152,6 +204,7 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
 }
 
 // Parse headers (e.g., "Host: example.com\r\n")
+// RFC 2616 §4.2: Field names are case-insensitive, LWS may be present
 Result<std::pair<std::map<std::string, Json>, size_t> >
 Http::Request::Parser::parse_headers(const char *input, size_t offset) {
   typedef std::map<std::string, Json> HeaderMap;
@@ -196,8 +249,14 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
       return ERR_PAIR(HeaderMap, size_t, Errors::invalid_format);
     }
     
+    // RFC 2616 §4.2: Normalize header name to lowercase (case-insensitive)
+    std::string normalized_name = normalize_header_name(header_name);
+    
+    // RFC 2616 §4.2: Trim leading/trailing whitespace from value
+    std::string trimmed_value = trim_whitespace(header_value);
+    
     // Store header as Json string
-    headers[header_name] = *Json::str(header_value);
+    headers[normalized_name] = *Json::str(trimmed_value);
   }
   
   return OK_PAIR(HeaderMap, size_t, headers, offset - start_offset);
