@@ -11,7 +11,7 @@ template <typename T> class Result {
 
 public:
   Result(T *v, std::string e) : val(v), err(e) {}
-  const T *const value() const { return val; }
+  const T *value() const { return val; }
   const std::string &error() const { return err; }
 
   ~Result() {
