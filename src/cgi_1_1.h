@@ -234,6 +234,11 @@ class CgiInput {
   std::vector<CgiMetaVar> mvars;
   Http::Body req_body;
 
+private:
+  CgiInput();
+  CgiInput(std::vector<CgiMetaVar>, Http::Body);
+  CgiInput(Http::Request const &);
+
 public:
   class Parser {
     virtual void phantom() = 0;
@@ -241,8 +246,10 @@ public:
   public:
     static Result<CgiInput *> parse(Http::Request const &);
   };
+  
+  friend class Parser;
+  friend class CgiDelegate;
 
-  CgiInput(Http::Request const &);
   CgiInput(const CgiInput &other)
       : mvars(other.mvars), req_body(other.req_body) {}
   void add_mvar(std::string const &, std::string const &);
@@ -251,7 +258,7 @@ public:
 
 class CgiDelegate {
   CgiInput env;
-  CgiDelegate(Http::Request req) : env(req) {}
+  CgiDelegate(Http::Request) : env() {}
 
 public:
   ~CgiDelegate();

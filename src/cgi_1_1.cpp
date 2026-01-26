@@ -619,8 +619,19 @@ CgiMetaVar::Parser::parse(std::string const &name, std::string const &value) {
   return parse_custom_var(name, value);
 }
 
+// CgiInput constructors
+CgiInput::CgiInput() 
+    : mvars(), req_body(Http::Body::Empty, (Http::Body::Value){._null = NULL}) {}
+
+CgiInput::CgiInput(std::vector<CgiMetaVar> vars, Http::Body body)
+    : mvars(vars), req_body(body) {}
+
+CgiInput::CgiInput(Http::Request const &req)
+    : mvars(), req_body(req.body()) {}
+
 Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
-  CgiInput *input = new CgiInput(req);
+  CgiInput *input = new CgiInput();
+  input->req_body = req.body();
   
   // Add REQUEST_METHOD
   CgiMetaVar *method_var = CgiMetaVar::request_method(req.method());
