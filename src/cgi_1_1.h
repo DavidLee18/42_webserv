@@ -239,7 +239,7 @@ public:
     virtual void phantom() = 0;
 
   public:
-    static Result<CgiInput> parse(Http::Request const &);
+    static Result<CgiInput *> parse(Http::Request const &);
   };
 
   CgiInput(Http::Request const &);

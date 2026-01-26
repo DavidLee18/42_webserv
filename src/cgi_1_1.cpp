@@ -619,7 +619,7 @@ CgiMetaVar::Parser::parse(std::string const &name, std::string const &value) {
   return parse_custom_var(name, value);
 }
 
-Result<CgiInput> CgiInput::Parser::parse(Http::Request const &req) {
+Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
   CgiInput *input = new CgiInput(req);
   
   // Add REQUEST_METHOD
@@ -737,7 +737,11 @@ Result<CgiInput> CgiInput::Parser::parse(Http::Request const &req) {
     }
   }
   
-  return OK(CgiInput, input);
+  // Allocate a pointer to the CgiInput pointer on the heap
+  // This allows the CgiInput object to survive after Result is destroyed
+  CgiInput **result_ptr = new CgiInput *;
+  *result_ptr = input;
+  return OK(CgiInput *, result_ptr);
 }
 
 char **CgiInput::to_envp() const {
