@@ -262,15 +262,154 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
   return OK_PAIR(HeaderMap, size_t, headers, offset - start_offset);
 }
 
+// Helper function for URL decoding (application/x-www-form-urlencoded)
+static std::string url_decode(const std::string &encoded) {
+  std::string decoded;
+  size_t i = 0;
+  
+  while (i < encoded.length()) {
+    if (encoded[i] == '%' && i + 2 < encoded.length()) {
+      // Decode hex character
+      char hex[3] = {encoded[i + 1], encoded[i + 2], '\0'};
+      char *end;
+      long value = std::strtol(hex, &end, 16);
+      if (end == hex + 2) {
+        decoded += static_cast<char>(value);
+        i += 3;
+        continue;
+      }
+    } else if (encoded[i] == '+') {
+      // Plus signs represent spaces in form encoding
+      decoded += ' ';
+      i++;
+      continue;
+    }
+    decoded += encoded[i];
+    i++;
+  }
+  
+  return decoded;
+}
+
+// Parse application/x-www-form-urlencoded body
+static Result<std::pair<std::map<std::string, std::string> *, size_t> >
+parse_form_urlencoded(const char *input, size_t offset, size_t body_length) {
+  std::map<std::string, std::string> *form = new std::map<std::string, std::string>();
+  std::string body_str(input + offset, body_length);
+  
+  size_t pos = 0;
+  while (pos < body_str.length()) {
+    // Find the next '&' or end of string
+    size_t amp_pos = body_str.find('&', pos);
+    if (amp_pos == std::string::npos) {
+      amp_pos = body_str.length();
+    }
+    
+    std::string pair = body_str.substr(pos, amp_pos - pos);
+    
+    // Split on '='
+    size_t eq_pos = pair.find('=');
+    if (eq_pos != std::string::npos) {
+      std::string key = url_decode(pair.substr(0, eq_pos));
+      std::string value = url_decode(pair.substr(eq_pos + 1));
+      (*form)[key] = value;
+    } else {
+      // Key without value
+      (*form)[url_decode(pair)] = "";
+    }
+    
+    pos = amp_pos + 1;
+  }
+  
+  typedef std::map<std::string, std::string> FormMap;
+  return OK_PAIR(FormMap *, size_t, form, body_length);
+}
+
 // Parse body
+// RFC 2616 §4.3: Message body determined by Content-Type and Content-Length
 Result<std::pair<Http::Body *, size_t> >
-Http::Request::Parser::parse_body(const char *, size_t, 
-                                   std::map<std::string, Json> const &) {
-  // For now, just return empty body
-  // A full implementation would parse the body based on Content-Type and Content-Length
-  Http::Body::Value empty_val;
-  empty_val._null = NULL;
-  return OK_PAIR(Http::Body *, size_t, new Http::Body(Http::Body::Empty, empty_val), 0);
+Http::Request::Parser::parse_body(const char *input, size_t offset, 
+                                   std::map<std::string, Json> const &headers) {
+  // Check for Content-Length header
+  std::map<std::string, Json>::const_iterator content_length_it = 
+      headers.find("content-length");
+  
+  // If no Content-Length, return empty body
+  if (content_length_it == headers.end()) {
+    Http::Body::Value empty_val;
+    empty_val._null = NULL;
+    return OK_PAIR(Http::Body *, size_t, new Http::Body(Http::Body::Empty, empty_val), 0);
+  }
+  
+  // Parse Content-Length value
+  if (content_length_it->second.type() != Json::Str) {
+    Http::Body::Value empty_val;
+    empty_val._null = NULL;
+    return OK_PAIR(Http::Body *, size_t, new Http::Body(Http::Body::Empty, empty_val), 0);
+  }
+  
+  std::string length_str = *content_length_it->second.value()._str;
+  char *end_ptr = NULL;
+  unsigned long body_length = std::strtoul(length_str.c_str(), &end_ptr, 10);
+  
+  if (end_ptr == length_str.c_str() || *end_ptr != '\0' || body_length == 0) {
+    // Invalid or zero Content-Length
+    Http::Body::Value empty_val;
+    empty_val._null = NULL;
+    return OK_PAIR(Http::Body *, size_t, new Http::Body(Http::Body::Empty, empty_val), 0);
+  }
+  
+  // Check Content-Type header to determine body type
+  std::map<std::string, Json>::const_iterator content_type_it = 
+      headers.find("content-type");
+  
+  std::string content_type;
+  if (content_type_it != headers.end() && content_type_it->second.type() == Json::Str) {
+    content_type = *content_type_it->second.value()._str;
+    // Normalize to lowercase for comparison
+    for (size_t i = 0; i < content_type.length(); i++) {
+      content_type[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(content_type[i])));
+    }
+  }
+  
+  Http::Body::Value body_val;
+  Http::Body::Type body_type;
+  
+  // Determine body type based on Content-Type
+  if (content_type.find("application/json") != std::string::npos) {
+    // Parse as JSON
+    Result<std::pair<Json *, size_t> > json_res = 
+        Json::Parser::parse(input + offset, '\0');
+    
+    if (!json_res.error().empty()) {
+      // JSON parsing failed, treat as raw HTML
+      body_type = Http::Body::Html;
+      body_val.html_raw = new std::string(input + offset, body_length);
+    } else {
+      body_type = Http::Body::HttpJson;
+      body_val.json = json_res.value()->first;
+    }
+  } else if (content_type.find("application/x-www-form-urlencoded") != std::string::npos) {
+    // Parse as form-urlencoded
+    Result<std::pair<std::map<std::string, std::string> *, size_t> > form_res = 
+        parse_form_urlencoded(input, offset, static_cast<size_t>(body_length));
+    
+    if (!form_res.error().empty()) {
+      // Form parsing failed, treat as raw HTML
+      body_type = Http::Body::Html;
+      body_val.html_raw = new std::string(input + offset, body_length);
+    } else {
+      body_type = Http::Body::HttpFormUrlEncoded;
+      body_val.form = form_res.value()->first;
+    }
+  } else {
+    // Default: treat as raw HTML/text
+    body_type = Http::Body::Html;
+    body_val.html_raw = new std::string(input + offset, body_length);
+  }
+  
+  return OK_PAIR(Http::Body *, size_t, new Http::Body(body_type, body_val), 
+                 static_cast<size_t>(body_length));
 }
 
 // Main parse function
