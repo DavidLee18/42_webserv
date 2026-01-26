@@ -186,8 +186,9 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   
   offset += version_res.value()->second;
   
-  // Skip \r\n
-  if (input[offset] == '\r' && input[offset + 1] == '\n') {
+  // Skip \r\n (with bounds checking)
+  if (input[offset] != '\0' && input[offset] == '\r' && 
+      input[offset + 1] != '\0' && input[offset + 1] == '\n') {
     offset += 2;
   } else {
     return ERR_PAIR(Http::Request *, size_t, Errors::invalid_format);
@@ -214,8 +215,9 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
   
   // Parse headers until we hit empty line (\r\n\r\n)
   while (true) {
-    // Check for end of headers (empty line)
-    if (input[offset] == '\r' && input[offset + 1] == '\n') {
+    // Check for end of headers (empty line) - with bounds checking
+    if (input[offset] != '\0' && input[offset] == '\r' && 
+        input[offset + 1] != '\0' && input[offset + 1] == '\n') {
       offset += 2;
       break;
     }
@@ -243,8 +245,9 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
       offset++;
     }
     
-    // Skip \r\n
-    if (input[offset] == '\r' && input[offset + 1] == '\n') {
+    // Skip \r\n (with bounds checking)
+    if (input[offset] != '\0' && input[offset] == '\r' && 
+        input[offset + 1] != '\0' && input[offset + 1] == '\n') {
       offset += 2;
     } else {
       return ERR_PAIR(HeaderMap, size_t, Errors::invalid_format);
@@ -252,7 +255,7 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
     
     // RFC 2616 §4.2: Check for header continuation (line folding)
     // Continuation lines start with space or tab
-    while (input[offset] == ' ' || input[offset] == '\t') {
+    while (input[offset] != '\0' && (input[offset] == ' ' || input[offset] == '\t')) {
       // This is a continuation line
       // Skip the leading whitespace
       while (input[offset] != '\0' && (input[offset] == ' ' || input[offset] == '\t')) {
@@ -268,8 +271,9 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
         offset++;
       }
       
-      // Skip \r\n
-      if (input[offset] == '\r' && input[offset + 1] == '\n') {
+      // Skip \r\n (with bounds checking)
+      if (input[offset] != '\0' && input[offset] == '\r' && 
+          input[offset + 1] != '\0' && input[offset + 1] == '\n') {
         offset += 2;
       } else {
         return ERR_PAIR(HeaderMap, size_t, Errors::invalid_format);
