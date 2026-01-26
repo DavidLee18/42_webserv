@@ -269,7 +269,7 @@ static std::string url_decode(const std::string &encoded) {
   
   while (i < encoded.length()) {
     if (encoded[i] == '%' && i + 2 < encoded.length()) {
-      // Decode hex character
+      // Decode hex character (ensure we have at least 2 chars after %)
       char hex[3] = {encoded[i + 1], encoded[i + 2], '\0'};
       char *end;
       long value = std::strtol(hex, &end, 16);
@@ -352,8 +352,15 @@ Http::Request::Parser::parse_body(const char *input, size_t offset,
   char *end_ptr = NULL;
   unsigned long body_length = std::strtoul(length_str.c_str(), &end_ptr, 10);
   
-  if (end_ptr == length_str.c_str() || *end_ptr != '\0' || body_length == 0) {
-    // Invalid or zero Content-Length
+  if (end_ptr == length_str.c_str() || *end_ptr != '\0') {
+    // Invalid Content-Length
+    Http::Body::Value empty_val;
+    empty_val._null = NULL;
+    return OK_PAIR(Http::Body *, size_t, new Http::Body(Http::Body::Empty, empty_val), 0);
+  }
+  
+  // RFC 2616: Content-Length of 0 is valid and indicates empty body
+  if (body_length == 0) {
     Http::Body::Value empty_val;
     empty_val._null = NULL;
     return OK_PAIR(Http::Body *, size_t, new Http::Body(Http::Body::Empty, empty_val), 0);
@@ -378,8 +385,10 @@ Http::Request::Parser::parse_body(const char *input, size_t offset,
   // Determine body type based on Content-Type
   if (content_type.find("application/json") != std::string::npos) {
     // Parse as JSON
+    // Create a temporary null-terminated string for JSON parser
+    std::string json_body(input + offset, body_length);
     Result<std::pair<Json *, size_t> > json_res = 
-        Json::Parser::parse(input + offset, '\0');
+        Json::Parser::parse(json_body.c_str(), '\0');
     
     if (!json_res.error().empty()) {
       // JSON parsing failed, treat as raw HTML
