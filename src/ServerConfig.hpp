@@ -91,11 +91,9 @@ private:
   // RouteRule method
   bool is_RouteRule(std::string line);
   bool parse_RouteRule(std::string line, std::ifstream &file);
-  bool parse_GET(std::vector<std::string>);
-  bool parse_POST(std::vector<std::string>);
-  bool parse_DELETE(std::vector<std::string>);
-  bool parse_Rule(std::vector<std::string> met, std::string key, std::string line);
-  RuleOperator is_RuleOperator(std::string indicator);
+  bool parse_Httpmethod(std::vector<std::string> data, std::vector<HttpMethod> mets);
+  bool parse_Rule(std::vector<HttpMethod> met, std::string key, std::string line);
+  RuleOperator parse_RuleOperator(std::string indicator);
 
 public:
   ServerConfig();

@@ -36,9 +36,9 @@ bool ServerConfig::set_ServerConfig(std::ifstream &file) {
   //   }
   //   std::cout << std::endl;
   // }
-  // for (size_t i = 0; i < err_line.size(); ++i) {
-  //   std::cout << "err_line: " << err_line[i] << std::endl;
-  // }
+  for (size_t i = 0; i < err_line.size(); ++i) {
+    std::cout << "err_line: " << err_line[i] << std::endl;
+  }
   return (true);
 }
 
@@ -146,109 +146,72 @@ void ServerConfig::parse_serverResponseTime(std::string line) {
 
 
 // RouteRule method
-bool ServerConfig::is_RouteRule(std::string line) {
-  std::vector<std::string> Route = string_split(line, " ");
-  if (Route[0] == "GET")
-    return (parse_GET(Route));
-  else if(Route[0] == "POST")
-    return (parse_POST(Route));
-  else if (Route[0] == "DELETE")
-    return (parse_DELETE(Route));
-  else if (Route[0] == "GET|POST|DELETE")
+
+static bool is_pattern(std::string line)
+{
+  size_t string_pos = line.find("*");
+  if (string_pos == std::string::npos)
+    return (false);
+  size_t pattrn_pos = line.find(".(");
+  if (pattrn_pos == std::string::npos)
+    return (false);
+  if (pattrn_pos <= string_pos)
+    return (false);
+  for (size_t i = 0; i < line.length(); ++i)
   {
-    if (parse_GET(Route) && parse_POST(Route) && parse_DELETE(Route))
-      return (true);
-    return (false);
+    if (
   }
-  else
-    return (false);
+  return (true);
 }
 
-bool ServerConfig::parse_RouteRule(std::string method, std::ifstream &file) {
-  std::string line;
-  std::vector<std::string> met = string_split(string_split(method, " ")[0], "|");
-  std::string key = string_split(method, " ")[1];
 
-  while (std::getline(file, line))
+static std::vector<std::vector<std::string>> urlpattern(std::vector<std::string> line)
+{
+  std::vector<std::string> path(line);
+  std::vector<std::vector<std::string>> paths;
+
+  for (size_t i = 0; i < line.size(); ++i)
   {
-    if (is_tab_or_space(line, 0))
-      break;
-    else if (is_tab_or_space(line, 2) != false)
-      return (false);
-    else if (parse_Rule(met, key, line))
-      continue ;
+    if (line[i].find("*") == std::string::npos)
+      continue;
     else
-      return (false);
+    {
+      if 
+      std::vector<std::string> pattern = string_split(line[i], "|");
+    }
   }
+
+}  
+
+bool ServerConfig::is_RouteRule(std::string line) {
+  (void)line;
   return (true);
 }
 
-bool ServerConfig::parse_GET(std::vector<std::string> line) {
-  RouteRule get;
-  
-  if (line.size() != 4)
-    return (false);
-  get.method = GET;
-  get.path = string_split(line[1], "/");
-  get.op = is_RuleOperator(line[2]);
-  get.root = string_split(line[3], "/");
-  get.index = "";
-  get.authInfo = "";
-  get.maxBodyMB = 1;
-  routes[std::make_pair(get.method, get.path)] = get;
-  return (true);
-}
-
-bool ServerConfig::parse_POST(std::vector<std::string> line) {
-  RouteRule post;
-  
-  if (line.size() != 4)
-    return (false);
-  post.method = POST;
-  post.path = string_split(line[1], "/");
-  post.op = is_RuleOperator(line[2]);
-  post.root = string_split(line[3], "/");
-  post.index = "";
-  post.authInfo = "";
-  post.maxBodyMB = 1;
-  routes[std::make_pair(post.method, post.path)] = post;
-  return (true);
-}
-
-bool ServerConfig::parse_DELETE(std::vector<std::string> line) {
-  RouteRule del;
-  
-  if (line.size() != 4)
-    return (false);
-  del.method = DELETE;
-  del.path = string_split(line[1], "/");
-  del.op = is_RuleOperator(line[2]);
-  del.root = string_split(line[3], "/");
-  del.index = "";
-  del.authInfo = "";
-  del.maxBodyMB = 1;
-  routes[std::make_pair(del.method, del.path)] = del;
-  return (true);
-}
-
-bool ServerConfig::parse_Rule(std::vector<std::string> met, std::string key, std::string line) {
-  (void)met;
+bool ServerConfig::parse_Rule(std::vector<HttpMethod> mets, std::string key, std::string line) {
+  (void)mets;
   (void)key;
-  std::vector<std::string> rule = string_split(line, " ");
-  if (rule[0] == "?")
-    ;
-  else if (rule[0] == "@")
-    ;
-  else if (rule[0] == "->{}")
-    ;
-  else if (rule[0] == "!")
-    ;
-  else
-    return (false);
+  (void)line;
+  // std::vector<std::string> rule = string_split(line, " ");
+
+    // if (rule[0] == "?")
+    //   for (size_t i = 0; i < mets.size(); ++i)
+    //     routes[std::make_pair(mets[i], key)].index = rule[1];
+    // else if (rule[0] == "@")
+    //   for (size_t i = 0; i < mets.size(); ++i)
+    //     routes[std::make_pair(mets[i], key)].authInfo = rule[1];
+    // else if (rule[0] == "->{}")
+    //   for (size_t i = 0; i < mets.size(); ++i)
+    //     routes[std::make_pair(mets[i], key)].maxBodyMB = rule[1];
+    // else if (rule[0] == "!")
+    //   for (size_t i = 0; i < mets.size(); ++i)
+    //     routes[std::make_pair(mets[i], key)].errorPages = rule[1];
+    // else
+    //   return (false);
   return (true);
 }
 
-RuleOperator ServerConfig::is_RuleOperator(std::string indicator)
+RuleOperator ServerConfig::parse_RuleOperator(std::string indicator)
 {
   if (indicator == "<-")
     return (SEREVEFROM);
@@ -273,3 +236,58 @@ RuleOperator ServerConfig::is_RuleOperator(std::string indicator)
   else
     return (UNDEFINE);
 }
+
+bool ServerConfig::parse_Httpmethod(std::vector<std::string> data, std::vector<HttpMethod> mets) {
+  RouteRule route;
+  
+  if (data.size() != 4)
+    return (false);
+  for (size_t i = 0; i < mets.size(); ++i)
+  {
+    route.method = mets[i];
+    route.op = parse_RuleOperator(data[2]);
+    route.index = "";
+    route.authInfo = "";
+    route.maxBodyMB = 1;
+    route.path = string_split(data[1], "/");
+    route.root = string_split(data[3], "/");
+    // routes[std::make_pair(route.method, route.path)] = route;
+  }
+  return (true);
+}
+
+bool ServerConfig::parse_RouteRule(std::string method_line, std::ifstream &file) {
+  std::string line;
+  std::vector<HttpMethod> mets;
+  std::vector<std::string> method_line_data = string_split(method_line, " ");
+  std::vector<std::string> method = string_split(method_line_data[0], "|");
+  
+  for (size_t i = 0; i < method.size(); ++i)
+  {
+    if (method[i] == "GET")
+      mets.push_back(GET);
+    else if (method[i] == "POST")
+      mets.push_back(POST);
+    else if (method[i] == "DELETE")
+      mets.push_back(DELETE);
+    else
+      return (false);
+  }
+
+  if (parse_Httpmethod(method_line_data, mets))
+    return (false);
+
+  while (std::getline(file, line))
+  {
+    if (is_tab_or_space(line, 0))
+      break;
+    else if (is_tab_or_space(line, 2) != false)
+      return (false);
+    else if (parse_Rule(mets, method_line_data[1], line))
+      continue ;
+    else
+      return (false);
+  }
+  return (true);
+}
+
