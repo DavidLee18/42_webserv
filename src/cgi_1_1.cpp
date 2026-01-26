@@ -580,6 +580,382 @@ CgiMetaVar::Parser::parse_custom_var(std::string name, std::string value) {
                  name.length() + value.length());
 }
 
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse(std::string const &name, std::string const &value) {
+  if (name == "AUTH_TYPE")
+    return parse_auth_type(value);
+  if (name == "CONTENT_LENGTH")
+    return parse_content_length(value);
+  if (name == "CONTENT_TYPE")
+    return parse_content_type(value);
+  if (name == "GATEWAY_INTERFACE")
+    return parse_gateway_interface(value);
+  if (name == "PATH_INFO")
+    return parse_path_info(value);
+  if (name == "PATH_TRANSLATED")
+    return parse_path_translated(value);
+  if (name == "QUERY_STRING")
+    return parse_query_string(value);
+  if (name == "REMOTE_ADDR")
+    return parse_remote_addr(value);
+  if (name == "REMOTE_HOST")
+    return parse_remote_host(value);
+  if (name == "REMOTE_IDENT")
+    return parse_remote_ident(value);
+  if (name == "REMOTE_USER")
+    return parse_remote_user(value);
+  if (name == "REQUEST_METHOD")
+    return parse_request_method(value);
+  if (name == "SCRIPT_NAME")
+    return parse_script_name(value);
+  if (name == "SERVER_NAME")
+    return parse_server_name(value);
+  if (name == "SERVER_PORT")
+    return parse_server_port(value);
+  if (name == "SERVER_PROTOCOL")
+    return parse_server_protocol(value);
+  if (name == "SERVER_SOFTWARE")
+    return parse_server_software(value);
+  return parse_custom_var(name, value);
+}
+
+// CgiInput constructors
+CgiInput::CgiInput() 
+    : mvars(), req_body(Http::Body::Empty, (Http::Body::Value){._null = NULL}) {}
+
+CgiInput::CgiInput(std::vector<CgiMetaVar> vars, Http::Body body)
+    : mvars(vars), req_body(body) {}
+
+CgiInput::CgiInput(Http::Request const &req)
+    : mvars(), req_body(req.body()) {}
+
+Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
+  CgiInput *input = new CgiInput();
+  input->req_body = req.body();
+  
+  // Add REQUEST_METHOD
+  CgiMetaVar *method_var = CgiMetaVar::request_method(req.method());
+  input->mvars.push_back(*method_var);
+  delete method_var;
+  
+  // Add SERVER_PROTOCOL
+  CgiMetaVar *protocol_var = CgiMetaVar::server_protocol(Http_1_1);
+  input->mvars.push_back(*protocol_var);
+  delete protocol_var;
+  
+  // Add GATEWAY_INTERFACE
+  CgiMetaVar *gateway_var = CgiMetaVar::gateway_interface(Cgi_1_1);
+  input->mvars.push_back(*gateway_var);
+  delete gateway_var;
+  
+  // Parse path for SCRIPT_NAME and QUERY_STRING
+  std::string path = req.path();
+  size_t query_pos = path.find('?');
+  std::string script_path;
+  std::string query_string;
+  
+  if (query_pos != std::string::npos) {
+    script_path = path.substr(0, query_pos);
+    query_string = path.substr(query_pos + 1);
+  } else {
+    script_path = path;
+    query_string = "";
+  }
+  
+  // Add SCRIPT_NAME
+  if (!script_path.empty()) {
+    std::list<std::string> script_parts;
+    if (script_path[0] == '/') {
+      std::stringstream ss(script_path.substr(1));
+      std::string part;
+      while (std::getline(ss, part, '/')) {
+        script_parts.push_back(part);
+      }
+    }
+    CgiMetaVar *script_var = CgiMetaVar::script_name(script_parts);
+    input->mvars.push_back(*script_var);
+    delete script_var;
+  }
+  
+  // Add QUERY_STRING
+  if (!query_string.empty()) {
+    std::map<std::string, std::string> query_map;
+    std::stringstream ss(query_string);
+    std::string pair;
+    while (std::getline(ss, pair, '&')) {
+      size_t eq_pos = pair.find('=');
+      if (eq_pos != std::string::npos) {
+        query_map[pair.substr(0, eq_pos)] = pair.substr(eq_pos + 1);
+      } else {
+        query_map[pair] = "";
+      }
+    }
+    CgiMetaVar *query_var = CgiMetaVar::query_string(query_map);
+    input->mvars.push_back(*query_var);
+    delete query_var;
+  }
+  
+  // Add HTTP headers as CGI variables
+  std::map<std::string, Json> const &headers = req.headers();
+  for (std::map<std::string, Json>::const_iterator it = headers.begin();
+       it != headers.end(); ++it) {
+    std::string header_name = it->first;
+    
+    // Convert header name to CGI format (uppercase with underscores)
+    for (size_t i = 0; i < header_name.length(); i++) {
+      if (header_name[i] == '-') {
+        header_name[i] = '_';
+      } else {
+        header_name[i] = static_cast<char>(
+            to_upper(static_cast<unsigned char>(header_name[i])));
+      }
+    }
+    
+    // Get string value from Json
+    std::string value;
+    if (it->second.type() == Json::Str && it->second.value()._str != NULL) {
+      value = *it->second.value()._str;
+    } else {
+      // For non-string types, convert to string representation
+      std::stringstream ss;
+      Json json_copy = it->second;
+      ss << json_copy;
+      value = ss.str();
+    }
+    
+    // Special handling for standard CGI variables
+    if (header_name == "CONTENT_TYPE") {
+      Result<std::pair<CgiMetaVar *, size_t> > res =
+          CgiMetaVar::Parser::parse("CONTENT_TYPE", value);
+      if (res.error().empty()) {
+        input->mvars.push_back(*res.value()->first);
+        delete res.value()->first;
+      }
+    } else if (header_name == "CONTENT_LENGTH") {
+      Result<std::pair<CgiMetaVar *, size_t> > res =
+          CgiMetaVar::Parser::parse("CONTENT_LENGTH", value);
+      if (res.error().empty()) {
+        input->mvars.push_back(*res.value()->first);
+        delete res.value()->first;
+      }
+    } else {
+      // Add as HTTP_* variable
+      std::string cgi_name = "HTTP_" + header_name;
+      CgiMetaVar *custom_var = CgiMetaVar::custom_var(
+          EtcMetaVar::Http, cgi_name, value);
+      input->mvars.push_back(*custom_var);
+      delete custom_var;
+    }
+  }
+  
+  // Allocate a pointer to the CgiInput pointer on the heap
+  // This allows the CgiInput object to survive after Result is destroyed
+  CgiInput **result_ptr = new CgiInput *;
+  *result_ptr = input;
+  return OK(CgiInput *, result_ptr);
+}
+
+char **CgiInput::to_envp() const {
+  // Allocate array with space for all variables plus NULL terminator
+  char **envp = new char *[mvars.size() + 1];
+  
+  for (size_t i = 0; i < mvars.size(); i++) {
+    CgiMetaVar const &var = mvars[i];
+    std::string env_str;
+    
+    // Format each variable as "NAME=value"
+    switch (var.get_name()) {
+    case CgiMetaVar::AUTH_TYPE:
+      env_str = "AUTH_TYPE=";
+      if (var.get_val().auth_type->type() == CgiAuthType::Basic) {
+        env_str += "Basic";
+      } else if (var.get_val().auth_type->type() == CgiAuthType::Digest) {
+        env_str += "Digest";
+      } else if (var.get_val().auth_type->other() != NULL) {
+        env_str += *var.get_val().auth_type->other();
+      }
+      break;
+      
+    case CgiMetaVar::CONTENT_LENGTH: {
+      std::stringstream ss;
+      ss << var.get_val().content_length;
+      env_str = "CONTENT_LENGTH=" + ss.str();
+      break;
+    }
+    
+    case CgiMetaVar::CONTENT_TYPE:
+      env_str = "CONTENT_TYPE=";
+      if (var.get_val().content_type != NULL) {
+        ContentType const &ct = *var.get_val().content_type;
+        // Format type/subtype
+        switch (ct.type) {
+        case ContentType::application: env_str += "application/"; break;
+        case ContentType::audio: env_str += "audio/"; break;
+        case ContentType::example: env_str += "example/"; break;
+        case ContentType::font: env_str += "font/"; break;
+        case ContentType::haptics: env_str += "haptics/"; break;
+        case ContentType::image: env_str += "image/"; break;
+        case ContentType::message: env_str += "message/"; break;
+        case ContentType::model: env_str += "model/"; break;
+        case ContentType::multipart: env_str += "multipart/"; break;
+        case ContentType::text: env_str += "text/"; break;
+        case ContentType::video: env_str += "video/"; break;
+        }
+        env_str += ct.subtype;
+        // Add parameters if any
+        for (std::map<std::string, std::string>::const_iterator it = ct.params.begin();
+             it != ct.params.end(); ++it) {
+          env_str += "; " + it->first + "=" + it->second;
+        }
+      }
+      break;
+      
+    case CgiMetaVar::GATEWAY_INTERFACE:
+      env_str = "GATEWAY_INTERFACE=CGI/1.1";
+      break;
+      
+    case CgiMetaVar::PATH_INFO:
+      env_str = "PATH_INFO=/";
+      if (var.get_val().path_info != NULL) {
+        for (std::list<std::string>::const_iterator it = var.get_val().path_info->begin();
+             it != var.get_val().path_info->end(); ++it) {
+          env_str += *it + "/";
+        }
+        if (!var.get_val().path_info->empty()) {
+          env_str.erase(env_str.length() - 1); // Remove trailing slash
+        }
+      }
+      break;
+      
+    case CgiMetaVar::PATH_TRANSLATED:
+      env_str = "PATH_TRANSLATED=";
+      if (var.get_val().path_translated != NULL) {
+        env_str += *var.get_val().path_translated;
+      }
+      break;
+      
+    case CgiMetaVar::QUERY_STRING:
+      env_str = "QUERY_STRING=";
+      if (var.get_val().query_string != NULL) {
+        bool first = true;
+        for (std::map<std::string, std::string>::const_iterator it =
+                 var.get_val().query_string->begin();
+             it != var.get_val().query_string->end(); ++it) {
+          if (!first) env_str += "&";
+          env_str += it->first + "=" + it->second;
+          first = false;
+        }
+      }
+      break;
+      
+    case CgiMetaVar::REMOTE_ADDR: {
+      std::stringstream ss;
+      ss << static_cast<int>(var.get_val().remote_addr[0]) << "."
+         << static_cast<int>(var.get_val().remote_addr[1]) << "."
+         << static_cast<int>(var.get_val().remote_addr[2]) << "."
+         << static_cast<int>(var.get_val().remote_addr[3]);
+      env_str = "REMOTE_ADDR=" + ss.str();
+      break;
+    }
+    
+    case CgiMetaVar::REMOTE_HOST:
+      env_str = "REMOTE_HOST=";
+      if (var.get_val().remote_host != NULL) {
+        bool first = true;
+        for (std::list<std::string>::const_iterator it = var.get_val().remote_host->begin();
+             it != var.get_val().remote_host->end(); ++it) {
+          if (!first) env_str += ".";
+          env_str += *it;
+          first = false;
+        }
+      }
+      break;
+      
+    case CgiMetaVar::REMOTE_IDENT:
+      env_str = "REMOTE_IDENT=";
+      if (var.get_val().remote_ident != NULL) {
+        env_str += *var.get_val().remote_ident;
+      }
+      break;
+      
+    case CgiMetaVar::REMOTE_USER:
+      env_str = "REMOTE_USER=";
+      if (var.get_val().remote_user != NULL) {
+        env_str += *var.get_val().remote_user;
+      }
+      break;
+      
+    case CgiMetaVar::REQUEST_METHOD:
+      env_str = "REQUEST_METHOD=";
+      switch (var.get_val().request_method) {
+      case Http::GET: env_str += "GET"; break;
+      case Http::HEAD: env_str += "HEAD"; break;
+      case Http::POST: env_str += "POST"; break;
+      case Http::PUT: env_str += "PUT"; break;
+      case Http::DELETE: env_str += "DELETE"; break;
+      case Http::OPTIONS: env_str += "OPTIONS"; break;
+      case Http::CONNECT: env_str += "CONNECT"; break;
+      case Http::TRACE: env_str += "TRACE"; break;
+      case Http::PATCH: env_str += "PATCH"; break;
+      }
+      break;
+      
+    case CgiMetaVar::SCRIPT_NAME:
+      env_str = "SCRIPT_NAME=/";
+      if (var.get_val().script_name != NULL) {
+        for (std::list<std::string>::const_iterator it = var.get_val().script_name->begin();
+             it != var.get_val().script_name->end(); ++it) {
+          env_str += *it + "/";
+        }
+        if (!var.get_val().script_name->empty()) {
+          env_str.erase(env_str.length() - 1); // Remove trailing slash
+        }
+      }
+      break;
+      
+    case CgiMetaVar::SERVER_NAME:
+      env_str = "SERVER_NAME=";
+      if (var.get_val().server_name != NULL) {
+        // ServerName formatting - could be host or IPv4
+        // For simplicity, we'll format it as a string
+        // This is a simplified implementation
+        env_str += "localhost"; // TODO: proper ServerName formatting
+      }
+      break;
+      
+    case CgiMetaVar::SERVER_PORT: {
+      std::stringstream ss;
+      ss << var.get_val().server_port;
+      env_str = "SERVER_PORT=" + ss.str();
+      break;
+    }
+    
+    case CgiMetaVar::SERVER_PROTOCOL:
+      env_str = "SERVER_PROTOCOL=HTTP/1.1";
+      break;
+      
+    case CgiMetaVar::SERVER_SOFTWARE:
+      env_str = "SERVER_SOFTWARE=webserv";
+      break;
+      
+    case CgiMetaVar::X_:
+      if (var.get_val().etc_val != NULL) {
+        env_str = var.get_val().etc_val->get_name() + "=" + var.get_val().etc_val->get_value();
+      }
+      break;
+    }
+    
+    // Allocate and copy the string
+    envp[i] = new char[env_str.length() + 1];
+    std::strcpy(envp[i], env_str.c_str());
+  }
+  
+  // NULL terminate the array
+  envp[mvars.size()] = NULL;
+  
+  return envp;
+}
+
 unsigned char to_upper(unsigned char c) {
   return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
 }
