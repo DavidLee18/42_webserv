@@ -205,6 +205,7 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
 
 // Parse headers (e.g., "Host: example.com\r\n")
 // RFC 2616 §4.2: Field names are case-insensitive, LWS may be present
+// RFC 2616 §4.2: Headers can be continued on next line with leading space/tab
 Result<std::pair<std::map<std::string, Json>, size_t> >
 Http::Request::Parser::parse_headers(const char *input, size_t offset) {
   typedef std::map<std::string, Json> HeaderMap;
@@ -235,7 +236,7 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
     size_t ws_limit = offset + 10; // reasonable limit for whitespace
     offset = skip_whitespace(input, offset, ws_limit);
     
-    // Parse header value
+    // Parse header value (may span multiple lines)
     std::string header_value;
     while (input[offset] != '\0' && input[offset] != '\r') {
       header_value += input[offset];
@@ -247,6 +248,32 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
       offset += 2;
     } else {
       return ERR_PAIR(HeaderMap, size_t, Errors::invalid_format);
+    }
+    
+    // RFC 2616 §4.2: Check for header continuation (line folding)
+    // Continuation lines start with space or tab
+    while (input[offset] == ' ' || input[offset] == '\t') {
+      // This is a continuation line
+      // Skip the leading whitespace
+      while (input[offset] != '\0' && (input[offset] == ' ' || input[offset] == '\t')) {
+        offset++;
+      }
+      
+      // Add a space to separate from previous line content
+      header_value += ' ';
+      
+      // Parse the continuation line value
+      while (input[offset] != '\0' && input[offset] != '\r') {
+        header_value += input[offset];
+        offset++;
+      }
+      
+      // Skip \r\n
+      if (input[offset] == '\r' && input[offset + 1] == '\n') {
+        offset += 2;
+      } else {
+        return ERR_PAIR(HeaderMap, size_t, Errors::invalid_format);
+      }
     }
     
     // RFC 2616 §4.2: Normalize header name to lowercase (case-insensitive)
