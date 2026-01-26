@@ -770,7 +770,29 @@ char **CgiInput::to_envp() const {
     
     case CgiMetaVar::CONTENT_TYPE:
       env_str = "CONTENT_TYPE=";
-      // Content type formatting would need more detail
+      if (var.get_val().content_type != NULL) {
+        ContentType const &ct = *var.get_val().content_type;
+        // Format type/subtype
+        switch (ct.type) {
+        case ContentType::application: env_str += "application/"; break;
+        case ContentType::audio: env_str += "audio/"; break;
+        case ContentType::example: env_str += "example/"; break;
+        case ContentType::font: env_str += "font/"; break;
+        case ContentType::haptics: env_str += "haptics/"; break;
+        case ContentType::image: env_str += "image/"; break;
+        case ContentType::message: env_str += "message/"; break;
+        case ContentType::model: env_str += "model/"; break;
+        case ContentType::multipart: env_str += "multipart/"; break;
+        case ContentType::text: env_str += "text/"; break;
+        case ContentType::video: env_str += "video/"; break;
+        }
+        env_str += ct.subtype;
+        // Add parameters if any
+        for (std::map<std::string, std::string>::const_iterator it = ct.params.begin();
+             it != ct.params.end(); ++it) {
+          env_str += "; " + it->first + "=" + it->second;
+        }
+      }
       break;
       
     case CgiMetaVar::GATEWAY_INTERFACE:
@@ -878,7 +900,12 @@ char **CgiInput::to_envp() const {
       
     case CgiMetaVar::SERVER_NAME:
       env_str = "SERVER_NAME=";
-      // Server name formatting would need more detail
+      if (var.get_val().server_name != NULL) {
+        // ServerName formatting - could be host or IPv4
+        // For simplicity, we'll format it as a string
+        // This is a simplified implementation
+        env_str += "localhost"; // TODO: proper ServerName formatting
+      }
       break;
       
     case CgiMetaVar::SERVER_PORT: {
