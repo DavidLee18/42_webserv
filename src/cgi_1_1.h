@@ -187,6 +187,10 @@ public:
         parse_server_software(std::string);
     static Result<std::pair<CgiMetaVar *, size_t> >
         parse_custom_var(std::string, std::string);
+
+  public:
+    static Result<std::pair<CgiMetaVar *, size_t> >
+        parse(std::string, std::string);
   };
 
 private:

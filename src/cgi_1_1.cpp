@@ -580,6 +580,45 @@ CgiMetaVar::Parser::parse_custom_var(std::string name, std::string value) {
                  name.length() + value.length());
 }
 
+Result<std::pair<CgiMetaVar *, size_t> >
+CgiMetaVar::Parser::parse(std::string name, std::string value) {
+  if (name == "AUTH_TYPE")
+    return parse_auth_type(value);
+  if (name == "CONTENT_LENGTH")
+    return parse_content_length(value);
+  if (name == "CONTENT_TYPE")
+    return parse_content_type(value);
+  if (name == "GATEWAY_INTERFACE")
+    return parse_gateway_interface(value);
+  if (name == "PATH_INFO")
+    return parse_path_info(value);
+  if (name == "PATH_TRANSLATED")
+    return parse_path_translated(value);
+  if (name == "QUERY_STRING")
+    return parse_query_string(value);
+  if (name == "REMOTE_ADDR")
+    return parse_remote_addr(value);
+  if (name == "REMOTE_HOST")
+    return parse_remote_host(value);
+  if (name == "REMOTE_IDENT")
+    return parse_remote_ident(value);
+  if (name == "REMOTE_USER")
+    return parse_remote_user(value);
+  if (name == "REQUEST_METHOD")
+    return parse_request_method(value);
+  if (name == "SCRIPT_NAME")
+    return parse_script_name(value);
+  if (name == "SERVER_NAME")
+    return parse_server_name(value);
+  if (name == "SERVER_PORT")
+    return parse_server_port(value);
+  if (name == "SERVER_PROTOCOL")
+    return parse_server_protocol(value);
+  if (name == "SERVER_SOFTWARE")
+    return parse_server_software(value);
+  return parse_custom_var(name, value);
+}
+
 unsigned char to_upper(unsigned char c) {
   return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
 }
