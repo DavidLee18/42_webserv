@@ -70,9 +70,11 @@ if (version.find("HTTP/") != 0) {
 **Fix Needed**: Normalize header names to lowercase before storing.
 
 #### 5. **Linear White Space (LWS) in Headers** (RFC 2616 §2.2)
-**Status**: ✅ **IMPLEMENTED**
+**Status**: ❌ **NOT IMPLEMENTED** (Intentional - Deprecated in RFC 7230)
 
 **RFC 2616 §4.2**: "Header fields can be extended over multiple lines by preceding each extra line with at least one SP or HT."
+
+**RFC 7230 §3.2.4** (Obsoletes RFC 2616): "Historically, HTTP header field values could be extended over multiple lines by preceding each extra line with at least one space or horizontal tab (obs-fold). **This specification deprecates such line folding** except within the message/http media type."
 
 **Example**:
 ```
@@ -80,7 +82,7 @@ Header: value1
     value2
 ```
 
-**Implementation**: Multiline header support added with proper line folding. Continuation lines (starting with space or tab) are joined with a single space separator.
+**Decision**: Multiline headers (line folding) are **NOT supported** as they were deprecated in RFC 7230 (2014), which obsoletes RFC 2616. Modern HTTP/1.1 implementations should not use or accept line folding.
 
 #### 6. **Whitespace in Headers** (RFC 2616 §4.2)
 **Status**: ✅ **IMPLEMENTED**
@@ -126,7 +128,7 @@ Header: value1
 ✅ All important issues fixed:
 3. ✅ HTTP version format validation (Line 116-146)
 4. ✅ Header value whitespace trimming (Line 255-256)
-5. ✅ Multi-line headers support (Line 245-266)
+5. ❌ Multi-line headers NOT supported (deprecated in RFC 7230)
 
 ### Minor Issues (Edge Cases)
 6. ⚠️ Request-URI validation (Line 62-64) - Basic validation only
@@ -134,13 +136,13 @@ Header: value1
 
 ## Recommendation
 
-The implementation is now **RFC 2616 conformant** for HTTP/1.1 request parsing with the following features:
+The implementation is **RFC 7230 compliant** (modern HTTP/1.1) for request parsing with the following features:
 - ✅ Case-sensitive HTTP methods
 - ✅ HTTP version format validation
 - ✅ Case-insensitive header field names
 - ✅ Proper whitespace handling in headers
-- ✅ **Multiline header support (header folding)**
+- ❌ **Multiline headers NOT supported** (deprecated in RFC 7230 - correct behavior)
 - ✅ Complete body parsing for JSON, form-urlencoded, and HTML/text
 - ✅ URL decoding for form data
 
-The implementation is suitable for **production use** with only minor limitations in Request-URI validation and Transfer-Encoding support.
+The implementation is suitable for **production use** with only minor limitations in Request-URI validation and Transfer-Encoding support. The lack of multiline header support is intentional and correct per RFC 7230.
