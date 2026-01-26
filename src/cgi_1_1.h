@@ -190,7 +190,7 @@ public:
 
   public:
     static Result<std::pair<CgiMetaVar *, size_t> >
-        parse(std::string, std::string);
+        parse(std::string const &, std::string const &);
   };
 
 private:

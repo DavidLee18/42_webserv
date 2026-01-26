@@ -581,7 +581,7 @@ CgiMetaVar::Parser::parse_custom_var(std::string name, std::string value) {
 }
 
 Result<std::pair<CgiMetaVar *, size_t> >
-CgiMetaVar::Parser::parse(std::string name, std::string value) {
+CgiMetaVar::Parser::parse(std::string const &name, std::string const &value) {
   if (name == "AUTH_TYPE")
     return parse_auth_type(value);
   if (name == "CONTENT_LENGTH")
