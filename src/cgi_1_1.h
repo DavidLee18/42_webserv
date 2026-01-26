@@ -8,6 +8,9 @@
 #include <map>
 #include <string>
 
+// Forward declarations
+class CgiInput;
+
 class CgiAuthType {
 public:
   enum Type {
@@ -99,6 +102,10 @@ public:
       : type(ty), name(n), value(v) {}
   EtcMetaVar(EtcMetaVar const &other)
       : type(other.type), name(other.name), value(other.value) {}
+  
+  Type const &get_type() const { return type; }
+  std::string const &get_name() const { return name; }
+  std::string const &get_value() const { return value; }
 
 private:
   Type type;
@@ -192,6 +199,11 @@ public:
     static Result<std::pair<CgiMetaVar *, size_t> >
         parse(std::string const &, std::string const &);
   };
+  
+  friend class CgiInput;
+  
+  Name const &get_name() const { return name; }
+  Val const &get_val() const { return val; }
 
 private:
   Name name;
@@ -223,6 +235,13 @@ class CgiInput {
   Http::Body req_body;
 
 public:
+  class Parser {
+    virtual void phantom() = 0;
+
+  public:
+    static Result<CgiInput> parse(Http::Request const &);
+  };
+
   CgiInput(Http::Request const &);
   CgiInput(const CgiInput &other)
       : mvars(other.mvars), req_body(other.req_body) {}
