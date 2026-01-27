@@ -235,7 +235,7 @@ std::ostream &operator<<(std::ostream &os, Json &js) {
       }
       try {
         os << js._value.obj->at(i);
-      } catch (std::out_of_range e) {
+      } catch (const std::out_of_range& e) {
         std::cerr << e.what() << std::endl;
         return os;
       }

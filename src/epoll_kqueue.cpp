@@ -37,11 +37,11 @@ Result<Events> Events::init(const std::vector<FileDescriptor> &all_events,
       return ERR(Events, Errors::not_found);
     }
     new ((void *)(es->_events + i)) Event(
-        *fd, (events[i].events & EPOLLIN) == 1,
-        (events[i].events & EPOLLOUT) == 1,
-        (events[i].events & EPOLLRDHUP) == 1,
-        (events[i].events & EPOLLPRI) == 1, (events[i].events & EPOLLERR) == 1,
-        (events[i].events & EPOLLHUP) == 1);
+        *fd, (events[i].events & EPOLLIN) != 0,
+        (events[i].events & EPOLLOUT) != 0,
+        (events[i].events & EPOLLRDHUP) != 0,
+        (events[i].events & EPOLLPRI) != 0, (events[i].events & EPOLLERR) != 0,
+        (events[i].events & EPOLLHUP) != 0);
   }
   delete[] events;
   return OK(Events, es);
