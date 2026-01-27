@@ -258,7 +258,7 @@ std::ostream &operator<<(std::ostream &os, Json &js) {
     os << "null";
     break;
   case Json::Bool:
-    os << js._value._bool;
+    os << (js._value._bool ? "true" : "false");
     break;
   case Json::Num:
     os << js._value.num;
@@ -267,7 +267,7 @@ std::ostream &operator<<(std::ostream &os, Json &js) {
     os << '\"' << *js._value._str << '\"';
     break;
   case Json::Arr:
-    os << "JsonArr " << *js._value.arr;
+    os << *js._value.arr;
     break;
   case Json::Obj:
     os << '{';
@@ -275,12 +275,7 @@ std::ostream &operator<<(std::ostream &os, Json &js) {
       if (i != 0) {
         os << ", ";
       }
-      try {
-        os << js._value.obj->at(i);
-      } catch (const std::out_of_range& e) {
-        std::cerr << e.what() << std::endl;
-        return os;
-      }
+      os << (*js._value.obj)[i];
     }
     os << '}';
     break;
