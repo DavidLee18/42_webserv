@@ -1105,14 +1105,16 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
       ssize_t written = write(stdin_pipe[1], 
                               body_str.c_str() + total_written, 
                               body_str.length() - total_written);
-      if (written <= 0) {
+      if (written < 0) {
         close(stdin_pipe[1]);
         close(stdout_pipe[0]);
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
         return ERR(Http::Body *, "Failed to write to CGI stdin");
       }
-      total_written += static_cast<size_t>(written);
+      if (written > 0) {
+        total_written += static_cast<size_t>(written);
+      }
     }
   }
   close(stdin_pipe[1]); // Close stdin to signal end of input
@@ -1120,6 +1122,9 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
   // Read output with timeout using select()
   std::string output;
   char buffer[4096];
+  int initial_timeout = timeout_seconds;
+  int subsequent_timeout = 5; // Shorter timeout for subsequent reads
+  bool first_read = true;
   
   while (true) {
     fd_set read_fds;
@@ -1127,7 +1132,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
     FD_SET(stdout_pipe[0], &read_fds);
     
     struct timeval tv;
-    tv.tv_sec = timeout_seconds;
+    tv.tv_sec = first_read ? initial_timeout : subsequent_timeout;
     tv.tv_usec = 0;
     
     int select_result = select(stdout_pipe[0] + 1, &read_fds, NULL, NULL, &tv);
@@ -1151,8 +1156,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
     
     if (bytes_read > 0) {
       output.append(buffer, static_cast<size_t>(bytes_read));
-      // Reset timeout for next read
-      timeout_seconds = 5; // Use shorter timeout for subsequent reads
+      first_read = false; // Use shorter timeout for subsequent reads
     } else if (bytes_read == 0) {
       // EOF reached
       break;
