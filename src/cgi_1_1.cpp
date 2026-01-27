@@ -1358,7 +1358,9 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         }
         
         // Store header
-        response_headers[header_name] = *Json::str(header_value);
+        Json *header_json = Json::str(header_value);
+        response_headers[header_name] = *header_json;
+        delete header_json;
       }
     }
   }

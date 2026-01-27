@@ -256,7 +256,9 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
     std::string trimmed_value = trim_whitespace(header_value);
     
     // Store header as Json string
-    headers[normalized_name] = *Json::str(trimmed_value);
+    Json *header_json = Json::str(trimmed_value);
+    headers[normalized_name] = *header_json;
+    delete header_json;
   }
   
   return OK_PAIR(HeaderMap, size_t, headers, offset - start_offset);

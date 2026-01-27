@@ -64,6 +64,21 @@ public:
         break;
       }
     }
+    ~Body() {
+      switch (_type) {
+      case HttpJson:
+        delete _value.json;
+        break;
+      case HttpFormUrlEncoded:
+        delete _value.form;
+        break;
+      case Html:
+        delete _value.html_raw;
+        break;
+      default:
+        break;
+      }
+    }
     static Body *empty() { return new Body(Empty, (Value){._null = NULL}); }
     static Body *json(Json *json) {
       return new Body(HttpJson, (Value){.json = json});
