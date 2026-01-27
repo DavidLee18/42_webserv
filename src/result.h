@@ -22,8 +22,8 @@ class Optional {
   };
   Storage _storage;
 
-  T* ptr() { return reinterpret_cast<T*>(&_storage._data[0]); }
-  const T* ptr() const { return reinterpret_cast<const T*>(&_storage._data[0]); }
+  T* ptr() { return reinterpret_cast<T*>(_storage._data); }
+  const T* ptr() const { return reinterpret_cast<const T*>(_storage._data); }
 
 public:
   Optional() : _has_value(false) {
