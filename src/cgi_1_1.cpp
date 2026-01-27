@@ -214,7 +214,7 @@ CgiMetaVar::Parser::parse_auth_type(std::string raw) {
     return OK_PAIR(CgiMetaVar, size_t,
                    CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::Digest)), 6);
   return OK_PAIR(
-      CgiMetaVar *, size_t,
+      CgiMetaVar, size_t,
       CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::CgiAuthOther, ty)),
       ty.size());
 }
@@ -629,21 +629,21 @@ CgiInput::CgiInput(std::vector<CgiMetaVar> vars, Http::Body body)
 CgiInput::CgiInput(Http::Request const &req)
     : mvars(), req_body(req.body()) {}
 
-Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
-  CgiInput *input = new CgiInput();
-  input->req_body = req.body();
+Result<CgiInput> CgiInput::Parser::parse(Http::Request const &req) {
+  CgiInput input;
+  input.req_body = req.body();
   
   // Add REQUEST_METHOD
   CgiMetaVar method_var = CgiMetaVar::request_method(req.method());
-  input->mvars.push_back(method_var);
+  input.mvars.push_back(method_var);
   
   // Add SERVER_PROTOCOL
   CgiMetaVar protocol_var = CgiMetaVar::server_protocol(Http_1_1);
-  input->mvars.push_back(protocol_var);
+  input.mvars.push_back(protocol_var);
   
   // Add GATEWAY_INTERFACE
   CgiMetaVar gateway_var = CgiMetaVar::gateway_interface(Cgi_1_1);
-  input->mvars.push_back(gateway_var);
+  input.mvars.push_back(gateway_var);
   
   // Parse path for SCRIPT_NAME and QUERY_STRING
   std::string path = req.path();
@@ -670,7 +670,7 @@ Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
       }
     }
     CgiMetaVar script_var = CgiMetaVar::script_name(script_parts);
-    input->mvars.push_back(script_var);
+    input.mvars.push_back(script_var);
   }
   
   // Add QUERY_STRING
@@ -687,7 +687,7 @@ Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
       }
     }
     CgiMetaVar query_var = CgiMetaVar::query_string(query_map);
-    input->mvars.push_back(query_var);
+    input.mvars.push_back(query_var);
   }
   
   // Add HTTP headers as CGI variables
@@ -723,28 +723,24 @@ Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
       Result<std::pair<CgiMetaVar, size_t> > res =
           CgiMetaVar::Parser::parse("CONTENT_TYPE", value);
       if (res.error().empty()) {
-        input->mvars.push_back(res.value().first);
+        input.mvars.push_back(res.value().first);
       }
     } else if (header_name == "CONTENT_LENGTH") {
       Result<std::pair<CgiMetaVar, size_t> > res =
           CgiMetaVar::Parser::parse("CONTENT_LENGTH", value);
       if (res.error().empty()) {
-        input->mvars.push_back(res.value().first);
+        input.mvars.push_back(res.value().first);
       }
     } else {
       // Add as HTTP_* variable
       std::string cgi_name = "HTTP_" + header_name;
       CgiMetaVar custom_var = CgiMetaVar::custom_var(
           EtcMetaVar::Http, cgi_name, value);
-      input->mvars.push_back(custom_var);
+      input.mvars.push_back(custom_var);
     }
   }
   
-  // Allocate a pointer to the CgiInput pointer on the heap
-  // This allows the CgiInput object to survive after Result is destroyed
-  CgiInput **result_ptr = new CgiInput *;
-  *result_ptr = input;
-  return OK(CgiInput *, result_ptr);
+  return OK(CgiInput, input);
 }
 
 char **CgiInput::to_envp() const {
@@ -959,27 +955,24 @@ static const int CGI_INITIAL_TIMEOUT_SEC = 30;  // Initial timeout for first rea
 static const int CGI_SUBSEQUENT_TIMEOUT_SEC = 5; // Timeout for subsequent reads
 
 CgiDelegate::CgiDelegate(const Http::Request &req, const std::string &script)
-    : env(NULL), script_path(script), request(req) {}
+    : env(), script_path(script), request(req) {}
 
 CgiDelegate *CgiDelegate::create(const Http::Request &req,
                                   const std::string &script) {
   CgiDelegate *delegate = new CgiDelegate(req, script);
 
   // Parse the HTTP request to CgiInput
-  Result<CgiInput *> parse_result = CgiInput::Parser::parse(req);
+  Result<CgiInput> parse_result = CgiInput::Parser::parse(req);
   if (!parse_result.error().empty()) {
     delete delegate;
     return NULL;
   }
 
-  delegate->env = *const_cast<CgiInput **>(parse_result.value());
+  delegate->env = parse_result.value();
   return delegate;
 }
 
 Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
-  if (env == NULL) {
-    return ERR(Http::Response *, "CgiInput not initialized");
-  }
   
   if (epoll == NULL) {
     return ERR(Http::Response *, "EPoll instance required");
@@ -1030,7 +1023,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     close(stdout_pipe[1]);
 
     // Prepare environment variables
-    char **envp = env->to_envp();
+    char **envp = env.to_envp();
 
     // Prepare arguments
     char *argv[2];
@@ -1066,7 +1059,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     waitpid(pid, NULL, 0);
     return ERR(Http::Response *, "Failed to create stdin FileDescriptor");
   }
-  FileDescriptor stdin_fd = *const_cast<FileDescriptor *>(stdin_fd_res.value());
+  FileDescriptor stdin_fd = stdin_fd_res.value();
 
   Result<FileDescriptor> stdout_fd_res = FileDescriptor::from_raw(stdout_pipe[0]);
   if (!stdout_fd_res.error().empty()) {
@@ -1076,7 +1069,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     waitpid(pid, NULL, 0);
     return ERR(Http::Response *, "Failed to create stdout FileDescriptor");
   }
-  FileDescriptor stdout_fd = *const_cast<FileDescriptor *>(stdout_fd_res.value());
+  FileDescriptor stdout_fd = stdout_fd_res.value();
 
   // Prepare request body for writing
   const Http::Body &body = request.body();
@@ -1149,7 +1142,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         return ERR(Http::Response *, "EPoll wait failed for stdin");
       }
       
-      Events events = *const_cast<Events *>(wait_result.value());
+      Events events = wait_result.value();
       
       // Check if timeout occurred (no events returned)
       if (events.is_end()) {
@@ -1168,7 +1161,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         if (!event_result.error().empty()) {
           continue;
         }
-        const Event *ev = *const_cast<const Event **>(event_result.value());
+        const Event *ev = event_result.value();
         if (*ev->fd == stdin_pipe[1] && ev->out) {
           fd_ready = true;
           break;
@@ -1236,7 +1229,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       return ERR(Http::Response *, "EPoll wait failed for stdout");
     }
     
-    Events events = *const_cast<Events *>(wait_result.value());
+    Events events = wait_result.value();
     
     // Check if timeout occurred (no events returned)
     if (events.is_end()) {
@@ -1254,7 +1247,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       if (!event_result.error().empty()) {
         continue;
       }
-      const Event *ev = *const_cast<const Event **>(event_result.value());
+      const Event *ev = event_result.value();
       if (*ev->fd == stdout_pipe[0] && ev->in) {
         fd_ready = true;
         break;
@@ -1350,9 +1343,8 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         }
         
         // Store header
-        Json *header_json = Json::str(header_value);
-        response_headers[header_name] = *header_json;
-        delete header_json;
+        Json header_json = Json::str(header_value);
+        response_headers[header_name] = header_json;
       }
     }
   }
@@ -1365,16 +1357,9 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   // Create Http::Response
   Http::Response *response = new Http::Response(status_code, response_headers, result_body);
 
-  // Allocate a pointer to the Http::Response pointer on the heap
-  // This allows the Http::Response object to survive after Result is destroyed
-  Http::Response **result_ptr = new Http::Response *;
-  *result_ptr = response;
-  return OK(Http::Response *, result_ptr);
+  return OK(Http::Response *, response);
 }
 
 CgiDelegate::~CgiDelegate() {
-  if (env != NULL) {
-    delete env;
-    env = NULL;
-  }
+  // env is now a value member, will be automatically destroyed
 }

@@ -148,18 +148,18 @@ Http::Request::Parser::parse_http_version(const char *input, size_t offset) {
 }
 
 // Parse request line (e.g., "GET /path HTTP/1.1\r\n")
-Result<std::pair<Http::Request *, size_t> >
+Result<std::pair<Http::Request, size_t> >
 Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   size_t start_offset = offset;
   
   // Parse method
   Result<std::pair<Http::Method, size_t> > method_res = parse_method(input, offset);
   if (!method_res.error().empty()) {
-    return ERR_PAIR(Http::Request *, size_t, method_res.error());
+    return ERR_PAIR(Http::Request, size_t, method_res.error());
   }
   
-  Http::Method method = method_res.value()->first;
-  offset += method_res.value()->second;
+  Http::Method method = method_res.value().first;
+  offset += method_res.value().second;
   
   // Skip space (limited search)
   size_t space_limit = offset + 10; // reasonable limit for spaces
@@ -167,12 +167,12 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   
   // Parse path
   Result<std::pair<std::string, size_t> > path_res = parse_path(input, offset);
-  if (!path_res.error().empty()) {
-    return ERR_PAIR(Http::Request *, size_t, path_res.error());
+  if (!path_res.empty()) {
+    return ERR_PAIR(Http::Request, size_t, path_res.error());
   }
   
-  std::string path = path_res.value()->first;
-  offset += path_res.value()->second;
+  std::string path = path_res.value().first;
+  offset += path_res.value().second;
   
   // Skip space (limited search)
   space_limit = offset + 10; // reasonable limit for spaces
@@ -181,16 +181,16 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   // Parse HTTP version
   Result<std::pair<std::string, size_t> > version_res = parse_http_version(input, offset);
   if (!version_res.error().empty()) {
-    return ERR_PAIR(Http::Request *, size_t, version_res.error());
+    return ERR_PAIR(Http::Request, size_t, version_res.error());
   }
   
-  offset += version_res.value()->second;
+  offset += version_res.value().second;
   
   // Skip \r\n
   if (input[offset] == '\r' && input[offset + 1] == '\n') {
     offset += 2;
   } else {
-    return ERR_PAIR(Http::Request *, size_t, Errors::invalid_format);
+    return ERR_PAIR(Http::Request, size_t, Errors::invalid_format);
   }
   
   // For now, create a simple request with empty body
@@ -198,9 +198,9 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   empty_val._null = NULL;
   Http::Body body(Http::Body::Empty, empty_val);
   
-  Http::Request *req = new Http::Request(method, path, body);
+  Http::Request req(method, path, body);
   
-  return OK_PAIR(Http::Request *, size_t, req, offset - start_offset);
+  return OK_PAIR(Http::Request, size_t, req, offset - start_offset);
 }
 
 // Parse headers (e.g., "Host: example.com\r\n")
