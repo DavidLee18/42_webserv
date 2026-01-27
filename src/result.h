@@ -18,7 +18,7 @@ class Optional {
 
 public:
   Optional() : _has_value(false) {
-    std::memset(_storage, 0, sizeof(T));
+    // Storage is uninitialized, will be constructed via placement new if needed
   }
   
   Optional(const T& val) : _has_value(true) {
@@ -28,9 +28,8 @@ public:
   Optional(const Optional& other) : _has_value(other._has_value) {
     if (_has_value) {
       new (_storage) T(*other.ptr());
-    } else {
-      std::memset(_storage, 0, sizeof(T));
     }
+    // If not has_value, storage remains uninitialized
   }
   
   ~Optional() {
@@ -47,9 +46,8 @@ public:
       _has_value = other._has_value;
       if (_has_value) {
         new (_storage) T(*other.ptr());
-      } else {
-        std::memset(_storage, 0, sizeof(T));
       }
+      // If not has_value, storage remains uninitialized
     }
     return *this;
   }
