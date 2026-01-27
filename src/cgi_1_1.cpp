@@ -1041,6 +1041,12 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
     execve(script_path.c_str(), argv, envp);
 
     // If execve returns, it failed
+    // Clean up allocated memory before exit
+    for (size_t i = 0; envp[i] != NULL; i++) {
+      delete[] envp[i];
+    }
+    delete[] envp;
+    
     std::cerr << "Failed to execute CGI script: " << script_path << std::endl;
     exit(1);
   }
@@ -1120,7 +1126,18 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
 
   // Set stdout_pipe[0] to non-blocking
   int flags = fcntl(stdout_pipe[0], F_GETFL, 0);
-  fcntl(stdout_pipe[0], F_SETFL, flags | O_NONBLOCK);
+  if (flags == -1) {
+    close(stdout_pipe[0]);
+    kill(pid, SIGKILL);
+    waitpid(pid, NULL, 0);
+    return ERR(Http::Body *, "Failed to get file descriptor flags");
+  }
+  if (fcntl(stdout_pipe[0], F_SETFL, flags | O_NONBLOCK) == -1) {
+    close(stdout_pipe[0]);
+    kill(pid, SIGKILL);
+    waitpid(pid, NULL, 0);
+    return ERR(Http::Body *, "Failed to set non-blocking mode");
+  }
 
   // Read output with timeout
   std::string output;
