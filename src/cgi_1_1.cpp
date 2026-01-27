@@ -1094,13 +1094,22 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
   }
   
   if (!body_str.empty()) {
-    ssize_t written = write(stdin_pipe[1], body_str.c_str(), body_str.length());
-    if (written == -1) {
-      close(stdin_pipe[1]);
-      close(stdout_pipe[0]);
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
-      return ERR(Http::Body *, "Failed to write to CGI stdin");
+    size_t total_written = 0;
+    while (total_written < body_str.length()) {
+      ssize_t written = write(stdin_pipe[1], 
+                              body_str.c_str() + total_written, 
+                              body_str.length() - total_written);
+      if (written == -1) {
+        if (errno == EINTR) {
+          continue; // Interrupted by signal, retry
+        }
+        close(stdin_pipe[1]);
+        close(stdout_pipe[0]);
+        kill(pid, SIGKILL);
+        waitpid(pid, NULL, 0);
+        return ERR(Http::Body *, "Failed to write to CGI stdin");
+      }
+      total_written += static_cast<size_t>(written);
     }
   }
   close(stdin_pipe[1]); // Close stdin to signal end of input
@@ -1169,7 +1178,11 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
   body_val.html_raw = new std::string(output);
   Http::Body *result_body = new Http::Body(Http::Body::Html, body_val);
 
-  return OK(Http::Body *, &result_body);
+  // Allocate a pointer to the Http::Body pointer on the heap
+  // This allows the Http::Body object to survive after Result is destroyed
+  Http::Body **result_ptr = new Http::Body *;
+  *result_ptr = result_body;
+  return OK(Http::Body *, result_ptr);
 }
 
 CgiDelegate::~CgiDelegate() {
