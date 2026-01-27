@@ -1131,7 +1131,8 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   // Write request body to CGI stdin if present, using EPoll to check writability
   if (!body_str.empty()) {
     // Add stdin_fd to epoll for writing
-    Event write_event(NULL, false, true, false, false, false, false);
+    const FileDescriptor *stdin_fd_ptr = const_cast<const FileDescriptor *>(&stdin_fd);
+    Event write_event(stdin_fd_ptr, false, true, false, false, false, false);
     Option write_option(false, false, false, false);
     Result<const FileDescriptor *> add_result = epoll->add_fd(stdin_fd, write_event, write_option);
     
@@ -1157,6 +1158,17 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       }
       
       Events events = *const_cast<Events *>(wait_result.value());
+      
+      // Check if timeout occurred (no events returned)
+      if (events.is_end()) {
+        epoll->del_fd(stdin_fd);
+        close(stdin_pipe[1]);
+        close(stdout_pipe[0]);
+        kill(pid, SIGKILL);
+        waitpid(pid, NULL, 0);
+        return ERR(Http::Body *, "Timeout waiting for stdin writability");
+      }
+      
       bool fd_ready = false;
       
       for (; !events.is_end(); ++events) {
@@ -1172,13 +1184,8 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       }
       
       if (!fd_ready) {
-        // Timeout - no event for our fd
-        epoll->del_fd(stdin_fd);
-        close(stdin_pipe[1]);
-        close(stdout_pipe[0]);
-        kill(pid, SIGKILL);
-        waitpid(pid, NULL, 0);
-        return ERR(Http::Body *, "Timeout waiting for stdin writability");
+        // Got events but not for our fd, continue waiting
+        continue;
       }
       
       // FD is ready, perform write
@@ -1210,7 +1217,8 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   close(stdin_pipe[1]); // Close stdin to signal end of input
 
   // Add stdout_fd to epoll for reading
-  Event read_event(NULL, true, false, false, false, false, false);
+  const FileDescriptor *stdout_fd_ptr = const_cast<const FileDescriptor *>(&stdout_fd);
+  Event read_event(stdout_fd_ptr, true, false, false, false, false, false);
   Option read_option(false, false, false, false);
   Result<const FileDescriptor *> add_stdout_result = epoll->add_fd(stdout_fd, read_event, read_option);
   
@@ -1237,8 +1245,17 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     }
     
     Events events = *const_cast<Events *>(wait_result.value());
+    
+    // Check if timeout occurred (no events returned)
+    if (events.is_end()) {
+      epoll->del_fd(stdout_fd);
+      close(stdout_pipe[0]);
+      kill(pid, SIGKILL);
+      waitpid(pid, NULL, 0);
+      return ERR(Http::Body *, "CGI execution timeout");
+    }
+    
     bool fd_ready = false;
-    bool timeout_occurred = true;
     
     for (; !events.is_end(); ++events) {
       Result<const Event *> event_result = *events;
@@ -1246,20 +1263,10 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         continue;
       }
       const Event *ev = *const_cast<const Event **>(event_result.value());
-      timeout_occurred = false;
       if (*ev->fd == stdout_pipe[0] && ev->in) {
         fd_ready = true;
         break;
       }
-    }
-    
-    if (timeout_occurred) {
-      // No events returned - timeout
-      epoll->del_fd(stdout_fd);
-      close(stdout_pipe[0]);
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
-      return ERR(Http::Body *, "CGI execution timeout");
     }
     
     if (!fd_ready) {
