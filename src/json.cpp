@@ -275,12 +275,7 @@ std::ostream &operator<<(std::ostream &os, Json &js) {
       if (i != 0) {
         os << ", ";
       }
-      try {
-        os << js._value.obj->at(i);
-      } catch (const std::out_of_range& e) {
-        std::cerr << e.what() << std::endl;
-        return os;
-      }
+      os << (*js._value.obj)[i];
     }
     os << '}';
     break;
