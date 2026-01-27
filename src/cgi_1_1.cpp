@@ -1053,8 +1053,47 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
 
   // Write request body to CGI stdin if present
   const Http::Body &body = request.body();
-  if (body.type() == Http::Body::Html && body.value().html_raw != NULL) {
-    const std::string &body_str = *body.value().html_raw;
+  std::string body_str;
+  
+  switch (body.type()) {
+    case Http::Body::Html:
+      if (body.value().html_raw != NULL) {
+        body_str = *body.value().html_raw;
+      }
+      break;
+      
+    case Http::Body::HttpJson:
+      if (body.value().json != NULL) {
+        std::stringstream ss;
+        Json json_copy = *body.value().json;
+        ss << json_copy;
+        body_str = ss.str();
+      }
+      break;
+      
+    case Http::Body::HttpFormUrlEncoded:
+      if (body.value().form != NULL) {
+        std::stringstream ss;
+        const std::map<std::string, std::string> &form = *body.value().form;
+        bool first = true;
+        for (std::map<std::string, std::string>::const_iterator it = form.begin();
+             it != form.end(); ++it) {
+          if (!first) {
+            ss << "&";
+          }
+          ss << it->first << "=" << it->second;
+          first = false;
+        }
+        body_str = ss.str();
+      }
+      break;
+      
+    case Http::Body::Empty:
+      // No body to write
+      break;
+  }
+  
+  if (!body_str.empty()) {
     ssize_t written = write(stdin_pipe[1], body_str.c_str(), body_str.length());
     if (written == -1) {
       close(stdin_pipe[1]);
