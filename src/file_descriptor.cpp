@@ -19,24 +19,24 @@ Result<FileDescriptor> FileDescriptor::socket_new() {
       return ERR(FileDescriptor, Errors::out_of_mem);
     }
   }
-  FileDescriptor *fd = new FileDescriptor();
-  fd->set_fd(sock);
+  FileDescriptor fd;
+  fd.set_fd(sock);
   return OK(FileDescriptor, fd);
 }
 
 Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
   if (raw_fd < 0)
     return ERR(FileDescriptor, Errors::invalid_fd);
-  FileDescriptor *fd = new FileDescriptor();
-  fd->set_fd(raw_fd);
+  FileDescriptor fd;
+  fd.set_fd(raw_fd);
   return OK(FileDescriptor, fd);
 }
 
 Result<FileDescriptor> FileDescriptor::move_from(FileDescriptor other) {
   if (other._fd < 0)
     return ERR(FileDescriptor, Errors::invalid_fd);
-  FileDescriptor *fd = new FileDescriptor();
-  fd->set_fd(other._fd);
+  FileDescriptor fd;
+  fd.set_fd(other._fd);
   other._fd = -1;
   return OK(FileDescriptor, fd);
 }
@@ -113,8 +113,8 @@ Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
                                                      socklen_t *len) {
   int fd = accept(_fd, addr, len);
   if (fd >= 0) {
-    FileDescriptor *fd_ = new FileDescriptor();
-    fd_->set_fd(fd);
+    FileDescriptor fd_;
+    fd_.set_fd(fd);
     return OK(FileDescriptor, fd_);
   }
   switch (errno) {
@@ -153,8 +153,7 @@ Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) {
   ssize_t res = recv(_fd, buf, size, 0);
   if (res < 0)
     return ERR(ssize_t, "`recv` failed");
-  ssize_t *r = new ssize_t(res);
-  return OK(ssize_t, r);
+  return OK(ssize_t, res);
 }
 
 Result<Http::PartialString> FileDescriptor::try_read_to_end() {
@@ -162,11 +161,11 @@ Result<Http::PartialString> FileDescriptor::try_read_to_end() {
   char buf[BUFFER_SIZE];
 
   Result<ssize_t> bytes = this->sock_recv(buf, BUFFER_SIZE);
-  while (bytes.error().empty() && *bytes.value() > 0) {
-    ssize_t *bs;
+  while (bytes.error().empty() && bytes.value() > 0) {
+    ssize_t bs;
     TRY(Http::PartialString, ssize_t, bs, bytes)
-    char *s = new char[static_cast<size_t>(*bs + 1)];
-    s = std::strncpy(s, buf, static_cast<size_t>(*bs + 1));
+    char *s = new char[static_cast<size_t>(bs + 1)];
+    s = std::strncpy(s, buf, static_cast<size_t>(bs + 1));
     if (!(ss << s))
       return ERR(Http::PartialString, "string concat failed");
     delete[] s;
@@ -176,7 +175,7 @@ Result<Http::PartialString> FileDescriptor::try_read_to_end() {
     return ERR(Http::PartialString, bytes.error());
   char *s = new char[ss.str().length()];
   s = std::strcpy(s, ss.str().c_str());
-  if (*bytes.value() == 0) {
+  if (bytes.value() == 0) {
     return OK(Http::PartialString, Http::PartialString::full(s));
   }
   return OK(Http::PartialString, Http::PartialString::partial(s));

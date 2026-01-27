@@ -14,15 +14,15 @@ public:
   class PartialString {
   public:
     enum Type { Partial, Full };
-    static PartialString *partial(char *input) {
-      PartialString *p = new PartialString();
-      p->_part = input;
+    static PartialString partial(char *input) {
+      PartialString p;
+      p._part = input;
       return p;
     }
-    static PartialString *full(char *input) {
-      PartialString *p = new PartialString();
-      p->_kind = PartialString::Full;
-      p->_part = input;
+    static PartialString full(char *input) {
+      PartialString p;
+      p._kind = PartialString::Full;
+      p._part = input;
       return p;
     }
     Type const &kind() const { return _kind; }
@@ -79,9 +79,9 @@ public:
         break;
       }
     }
-    static Body *empty() { return new Body(Empty, (Value){._null = NULL}); }
-    static Body *json(Json *json) {
-      return new Body(HttpJson, (Value){.json = json});
+    static Body empty() { return Body(Empty, (Value){._null = NULL}); }
+    static Body json(Json j) {
+      return Body(HttpJson, (Value){.json = new Json(j)});
     }
     const Type &type() const { return _type; }
     const Value &value() const { return _value; }
@@ -101,15 +101,15 @@ public:
     class Parser {
       virtual void phantom() = 0;
       
-      static Result<std::pair<Request *, size_t> > parse_request_line(const char *, size_t);
+      static Result<std::pair<Request, size_t> > parse_request_line(const char *, size_t);
       static Result<std::pair<Method, size_t> > parse_method(const char *, size_t);
       static Result<std::pair<std::string, size_t> > parse_path(const char *, size_t);
       static Result<std::pair<std::string, size_t> > parse_http_version(const char *, size_t);
       static Result<std::pair<std::map<std::string, Json>, size_t> > parse_headers(const char *, size_t);
-      static Result<std::pair<Body *, size_t> > parse_body(const char *, size_t, std::map<std::string, Json> const &);
+      static Result<std::pair<Body, size_t> > parse_body(const char *, size_t, std::map<std::string, Json> const &);
 
     public:
-      static Result<std::pair<Request *, size_t> > parse(const char *, size_t);
+      static Result<std::pair<Request, size_t> > parse(const char *, size_t);
     };
     
     friend class Parser;

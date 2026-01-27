@@ -159,13 +159,12 @@ public:
  * @brief A simple epoll wrapper class.
  */
 class EPoll {
-  FileDescriptor *_fd;
+  FileDescriptor _fd;
   std::vector<FileDescriptor> _events;
   unsigned short _size;
-  EPoll() : _fd(NULL), _events(), _size(0) {}
-  Result<Void> init();
-
+  
 public:
+  EPoll() : _fd(), _events(), _size(0) {}
   static Result<EPoll> create(unsigned short);
   Result<Events> wait(const int timeout_ms);
   Result<const FileDescriptor *> add_fd(FileDescriptor, const Event &,
