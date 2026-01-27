@@ -1116,9 +1116,12 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
         waitpid(pid, NULL, 0);
         return ERR(Http::Body *, "Failed to write to CGI stdin");
       } else if (written == 0) {
-        // Pipe buffer full, but this shouldn't normally happen in blocking mode
-        // Try again after brief delay
-        continue;
+        // Pipe closed by reader (child process)
+        close(stdin_pipe[1]);
+        close(stdout_pipe[0]);
+        kill(pid, SIGKILL);
+        waitpid(pid, NULL, 0);
+        return ERR(Http::Body *, "CGI process closed stdin prematurely");
       }
       total_written += static_cast<size_t>(written);
     }
@@ -1145,7 +1148,8 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
     int select_result = select(stdout_pipe[0] + 1, &read_fds, NULL, NULL, &tv);
     
     if (select_result < 0) {
-      // Error in select
+      // Error in select - could be interrupted by signal, but treat as error
+      // Note: EINTR handling omitted as errno checks are forbidden
       close(stdout_pipe[0]);
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
