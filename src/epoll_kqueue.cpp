@@ -21,27 +21,28 @@ void KQueue::del_event(const FileDescriptor &fd,
 #else // LINUX
 Result<Events> Events::init(const std::vector<FileDescriptor> &all_events,
                             size_t size, const epoll_event *events) {
-  Events *es = new Events();
-  es->_events = static_cast<Event *>(operator new(sizeof(Event) * size));
+  Events es;
+  es._len = size;
+  es._curr = 0;
+  es._events = static_cast<Event *>(operator new(sizeof(Event) * size));
   for (size_t i = 0; i < size; i++) {
-    FileDescriptor const **fd = NULL;
-    for (size_t j = 0; j < all_events.size(); i++) {
+    const FileDescriptor *fd = NULL;
+    for (size_t j = 0; j < all_events.size(); j++) {
       if (events[i].data.fd == all_events.at(j)) {
-        fd = new const FileDescriptor *;
-        *fd = FileDescriptor::from_raw(events[i].data.fd).value();
+        fd = &all_events.at(j);
+        break;
       }
     }
     if (fd == NULL) {
-      operator delete((void *)es->_events);
-      delete es;
+      operator delete((void *)es._events);
       return ERR(Events, Errors::not_found);
     }
-    new ((void *)(es->_events + i)) Event(
-        *fd, (events[i].events & EPOLLIN) == 1,
-        (events[i].events & EPOLLOUT) == 1,
-        (events[i].events & EPOLLRDHUP) == 1,
-        (events[i].events & EPOLLPRI) == 1, (events[i].events & EPOLLERR) == 1,
-        (events[i].events & EPOLLHUP) == 1);
+    new ((void *)(es._events + i)) Event(
+        fd, (events[i].events & EPOLLIN) != 0,
+        (events[i].events & EPOLLOUT) != 0,
+        (events[i].events & EPOLLRDHUP) != 0,
+        (events[i].events & EPOLLPRI) != 0, (events[i].events & EPOLLERR) != 0,
+        (events[i].events & EPOLLHUP) != 0);
   }
   delete[] events;
   return OK(Events, es);
@@ -59,16 +60,15 @@ Result<Void> Events::operator++() {
   if (_curr >= _len)
     return ERR(Void, Errors::iter_ended);
   ++_curr;
-  return OK(Void, new Void);
+  return OKV;
 }
 
 Result<const Event *> Events::operator*() const {
   if (_curr >= _len) {
     return ERR(const Event *, Errors::iter_ended);
   }
-  const Event **evpp = new const Event *;
-  *evpp = _events + _curr;
-  return OK(const Event *, evpp);
+  const Event *evp = _events + _curr;
+  return OK(const Event *, evp);
 }
 
 Result<EPoll> EPoll::create(unsigned short sz) {
@@ -86,9 +86,11 @@ Result<EPoll> EPoll::create(unsigned short sz) {
       return ERR(EPoll, "an unknown epoll error occured");
     }
   }
-  EPoll *ep = new EPoll();
-  ep->_size = sz;
-  TRY(EPoll, FileDescriptor, ep->_fd, FileDescriptor::from_raw(fd))
+  EPoll ep;
+  ep._size = sz;
+  FileDescriptor fdesc;
+  TRY(EPoll, FileDescriptor, fdesc, FileDescriptor::from_raw(fd))
+  ep._fd = fdesc;
   return OK(EPoll, ep);
 }
 
@@ -116,7 +118,7 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   if (op.exclusive)
     event.events |= EPOLLEXCLUSIVE;
   event.data.fd = fd._fd;
-  if (epoll_ctl(_fd->_fd, EPOLL_CTL_ADD, fd._fd, &event) == -1) {
+  if (epoll_ctl(_fd._fd, EPOLL_CTL_ADD, fd._fd, &event) == -1) {
     switch (errno) {
     case EEXIST:
       return ERR(const FileDescriptor *,
@@ -137,12 +139,10 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
     }
   }
   _events.push_back(fd);
-  FileDescriptor const **fd_in;
 
   for (size_t i = 0; i < _events.size(); i++) {
     if (fd == _events.at(i)) {
-      fd_in = new const FileDescriptor *();
-      *fd_in = FileDescriptor::move_from(fd).value();
+      const FileDescriptor *fd_in = &_events.at(i);
       return OK(const FileDescriptor *, fd_in);
     }
   }
@@ -173,7 +173,7 @@ Result<Void> EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,
   if (op.exclusive)
     event.events |= EPOLLEXCLUSIVE;
   event.data.fd = fd._fd;
-  if (epoll_ctl(_fd->_fd, EPOLL_CTL_MOD, fd._fd, &event) == -1) {
+  if (epoll_ctl(_fd._fd, EPOLL_CTL_MOD, fd._fd, &event) == -1) {
     switch (errno) {
     case EINVAL:
       return ERR(Void, Errors::invalid_operation);
@@ -187,13 +187,13 @@ Result<Void> EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,
       return ERR(Void, "an unknown error occured during EPOLL_CTL_MOD");
     }
   }
-  return OK(Void, new Void);
+  return OKV;
 }
 
 Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
   epoll_event event = {};
   event.data.fd = fd._fd;
-  if (epoll_ctl(_fd->_fd, EPOLL_CTL_DEL, fd._fd, &event) == -1) {
+  if (epoll_ctl(_fd._fd, EPOLL_CTL_DEL, fd._fd, &event) == -1) {
     switch (errno) {
     case EINVAL:
       return ERR(Void, Errors::invalid_operation);
@@ -207,12 +207,12 @@ Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
       return ERR(Void, "an unknown error occured during EPOLL_CTL_DEL");
     }
   }
-  return OK(Void, new Void);
+  return OKV;
 }
 
 Result<Events> EPoll::wait(const int timeout_ms) {
   struct epoll_event *events = new struct epoll_event[_size];
-  int n = epoll_wait(_fd->_fd, events, _size, timeout_ms);
+  int n = epoll_wait(_fd._fd, events, _size, timeout_ms);
   if (n == -1) {
     return ERR(Events, Errors::interrupted);
   }

@@ -26,9 +26,11 @@ public:
 
   static Result<FileDescriptor> socket_new();
 
-  static Result<FileDescriptor> move_from(FileDescriptor);
+  // Move-like copy constructor: transfers ownership from other
+  FileDescriptor(const FileDescriptor &other);
 
-  Result<Void> operator=(FileDescriptor);
+  // Move-like assignment operator: transfers ownership from other
+  FileDescriptor& operator=(const FileDescriptor &other);
 
   ~FileDescriptor();
 

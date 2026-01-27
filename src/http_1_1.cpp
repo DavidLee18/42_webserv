@@ -148,18 +148,18 @@ Http::Request::Parser::parse_http_version(const char *input, size_t offset) {
 }
 
 // Parse request line (e.g., "GET /path HTTP/1.1\r\n")
-Result<std::pair<Http::Request *, size_t> >
+Result<std::pair<Http::Request, size_t> >
 Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   size_t start_offset = offset;
   
   // Parse method
   Result<std::pair<Http::Method, size_t> > method_res = parse_method(input, offset);
   if (!method_res.error().empty()) {
-    return ERR_PAIR(Http::Request *, size_t, method_res.error());
+    return ERR_PAIR(Http::Request, size_t, method_res.error());
   }
   
-  Http::Method method = method_res.value()->first;
-  offset += method_res.value()->second;
+  Http::Method method = method_res.value().first;
+  offset += method_res.value().second;
   
   // Skip space (limited search)
   size_t space_limit = offset + 10; // reasonable limit for spaces
@@ -168,11 +168,11 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   // Parse path
   Result<std::pair<std::string, size_t> > path_res = parse_path(input, offset);
   if (!path_res.error().empty()) {
-    return ERR_PAIR(Http::Request *, size_t, path_res.error());
+    return ERR_PAIR(Http::Request, size_t, path_res.error());
   }
   
-  std::string path = path_res.value()->first;
-  offset += path_res.value()->second;
+  std::string path = path_res.value().first;
+  offset += path_res.value().second;
   
   // Skip space (limited search)
   space_limit = offset + 10; // reasonable limit for spaces
@@ -181,16 +181,16 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   // Parse HTTP version
   Result<std::pair<std::string, size_t> > version_res = parse_http_version(input, offset);
   if (!version_res.error().empty()) {
-    return ERR_PAIR(Http::Request *, size_t, version_res.error());
+    return ERR_PAIR(Http::Request, size_t, version_res.error());
   }
   
-  offset += version_res.value()->second;
+  offset += version_res.value().second;
   
   // Skip \r\n
   if (input[offset] == '\r' && input[offset + 1] == '\n') {
     offset += 2;
   } else {
-    return ERR_PAIR(Http::Request *, size_t, Errors::invalid_format);
+    return ERR_PAIR(Http::Request, size_t, Errors::invalid_format);
   }
   
   // For now, create a simple request with empty body
@@ -198,9 +198,9 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   empty_val._null = NULL;
   Http::Body body(Http::Body::Empty, empty_val);
   
-  Http::Request *req = new Http::Request(method, path, body);
+  Http::Request req(method, path, body);
   
-  return OK_PAIR(Http::Request *, size_t, req, offset - start_offset);
+  return OK_PAIR(Http::Request, size_t, req, offset - start_offset);
 }
 
 // Parse headers (e.g., "Host: example.com\r\n")
@@ -256,9 +256,8 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
     std::string trimmed_value = trim_whitespace(header_value);
     
     // Store header as Json string
-    Json *header_json = Json::str(trimmed_value);
-    headers[normalized_name] = *header_json;
-    delete header_json;
+    Json header_json = Json::str(trimmed_value);
+    headers[normalized_name] = header_json;
   }
   
   return OK_PAIR(HeaderMap, size_t, headers, offset - start_offset);
@@ -294,9 +293,9 @@ static std::string url_decode(const std::string &encoded) {
 }
 
 // Parse application/x-www-form-urlencoded body
-static Result<std::pair<std::map<std::string, std::string> *, size_t> >
+static Result<std::pair<std::map<std::string, std::string>, size_t> >
 parse_form_urlencoded(const char *input, size_t offset, size_t body_length) {
-  std::map<std::string, std::string> *form = new std::map<std::string, std::string>();
+  std::map<std::string, std::string> form;
   std::string body_str(input + offset, body_length);
   
   size_t pos = 0;
@@ -314,22 +313,22 @@ parse_form_urlencoded(const char *input, size_t offset, size_t body_length) {
     if (eq_pos != std::string::npos) {
       std::string key = url_decode(pair.substr(0, eq_pos));
       std::string value = url_decode(pair.substr(eq_pos + 1));
-      (*form)[key] = value;
+      form[key] = value;
     } else {
       // Key without value
-      (*form)[url_decode(pair)] = "";
+      form[url_decode(pair)] = "";
     }
     
     pos = amp_pos + 1;
   }
   
   typedef std::map<std::string, std::string> FormMap;
-  return OK_PAIR(FormMap *, size_t, form, body_length);
+  return OK_PAIR(FormMap, size_t, form, body_length);
 }
 
 // Parse body
 // RFC 2616 §4.3: Message body determined by Content-Type and Content-Length
-Result<std::pair<Http::Body *, size_t> >
+Result<std::pair<Http::Body, size_t> >
 Http::Request::Parser::parse_body(const char *input, size_t offset, 
                                    std::map<std::string, Json> const &headers) {
   // Check for Content-Length header
@@ -340,14 +339,14 @@ Http::Request::Parser::parse_body(const char *input, size_t offset,
   if (content_length_it == headers.end()) {
     Http::Body::Value empty_val;
     empty_val._null = NULL;
-    return OK_PAIR(Http::Body *, size_t, new Http::Body(Http::Body::Empty, empty_val), 0);
+    return OK_PAIR(Http::Body, size_t, Http::Body(Http::Body::Empty, empty_val), 0);
   }
   
   // Parse Content-Length value
   if (content_length_it->second.type() != Json::Str) {
     Http::Body::Value empty_val;
     empty_val._null = NULL;
-    return OK_PAIR(Http::Body *, size_t, new Http::Body(Http::Body::Empty, empty_val), 0);
+    return OK_PAIR(Http::Body, size_t, Http::Body(Http::Body::Empty, empty_val), 0);
   }
   
   std::string length_str = *content_length_it->second.value()._str;
@@ -358,14 +357,14 @@ Http::Request::Parser::parse_body(const char *input, size_t offset,
     // Invalid Content-Length
     Http::Body::Value empty_val;
     empty_val._null = NULL;
-    return OK_PAIR(Http::Body *, size_t, new Http::Body(Http::Body::Empty, empty_val), 0);
+    return OK_PAIR(Http::Body, size_t, Http::Body(Http::Body::Empty, empty_val), 0);
   }
   
   // RFC 2616: Content-Length of 0 is valid and indicates empty body
   if (body_length == 0) {
     Http::Body::Value empty_val;
     empty_val._null = NULL;
-    return OK_PAIR(Http::Body *, size_t, new Http::Body(Http::Body::Empty, empty_val), 0);
+    return OK_PAIR(Http::Body, size_t, Http::Body(Http::Body::Empty, empty_val), 0);
   }
   
   // Check Content-Type header to determine body type
@@ -389,7 +388,7 @@ Http::Request::Parser::parse_body(const char *input, size_t offset,
     // Parse as JSON
     // Create a temporary null-terminated string for JSON parser
     std::string json_body(input + offset, body_length);
-    Result<std::pair<Json *, size_t> > json_res = 
+    Result<std::pair<Json, size_t> > json_res = 
         Json::Parser::parse(json_body.c_str(), '\0');
     
     if (!json_res.error().empty()) {
@@ -398,11 +397,11 @@ Http::Request::Parser::parse_body(const char *input, size_t offset,
       body_val.html_raw = new std::string(input + offset, body_length);
     } else {
       body_type = Http::Body::HttpJson;
-      body_val.json = json_res.value()->first;
+      body_val.json = new Json(json_res.value().first);
     }
   } else if (content_type.find("application/x-www-form-urlencoded") != std::string::npos) {
     // Parse as form-urlencoded
-    Result<std::pair<std::map<std::string, std::string> *, size_t> > form_res = 
+    Result<std::pair<std::map<std::string, std::string>, size_t> > form_res = 
         parse_form_urlencoded(input, offset, static_cast<size_t>(body_length));
     
     if (!form_res.error().empty()) {
@@ -411,7 +410,7 @@ Http::Request::Parser::parse_body(const char *input, size_t offset,
       body_val.html_raw = new std::string(input + offset, body_length);
     } else {
       body_type = Http::Body::HttpFormUrlEncoded;
-      body_val.form = form_res.value()->first;
+      body_val.form = new std::map<std::string, std::string>(form_res.value().first);
     }
   } else {
     // Default: treat as raw HTML/text
@@ -419,54 +418,52 @@ Http::Request::Parser::parse_body(const char *input, size_t offset,
     body_val.html_raw = new std::string(input + offset, body_length);
   }
   
-  return OK_PAIR(Http::Body *, size_t, new Http::Body(body_type, body_val), 
+  return OK_PAIR(Http::Body, size_t, Http::Body(body_type, body_val), 
                  static_cast<size_t>(body_length));
 }
 
 // Main parse function
-Result<std::pair<Http::Request *, size_t> >
+Result<std::pair<Http::Request, size_t> >
 Http::Request::Parser::parse(const char *input, size_t) {
   if (input == NULL) {
-    return ERR_PAIR(Http::Request *, size_t, Errors::invalid_format);
+    return ERR_PAIR(Http::Request, size_t, Errors::invalid_format);
   }
   
   size_t offset = 0;
   
   // Parse request line
-  Result<std::pair<Http::Request *, size_t> > req_line_res = 
+  Result<std::pair<Http::Request, size_t> > req_line_res = 
       parse_request_line(input, offset);
   if (!req_line_res.error().empty()) {
     return req_line_res;
   }
   
-  Http::Request *request = req_line_res.value()->first;
-  offset += req_line_res.value()->second;
+  Http::Request request = req_line_res.value().first;
+  offset += req_line_res.value().second;
   
   // Parse headers
   Result<std::pair<std::map<std::string, Json>, size_t> > headers_res = 
       parse_headers(input, offset);
   if (!headers_res.error().empty()) {
-    delete request;
-    return ERR_PAIR(Http::Request *, size_t, headers_res.error());
+    return ERR_PAIR(Http::Request, size_t, headers_res.error());
   }
   
   // Update request headers
-  request->_headers = headers_res.value()->first;
-  offset += headers_res.value()->second;
+  request._headers = headers_res.value().first;
+  offset += headers_res.value().second;
   
   // Parse body
-  Result<std::pair<Http::Body *, size_t> > body_res = 
-      parse_body(input, offset, request->_headers);
+  Result<std::pair<Http::Body, size_t> > body_res = 
+      parse_body(input, offset, request._headers);
   if (!body_res.error().empty()) {
-    delete request;
-    return ERR_PAIR(Http::Request *, size_t, body_res.error());
+    return ERR_PAIR(Http::Request, size_t, body_res.error());
   }
   
   // Update request body
-  request->_body = *body_res.value()->first;
-  offset += body_res.value()->second;
+  request._body = body_res.value().first;
+  offset += body_res.value().second;
   
-  return OK_PAIR(Http::Request *, size_t, request, offset);
+  return OK_PAIR(Http::Request, size_t, request, offset);
 }
 
 // Original parse function (delegating to Parser::parse)
@@ -478,5 +475,13 @@ Http::Request::parse(const char *input, char delimiter) {
     len++;
   }
   
-  return Http::Request::Parser::parse(input, len);
+  Result<std::pair<Http::Request, size_t> > result = 
+      Http::Request::Parser::parse(input, len);
+  
+  if (!result.error().empty()) {
+    return ERR_PAIR(Http::Request *, size_t, result.error());
+  }
+  
+  return OK_PAIR(Http::Request *, size_t, new Http::Request(result.value().first), 
+                 result.value().second);
 }

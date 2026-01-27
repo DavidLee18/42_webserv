@@ -11,18 +11,18 @@ Result<Void> ContentType::add_param(std::string k, std::string v) {
   return OKV;
 }
 
-ServerName *ServerName::host(std::list<std::string> hostparts) {
-  return new ServerName(
+ServerName ServerName::host(std::list<std::string> hostparts) {
+  return ServerName(
       Host,
       (ServerName::Val){.host_name = new std::list<std::string>(hostparts)});
 }
 
-ServerName *ServerName::ipv4(unsigned char b1, unsigned char b2,
+ServerName ServerName::ipv4(unsigned char b1, unsigned char b2,
                              unsigned char b3, unsigned char b4) {
-  return new ServerName(Ipv4, (ServerName::Val){.ipv4 = {b1, b2, b3, b4}});
+  return ServerName(Ipv4, (ServerName::Val){.ipv4 = {b1, b2, b3, b4}});
 }
 
-Result<std::pair<ServerName *, size_t> >
+Result<std::pair<ServerName, size_t> >
 ServerName::Parser::parse_host(std::string raw) {
   std::stringstream ss(raw);
   std::list<std::string> parts;
@@ -32,211 +32,208 @@ ServerName::Parser::parse_host(std::string raw) {
   std::getline(ss, part, '.');
   while (ss && !ss.eof()) {
     if ((!dom_end && !std::isalnum(part[0])) || !std::isalpha(part[0]))
-      return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
+      return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
     j++;
     for (size_t i = 1; i < part.size() - 1; i++) {
       if (!std::isalnum(part[i]) && part[i] != '-')
-        return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
+        return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
     }
     if (!std::isalnum(part[part.size() - 1]))
-      return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
+      return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
     j += part.size();
     std::getline(ss, part, '.');
   }
   if (!ss.eof())
-    return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
+    return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   if ((!dom_end && !std::isalnum(part[0])) || !std::isalpha(part[0]))
-    return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
+    return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   j++;
   for (size_t i = 1; i < part.size() - 1; i++) {
     if (!std::isalnum(part[i]) && part[i] != '-')
-      return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
+      return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   }
   if (!std::isalnum(part[part.size() - 1]))
-    return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
-  return OK_PAIR(ServerName *, size_t, ServerName::host(parts),
+    return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
+  return OK_PAIR(ServerName, size_t, ServerName::host(parts),
                  j + part.size());
 }
 
-Result<std::pair<ServerName *, size_t> >
+Result<std::pair<ServerName, size_t> >
 ServerName::Parser::parse_ipv4(std::string raw) {
   std::stringstream ss(raw);
-  std::vector<std::string> *ips = new std::vector<std::string>();
   std::vector<unsigned char> addrs;
   std::string part;
   size_t i = 0;
   std::getline(ss, part, '.');
   while (ss && !ss.eof()) {
     if (part.size() < 1 || part.size() > 3)
-      return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
+      return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
     for (size_t j = 0; j < part.size(); j++) {
-      if ('0' < part[j] || part[j] > '9')
-        return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
+      if (part[j] < '0' || part[j] > '9')
+        return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
     }
     i += part.size();
     addrs.push_back(static_cast<unsigned char>(std::atoi(part.c_str())));
-    ips->push_back(part);
     std::getline(ss, part, '.');
   }
   if (!ss.eof())
-    return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
+    return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   if (part.size() < 1 || part.size() > 3)
-    return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
+    return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   for (size_t j = 0; j < part.size(); j++) {
-    if ('0' < part[j] || part[j] > '9')
-      return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
+    if (part[j] < '0' || part[j] > '9')
+      return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   }
   addrs.push_back(static_cast<unsigned char>(std::atoi(part.c_str())));
-  ips->push_back(part);
   if (addrs.size() != 4)
-    return ERR_PAIR(ServerName *, size_t, Errors::invalid_format);
-  return OK_PAIR(ServerName *, size_t,
+    return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
+  return OK_PAIR(ServerName, size_t,
                  ServerName::ipv4(addrs[0], addrs[1], addrs[2], addrs[3]),
                  i + part.size());
 }
 
-Result<std::pair<ServerName *, size_t> >
+Result<std::pair<ServerName, size_t> >
 ServerName::Parser::parse(std::string raw) {
-  Result<std::pair<ServerName *, size_t> > res = parse_host(raw);
+  Result<std::pair<ServerName, size_t> > res = parse_host(raw);
   if (res.error().empty())
     return res;
   return parse_ipv4(raw);
 }
 
-CgiMetaVar *CgiMetaVar::auth_type(CgiAuthType ty) {
-  return new CgiMetaVar(AUTH_TYPE,
+CgiMetaVar CgiMetaVar::auth_type(CgiAuthType ty) {
+  return CgiMetaVar(AUTH_TYPE,
                         (CgiMetaVar::Val){.auth_type = new CgiAuthType(ty)});
 }
 
-CgiMetaVar *CgiMetaVar::content_length(unsigned int l) {
-  return new CgiMetaVar(CONTENT_LENGTH, (CgiMetaVar::Val){.content_length = l});
+CgiMetaVar CgiMetaVar::content_length(unsigned int l) {
+  return CgiMetaVar(CONTENT_LENGTH, (CgiMetaVar::Val){.content_length = l});
 }
 
-CgiMetaVar *CgiMetaVar::content_type(ContentType ty) {
-  return new CgiMetaVar(CONTENT_TYPE,
+CgiMetaVar CgiMetaVar::content_type(ContentType ty) {
+  return CgiMetaVar(CONTENT_TYPE,
                         (CgiMetaVar::Val){.content_type = new ContentType(ty)});
 }
 
-CgiMetaVar *CgiMetaVar::gateway_interface(GatewayInterface i) {
-  return new CgiMetaVar(GATEWAY_INTERFACE,
+CgiMetaVar CgiMetaVar::gateway_interface(GatewayInterface i) {
+  return CgiMetaVar(GATEWAY_INTERFACE,
                         (CgiMetaVar::Val){.gateway_interface = i});
 }
 
-CgiMetaVar *CgiMetaVar::path_info(std::list<std::string> parts) {
-  return new CgiMetaVar(
+CgiMetaVar CgiMetaVar::path_info(std::list<std::string> parts) {
+  return CgiMetaVar(
       PATH_INFO,
       (CgiMetaVar::Val){.path_info = new std::list<std::string>(parts)});
 }
 
-CgiMetaVar *CgiMetaVar::path_translated(std::string path) {
-  return new CgiMetaVar(
+CgiMetaVar CgiMetaVar::path_translated(std::string path) {
+  return CgiMetaVar(
       PATH_TRANSLATED,
       (CgiMetaVar::Val){.path_translated = new std::string(path)});
 }
 
-CgiMetaVar *
+CgiMetaVar
 CgiMetaVar::query_string(std::map<std::string, std::string> query_map) {
-  return new CgiMetaVar(
+  return CgiMetaVar(
       QUERY_STRING,
       (CgiMetaVar::Val){.query_string =
                             new std::map<std::string, std::string>(query_map)});
 }
 
-CgiMetaVar *CgiMetaVar::remote_addr(unsigned char a, unsigned char b,
+CgiMetaVar CgiMetaVar::remote_addr(unsigned char a, unsigned char b,
                                     unsigned char c, unsigned char d) {
-  return new CgiMetaVar(REMOTE_ADDR,
+  return CgiMetaVar(REMOTE_ADDR,
                         (CgiMetaVar::Val){.remote_addr = {a, b, c, d}});
 }
 
-CgiMetaVar *CgiMetaVar::remote_host(std::list<std::string> parts) {
-  return new CgiMetaVar(
+CgiMetaVar CgiMetaVar::remote_host(std::list<std::string> parts) {
+  return CgiMetaVar(
       REMOTE_HOST,
       (CgiMetaVar::Val){.remote_host = new std::list<std::string>(parts)});
 }
 
-CgiMetaVar *CgiMetaVar::remote_ident(std::string id) {
-  return new CgiMetaVar(REMOTE_IDENT,
+CgiMetaVar CgiMetaVar::remote_ident(std::string id) {
+  return CgiMetaVar(REMOTE_IDENT,
                         (CgiMetaVar::Val){.remote_ident = new std::string(id)});
 }
 
-CgiMetaVar *CgiMetaVar::remote_user(std::string user) {
-  return new CgiMetaVar(
+CgiMetaVar CgiMetaVar::remote_user(std::string user) {
+  return CgiMetaVar(
       REMOTE_USER, (CgiMetaVar::Val){.remote_user = new std::string(user)});
 }
 
-CgiMetaVar *CgiMetaVar::request_method(Http::Method method) {
-  return new CgiMetaVar(REQUEST_METHOD,
+CgiMetaVar CgiMetaVar::request_method(Http::Method method) {
+  return CgiMetaVar(REQUEST_METHOD,
                         (CgiMetaVar::Val){.request_method = method});
 }
 
-CgiMetaVar *CgiMetaVar::script_name(std::list<std::string> parts) {
-  return new CgiMetaVar(
+CgiMetaVar CgiMetaVar::script_name(std::list<std::string> parts) {
+  return CgiMetaVar(
       SCRIPT_NAME,
       (CgiMetaVar::Val){.script_name = new std::list<std::string>(parts)});
 }
 
-CgiMetaVar *CgiMetaVar::server_name(ServerName *srv) {
-  return new CgiMetaVar(SERVER_NAME, (CgiMetaVar::Val){.server_name = srv});
+CgiMetaVar CgiMetaVar::server_name(ServerName srv) {
+  return CgiMetaVar(SERVER_NAME, (CgiMetaVar::Val){.server_name = new ServerName(srv)});
 }
 
-CgiMetaVar *CgiMetaVar::server_port(unsigned short port) {
-  return new CgiMetaVar(SERVER_PORT, (CgiMetaVar::Val){.server_port = port});
+CgiMetaVar CgiMetaVar::server_port(unsigned short port) {
+  return CgiMetaVar(SERVER_PORT, (CgiMetaVar::Val){.server_port = port});
 }
 
-CgiMetaVar *CgiMetaVar::server_protocol(ServerProtocol proto) {
-  return new CgiMetaVar(SERVER_PROTOCOL,
+CgiMetaVar CgiMetaVar::server_protocol(ServerProtocol proto) {
+  return CgiMetaVar(SERVER_PROTOCOL,
                         (CgiMetaVar::Val){.server_protocol = proto});
 }
 
-CgiMetaVar *CgiMetaVar::server_software(ServerSoftware soft) {
-  return new CgiMetaVar(SERVER_SOFTWARE,
+CgiMetaVar CgiMetaVar::server_software(ServerSoftware soft) {
+  return CgiMetaVar(SERVER_SOFTWARE,
                         (CgiMetaVar::Val){.server_software = soft});
 }
 
-CgiMetaVar *CgiMetaVar::custom_var(EtcMetaVar::Type ty, std::string name,
+CgiMetaVar CgiMetaVar::custom_var(EtcMetaVar::Type ty, std::string name,
                                    std::string value) {
-  return new CgiMetaVar(
+  return CgiMetaVar(
       X_, (CgiMetaVar::Val){.etc_val = new EtcMetaVar(ty, name, value)});
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_auth_type(std::string raw) {
   std::stringstream ss(raw);
   std::string ty;
   std::getline(ss, ty, ' ');
   if (ss.eof() || !ss)
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
   std::transform(ty.begin(), ty.end(), ty.begin(), to_upper);
   if (ty == "basic")
-    return OK_PAIR(CgiMetaVar *, size_t,
+    return OK_PAIR(CgiMetaVar, size_t,
                    CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::Basic)), 5);
   if (ty == "digest")
-    return OK_PAIR(CgiMetaVar *, size_t,
+    return OK_PAIR(CgiMetaVar, size_t,
                    CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::Digest)), 6);
   return OK_PAIR(
-      CgiMetaVar *, size_t,
+      CgiMetaVar, size_t,
       CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::CgiAuthOther, ty)),
       ty.size());
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_content_length(std::string raw) {
   char *ptr = NULL;
   const char *str = raw.c_str();
   unsigned long l = std::strtoul(str, &ptr, 10);
   if (ptr == NULL || *ptr != '\0' || l > UINT32_MAX)
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
-  return OK_PAIR(CgiMetaVar *, size_t,
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
+  return OK_PAIR(CgiMetaVar, size_t,
                  CgiMetaVar::content_length(static_cast<unsigned int>(l)),
                  ptr - str);
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_content_type(std::string raw) {
   size_t consumed = 0;
   size_t slash_pos = raw.find('/');
   if (slash_pos == std::string::npos)
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
   
   std::string type_str = raw.substr(0, slash_pos);
   // Convert to lowercase for comparison
@@ -267,7 +264,7 @@ CgiMetaVar::Parser::parse_content_type(std::string raw) {
   else if (type_str == "video")
     type = ContentType::video;
   else
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
   
   consumed = slash_pos + 1;
   
@@ -286,7 +283,7 @@ CgiMetaVar::Parser::parse_content_type(std::string raw) {
   size_t start = subtype.find_first_not_of(" \t");
   size_t end = subtype.find_last_not_of(" \t");
   if (start == std::string::npos)
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
   subtype = subtype.substr(start, end - start + 1);
   
   ContentType ct(type, subtype);
@@ -344,23 +341,23 @@ CgiMetaVar::Parser::parse_content_type(std::string raw) {
     ct.params[param_name] = param_value;
   }
   
-  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::content_type(ct), consumed);
+  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::content_type(ct), consumed);
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_gateway_interface(std::string raw) {
   std::string norm = raw;
   std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
   if (norm == "cgi/1.1" || norm == "cgi-1.1")
-    return OK_PAIR(CgiMetaVar *, size_t,
+    return OK_PAIR(CgiMetaVar, size_t,
                    CgiMetaVar::gateway_interface(Cgi_1_1), raw.length());
-  return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_path_info(std::string raw) {
   if (raw.empty() || raw[0] != '/')
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
   
   std::list<std::string> parts;
   std::stringstream ss(raw.substr(1)); // skip leading slash
@@ -370,24 +367,24 @@ CgiMetaVar::Parser::parse_path_info(std::string raw) {
     parts.push_back(part);
   }
   
-  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::path_info(parts),
+  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::path_info(parts),
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_path_translated(std::string raw) {
   if (raw.empty())
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
-  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::path_translated(raw),
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
+  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::path_translated(raw),
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_query_string(std::string raw) {
   std::map<std::string, std::string> query_map;
   
   if (raw.empty()) {
-    return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::query_string(query_map),
+    return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::query_string(query_map),
                    0);
   }
   
@@ -405,11 +402,11 @@ CgiMetaVar::Parser::parse_query_string(std::string raw) {
     }
   }
   
-  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::query_string(query_map),
+  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::query_string(query_map),
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_remote_addr(std::string raw) {
   std::stringstream ss(raw);
   std::vector<unsigned char> octets;
@@ -417,35 +414,35 @@ CgiMetaVar::Parser::parse_remote_addr(std::string raw) {
   
   while (std::getline(ss, octet, '.')) {
     if (octet.empty() || octet.length() > 3)
-      return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+      return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
     
     for (size_t i = 0; i < octet.length(); i++) {
       if (octet[i] < '0' || octet[i] > '9')
-        return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+        return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
     }
     
     long val = std::atol(octet.c_str());
     if (val < 0 || val > 255)
-      return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+      return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
     
     octets.push_back(static_cast<unsigned char>(val));
   }
   
   if (octets.size() != 4)
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
   
-  return OK_PAIR(CgiMetaVar *, size_t,
+  return OK_PAIR(CgiMetaVar, size_t,
                  CgiMetaVar::remote_addr(octets[0], octets[1], octets[2],
                                         octets[3]),
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_remote_host(std::string raw) {
-  Result<std::pair<ServerName *, size_t> > server_res =
+  Result<std::pair<ServerName, size_t> > server_res =
       ServerName::Parser::parse(raw);
   if (!server_res.error().empty())
-    return ERR_PAIR(CgiMetaVar *, size_t, server_res.error());
+    return ERR_PAIR(CgiMetaVar, size_t, server_res.error());
   
   // ServerName parser returns a ServerName, but we need a list of strings
   // For simplicity, we'll parse it as a hostname
@@ -457,27 +454,27 @@ CgiMetaVar::Parser::parse_remote_host(std::string raw) {
     parts.push_back(part);
   }
   
-  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::remote_host(parts),
-                 server_res.value()->second);
+  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::remote_host(parts),
+                 server_res.value().second);
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_remote_ident(std::string raw) {
   if (raw.empty())
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
-  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::remote_ident(raw),
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
+  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::remote_ident(raw),
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_remote_user(std::string raw) {
   if (raw.empty())
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
-  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::remote_user(raw),
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
+  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::remote_user(raw),
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_request_method(std::string raw) {
   std::string method = raw;
   std::transform(method.begin(), method.end(), method.begin(), to_upper);
@@ -502,16 +499,16 @@ CgiMetaVar::Parser::parse_request_method(std::string raw) {
   else if (method == "PATCH")
     m = Http::PATCH;
   else
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
   
-  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::request_method(m),
+  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::request_method(m),
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_script_name(std::string raw) {
   if (raw.empty() || raw[0] != '/')
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
   
   std::list<std::string> parts;
   std::stringstream ss(raw.substr(1)); // skip leading slash
@@ -521,66 +518,66 @@ CgiMetaVar::Parser::parse_script_name(std::string raw) {
     parts.push_back(part);
   }
   
-  return OK_PAIR(CgiMetaVar *, size_t, CgiMetaVar::script_name(parts),
+  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::script_name(parts),
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_server_name(std::string raw) {
-  Result<std::pair<ServerName *, size_t> > res =
+  Result<std::pair<ServerName, size_t> > res =
       ServerName::Parser::parse(raw);
   if (!res.error().empty())
-    return ERR_PAIR(CgiMetaVar *, size_t, res.error());
+    return ERR_PAIR(CgiMetaVar, size_t, res.error());
   
-  return OK_PAIR(CgiMetaVar *, size_t,
-                 CgiMetaVar::server_name(res.value()->first),
-                 res.value()->second);
+  return OK_PAIR(CgiMetaVar, size_t,
+                 CgiMetaVar::server_name(res.value().first),
+                 res.value().second);
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_server_port(std::string raw) {
   char *ptr = NULL;
   const char *str = raw.c_str();
   unsigned long port = std::strtoul(str, &ptr, 10);
   if (ptr == str || *ptr != '\0' || port > 65535)
-    return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
-  return OK_PAIR(CgiMetaVar *, size_t,
+    return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
+  return OK_PAIR(CgiMetaVar, size_t,
                  CgiMetaVar::server_port(static_cast<unsigned short>(port)),
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_server_protocol(std::string raw) {
   std::string norm = raw;
   std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
   if (norm == "http/1.1" || norm == "http-1.1")
-    return OK_PAIR(CgiMetaVar *, size_t,
+    return OK_PAIR(CgiMetaVar, size_t,
                    CgiMetaVar::server_protocol(Http_1_1), raw.length());
-  return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_server_software(std::string raw) {
   std::string norm = raw;
   std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
   if (norm == "webserv")
-    return OK_PAIR(CgiMetaVar *, size_t,
+    return OK_PAIR(CgiMetaVar, size_t,
                    CgiMetaVar::server_software(Webserv), raw.length());
-  return ERR_PAIR(CgiMetaVar *, size_t, Errors::invalid_format);
+  return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_custom_var(std::string name, std::string value) {
   EtcMetaVar::Type type = EtcMetaVar::Custom;
   if (name.length() >= 5 && name.substr(0, 5) == "HTTP_") {
     type = EtcMetaVar::Http;
   }
-  return OK_PAIR(CgiMetaVar *, size_t,
+  return OK_PAIR(CgiMetaVar, size_t,
                  CgiMetaVar::custom_var(type, name, value),
                  name.length() + value.length());
 }
 
-Result<std::pair<CgiMetaVar *, size_t> >
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse(std::string const &name, std::string const &value) {
   if (name == "AUTH_TYPE")
     return parse_auth_type(value);
@@ -629,24 +626,21 @@ CgiInput::CgiInput(std::vector<CgiMetaVar> vars, Http::Body body)
 CgiInput::CgiInput(Http::Request const &req)
     : mvars(), req_body(req.body()) {}
 
-Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
-  CgiInput *input = new CgiInput();
-  input->req_body = req.body();
+Result<CgiInput> CgiInput::Parser::parse(Http::Request const &req) {
+  CgiInput input;
+  input.req_body = req.body();
   
   // Add REQUEST_METHOD
-  CgiMetaVar *method_var = CgiMetaVar::request_method(req.method());
-  input->mvars.push_back(*method_var);
-  delete method_var;
+  CgiMetaVar method_var = CgiMetaVar::request_method(req.method());
+  input.mvars.push_back(method_var);
   
   // Add SERVER_PROTOCOL
-  CgiMetaVar *protocol_var = CgiMetaVar::server_protocol(Http_1_1);
-  input->mvars.push_back(*protocol_var);
-  delete protocol_var;
+  CgiMetaVar protocol_var = CgiMetaVar::server_protocol(Http_1_1);
+  input.mvars.push_back(protocol_var);
   
   // Add GATEWAY_INTERFACE
-  CgiMetaVar *gateway_var = CgiMetaVar::gateway_interface(Cgi_1_1);
-  input->mvars.push_back(*gateway_var);
-  delete gateway_var;
+  CgiMetaVar gateway_var = CgiMetaVar::gateway_interface(Cgi_1_1);
+  input.mvars.push_back(gateway_var);
   
   // Parse path for SCRIPT_NAME and QUERY_STRING
   std::string path = req.path();
@@ -672,9 +666,8 @@ Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
         script_parts.push_back(part);
       }
     }
-    CgiMetaVar *script_var = CgiMetaVar::script_name(script_parts);
-    input->mvars.push_back(*script_var);
-    delete script_var;
+    CgiMetaVar script_var = CgiMetaVar::script_name(script_parts);
+    input.mvars.push_back(script_var);
   }
   
   // Add QUERY_STRING
@@ -690,9 +683,8 @@ Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
         query_map[pair] = "";
       }
     }
-    CgiMetaVar *query_var = CgiMetaVar::query_string(query_map);
-    input->mvars.push_back(*query_var);
-    delete query_var;
+    CgiMetaVar query_var = CgiMetaVar::query_string(query_map);
+    input.mvars.push_back(query_var);
   }
   
   // Add HTTP headers as CGI variables
@@ -725,34 +717,27 @@ Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
     
     // Special handling for standard CGI variables
     if (header_name == "CONTENT_TYPE") {
-      Result<std::pair<CgiMetaVar *, size_t> > res =
+      Result<std::pair<CgiMetaVar, size_t> > res =
           CgiMetaVar::Parser::parse("CONTENT_TYPE", value);
       if (res.error().empty()) {
-        input->mvars.push_back(*res.value()->first);
-        delete res.value()->first;
+        input.mvars.push_back(res.value().first);
       }
     } else if (header_name == "CONTENT_LENGTH") {
-      Result<std::pair<CgiMetaVar *, size_t> > res =
+      Result<std::pair<CgiMetaVar, size_t> > res =
           CgiMetaVar::Parser::parse("CONTENT_LENGTH", value);
       if (res.error().empty()) {
-        input->mvars.push_back(*res.value()->first);
-        delete res.value()->first;
+        input.mvars.push_back(res.value().first);
       }
     } else {
       // Add as HTTP_* variable
       std::string cgi_name = "HTTP_" + header_name;
-      CgiMetaVar *custom_var = CgiMetaVar::custom_var(
+      CgiMetaVar custom_var = CgiMetaVar::custom_var(
           EtcMetaVar::Http, cgi_name, value);
-      input->mvars.push_back(*custom_var);
-      delete custom_var;
+      input.mvars.push_back(custom_var);
     }
   }
   
-  // Allocate a pointer to the CgiInput pointer on the heap
-  // This allows the CgiInput object to survive after Result is destroyed
-  CgiInput **result_ptr = new CgiInput *;
-  *result_ptr = input;
-  return OK(CgiInput *, result_ptr);
+  return OK(CgiInput, input);
 }
 
 char **CgiInput::to_envp() const {
@@ -967,27 +952,24 @@ static const int CGI_INITIAL_TIMEOUT_SEC = 30;  // Initial timeout for first rea
 static const int CGI_SUBSEQUENT_TIMEOUT_SEC = 5; // Timeout for subsequent reads
 
 CgiDelegate::CgiDelegate(const Http::Request &req, const std::string &script)
-    : env(NULL), script_path(script), request(req) {}
+    : env(), script_path(script), request(req) {}
 
 CgiDelegate *CgiDelegate::create(const Http::Request &req,
                                   const std::string &script) {
   CgiDelegate *delegate = new CgiDelegate(req, script);
 
   // Parse the HTTP request to CgiInput
-  Result<CgiInput *> parse_result = CgiInput::Parser::parse(req);
+  Result<CgiInput> parse_result = CgiInput::Parser::parse(req);
   if (!parse_result.error().empty()) {
     delete delegate;
     return NULL;
   }
 
-  delegate->env = *const_cast<CgiInput **>(parse_result.value());
+  delegate->env = parse_result.value();
   return delegate;
 }
 
 Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
-  if (env == NULL) {
-    return ERR(Http::Response *, "CgiInput not initialized");
-  }
   
   if (epoll == NULL) {
     return ERR(Http::Response *, "EPoll instance required");
@@ -1038,7 +1020,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     close(stdout_pipe[1]);
 
     // Prepare environment variables
-    char **envp = env->to_envp();
+    char **envp = env.to_envp();
 
     // Prepare arguments
     char *argv[2];
@@ -1074,7 +1056,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     waitpid(pid, NULL, 0);
     return ERR(Http::Response *, "Failed to create stdin FileDescriptor");
   }
-  FileDescriptor stdin_fd = *const_cast<FileDescriptor *>(stdin_fd_res.value());
+  FileDescriptor stdin_fd = stdin_fd_res.value();
 
   Result<FileDescriptor> stdout_fd_res = FileDescriptor::from_raw(stdout_pipe[0]);
   if (!stdout_fd_res.error().empty()) {
@@ -1084,7 +1066,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     waitpid(pid, NULL, 0);
     return ERR(Http::Response *, "Failed to create stdout FileDescriptor");
   }
-  FileDescriptor stdout_fd = *const_cast<FileDescriptor *>(stdout_fd_res.value());
+  FileDescriptor stdout_fd = stdout_fd_res.value();
 
   // Prepare request body for writing
   const Http::Body &body = request.body();
@@ -1157,7 +1139,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         return ERR(Http::Response *, "EPoll wait failed for stdin");
       }
       
-      Events events = *const_cast<Events *>(wait_result.value());
+      Events events = wait_result.value();
       
       // Check if timeout occurred (no events returned)
       if (events.is_end()) {
@@ -1176,7 +1158,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         if (!event_result.error().empty()) {
           continue;
         }
-        const Event *ev = *const_cast<const Event **>(event_result.value());
+        const Event *ev = event_result.value();
         if (*ev->fd == stdin_pipe[1] && ev->out) {
           fd_ready = true;
           break;
@@ -1244,7 +1226,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       return ERR(Http::Response *, "EPoll wait failed for stdout");
     }
     
-    Events events = *const_cast<Events *>(wait_result.value());
+    Events events = wait_result.value();
     
     // Check if timeout occurred (no events returned)
     if (events.is_end()) {
@@ -1262,7 +1244,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       if (!event_result.error().empty()) {
         continue;
       }
-      const Event *ev = *const_cast<const Event **>(event_result.value());
+      const Event *ev = event_result.value();
       if (*ev->fd == stdout_pipe[0] && ev->in) {
         fd_ready = true;
         break;
@@ -1358,9 +1340,8 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         }
         
         // Store header
-        Json *header_json = Json::str(header_value);
-        response_headers[header_name] = *header_json;
-        delete header_json;
+        Json header_json = Json::str(header_value);
+        response_headers[header_name] = header_json;
       }
     }
   }
@@ -1373,16 +1354,9 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   // Create Http::Response
   Http::Response *response = new Http::Response(status_code, response_headers, result_body);
 
-  // Allocate a pointer to the Http::Response pointer on the heap
-  // This allows the Http::Response object to survive after Result is destroyed
-  Http::Response **result_ptr = new Http::Response *;
-  *result_ptr = response;
-  return OK(Http::Response *, result_ptr);
+  return OK(Http::Response *, response);
 }
 
 CgiDelegate::~CgiDelegate() {
-  if (env != NULL) {
-    delete env;
-    env = NULL;
-  }
+  // env is now a value member, will be automatically destroyed
 }
