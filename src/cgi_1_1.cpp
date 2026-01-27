@@ -442,7 +442,7 @@ CgiMetaVar::Parser::parse_remote_addr(std::string raw) {
 
 Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_remote_host(std::string raw) {
-  Result<std::pair<ServerName *, size_t> > server_res =
+  Result<std::pair<ServerName, size_t> > server_res =
       ServerName::Parser::parse(raw);
   if (!server_res.error().empty())
     return ERR_PAIR(CgiMetaVar, size_t, server_res.error());
@@ -458,7 +458,7 @@ CgiMetaVar::Parser::parse_remote_host(std::string raw) {
   }
   
   return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::remote_host(parts),
-                 server_res.value()->second);
+                 server_res.value().second);
 }
 
 Result<std::pair<CgiMetaVar, size_t> >
@@ -527,14 +527,14 @@ CgiMetaVar::Parser::parse_script_name(std::string raw) {
 
 Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_server_name(std::string raw) {
-  Result<std::pair<ServerName *, size_t> > res =
+  Result<std::pair<ServerName, size_t> > res =
       ServerName::Parser::parse(raw);
   if (!res.error().empty())
     return ERR_PAIR(CgiMetaVar, size_t, res.error());
   
   return OK_PAIR(CgiMetaVar, size_t,
-                 CgiMetaVar::server_name(res.value()->first),
-                 res.value()->second);
+                 CgiMetaVar::server_name(res.value().first),
+                 res.value().second);
 }
 
 Result<std::pair<CgiMetaVar, size_t> >
@@ -634,19 +634,16 @@ Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
   input->req_body = req.body();
   
   // Add REQUEST_METHOD
-  CgiMetaVar *method_var = CgiMetaVar::request_method(req.method());
-  input->mvars.push_back(*method_var);
-  delete method_var;
+  CgiMetaVar method_var = CgiMetaVar::request_method(req.method());
+  input->mvars.push_back(method_var);
   
   // Add SERVER_PROTOCOL
-  CgiMetaVar *protocol_var = CgiMetaVar::server_protocol(Http_1_1);
-  input->mvars.push_back(*protocol_var);
-  delete protocol_var;
+  CgiMetaVar protocol_var = CgiMetaVar::server_protocol(Http_1_1);
+  input->mvars.push_back(protocol_var);
   
   // Add GATEWAY_INTERFACE
-  CgiMetaVar *gateway_var = CgiMetaVar::gateway_interface(Cgi_1_1);
-  input->mvars.push_back(*gateway_var);
-  delete gateway_var;
+  CgiMetaVar gateway_var = CgiMetaVar::gateway_interface(Cgi_1_1);
+  input->mvars.push_back(gateway_var);
   
   // Parse path for SCRIPT_NAME and QUERY_STRING
   std::string path = req.path();
@@ -672,9 +669,8 @@ Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
         script_parts.push_back(part);
       }
     }
-    CgiMetaVar *script_var = CgiMetaVar::script_name(script_parts);
-    input->mvars.push_back(*script_var);
-    delete script_var;
+    CgiMetaVar script_var = CgiMetaVar::script_name(script_parts);
+    input->mvars.push_back(script_var);
   }
   
   // Add QUERY_STRING
@@ -690,9 +686,8 @@ Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
         query_map[pair] = "";
       }
     }
-    CgiMetaVar *query_var = CgiMetaVar::query_string(query_map);
-    input->mvars.push_back(*query_var);
-    delete query_var;
+    CgiMetaVar query_var = CgiMetaVar::query_string(query_map);
+    input->mvars.push_back(query_var);
   }
   
   // Add HTTP headers as CGI variables
@@ -728,23 +723,20 @@ Result<CgiInput *> CgiInput::Parser::parse(Http::Request const &req) {
       Result<std::pair<CgiMetaVar, size_t> > res =
           CgiMetaVar::Parser::parse("CONTENT_TYPE", value);
       if (res.error().empty()) {
-        input->mvars.push_back(*res.value()->first);
-        delete res.value()->first;
+        input->mvars.push_back(res.value().first);
       }
     } else if (header_name == "CONTENT_LENGTH") {
       Result<std::pair<CgiMetaVar, size_t> > res =
           CgiMetaVar::Parser::parse("CONTENT_LENGTH", value);
       if (res.error().empty()) {
-        input->mvars.push_back(*res.value()->first);
-        delete res.value()->first;
+        input->mvars.push_back(res.value().first);
       }
     } else {
       // Add as HTTP_* variable
       std::string cgi_name = "HTTP_" + header_name;
-      CgiMetaVar *custom_var = CgiMetaVar::custom_var(
+      CgiMetaVar custom_var = CgiMetaVar::custom_var(
           EtcMetaVar::Http, cgi_name, value);
-      input->mvars.push_back(*custom_var);
-      delete custom_var;
+      input->mvars.push_back(custom_var);
     }
   }
   
