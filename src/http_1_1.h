@@ -107,5 +107,28 @@ public:
     const Body &body() const { return _body; }
     static Result<std::pair<Request *, size_t> > parse(const char *, char);
   };
+
+  class Response {
+    int _status_code;
+    std::map<std::string, Json> _headers;
+    Body _body;
+
+  private:
+    Response(int status, Body b)
+        : _status_code(status), _headers(), _body(b) {}
+
+  public:
+    Response(int status, std::map<std::string, Json> headers, Body b)
+        : _status_code(status), _headers(headers), _body(b) {}
+    
+    const int &status_code() const { return _status_code; }
+    const std::map<std::string, Json> &headers() const { return _headers; }
+    const Body &body() const { return _body; }
+    
+    std::map<std::string, Json> &headers_mut() { return _headers; }
+    void set_header(const std::string &name, const Json &value) {
+      _headers[name] = value;
+    }
+  };
 };
 #endif

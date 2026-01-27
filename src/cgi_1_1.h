@@ -266,7 +266,7 @@ class CgiDelegate {
 
 public:
   static CgiDelegate *create(const Http::Request &req, const std::string &script);
-  Result<Http::Body *> execute(int timeout_ms, EPoll *epoll);
+  Result<Http::Response *> execute(int timeout_ms, EPoll *epoll);
   ~CgiDelegate();
 };
 

@@ -984,13 +984,13 @@ CgiDelegate *CgiDelegate::create(const Http::Request &req,
   return delegate;
 }
 
-Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
+Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   if (env == NULL) {
-    return ERR(Http::Body *, "CgiInput not initialized");
+    return ERR(Http::Response *, "CgiInput not initialized");
   }
   
   if (epoll == NULL) {
-    return ERR(Http::Body *, "EPoll instance required");
+    return ERR(Http::Response *, "EPoll instance required");
   }
 
   // Create pipes for communication
@@ -998,12 +998,12 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   int stdout_pipe[2];
 
   if (pipe(stdin_pipe) == -1) {
-    return ERR(Http::Body *, "Failed to create stdin pipe");
+    return ERR(Http::Response *, "Failed to create stdin pipe");
   }
   if (pipe(stdout_pipe) == -1) {
     close(stdin_pipe[0]);
     close(stdin_pipe[1]);
-    return ERR(Http::Body *, "Failed to create stdout pipe");
+    return ERR(Http::Response *, "Failed to create stdout pipe");
   }
 
   // Fork the process
@@ -1013,7 +1013,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     close(stdin_pipe[1]);
     close(stdout_pipe[0]);
     close(stdout_pipe[1]);
-    return ERR(Http::Body *, "Failed to fork process");
+    return ERR(Http::Response *, "Failed to fork process");
   }
 
   if (pid == 0) {
@@ -1072,7 +1072,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     close(stdout_pipe[0]);
     kill(pid, SIGKILL);
     waitpid(pid, NULL, 0);
-    return ERR(Http::Body *, "Failed to create stdin FileDescriptor");
+    return ERR(Http::Response *, "Failed to create stdin FileDescriptor");
   }
   FileDescriptor stdin_fd = *const_cast<FileDescriptor *>(stdin_fd_res.value());
 
@@ -1082,7 +1082,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     close(stdout_pipe[0]);
     kill(pid, SIGKILL);
     waitpid(pid, NULL, 0);
-    return ERR(Http::Body *, "Failed to create stdout FileDescriptor");
+    return ERR(Http::Response *, "Failed to create stdout FileDescriptor");
   }
   FileDescriptor stdout_fd = *const_cast<FileDescriptor *>(stdout_fd_res.value());
 
@@ -1141,7 +1141,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       close(stdout_pipe[0]);
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
-      return ERR(Http::Body *, "Failed to add stdin to epoll");
+      return ERR(Http::Response *, "Failed to add stdin to epoll");
     }
 
     size_t total_written = 0;
@@ -1154,7 +1154,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         close(stdout_pipe[0]);
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
-        return ERR(Http::Body *, "EPoll wait failed for stdin");
+        return ERR(Http::Response *, "EPoll wait failed for stdin");
       }
       
       Events events = *const_cast<Events *>(wait_result.value());
@@ -1166,7 +1166,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         close(stdout_pipe[0]);
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
-        return ERR(Http::Body *, "Timeout waiting for stdin writability");
+        return ERR(Http::Response *, "Timeout waiting for stdin writability");
       }
       
       bool fd_ready = false;
@@ -1198,7 +1198,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         close(stdout_pipe[0]);
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
-        return ERR(Http::Body *, "Failed to write to CGI stdin");
+        return ERR(Http::Response *, "Failed to write to CGI stdin");
       } else if (written == 0) {
         // Pipe closed by reader (child process)
         epoll->del_fd(stdin_fd);
@@ -1206,7 +1206,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         close(stdout_pipe[0]);
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
-        return ERR(Http::Body *, "CGI process closed stdin prematurely");
+        return ERR(Http::Response *, "CGI process closed stdin prematurely");
       }
       total_written += static_cast<size_t>(written);
     }
@@ -1226,7 +1226,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     close(stdout_pipe[0]);
     kill(pid, SIGKILL);
     waitpid(pid, NULL, 0);
-    return ERR(Http::Body *, "Failed to add stdout to epoll");
+    return ERR(Http::Response *, "Failed to add stdout to epoll");
   }
 
   // Read output using EPoll to check readability
@@ -1241,7 +1241,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       close(stdout_pipe[0]);
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
-      return ERR(Http::Body *, "EPoll wait failed for stdout");
+      return ERR(Http::Response *, "EPoll wait failed for stdout");
     }
     
     Events events = *const_cast<Events *>(wait_result.value());
@@ -1252,7 +1252,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       close(stdout_pipe[0]);
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
-      return ERR(Http::Body *, "CGI execution timeout");
+      return ERR(Http::Response *, "CGI execution timeout");
     }
     
     bool fd_ready = false;
@@ -1288,7 +1288,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       close(stdout_pipe[0]);
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
-      return ERR(Http::Body *, "Failed to read from CGI stdout");
+      return ERR(Http::Response *, "Failed to read from CGI stdout");
     }
   }
 
@@ -1299,23 +1299,83 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   // Wait for child process
   int status;
   if (waitpid(pid, &status, 0) == -1) {
-    return ERR(Http::Body *, "Failed to wait for child process");
+    return ERR(Http::Response *, "Failed to wait for child process");
   }
 
   if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-    return ERR(Http::Body *, "CGI script failed");
+    return ERR(Http::Response *, "CGI script failed");
   }
 
-  // Create Http::Body from output
-  Http::Body::Value body_val;
-  body_val.html_raw = new std::string(output);
-  Http::Body *result_body = new Http::Body(Http::Body::Html, body_val);
+  // Parse CGI output to extract headers and body
+  // CGI scripts output headers followed by blank line, then body
+  std::string headers_section;
+  std::string body_section;
+  size_t blank_line_pos = output.find("\r\n\r\n");
+  
+  if (blank_line_pos == std::string::npos) {
+    blank_line_pos = output.find("\n\n");
+    if (blank_line_pos != std::string::npos) {
+      headers_section = output.substr(0, blank_line_pos);
+      body_section = output.substr(blank_line_pos + 2);
+    } else {
+      // No headers separator found, treat all as body
+      body_section = output;
+    }
+  } else {
+    headers_section = output.substr(0, blank_line_pos);
+    body_section = output.substr(blank_line_pos + 4);
+  }
 
-  // Allocate a pointer to the Http::Body pointer on the heap
-  // This allows the Http::Body object to survive after Result is destroyed
-  Http::Body **result_ptr = new Http::Body *;
-  *result_ptr = result_body;
-  return OK(Http::Body *, result_ptr);
+  // Parse headers
+  std::map<std::string, Json> response_headers;
+  int status_code = 200; // Default status
+  
+  if (!headers_section.empty()) {
+    std::istringstream header_stream(headers_section);
+    std::string line;
+    while (std::getline(header_stream, line)) {
+      // Remove trailing \r if present
+      if (!line.empty() && line[line.length() - 1] == '\r') {
+        line = line.substr(0, line.length() - 1);
+      }
+      
+      size_t colon_pos = line.find(':');
+      if (colon_pos != std::string::npos) {
+        std::string header_name = line.substr(0, colon_pos);
+        std::string header_value = line.substr(colon_pos + 1);
+        
+        // Trim leading whitespace from value
+        size_t value_start = header_value.find_first_not_of(" \t");
+        if (value_start != std::string::npos) {
+          header_value = header_value.substr(value_start);
+        }
+        
+        // Check for Status header
+        if (header_name == "Status") {
+          // Parse status code from value (e.g., "404 Not Found")
+          std::istringstream status_stream(header_value);
+          status_stream >> status_code;
+        }
+        
+        // Store header
+        response_headers[header_name] = *Json::str(header_value);
+      }
+    }
+  }
+
+  // Create Http::Body from body section
+  Http::Body::Value body_val;
+  body_val.html_raw = new std::string(body_section);
+  Http::Body result_body(Http::Body::Html, body_val);
+
+  // Create Http::Response
+  Http::Response *response = new Http::Response(status_code, response_headers, result_body);
+
+  // Allocate a pointer to the Http::Response pointer on the heap
+  // This allows the Http::Response object to survive after Result is destroyed
+  Http::Response **result_ptr = new Http::Response *;
+  *result_ptr = response;
+  return OK(Http::Response *, result_ptr);
 }
 
 CgiDelegate::~CgiDelegate() {
