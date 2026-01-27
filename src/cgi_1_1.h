@@ -10,6 +10,7 @@
 
 // Forward declarations
 class CgiInput;
+class EPoll;
 
 class CgiAuthType {
 public:
@@ -257,10 +258,15 @@ public:
 };
 
 class CgiDelegate {
-  CgiInput env;
-  CgiDelegate(Http::Request) : env() {}
+  CgiInput *env;
+  std::string script_path;
+  Http::Request request;
+
+  CgiDelegate(const Http::Request &req, const std::string &script);
 
 public:
+  static CgiDelegate *create(const Http::Request &req, const std::string &script);
+  Result<Http::Response *> execute(int timeout_ms, EPoll *epoll);
   ~CgiDelegate();
 };
 

@@ -64,6 +64,21 @@ public:
         break;
       }
     }
+    ~Body() {
+      switch (_type) {
+      case HttpJson:
+        delete _value.json;
+        break;
+      case HttpFormUrlEncoded:
+        delete _value.form;
+        break;
+      case Html:
+        delete _value.html_raw;
+        break;
+      default:
+        break;
+      }
+    }
     static Body *empty() { return new Body(Empty, (Value){._null = NULL}); }
     static Body *json(Json *json) {
       return new Body(HttpJson, (Value){.json = json});
@@ -106,6 +121,25 @@ public:
     const std::string &path() const { return _path; }
     const Body &body() const { return _body; }
     static Result<std::pair<Request *, size_t> > parse(const char *, char);
+  };
+
+  class Response {
+    int _status_code;
+    std::map<std::string, Json> _headers;
+    Body _body;
+
+  public:
+    Response(int status, std::map<std::string, Json> headers, Body b)
+        : _status_code(status), _headers(headers), _body(b) {}
+    
+    const int &status_code() const { return _status_code; }
+    const std::map<std::string, Json> &headers() const { return _headers; }
+    const Body &body() const { return _body; }
+    
+    std::map<std::string, Json> &headers_mut() { return _headers; }
+    void set_header(const std::string &name, const Json &value) {
+      _headers[name] = value;
+    }
   };
 };
 #endif
