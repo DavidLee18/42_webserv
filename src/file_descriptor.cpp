@@ -32,23 +32,26 @@ Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
   return OK(FileDescriptor, fd);
 }
 
-Result<FileDescriptor> FileDescriptor::move_from(FileDescriptor other) {
-  if (other._fd < 0)
-    return ERR(FileDescriptor, Errors::invalid_fd);
-  FileDescriptor fd;
-  fd.set_fd(other._fd);
-  other._fd = -1;
-  return OK(FileDescriptor, fd);
+// Move-like copy constructor: transfers ownership from other
+FileDescriptor::FileDescriptor(const FileDescriptor &other) {
+  _fd = other._fd;
+  // Invalidate source to transfer ownership (cast away const for move semantics)
+  const_cast<FileDescriptor&>(other)._fd = -1;
 }
 
-Result<Void> FileDescriptor::operator=(FileDescriptor other) {
+// Move-like assignment operator: transfers ownership from other
+FileDescriptor& FileDescriptor::operator=(const FileDescriptor &other) {
   if (this != &other) {
-    if (_fd < 0)
-      return ERR(Void, Errors::invalid_fd);
+    // Close current fd if valid
+    if (_fd >= 0)
+      close(_fd);
+    
+    // Transfer ownership
     _fd = other._fd;
-    other._fd = -1;
+    // Invalidate source (cast away const for move semantics)
+    const_cast<FileDescriptor&>(other)._fd = -1;
   }
-  return OKV;
+  return *this;
 }
 
 FileDescriptor::~FileDescriptor() {
