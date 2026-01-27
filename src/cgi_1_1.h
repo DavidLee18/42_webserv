@@ -257,10 +257,15 @@ public:
 };
 
 class CgiDelegate {
-  CgiInput env;
-  CgiDelegate(Http::Request) : env() {}
+  CgiInput *env;
+  std::string script_path;
+  Http::Request request;
+
+  CgiDelegate(const Http::Request &req, const std::string &script);
 
 public:
+  static CgiDelegate *create(const Http::Request &req, const std::string &script);
+  Result<Http::Body *> execute(int timeout_seconds);
   ~CgiDelegate();
 };
 

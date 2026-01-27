@@ -959,3 +959,183 @@ char **CgiInput::to_envp() const {
 unsigned char to_upper(unsigned char c) {
   return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
 }
+
+// CgiDelegate implementation
+
+CgiDelegate::CgiDelegate(const Http::Request &req, const std::string &script)
+    : env(NULL), script_path(script), request(req) {}
+
+CgiDelegate *CgiDelegate::create(const Http::Request &req,
+                                  const std::string &script) {
+  CgiDelegate *delegate = new CgiDelegate(req, script);
+
+  // Parse the HTTP request to CgiInput
+  Result<CgiInput *> parse_result = CgiInput::Parser::parse(req);
+  if (!parse_result.error().empty()) {
+    delete delegate;
+    return NULL;
+  }
+
+  delegate->env = *const_cast<CgiInput **>(parse_result.value());
+  return delegate;
+}
+
+Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
+  if (env == NULL) {
+    return ERR(Http::Body *, "CgiInput not initialized");
+  }
+
+  // Create pipes for communication
+  int stdin_pipe[2];
+  int stdout_pipe[2];
+
+  if (pipe(stdin_pipe) == -1) {
+    return ERR(Http::Body *, "Failed to create stdin pipe");
+  }
+  if (pipe(stdout_pipe) == -1) {
+    close(stdin_pipe[0]);
+    close(stdin_pipe[1]);
+    return ERR(Http::Body *, "Failed to create stdout pipe");
+  }
+
+  // Fork the process
+  pid_t pid = fork();
+  if (pid == -1) {
+    close(stdin_pipe[0]);
+    close(stdin_pipe[1]);
+    close(stdout_pipe[0]);
+    close(stdout_pipe[1]);
+    return ERR(Http::Body *, "Failed to fork process");
+  }
+
+  if (pid == 0) {
+    // Child process
+
+    // Close unused pipe ends
+    close(stdin_pipe[1]);  // Close write end of stdin pipe
+    close(stdout_pipe[0]); // Close read end of stdout pipe
+
+    // Redirect stdin and stdout
+    if (dup2(stdin_pipe[0], STDIN_FILENO) == -1) {
+      std::cerr << "Failed to redirect stdin" << std::endl;
+      exit(1);
+    }
+    if (dup2(stdout_pipe[1], STDOUT_FILENO) == -1) {
+      std::cerr << "Failed to redirect stdout" << std::endl;
+      exit(1);
+    }
+
+    // Close the pipe file descriptors after duplication
+    close(stdin_pipe[0]);
+    close(stdout_pipe[1]);
+
+    // Prepare environment variables
+    char **envp = env->to_envp();
+
+    // Prepare arguments
+    char *argv[2];
+    argv[0] = const_cast<char *>(script_path.c_str());
+    argv[1] = NULL;
+
+    // Execute the CGI script
+    execve(script_path.c_str(), argv, envp);
+
+    // If execve returns, it failed
+    std::cerr << "Failed to execute CGI script: " << script_path << std::endl;
+    exit(1);
+  }
+
+  // Parent process
+
+  // Close unused pipe ends
+  close(stdin_pipe[0]);  // Close read end of stdin pipe
+  close(stdout_pipe[1]); // Close write end of stdout pipe
+
+  // Write request body to CGI stdin if present
+  const Http::Body &body = request.body();
+  if (body.type() == Http::Body::Html && body.value().html_raw != NULL) {
+    const std::string &body_str = *body.value().html_raw;
+    ssize_t written = write(stdin_pipe[1], body_str.c_str(), body_str.length());
+    if (written == -1) {
+      close(stdin_pipe[1]);
+      close(stdout_pipe[0]);
+      kill(pid, SIGKILL);
+      waitpid(pid, NULL, 0);
+      return ERR(Http::Body *, "Failed to write to CGI stdin");
+    }
+  }
+  close(stdin_pipe[1]); // Close stdin to signal end of input
+
+  // Set timeout for reading
+  time_t start_time = time(NULL);
+  time_t end_time = start_time + timeout_seconds;
+
+  // Set stdout_pipe[0] to non-blocking
+  int flags = fcntl(stdout_pipe[0], F_GETFL, 0);
+  fcntl(stdout_pipe[0], F_SETFL, flags | O_NONBLOCK);
+
+  // Read output with timeout
+  std::string output;
+  char buffer[4096];
+  bool timeout_occurred = false;
+
+  while (true) {
+    // Check timeout
+    time_t current_time = time(NULL);
+    if (current_time >= end_time) {
+      timeout_occurred = true;
+      break;
+    }
+
+    ssize_t bytes_read = read(stdout_pipe[0], buffer, sizeof(buffer));
+
+    if (bytes_read > 0) {
+      output.append(buffer, static_cast<size_t>(bytes_read));
+    } else if (bytes_read == 0) {
+      // EOF reached
+      break;
+    } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+      // Real error occurred
+      close(stdout_pipe[0]);
+      kill(pid, SIGKILL);
+      waitpid(pid, NULL, 0);
+      return ERR(Http::Body *, "Failed to read from CGI stdout");
+    }
+
+    // Sleep briefly to avoid busy waiting
+    usleep(10000); // 10ms
+  }
+
+  close(stdout_pipe[0]);
+
+  // Handle timeout
+  if (timeout_occurred) {
+    kill(pid, SIGKILL);
+    waitpid(pid, NULL, 0);
+    return ERR(Http::Body *, "CGI execution timeout");
+  }
+
+  // Wait for child process
+  int status;
+  if (waitpid(pid, &status, 0) == -1) {
+    return ERR(Http::Body *, "Failed to wait for child process");
+  }
+
+  if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+    return ERR(Http::Body *, "CGI script failed");
+  }
+
+  // Create Http::Body from output
+  Http::Body::Value body_val;
+  body_val.html_raw = new std::string(output);
+  Http::Body *result_body = new Http::Body(Http::Body::Html, body_val);
+
+  return OK(Http::Body *, &result_body);
+}
+
+CgiDelegate::~CgiDelegate() {
+  if (env != NULL) {
+    delete env;
+    env = NULL;
+  }
+}
