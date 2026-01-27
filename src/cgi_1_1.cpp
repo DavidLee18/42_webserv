@@ -962,6 +962,10 @@ unsigned char to_upper(unsigned char c) {
 
 // CgiDelegate implementation
 
+// CGI read timeout constants
+static const int CGI_INITIAL_TIMEOUT_SEC = 30;  // Initial timeout for first read
+static const int CGI_SUBSEQUENT_TIMEOUT_SEC = 5; // Timeout for subsequent reads
+
 CgiDelegate::CgiDelegate(const Http::Request &req, const std::string &script)
     : env(NULL), script_path(script), request(req) {}
 
@@ -1111,10 +1115,12 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
         return ERR(Http::Body *, "Failed to write to CGI stdin");
+      } else if (written == 0) {
+        // Pipe buffer full, but this shouldn't normally happen in blocking mode
+        // Try again after brief delay
+        continue;
       }
-      if (written > 0) {
-        total_written += static_cast<size_t>(written);
-      }
+      total_written += static_cast<size_t>(written);
     }
   }
   close(stdin_pipe[1]); // Close stdin to signal end of input
@@ -1122,8 +1128,6 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
   // Read output with timeout using select()
   std::string output;
   char buffer[4096];
-  int initial_timeout = timeout_seconds;
-  int subsequent_timeout = 5; // Shorter timeout for subsequent reads
   bool first_read = true;
   
   while (true) {
@@ -1132,7 +1136,10 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
     FD_SET(stdout_pipe[0], &read_fds);
     
     struct timeval tv;
-    tv.tv_sec = first_read ? initial_timeout : subsequent_timeout;
+    // Use longer timeout for initial read, shorter for subsequent reads
+    tv.tv_sec = first_read ? 
+                (timeout_seconds > 0 ? timeout_seconds : CGI_INITIAL_TIMEOUT_SEC) : 
+                CGI_SUBSEQUENT_TIMEOUT_SEC;
     tv.tv_usec = 0;
     
     int select_result = select(stdout_pipe[0] + 1, &read_fds, NULL, NULL, &tv);
