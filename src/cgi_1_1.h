@@ -22,6 +22,28 @@ public:
   explicit CgiAuthType(Type type) : _type(type), _other(NULL) {}
   explicit CgiAuthType(Type type, std::string other)
       : _type(type), _other(new std::string(other)) {}
+  CgiAuthType(const CgiAuthType &other) : _type(other._type) {
+    if (other._other != NULL) {
+      _other = new std::string(*other._other);
+    } else {
+      _other = NULL;
+    }
+  }
+  CgiAuthType& operator=(const CgiAuthType &other) {
+    if (this != &other) {
+      delete _other;
+      _type = other._type;
+      if (other._other != NULL) {
+        _other = new std::string(*other._other);
+      } else {
+        _other = NULL;
+      }
+    }
+    return *this;
+  }
+  ~CgiAuthType() {
+    delete _other;
+  }
   Type const &type() { return _type; }
   std::string const *other() { return _other; }
 
@@ -49,6 +71,14 @@ public:
       : type(ty), subtype(subty), params() {}
   ContentType(ContentType const &other)
       : type(other.type), subtype(other.subtype), params(other.params) {}
+  ContentType& operator=(const ContentType &other) {
+    if (this != &other) {
+      type = other.type;
+      subtype = other.subtype;
+      params = other.params;
+    }
+    return *this;
+  }
   Result<Void> add_param(std::string, std::string);
 
 public:
@@ -80,6 +110,45 @@ public:
     unsigned char ipv4[4];
   };
 
+public:
+  ServerName(const ServerName &other) : type(other.type) {
+    if (type == Host) {
+      val.host_name = new std::list<std::string>(*other.val.host_name);
+    } else {
+      val.ipv4[0] = other.val.ipv4[0];
+      val.ipv4[1] = other.val.ipv4[1];
+      val.ipv4[2] = other.val.ipv4[2];
+      val.ipv4[3] = other.val.ipv4[3];
+    }
+  }
+  
+  ServerName& operator=(const ServerName &other) {
+    if (this != &other) {
+      // Clean up existing value
+      if (type == Host) {
+        delete val.host_name;
+      }
+      
+      // Copy new value
+      type = other.type;
+      if (type == Host) {
+        val.host_name = new std::list<std::string>(*other.val.host_name);
+      } else {
+        val.ipv4[0] = other.val.ipv4[0];
+        val.ipv4[1] = other.val.ipv4[1];
+        val.ipv4[2] = other.val.ipv4[2];
+        val.ipv4[3] = other.val.ipv4[3];
+      }
+    }
+    return *this;
+  }
+  
+  ~ServerName() {
+    if (type == Host) {
+      delete val.host_name;
+    }
+  }
+
 private:
   Type type;
   Val val;
@@ -103,6 +172,14 @@ public:
       : type(ty), name(n), value(v) {}
   EtcMetaVar(EtcMetaVar const &other)
       : type(other.type), name(other.name), value(other.value) {}
+  EtcMetaVar& operator=(const EtcMetaVar &other) {
+    if (this != &other) {
+      type = other.type;
+      name = other.name;
+      value = other.value;
+    }
+    return *this;
+  }
   
   Type const &get_type() const { return type; }
   std::string const &get_name() const { return name; }
@@ -203,6 +280,215 @@ public:
   
   friend class CgiInput;
   
+public:
+  CgiMetaVar(const CgiMetaVar &other) : name(other.name) {
+    switch (name) {
+    case AUTH_TYPE:
+      val.auth_type = new CgiAuthType(*other.val.auth_type);
+      break;
+    case CONTENT_LENGTH:
+      val.content_length = other.val.content_length;
+      break;
+    case CONTENT_TYPE:
+      val.content_type = new ContentType(*other.val.content_type);
+      break;
+    case GATEWAY_INTERFACE:
+      val.gateway_interface = other.val.gateway_interface;
+      break;
+    case PATH_INFO:
+      val.path_info = new std::list<std::string>(*other.val.path_info);
+      break;
+    case PATH_TRANSLATED:
+      val.path_translated = new std::string(*other.val.path_translated);
+      break;
+    case QUERY_STRING:
+      val.query_string = new std::map<std::string, std::string>(*other.val.query_string);
+      break;
+    case REMOTE_ADDR:
+      val.remote_addr[0] = other.val.remote_addr[0];
+      val.remote_addr[1] = other.val.remote_addr[1];
+      val.remote_addr[2] = other.val.remote_addr[2];
+      val.remote_addr[3] = other.val.remote_addr[3];
+      break;
+    case REMOTE_HOST:
+      val.remote_host = new std::list<std::string>(*other.val.remote_host);
+      break;
+    case REMOTE_IDENT:
+      val.remote_ident = new std::string(*other.val.remote_ident);
+      break;
+    case REMOTE_USER:
+      val.remote_user = new std::string(*other.val.remote_user);
+      break;
+    case REQUEST_METHOD:
+      val.request_method = other.val.request_method;
+      break;
+    case SCRIPT_NAME:
+      val.script_name = new std::list<std::string>(*other.val.script_name);
+      break;
+    case SERVER_NAME:
+      val.server_name = new ServerName(*other.val.server_name);
+      break;
+    case SERVER_PORT:
+      val.server_port = other.val.server_port;
+      break;
+    case SERVER_PROTOCOL:
+      val.server_protocol = other.val.server_protocol;
+      break;
+    case SERVER_SOFTWARE:
+      val.server_software = other.val.server_software;
+      break;
+    case X_:
+      val.etc_val = new EtcMetaVar(*other.val.etc_val);
+      break;
+    }
+  }
+  
+  CgiMetaVar& operator=(const CgiMetaVar &other) {
+    if (this != &other) {
+      // Clean up existing value
+      switch (name) {
+      case AUTH_TYPE:
+        delete val.auth_type;
+        break;
+      case CONTENT_TYPE:
+        delete val.content_type;
+        break;
+      case PATH_INFO:
+        delete val.path_info;
+        break;
+      case PATH_TRANSLATED:
+        delete val.path_translated;
+        break;
+      case QUERY_STRING:
+        delete val.query_string;
+        break;
+      case REMOTE_HOST:
+        delete val.remote_host;
+        break;
+      case REMOTE_IDENT:
+        delete val.remote_ident;
+        break;
+      case REMOTE_USER:
+        delete val.remote_user;
+        break;
+      case SCRIPT_NAME:
+        delete val.script_name;
+        break;
+      case SERVER_NAME:
+        delete val.server_name;
+        break;
+      case X_:
+        delete val.etc_val;
+        break;
+      default:
+        break;
+      }
+      
+      // Copy new value
+      name = other.name;
+      switch (name) {
+      case AUTH_TYPE:
+        val.auth_type = new CgiAuthType(*other.val.auth_type);
+        break;
+      case CONTENT_LENGTH:
+        val.content_length = other.val.content_length;
+        break;
+      case CONTENT_TYPE:
+        val.content_type = new ContentType(*other.val.content_type);
+        break;
+      case GATEWAY_INTERFACE:
+        val.gateway_interface = other.val.gateway_interface;
+        break;
+      case PATH_INFO:
+        val.path_info = new std::list<std::string>(*other.val.path_info);
+        break;
+      case PATH_TRANSLATED:
+        val.path_translated = new std::string(*other.val.path_translated);
+        break;
+      case QUERY_STRING:
+        val.query_string = new std::map<std::string, std::string>(*other.val.query_string);
+        break;
+      case REMOTE_ADDR:
+        val.remote_addr[0] = other.val.remote_addr[0];
+        val.remote_addr[1] = other.val.remote_addr[1];
+        val.remote_addr[2] = other.val.remote_addr[2];
+        val.remote_addr[3] = other.val.remote_addr[3];
+        break;
+      case REMOTE_HOST:
+        val.remote_host = new std::list<std::string>(*other.val.remote_host);
+        break;
+      case REMOTE_IDENT:
+        val.remote_ident = new std::string(*other.val.remote_ident);
+        break;
+      case REMOTE_USER:
+        val.remote_user = new std::string(*other.val.remote_user);
+        break;
+      case REQUEST_METHOD:
+        val.request_method = other.val.request_method;
+        break;
+      case SCRIPT_NAME:
+        val.script_name = new std::list<std::string>(*other.val.script_name);
+        break;
+      case SERVER_NAME:
+        val.server_name = new ServerName(*other.val.server_name);
+        break;
+      case SERVER_PORT:
+        val.server_port = other.val.server_port;
+        break;
+      case SERVER_PROTOCOL:
+        val.server_protocol = other.val.server_protocol;
+        break;
+      case SERVER_SOFTWARE:
+        val.server_software = other.val.server_software;
+        break;
+      case X_:
+        val.etc_val = new EtcMetaVar(*other.val.etc_val);
+        break;
+      }
+    }
+    return *this;
+  }
+  
+  ~CgiMetaVar() {
+    switch (name) {
+    case AUTH_TYPE:
+      delete val.auth_type;
+      break;
+    case CONTENT_TYPE:
+      delete val.content_type;
+      break;
+    case PATH_INFO:
+      delete val.path_info;
+      break;
+    case PATH_TRANSLATED:
+      delete val.path_translated;
+      break;
+    case QUERY_STRING:
+      delete val.query_string;
+      break;
+    case REMOTE_HOST:
+      delete val.remote_host;
+      break;
+    case REMOTE_IDENT:
+      delete val.remote_ident;
+      break;
+    case REMOTE_USER:
+      delete val.remote_user;
+      break;
+    case SCRIPT_NAME:
+      delete val.script_name;
+      break;
+    case SERVER_NAME:
+      delete val.server_name;
+      break;
+    case X_:
+      delete val.etc_val;
+      break;
+    default:
+      break;
+    }
+  }
+  
   Name const &get_name() const { return name; }
   Val const &get_val() const { return val; }
 
@@ -253,6 +539,13 @@ public:
 
   CgiInput(const CgiInput &other)
       : mvars(other.mvars), req_body(other.req_body) {}
+  CgiInput& operator=(const CgiInput &other) {
+    if (this != &other) {
+      mvars = other.mvars;
+      req_body = other.req_body;
+    }
+    return *this;
+  }
   void add_mvar(std::string const &, std::string const &);
   char **to_envp() const;
 };

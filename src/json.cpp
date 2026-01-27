@@ -24,6 +24,50 @@ Json::Json(const Json &other) : _type(other._type) {
   }
 }
 
+Json& Json::operator=(const Json &other) {
+  if (this != &other) {
+    // Clean up existing value
+    switch (_type) {
+    case Str:
+      delete _value._str;
+      break;
+    case Arr:
+      delete _value.arr;
+      break;
+    case Obj:
+      delete _value.obj;
+      break;
+    default:
+      break;
+    }
+    
+    // Copy new value
+    _type = other._type;
+    switch (other._type) {
+    case Null:
+      _value = (Value){._null = NULL};
+      break;
+    case Bool:
+      _value = (Value){._bool = other._value._bool};
+      break;
+    case Num:
+      _value = (Value){.num = other._value.num};
+      break;
+    case Str:
+      _value = (Value){._str = new std::string(*other._value._str)};
+      break;
+    case Arr:
+      _value = (Value){.arr = new std::vector<Json>(*other._value.arr)};
+      break;
+    case Obj:
+      _value = (Value){.obj = new std::vector<std::pair<std::string, Json> >(
+                           *other._value.obj)};
+      break;
+    }
+  }
+  return *this;
+}
+
 Json Json::null() { return Json(Null, (Value){._null = NULL}); }
 
 Json Json::_bool(bool b) { return Json(Bool, (Value){._bool = b}); }

@@ -29,6 +29,7 @@ public:
   Json() : _type(Null), _value((Value){._null = NULL}) {}
   Json(Type ty, Value val) : _type(ty), _value(val) {}
   Json(const Json &other);
+  Json& operator=(const Json &other);
   ~Json() {
     switch (_type) {
     case Str:
