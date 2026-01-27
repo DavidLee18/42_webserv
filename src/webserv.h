@@ -26,6 +26,7 @@
 #include <iostream>
 #include <netdb.h>
 #include <sstream>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>

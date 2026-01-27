@@ -1105,10 +1105,7 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
       ssize_t written = write(stdin_pipe[1], 
                               body_str.c_str() + total_written, 
                               body_str.length() - total_written);
-      if (written == -1) {
-        if (errno == EINTR) {
-          continue; // Interrupted by signal, retry
-        }
+      if (written <= 0) {
         close(stdin_pipe[1]);
         close(stdout_pipe[0]);
         kill(pid, SIGKILL);
@@ -1120,65 +1117,55 @@ Result<Http::Body *> CgiDelegate::execute(int timeout_seconds) {
   }
   close(stdin_pipe[1]); // Close stdin to signal end of input
 
-  // Set timeout for reading
-  time_t start_time = time(NULL);
-  time_t end_time = start_time + timeout_seconds;
-
-  // Set stdout_pipe[0] to non-blocking
-  int flags = fcntl(stdout_pipe[0], F_GETFL, 0);
-  if (flags == -1) {
-    close(stdout_pipe[0]);
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
-    return ERR(Http::Body *, "Failed to get file descriptor flags");
-  }
-  if (fcntl(stdout_pipe[0], F_SETFL, flags | O_NONBLOCK) == -1) {
-    close(stdout_pipe[0]);
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
-    return ERR(Http::Body *, "Failed to set non-blocking mode");
-  }
-
-  // Read output with timeout
+  // Read output with timeout using select()
   std::string output;
   char buffer[4096];
-  bool timeout_occurred = false;
-
+  
   while (true) {
-    // Check timeout
-    time_t current_time = time(NULL);
-    if (current_time >= end_time) {
-      timeout_occurred = true;
-      break;
+    fd_set read_fds;
+    FD_ZERO(&read_fds);
+    FD_SET(stdout_pipe[0], &read_fds);
+    
+    struct timeval tv;
+    tv.tv_sec = timeout_seconds;
+    tv.tv_usec = 0;
+    
+    int select_result = select(stdout_pipe[0] + 1, &read_fds, NULL, NULL, &tv);
+    
+    if (select_result < 0) {
+      // Error in select
+      close(stdout_pipe[0]);
+      kill(pid, SIGKILL);
+      waitpid(pid, NULL, 0);
+      return ERR(Http::Body *, "Failed to read from CGI stdout");
+    } else if (select_result == 0) {
+      // Timeout occurred
+      close(stdout_pipe[0]);
+      kill(pid, SIGKILL);
+      waitpid(pid, NULL, 0);
+      return ERR(Http::Body *, "CGI execution timeout");
     }
-
+    
+    // Data is available to read
     ssize_t bytes_read = read(stdout_pipe[0], buffer, sizeof(buffer));
-
+    
     if (bytes_read > 0) {
       output.append(buffer, static_cast<size_t>(bytes_read));
+      // Reset timeout for next read
+      timeout_seconds = 5; // Use shorter timeout for subsequent reads
     } else if (bytes_read == 0) {
       // EOF reached
       break;
-    } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-      // Real error occurred
+    } else {
+      // Read error
       close(stdout_pipe[0]);
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
       return ERR(Http::Body *, "Failed to read from CGI stdout");
     }
-
-    // Sleep briefly to avoid busy waiting
-    usleep(10000); // 10ms
   }
 
   close(stdout_pipe[0]);
-
-  // Handle timeout
-  if (timeout_occurred) {
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
-    return ERR(Http::Body *, "CGI execution timeout");
-  }
 
   // Wait for child process
   int status;
