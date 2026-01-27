@@ -155,32 +155,66 @@ static bool is_pattern(std::string line)
   size_t pattrn_pos = line.find(".(");
   if (pattrn_pos == std::string::npos)
     return (false);
-  if (pattrn_pos <= string_pos)
-    return (false);
-  for (size_t i = 0; i < line.length(); ++i)
-  {
-    if (
-  }
+  // if (pattrn_pos <= string_pos)
+    // return (false);
+  // for (size_t i = 0; i < line.length(); ++i)
+  // {
+  //   if (
+  // }
   return (true);
 }
 
-
-static std::vector<std::vector<std::string>> urlpattern(std::vector<std::string> line)
+static std::vector<std::string> get_pattern(std::string line)
 {
-  std::vector<std::string> path(line);
+  std::vector<std::string> temp = string_split(line, "*");
+  std::string pattern = temp[temp.size() - 1];
+
+  pattern.substr(1, s.length() - 2);
+  temp = string_split(pattern, "|");
+  // for (size_t i = 0; i < temp.size(); ++i)
+  // {
+  //   std::cout << temp[i] << std::endl;
+  // }
+  return (temp);
+}
+
+static std::vector<std::vector<std::string>> make_paths_from_url_pattern(std::vector<std::vector<std::string>> paths, std::vector<std::string> pattern, int index)
+{
+  std::vector<std::vector<std::string>> new_paths(paths);
+
+  if (paths.size() != pattern.size()) // pattern의 수 만큼 path을 생성
+  {
+    for (size_t i = paths.size(); i < pattern.size(); ++i)
+      new_paths.push_back(new_paths[0]);
+  }
+  for (size_t i = 0; i < new_paths.size(); ++i)
+  {
+    std::vector<std::string> temp = string_split(new_paths[i][index], "*");
+    new_paths[i][index] = "*" + pattern[i];
+    if (temp.size() > 1) 
+      new_paths[i][index] = temp[0] + new_paths[i][index];
+  }
+  return (new_paths);
+}
+
+static std::vector<std::vector<std::string>> expand_url_pattern(std::string line)
+{
+  std::vector<std::string> path(string_split(line, "/"));
   std::vector<std::vector<std::string>> paths;
 
-  for (size_t i = 0; i < line.size(); ++i)
+  paths.push_back(path); // path = /download/*.(jpg|jpeg|gif)을 string_split한 상태
+  for (size_t i = 0; i < path.size(); ++i)
   {
-    if (line[i].find("*") == std::string::npos)
-      continue;
-    else
+    if (is_pattern(path[i])) // path[i] = *.(jpg|jpeg|gif) 이때 참
     {
-      if 
-      std::vector<std::string> pattern = string_split(line[i], "|");
+      std::vector<std::string> pattern = get_pattern(path[i]); // jpg, jpeg, gif 등등 담은 백터
+      paths = make_paths(paths, pattern, i);
+      // /download/*.jpg, /download/*.jpeg, /download/*.gif이 3개 원소를 '/'으로 split한 백터
     }
+    else
+      continue;
   }
-
+  return (paths);
 }  
 
 bool ServerConfig::is_RouteRule(std::string line) {
@@ -242,6 +276,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data, std::vector<H
   
   if (data.size() != 4)
     return (false);
+  urlpattern(data);
   for (size_t i = 0; i < mets.size(); ++i)
   {
     route.method = mets[i];
