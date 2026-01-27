@@ -113,10 +113,6 @@ public:
     std::map<std::string, Json> _headers;
     Body _body;
 
-  private:
-    Response(int status, Body b)
-        : _status_code(status), _headers(), _body(b) {}
-
   public:
     Response(int status, std::map<std::string, Json> headers, Body b)
         : _status_code(status), _headers(headers), _body(b) {}
