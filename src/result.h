@@ -11,7 +11,16 @@
 template <typename T>
 class Optional {
   bool _has_value;
-  char _storage[sizeof(T)];
+  // Use max_align_t equivalent for C++98 to ensure proper alignment
+  // Use a properly aligned storage buffer
+  union AlignedStorage {
+    char _dummy;
+    long _align1;
+    double _align2;
+    long double _align3;
+    void* _align4;
+  };
+  char _storage[sizeof(T) > sizeof(AlignedStorage) ? sizeof(T) : sizeof(AlignedStorage)];
 
   T* ptr() { return reinterpret_cast<T*>(_storage); }
   const T* ptr() const { return reinterpret_cast<const T*>(_storage); }
@@ -22,12 +31,12 @@ public:
   }
   
   Optional(const T& val) : _has_value(true) {
-    new (_storage) T(val);
+    new (ptr()) T(val);
   }
   
   Optional(const Optional& other) : _has_value(other._has_value) {
     if (_has_value) {
-      new (_storage) T(*other.ptr());
+      new (ptr()) T(*other.ptr());
     }
     // If not has_value, storage remains uninitialized
   }
@@ -45,7 +54,7 @@ public:
       }
       _has_value = other._has_value;
       if (_has_value) {
-        new (_storage) T(*other.ptr());
+        new (ptr()) T(*other.ptr());
       }
       // If not has_value, storage remains uninitialized
     }

@@ -61,7 +61,6 @@ ServerName::Parser::parse_host(std::string raw) {
 Result<std::pair<ServerName, size_t> >
 ServerName::Parser::parse_ipv4(std::string raw) {
   std::stringstream ss(raw);
-  std::vector<std::string> *ips = new std::vector<std::string>();
   std::vector<unsigned char> addrs;
   std::string part;
   size_t i = 0;
@@ -70,12 +69,11 @@ ServerName::Parser::parse_ipv4(std::string raw) {
     if (part.size() < 1 || part.size() > 3)
       return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
     for (size_t j = 0; j < part.size(); j++) {
-      if ('0' < part[j] || part[j] > '9')
+      if (part[j] < '0' || part[j] > '9')
         return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
     }
     i += part.size();
     addrs.push_back(static_cast<unsigned char>(std::atoi(part.c_str())));
-    ips->push_back(part);
     std::getline(ss, part, '.');
   }
   if (!ss.eof())
@@ -83,11 +81,10 @@ ServerName::Parser::parse_ipv4(std::string raw) {
   if (part.size() < 1 || part.size() > 3)
     return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   for (size_t j = 0; j < part.size(); j++) {
-    if ('0' < part[j] || part[j] > '9')
+    if (part[j] < '0' || part[j] > '9')
       return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   }
   addrs.push_back(static_cast<unsigned char>(std::atoi(part.c_str())));
-  ips->push_back(part);
   if (addrs.size() != 4)
     return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   return OK_PAIR(ServerName, size_t,
