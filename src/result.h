@@ -11,19 +11,19 @@
 template <typename T>
 class Optional {
   bool _has_value;
-  // Use max_align_t equivalent for C++98 to ensure proper alignment
-  // Use a properly aligned storage buffer
-  union AlignedStorage {
-    char _dummy;
+  // Use a union to ensure proper alignment for T
+  union Storage {
+    char _data[sizeof(T)];
+    // Alignment members
     long _align1;
     double _align2;
     long double _align3;
     void* _align4;
   };
-  char _storage[sizeof(T) > sizeof(AlignedStorage) ? sizeof(T) : sizeof(AlignedStorage)];
+  Storage _storage;
 
-  T* ptr() { return reinterpret_cast<T*>(_storage); }
-  const T* ptr() const { return reinterpret_cast<const T*>(_storage); }
+  T* ptr() { return reinterpret_cast<T*>(&_storage._data[0]); }
+  const T* ptr() const { return reinterpret_cast<const T*>(&_storage._data[0]); }
 
 public:
   Optional() : _has_value(false) {
