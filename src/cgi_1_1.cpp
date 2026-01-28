@@ -948,8 +948,10 @@ unsigned char to_upper(unsigned char c) {
 // CgiDelegate implementation
 
 // CGI read timeout constants
-static const int CGI_INITIAL_TIMEOUT_SEC = 30;  // Initial timeout for first read
-static const int CGI_SUBSEQUENT_TIMEOUT_SEC = 5; // Timeout for subsequent reads
+// Initial timeout for first read
+#define CGI_INITIAL_TIMEOUT_SEC 30
+// Timeout for subsequent reads
+#define CGI_SUBSEQUENT_TIMEOUT_SEC 5
 
 CgiDelegate::CgiDelegate(const Http::Request &req, const std::string &script)
     : env(), script_path(script), request(req) {}
