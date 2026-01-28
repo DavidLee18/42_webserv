@@ -688,8 +688,8 @@ Result<CgiInput> CgiInput::Parser::parse(Http::Request const &req) {
   }
   
   // Add HTTP headers as CGI variables
-  std::map<std::string, Json> const &headers = req.headers();
-  for (std::map<std::string, Json>::const_iterator it = headers.begin();
+  std::map<std::string, std::string> const &headers = req.headers();
+  for (std::map<std::string, std::string>::const_iterator it = headers.begin();
        it != headers.end(); ++it) {
     std::string header_name = it->first;
     
@@ -703,17 +703,8 @@ Result<CgiInput> CgiInput::Parser::parse(Http::Request const &req) {
       }
     }
     
-    // Get string value from Json
-    std::string value;
-    if (it->second.type() == Json::Str && it->second.value()._str != NULL) {
-      value = *it->second.value()._str;
-    } else {
-      // For non-string types, convert to string representation
-      std::stringstream ss;
-      Json json_copy = it->second;
-      ss << json_copy;
-      value = ss.str();
-    }
+    // Get string value (now directly a string, not Json)
+    std::string value = it->second;
     
     // Special handling for standard CGI variables
     if (header_name == "CONTENT_TYPE") {
@@ -1311,7 +1302,7 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   }
 
   // Parse headers
-  std::map<std::string, Json> response_headers;
+  std::map<std::string, std::string> response_headers;
   int status_code = 200; // Default status
   
   if (!headers_section.empty()) {
@@ -1341,9 +1332,8 @@ Result<Http::Response *> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
           status_stream >> status_code;
         }
         
-        // Store header
-        Json header_json = Json::str(header_value);
-        response_headers[header_name] = header_json;
+        // Store header as string (HTTP/1.1 standard)
+        response_headers[header_name] = header_value;
       }
     }
   }

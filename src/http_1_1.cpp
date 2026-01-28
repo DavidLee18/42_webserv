@@ -205,9 +205,9 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
 
 // Parse headers (e.g., "Host: example.com\r\n")
 // RFC 2616 §4.2: Field names are case-insensitive, LWS may be present
-Result<std::pair<std::map<std::string, Json>, size_t> >
+Result<std::pair<std::map<std::string, std::string>, size_t> >
 Http::Request::Parser::parse_headers(const char *input, size_t offset) {
-  typedef std::map<std::string, Json> HeaderMap;
+  typedef std::map<std::string, std::string> HeaderMap;
   HeaderMap headers;
   size_t start_offset = offset;
   
@@ -255,9 +255,8 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
     // RFC 2616 §4.2: Trim leading/trailing whitespace from value
     std::string trimmed_value = trim_whitespace(header_value);
     
-    // Store header as Json string
-    Json header_json = Json::str(trimmed_value);
-    headers[normalized_name] = header_json;
+    // Store header as string (HTTP/1.1 standard)
+    headers[normalized_name] = trimmed_value;
   }
   
   return OK_PAIR(HeaderMap, size_t, headers, offset - start_offset);
@@ -330,9 +329,9 @@ parse_form_urlencoded(const char *input, size_t offset, size_t body_length) {
 // RFC 2616 §4.3: Message body determined by Content-Type and Content-Length
 Result<std::pair<Http::Body, size_t> >
 Http::Request::Parser::parse_body(const char *input, size_t offset, 
-                                   std::map<std::string, Json> const &headers) {
+                                   std::map<std::string, std::string> const &headers) {
   // Check for Content-Length header
-  std::map<std::string, Json>::const_iterator content_length_it = 
+  std::map<std::string, std::string>::const_iterator content_length_it = 
       headers.find("content-length");
   
   // If no Content-Length, return empty body
@@ -342,14 +341,8 @@ Http::Request::Parser::parse_body(const char *input, size_t offset,
     return OK_PAIR(Http::Body, size_t, Http::Body(Http::Body::Empty, empty_val), 0);
   }
   
-  // Parse Content-Length value
-  if (content_length_it->second.type() != Json::Str) {
-    Http::Body::Value empty_val;
-    empty_val._null = NULL;
-    return OK_PAIR(Http::Body, size_t, Http::Body(Http::Body::Empty, empty_val), 0);
-  }
-  
-  std::string length_str = *content_length_it->second.value()._str;
+  // Parse Content-Length value (now a string, not Json)
+  std::string length_str = content_length_it->second;
   char *end_ptr = NULL;
   unsigned long body_length = std::strtoul(length_str.c_str(), &end_ptr, 10);
   
@@ -368,12 +361,12 @@ Http::Request::Parser::parse_body(const char *input, size_t offset,
   }
   
   // Check Content-Type header to determine body type
-  std::map<std::string, Json>::const_iterator content_type_it = 
+  std::map<std::string, std::string>::const_iterator content_type_it = 
       headers.find("content-type");
   
   std::string content_type;
-  if (content_type_it != headers.end() && content_type_it->second.type() == Json::Str) {
-    content_type = *content_type_it->second.value()._str;
+  if (content_type_it != headers.end()) {
+    content_type = content_type_it->second;
     // Normalize to lowercase for comparison
     for (size_t i = 0; i < content_type.length(); i++) {
       content_type[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(content_type[i])));
@@ -442,7 +435,7 @@ Http::Request::Parser::parse(const char *input, size_t) {
   offset += req_line_res.value().second;
   
   // Parse headers
-  Result<std::pair<std::map<std::string, Json>, size_t> > headers_res = 
+  Result<std::pair<std::map<std::string, std::string>, size_t> > headers_res = 
       parse_headers(input, offset);
   if (!headers_res.error().empty()) {
     return ERR_PAIR(Http::Request, size_t, headers_res.error());
