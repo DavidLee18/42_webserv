@@ -11,14 +11,14 @@ enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
 
 struct RouteRule {
   HttpMethod method; // GET | POST | DELETE 등
-  std::vector<std::string> path; // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
+  Pathpattern path; // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
   int status_code;  // 상태코드
 
   RuleOperator op;
   std::string redirectTarget;
 
   // 정적 파일 전용
-  std::vector<std::string> root;                      // "/spool/www"
+  Pathpattern root;                      // "/spool/www"
   std::string index;                     // "index2.html" (있으면)
   std::string authInfo;                  // "@auth_info"에서 추출
   long maxBodyMB;                     // "< 10MB" → 10 * 1024 * 1024
@@ -46,6 +46,7 @@ private:
     return (true);
   }
 public:
+  Pathpattern() {};
   Pathpattern(std::vector<std::string> path) { this->path = path; };
   ~Pathpattern() {};
 

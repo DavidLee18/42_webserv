@@ -168,8 +168,11 @@ static std::vector<std::string> get_pattern(std::string line)
 {
   std::vector<std::string> temp = string_split(line, "*");
   std::string pattern = temp[temp.size() - 1];
+  size_t l = pattern.find('(');
+  size_t r = pattern.find(')', l == std::string::npos ? 0 : l + 1);
 
-  pattern.substr(1, s.length() - 2);
+  if (l != std::string::npos && r != std::string::npos && r > l)
+    pattern = pattern.substr(l + 1, r - l - 1);
   temp = string_split(pattern, "|");
   // for (size_t i = 0; i < temp.size(); ++i)
   // {
@@ -178,21 +181,30 @@ static std::vector<std::string> get_pattern(std::string line)
   return (temp);
 }
 
-static std::vector<std::vector<std::string>> make_paths_from_url_pattern(std::vector<std::vector<std::string>> paths, std::vector<std::string> pattern, int index)
+static std::vector<std::vector<std::string>> make_paths_from_url_pattern \
+(std::vector<std::vector<std::string>> paths, \
+ std::vector<std::string> pattern, int index)
 {
-  std::vector<std::vector<std::string>> new_paths(paths);
+  std::vector<std::vector<std::string>> new_paths;
+  std::string seg = paths[0][index];
+  std::string prefix = "";
+  std::string suffix = "";
+  
+  new_paths.reserve(paths.size() * pattern.size());
+  size_t pos = seg.find('(');
+  prefix = seg.substr(0, pos);
+  pos = seg.find(')', pos + 1);
+  if (pos != std::string::npos && pos + 1 < seg.size())
+    suffix = seg.substr(pos + 1);
 
-  if (paths.size() != pattern.size()) // pattern의 수 만큼 path을 생성
+  for (size_t i = 0; i < paths.size(); ++i)
   {
-    for (size_t i = paths.size(); i < pattern.size(); ++i)
-      new_paths.push_back(new_paths[0]);
-  }
-  for (size_t i = 0; i < new_paths.size(); ++i)
-  {
-    std::vector<std::string> temp = string_split(new_paths[i][index], "*");
-    new_paths[i][index] = "*" + pattern[i];
-    if (temp.size() > 1) 
-      new_paths[i][index] = temp[0] + new_paths[i][index];
+    for (size_t j = 0; j < pattern.size(); ++j)
+    {
+      std::vector<std::string> new_path = paths[i];
+      new_path[index] = prefix + pattern[j] + suffix;
+      new_paths.push_back(new_path);
+    }
   }
   return (new_paths);
 }
@@ -208,7 +220,7 @@ static std::vector<std::vector<std::string>> expand_url_pattern(std::string line
     if (is_pattern(path[i])) // path[i] = *.(jpg|jpeg|gif) 이때 참
     {
       std::vector<std::string> pattern = get_pattern(path[i]); // jpg, jpeg, gif 등등 담은 백터
-      paths = make_paths(paths, pattern, i);
+      paths = make_paths_from_url_pattern(paths, pattern, i);
       // /download/*.jpg, /download/*.jpeg, /download/*.gif이 3개 원소를 '/'으로 split한 백터
     }
     else
@@ -273,10 +285,11 @@ RuleOperator ServerConfig::parse_RuleOperator(std::string indicator)
 
 bool ServerConfig::parse_Httpmethod(std::vector<std::string> data, std::vector<HttpMethod> mets) {
   RouteRule route;
-  
+  std::vector<std::vector<std::string> > path_url;
+  // std::vector<std::vector<std::string> > root_url;
+
   if (data.size() != 4)
     return (false);
-  urlpattern(data);
   for (size_t i = 0; i < mets.size(); ++i)
   {
     route.method = mets[i];
@@ -284,9 +297,16 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data, std::vector<H
     route.index = "";
     route.authInfo = "";
     route.maxBodyMB = 1;
-    route.path = string_split(data[1], "/");
-    route.root = string_split(data[3], "/");
-    // routes[std::make_pair(route.method, route.path)] = route;
+    path_url = expand_url_pattern(data[1]);
+    // root_url = expand_url_pattern(data[3]);
+    // if (path_url.size() < 1 || root_url.size() < 1)
+      // return (false);
+    for (size_t i = 0; i < path_url.size(); ++i)
+    {
+      // route.path = path_url[i];
+      // route.root = root_url[i];
+      // routes[std::make_pair(route.method, route.path)] = route;
+    }
   }
   return (true);
 }
