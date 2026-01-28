@@ -130,7 +130,7 @@ public:
 
   class Request {
     Method _method;
-    std::map<std::string, Json> _headers;
+    std::map<std::string, std::string> _headers;
     std::string _path;
     Body _body;
 
@@ -142,8 +142,8 @@ public:
       static Result<std::pair<Method, size_t> > parse_method(const char *, size_t);
       static Result<std::pair<std::string, size_t> > parse_path(const char *, size_t);
       static Result<std::pair<std::string, size_t> > parse_http_version(const char *, size_t);
-      static Result<std::pair<std::map<std::string, Json>, size_t> > parse_headers(const char *, size_t);
-      static Result<std::pair<Body, size_t> > parse_body(const char *, size_t, std::map<std::string, Json> const &);
+      static Result<std::pair<std::map<std::string, std::string>, size_t> > parse_headers(const char *, size_t);
+      static Result<std::pair<Body, size_t> > parse_body(const char *, size_t, std::map<std::string, std::string> const &);
 
     public:
       static Result<std::pair<Request, size_t> > parse(const char *, size_t);
@@ -166,7 +166,7 @@ public:
       return *this;
     }
     const Method &method() const { return _method; }
-    const std::map<std::string, Json> &headers() const { return _headers; }
+    const std::map<std::string, std::string> &headers() const { return _headers; }
     const std::string &path() const { return _path; }
     const Body &body() const { return _body; }
     static Result<std::pair<Request *, size_t> > parse(const char *, char);
@@ -174,11 +174,11 @@ public:
 
   class Response {
     int _status_code;
-    std::map<std::string, Json> _headers;
+    std::map<std::string, std::string> _headers;
     Body _body;
 
   public:
-    Response(int status, std::map<std::string, Json> headers, Body b)
+    Response(int status, std::map<std::string, std::string> headers, Body b)
         : _status_code(status), _headers(headers), _body(b) {}
     Response(const Response &other)
         : _status_code(other._status_code), _headers(other._headers), 
@@ -193,11 +193,11 @@ public:
     }
     
     const int &status_code() const { return _status_code; }
-    const std::map<std::string, Json> &headers() const { return _headers; }
+    const std::map<std::string, std::string> &headers() const { return _headers; }
     const Body &body() const { return _body; }
     
-    std::map<std::string, Json> &headers_mut() { return _headers; }
-    void set_header(const std::string &name, const Json &value) {
+    std::map<std::string, std::string> &headers_mut() { return _headers; }
+    void set_header(const std::string &name, const std::string &value) {
       _headers[name] = value;
     }
   };
