@@ -13,31 +13,24 @@ int main(const int argc, char *argv[]) {
   std::cout << js << std::endl;
   WebserverConfig config(argv[1]);
   return 0;
-  // std::string config_path(argv[1]);
-  // signal(SIGINT, wrap_up);
+  signal(SIGINT, wrap_up);
 #ifdef __APPLE__
   KQueue k_queue(1000);
 #else
-  // EPoll *ep;
-  // Result<EPoll> rep = EPoll::create(1000);
-  // if (rep.err != NULL) {
-  //   std::cerr << rep.err << std::endl;
-  //   return 1;
-  // }
-  // ep = rep.val;
-  // // add the events
-  // Result<Events> w;
-  // while (sig == 0) {
-  //   std::cout << "Hello, World!" << std::endl;
-  //   w = ep->wait(100);
-  //   PANIC(w)
-  //   for (Events evs = *w.val; !evs.is_end(); ++evs) {
-  //     Result<const Event *> re = *evs;
-  //     PANIC(re)
-  //     const Event **ev = re.val;
-  //     // process events
-  //   }
-  // }
+  Result<EPoll> rep = EPoll::create(1000);
+  PANIC(rep)
+  EPoll ep = rep.value();
+  while (sig == 0) {
+    std::cout << "Hello, World!" << std::endl;
+    Result<Events> w = ep.wait(100);
+    PANIC(w)
+    for (Events evs = w.value(); !evs.is_end(); ++evs) {
+      Result<const Event *> re = *evs;
+      PANIC(re)
+      const Event *const ev = re.value();
+      // process events
+    }
+  }
 #endif
   return 0;
 }
