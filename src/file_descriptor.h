@@ -43,8 +43,12 @@ public:
   Result<ssize_t> sock_recv(void *buf, size_t size);
 
   Result<Http::PartialString> try_read_to_end();
-
-  int get_fd() const { return _fd; }
+  
+  Result<Void> set_nonblocking();
+  
+  Result<Void> set_socket_option(int level, int optname, const void *optval, socklen_t optlen);
+  
+  Result<ssize_t> sock_send(const void *buf, size_t size);
 
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {

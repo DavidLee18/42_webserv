@@ -225,8 +225,8 @@ public:
   Result<Events> wait(const int timeout_ms);
   Result<const FileDescriptor *> add_fd(FileDescriptor, const Event &,
                                         const Option &);
-  Result<Void> modify_fd(const FileDescriptor &, const Event &, const Option &);
-  Result<Void> del_fd(const FileDescriptor &);
+  Result<Void> modify_fd(FileDescriptor &, const Event &, const Option &);
+  Result<Void> del_fd(FileDescriptor &);
 };
 
 #endif // __APPLE__

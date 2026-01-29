@@ -4,23 +4,23 @@ volatile sig_atomic_t sig = 0;
 
 // Structure to hold client connection state
 struct ClientConnection {
-  int fd_value;  // Just store the fd value, not the FileDescriptor
+  intptr_t fd_key;  // Pointer-based key for tracking
   std::string read_buffer;
   std::string write_buffer;
   bool request_complete;
   
-  explicit ClientConnection(int client_fd) 
-    : fd_value(client_fd), read_buffer(), write_buffer(), request_complete(false) {}
+  explicit ClientConnection(intptr_t key) 
+    : fd_key(key), read_buffer(), write_buffer(), request_complete(false) {}
   
   // Copy constructor
   ClientConnection(const ClientConnection &other)
-    : fd_value(other.fd_value), read_buffer(other.read_buffer), write_buffer(other.write_buffer),
+    : fd_key(other.fd_key), read_buffer(other.read_buffer), write_buffer(other.write_buffer),
       request_complete(other.request_complete) {}
   
   // Assignment operator
   ClientConnection& operator=(const ClientConnection &other) {
     if (this != &other) {
-      fd_value = other.fd_value;
+      fd_key = other.fd_key;
       read_buffer = other.read_buffer;
       write_buffer = other.write_buffer;
       request_complete = other.request_complete;
@@ -73,7 +73,7 @@ int main(const int argc, char *argv[]) {
   
   // For now, bind to a single port (8080) for testing
   // TODO: Extract ports from config
-  std::vector<const FileDescriptor *> listen_sockets;  // Pointers to listen sockets in EPoll
+  std::vector<FileDescriptor *> listen_sockets;  // Pointers to listen sockets in EPoll
   std::vector<unsigned short> ports;
   ports.push_back(8080);
   
@@ -86,19 +86,20 @@ int main(const int argc, char *argv[]) {
       return 1;
     }
     FileDescriptor sock = rsock.value();
-    std::cout << "Socket created, fd=" << sock.get_fd() << std::endl;
+    std::cout << "Socket created" << std::endl;
     
     // Set socket to non-blocking mode
-    int flags = fcntl(sock.get_fd(), F_GETFL, 0);
-    if (flags < 0 || fcntl(sock.get_fd(), F_SETFL, flags | O_NONBLOCK) < 0) {
-      std::cerr << "Failed to set socket non-blocking" << std::endl;
+    Result<Void> rnonblock = sock.set_nonblocking();
+    if (!rnonblock.error().empty()) {
+      std::cerr << "Failed to set socket non-blocking: " << rnonblock.error() << std::endl;
       return 1;
     }
     
     // Enable SO_REUSEADDR
     int opt = 1;
-    if (setsockopt(sock.get_fd(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-      std::cerr << "Failed to set SO_REUSEADDR" << std::endl;
+    Result<Void> rsockopt = sock.set_socket_option(SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if (!rsockopt.error().empty()) {
+      std::cerr << "Failed to set SO_REUSEADDR: " << rsockopt.error() << std::endl;
       return 1;
     }
     
@@ -134,12 +135,13 @@ int main(const int argc, char *argv[]) {
     std::cout << "Socket added to epoll" << std::endl;
     
     // Store pointer to the socket (which is now in EPoll's _events vector)
-    listen_sockets.push_back(radd.value());
+    // Cast away const since we'll need to call non-const methods later
+    listen_sockets.push_back(const_cast<FileDescriptor *>(radd.value()));
     std::cout << "Listening on port " << ports[i] << std::endl;
   }
   
-  // Map to track client connections by file descriptor value
-  std::map<int, ClientConnection *> clients;
+  // Map to track client connections by pointer value
+  std::map<intptr_t, ClientConnection *> clients;
   
   // Main event loop
   std::cout << "Server started. Press Ctrl+C to stop." << std::endl;
@@ -162,8 +164,7 @@ int main(const int argc, char *argv[]) {
           while (true) {
             struct sockaddr_in client_addr;
             socklen_t client_len = sizeof(client_addr);
-            FileDescriptor *listen_sock = const_cast<FileDescriptor *>(listen_sockets[i]);
-            Result<FileDescriptor> rclient = listen_sock->socket_accept(
+            Result<FileDescriptor> rclient = listen_sockets[i]->socket_accept(
               reinterpret_cast<struct sockaddr *>(&client_addr), &client_len);
             
             if (!rclient.error().empty()) {
@@ -174,12 +175,11 @@ int main(const int argc, char *argv[]) {
             }
             
             FileDescriptor client_fd = rclient.value();
-            int client_fd_val = client_fd.get_fd();  // Get fd value before moving
             
             // Set client socket to non-blocking
-            int flags = fcntl(client_fd_val, F_GETFL, 0);
-            if (flags < 0 || fcntl(client_fd_val, F_SETFL, flags | O_NONBLOCK) < 0) {
-              std::cerr << "Failed to set client socket non-blocking" << std::endl;
+            Result<Void> rnonblock = client_fd.set_nonblocking();
+            if (!rnonblock.error().empty()) {
+              std::cerr << "Failed to set client socket non-blocking: " << rnonblock.error() << std::endl;
               continue;
             }
             
@@ -192,10 +192,13 @@ int main(const int argc, char *argv[]) {
               continue;
             }
             
-            // Create and store client connection
+            // Get pointer to the client FileDescriptor in EPoll's vector
+            // Cast away const since we'll need to call non-const methods later
+            FileDescriptor *client_fdptr = const_cast<FileDescriptor *>(radd_client.value());
+            intptr_t client_fd_val = reinterpret_cast<intptr_t>(client_fdptr);  // Use pointer as key
             clients[client_fd_val] = new ClientConnection(client_fd_val);
             
-            std::cout << "Accepted new client connection (fd=" << client_fd_val << ")" << std::endl;
+            std::cout << "Accepted new client connection" << std::endl;
           }
           break;
         }
@@ -203,8 +206,8 @@ int main(const int argc, char *argv[]) {
       
       if (!is_listen_socket && ev->fd) {
         // Handle client socket events
-        int client_fd_val = ev->fd->get_fd();
-        std::map<int, ClientConnection *>::iterator it = clients.find(client_fd_val);
+        intptr_t client_fd_val = reinterpret_cast<intptr_t>(ev->fd);  // Use pointer as key
+        std::map<intptr_t, ClientConnection *>::iterator it = clients.find(client_fd_val);
         
         if (it != clients.end()) {
           ClientConnection *client = it->second;
@@ -235,7 +238,7 @@ int main(const int argc, char *argv[]) {
                 client->read_buffer.append(buffer, static_cast<size_t>(bytes_read));
               } else if (bytes_read == 0) {
                 // Client closed connection
-                std::cout << "Client disconnected (fd=" << client_fd_val << ")" << std::endl;
+                std::cout << "Client disconnected" << std::endl;
                 client_closed = true;
                 break;
               }
@@ -284,32 +287,35 @@ int main(const int argc, char *argv[]) {
           
           // Handle write event
           if (!client_deleted && ev->out && !client->write_buffer.empty()) {
-            ssize_t bytes_sent = send(client->fd_value, client->write_buffer.c_str(), 
-                                     client->write_buffer.length(), 0);
+            Result<ssize_t> rsend = client_fdptr->sock_send(
+              client->write_buffer.c_str(), client->write_buffer.length());
             
-            if (bytes_sent > 0) {
-              client->write_buffer.erase(0, static_cast<size_t>(bytes_sent));
-              
-              if (client->write_buffer.empty()) {
-                // Response sent completely, close connection
-                std::cout << "Response sent, closing connection (fd=" << client_fd_val << ")" << std::endl;
-                ep.del_fd(*client_fdptr);
-                delete client;
-                clients.erase(it);
-                client_deleted = true;
-              }
-            } else if (bytes_sent < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-              std::cerr << "Send error" << std::endl;
+            if (!rsend.error().empty()) {
+              std::cerr << "Send error: " << rsend.error() << std::endl;
               ep.del_fd(*client_fdptr);
               delete client;
               clients.erase(it);
               client_deleted = true;
+            } else {
+              ssize_t bytes_sent = rsend.value();
+              if (bytes_sent > 0) {
+                client->write_buffer.erase(0, static_cast<size_t>(bytes_sent));
+                
+                if (client->write_buffer.empty()) {
+                  // Response sent completely, close connection
+                  std::cout << "Response sent, closing connection" << std::endl;
+                  ep.del_fd(*client_fdptr);
+                  delete client;
+                  clients.erase(it);
+                  client_deleted = true;
+                }
+              }
             }
           }
           
           // Handle errors
           if (!client_deleted && (ev->err || ev->hup)) {
-            std::cout << "Client error or hangup (fd=" << client_fd_val << ")" << std::endl;
+            std::cout << "Client error or hangup" << std::endl;
             ep.del_fd(*client_fdptr);
             delete client;
             clients.erase(it);
@@ -323,7 +329,7 @@ int main(const int argc, char *argv[]) {
   }
   
   // Clean up remaining clients
-  for (std::map<int, ClientConnection *>::iterator it = clients.begin(); 
+  for (std::map<intptr_t, ClientConnection *>::iterator it = clients.begin(); 
        it != clients.end(); ++it) {
     delete it->second;
   }

@@ -88,6 +88,7 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   }
   EPoll ep;
   ep._size = sz;
+  ep._events.reserve(sz);  // Reserve space to avoid reallocation
   Result<FileDescriptor> rfdesc = FileDescriptor::from_raw(fd);
   if (!rfdesc.error().empty()) {
     return ERR(EPoll, rfdesc.error());
@@ -148,7 +149,7 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   return OK(const FileDescriptor *, fd_in);
 }
 
-Result<Void> EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,
+Result<Void> EPoll::modify_fd(FileDescriptor &fd, const Event &ev,
                               const Option &op) {
   epoll_event event = {};
   if (ev.in)
@@ -189,7 +190,7 @@ Result<Void> EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,
   return OKV;
 }
 
-Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
+Result<Void> EPoll::del_fd(FileDescriptor &fd) {
   epoll_event event = {};
   event.data.fd = fd._fd;
   if (epoll_ctl(_fd._fd, EPOLL_CTL_DEL, fd._fd, &event) == -1) {
