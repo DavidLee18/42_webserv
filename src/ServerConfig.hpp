@@ -10,7 +10,7 @@ enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
 struct RouteRule {
   RouteType type;
 
-  std::vector<HttpMethod> methods; // GET | POST | DELETE 등
+  std::vector<Http::Method> methods; // GET | POST | DELETE 등
   std::string urlPattern;          // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
 
   // 리다이렉트 전용

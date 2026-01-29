@@ -2,6 +2,7 @@
 #define FILE_DESCRIPTOR_H
 
 // #include "http_1_1.h"
+#include "http_1_1.h"
 #include "result.h"
 #include <sys/socket.h>
 
@@ -13,7 +14,6 @@ class Option;
 #endif
 
 class Event;
-class PartialString;
 
 class FileDescriptor {
   int _fd;
@@ -26,9 +26,11 @@ public:
 
   static Result<FileDescriptor> socket_new();
 
-  static Result<FileDescriptor> move_from(FileDescriptor);
+  // Move-like copy constructor: transfers ownership from other
+  FileDescriptor(const FileDescriptor &other);
 
-  Result<Void> operator=(FileDescriptor);
+  // Move-like assignment operator: transfers ownership from other
+  FileDescriptor& operator=(const FileDescriptor &other);
 
   ~FileDescriptor();
 
@@ -40,7 +42,13 @@ public:
 
   Result<ssize_t> sock_recv(void *buf, size_t size);
 
-  Result<PartialString> try_read_to_end();
+  Result<Http::PartialString> try_read_to_end();
+  
+  Result<Void> set_nonblocking();
+  
+  Result<Void> set_socket_option(int level, int optname, const void *optval, socklen_t optlen);
+  
+  Result<ssize_t> sock_send(const void *buf, size_t size);
 
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {

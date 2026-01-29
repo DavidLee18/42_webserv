@@ -19,36 +19,39 @@ Result<FileDescriptor> FileDescriptor::socket_new() {
       return ERR(FileDescriptor, Errors::out_of_mem);
     }
   }
-  FileDescriptor *fd = new FileDescriptor();
-  fd->set_fd(sock);
+  FileDescriptor fd;
+  fd.set_fd(sock);
   return OK(FileDescriptor, fd);
 }
 
 Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
   if (raw_fd < 0)
     return ERR(FileDescriptor, Errors::invalid_fd);
-  FileDescriptor *fd = new FileDescriptor();
-  fd->set_fd(raw_fd);
+  FileDescriptor fd;
+  fd.set_fd(raw_fd);
   return OK(FileDescriptor, fd);
 }
 
-Result<FileDescriptor> FileDescriptor::move_from(FileDescriptor other) {
-  if (other._fd < 0)
-    return ERR(FileDescriptor, Errors::invalid_fd);
-  FileDescriptor *fd = new FileDescriptor();
-  fd->set_fd(other._fd);
-  other._fd = -1;
-  return OK(FileDescriptor, fd);
+// Move-like copy constructor: transfers ownership from other
+FileDescriptor::FileDescriptor(const FileDescriptor &other) {
+  _fd = other._fd;
+  // Invalidate source to transfer ownership (cast away const for move semantics)
+  const_cast<FileDescriptor&>(other)._fd = -1;
 }
 
-Result<Void> FileDescriptor::operator=(FileDescriptor other) {
+// Move-like assignment operator: transfers ownership from other
+FileDescriptor& FileDescriptor::operator=(const FileDescriptor &other) {
   if (this != &other) {
-    if (_fd < 0)
-      return ERR(Void, Errors::invalid_fd);
+    // Close current fd if valid
+    if (_fd >= 0)
+      close(_fd);
+    
+    // Transfer ownership
     _fd = other._fd;
-    other._fd = -1;
+    // Invalidate source (cast away const for move semantics)
+    const_cast<FileDescriptor&>(other)._fd = -1;
   }
-  return OKV;
+  return *this;
 }
 
 FileDescriptor::~FileDescriptor() {
@@ -113,8 +116,8 @@ Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
                                                      socklen_t *len) {
   int fd = accept(_fd, addr, len);
   if (fd >= 0) {
-    FileDescriptor *fd_ = new FileDescriptor();
-    fd_->set_fd(fd);
+    FileDescriptor fd_;
+    fd_.set_fd(fd);
     return OK(FileDescriptor, fd_);
   }
   switch (errno) {
@@ -153,33 +156,61 @@ Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) {
   ssize_t res = recv(_fd, buf, size, 0);
   if (res < 0)
     return ERR(ssize_t, "`recv` failed");
-  ssize_t *r = new ssize_t(res);
-  return OK(ssize_t, r);
+  return OK(ssize_t, res);
 }
 
-Result<PartialString> FileDescriptor::try_read_to_end() {
+Result<Http::PartialString> FileDescriptor::try_read_to_end() {
   std::stringstream ss;
   char buf[BUFFER_SIZE];
 
   Result<ssize_t> bytes = this->sock_recv(buf, BUFFER_SIZE);
-  while (bytes.error().empty() && *bytes.value() > 0) {
-    ssize_t *bs;
-    TRY(PartialString, ssize_t, bs, bytes)
-    char *s = new char[*bs + 1];
-    s = std::strncpy(s, buf, *bs + 1);
+  while (bytes.error().empty() && bytes.value() > 0) {
+    ssize_t bs;
+    TRY(Http::PartialString, ssize_t, bs, bytes)
+    char *s = new char[static_cast<size_t>(bs + 1)];
+    s = std::strncpy(s, buf, static_cast<size_t>(bs + 1));
     if (!(ss << s))
-      return ERR(PartialString, "string concat failed");
+      return ERR(Http::PartialString, "string concat failed");
     delete[] s;
     bytes = this->sock_recv(buf, BUFFER_SIZE);
   }
   if (!bytes.error().empty())
-    return ERR(PartialString, bytes.error());
+    return ERR(Http::PartialString, bytes.error());
   char *s = new char[ss.str().length()];
   s = std::strcpy(s, ss.str().c_str());
-  if (*bytes.value() == 0) {
-    return OK(PartialString, PartialString::full(s));
+  if (bytes.value() == 0) {
+    return OK(Http::PartialString, Http::PartialString::full(s));
   }
-  return OK(PartialString, PartialString::partial(s));
+  return OK(Http::PartialString, Http::PartialString::partial(s));
+}
+
+Result<Void> FileDescriptor::set_nonblocking() {
+  int flags = fcntl(_fd, F_GETFL, 0);
+  if (flags < 0) {
+    return ERR(Void, "Failed to get file descriptor flags");
+  }
+  if (fcntl(_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+    return ERR(Void, "Failed to set non-blocking mode");
+  }
+  return OKV;
+}
+
+Result<Void> FileDescriptor::set_socket_option(int level, int optname, const void *optval, socklen_t optlen) {
+  if (setsockopt(_fd, level, optname, optval, optlen) < 0) {
+    return ERR(Void, "Failed to set socket option");
+  }
+  return OKV;
+}
+
+Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) {
+  ssize_t res = send(_fd, buf, size, 0);
+  if (res < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      return OK(ssize_t, 0);  // Return 0 for would block
+    }
+    return ERR(ssize_t, "send failed");
+  }
+  return OK(ssize_t, res);
 }
 
 bool operator==(const int &lhs, const FileDescriptor &rhs) {

@@ -21,7 +21,7 @@ bool is_have_special(const std::string &line, const std::string &allowed) {
     unsigned char c = static_cast<unsigned char>(line[i]);
     if (std::isalnum(c))
       continue;
-    if (allowed.find(c) != std::string::npos)
+    if (allowed.find(static_cast<char>(c)) != std::string::npos)
       continue;
     return (true);
   }
@@ -47,8 +47,8 @@ std::string trim_space(const std::string &s) {
 }
 
 bool is_tab_or_space(std::string line, int num) {
-  int len = 0;
-  int i = 0;
+  size_t len = 0;
+  size_t i = 0;
 
   if (line.empty())
     return (num == 0);
@@ -59,7 +59,7 @@ bool is_tab_or_space(std::string line, int num) {
       len += 4;
     i++;
   }
-  return (len == num * 4);
+  return (len == static_cast<size_t>(num * 4));
 }
 
 std::vector<std::string> string_split(const std::string &line,
