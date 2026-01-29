@@ -72,9 +72,11 @@ Result<const Event *> Events::operator*() const {
 }
 
 Result<EPoll> EPoll::create(unsigned short sz) {
+  std::cerr << "DEBUG: EPoll::create called" << std::endl;
   int fd = epoll_create(static_cast<int>(sz));
+  std::cerr << "DEBUG: epoll_create returned fd=" << fd << std::endl;
   if (fd < 0) {
-    switch (fd) {
+    switch (errno) {
     case EINVAL:
       return ERR(EPoll, "the epoll size is zero");
     case EMFILE:
@@ -88,14 +90,19 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   }
   EPoll ep;
   ep._size = sz;
-  FileDescriptor fdesc;
-  TRY(EPoll, FileDescriptor, fdesc, FileDescriptor::from_raw(fd))
+  Result<FileDescriptor> rfdesc = FileDescriptor::from_raw(fd);
+  if (!rfdesc.error().empty()) {
+    return ERR(EPoll, rfdesc.error());
+  }
+  FileDescriptor fdesc = rfdesc.value();
   ep._fd = fdesc;
+  std::cerr << "DEBUG: EPoll::create returning, ep._fd._fd=" << ep._fd._fd << std::endl;
   return OK(EPoll, ep);
 }
 
 Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
                                              const Option &op) {
+  std::cerr << "DEBUG: EPoll::add_fd called, _fd._fd=" << _fd._fd << ", fd._fd=" << fd._fd << std::endl;
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -118,7 +125,9 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   if (op.exclusive)
     event.events |= EPOLLEXCLUSIVE;
   event.data.fd = fd._fd;
+  std::cerr << "DEBUG: epoll_ctl with epoll_fd=" << _fd._fd << ", target_fd=" << fd._fd << std::endl;
   if (epoll_ctl(_fd._fd, EPOLL_CTL_ADD, fd._fd, &event) == -1) {
+    std::cerr << "DEBUG: epoll_ctl failed with errno=" << errno << " (" << strerror(errno) << ")" << std::endl;
     switch (errno) {
     case EEXIST:
       return ERR(const FileDescriptor *,
@@ -139,14 +148,10 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
     }
   }
   _events.push_back(fd);
-
-  for (size_t i = 0; i < _events.size(); i++) {
-    if (fd == _events.at(i)) {
-      const FileDescriptor *fd_in = &_events.at(i);
-      return OK(const FileDescriptor *, fd_in);
-    }
-  }
-  return ERR(const FileDescriptor *, Errors::not_found);
+  
+  // Return pointer to the FileDescriptor in the vector (last element just added)
+  const FileDescriptor *fd_in = &_events.at(_events.size() - 1);
+  return OK(const FileDescriptor *, fd_in);
 }
 
 Result<Void> EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,

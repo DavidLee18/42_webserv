@@ -44,6 +44,8 @@ public:
 
   Result<Http::PartialString> try_read_to_end();
 
+  int get_fd() const { return _fd; }
+
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {
     return _fd == other._fd;

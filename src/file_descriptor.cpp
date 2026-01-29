@@ -41,22 +41,28 @@ FileDescriptor::FileDescriptor(const FileDescriptor &other) {
 
 // Move-like assignment operator: transfers ownership from other
 FileDescriptor& FileDescriptor::operator=(const FileDescriptor &other) {
+  std::cerr << "DEBUG: FileDescriptor::operator= called, this->_fd=" << _fd << ", other._fd=" << other._fd << std::endl;
   if (this != &other) {
     // Close current fd if valid
-    if (_fd >= 0)
+    if (_fd >= 0) {
+      std::cerr << "DEBUG: FileDescriptor::operator= closing this->_fd=" << _fd << std::endl;
       close(_fd);
+    }
     
     // Transfer ownership
     _fd = other._fd;
     // Invalidate source (cast away const for move semantics)
     const_cast<FileDescriptor&>(other)._fd = -1;
+    std::cerr << "DEBUG: FileDescriptor::operator= done, this->_fd=" << _fd << ", other._fd=" << other._fd << std::endl;
   }
   return *this;
 }
 
 FileDescriptor::~FileDescriptor() {
-  if (_fd >= 0)
+  if (_fd >= 0) {
+    std::cerr << "DEBUG: Closing FileDescriptor with fd=" << _fd << std::endl;
     close(_fd);
+  }
 }
 
 Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
