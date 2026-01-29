@@ -72,9 +72,7 @@ Result<const Event *> Events::operator*() const {
 }
 
 Result<EPoll> EPoll::create(unsigned short sz) {
-  std::cerr << "DEBUG: EPoll::create called" << std::endl;
   int fd = epoll_create(static_cast<int>(sz));
-  std::cerr << "DEBUG: epoll_create returned fd=" << fd << std::endl;
   if (fd < 0) {
     switch (errno) {
     case EINVAL:
@@ -96,13 +94,11 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   }
   FileDescriptor fdesc = rfdesc.value();
   ep._fd = fdesc;
-  std::cerr << "DEBUG: EPoll::create returning, ep._fd._fd=" << ep._fd._fd << std::endl;
   return OK(EPoll, ep);
 }
 
 Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
                                              const Option &op) {
-  std::cerr << "DEBUG: EPoll::add_fd called, _fd._fd=" << _fd._fd << ", fd._fd=" << fd._fd << std::endl;
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -125,9 +121,7 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   if (op.exclusive)
     event.events |= EPOLLEXCLUSIVE;
   event.data.fd = fd._fd;
-  std::cerr << "DEBUG: epoll_ctl with epoll_fd=" << _fd._fd << ", target_fd=" << fd._fd << std::endl;
   if (epoll_ctl(_fd._fd, EPOLL_CTL_ADD, fd._fd, &event) == -1) {
-    std::cerr << "DEBUG: epoll_ctl failed with errno=" << errno << " (" << strerror(errno) << ")" << std::endl;
     switch (errno) {
     case EEXIST:
       return ERR(const FileDescriptor *,

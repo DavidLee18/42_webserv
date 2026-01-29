@@ -4,23 +4,23 @@ volatile sig_atomic_t sig = 0;
 
 // Structure to hold client connection state
 struct ClientConnection {
-  FileDescriptor fd;
+  int fd_value;  // Just store the fd value, not the FileDescriptor
   std::string read_buffer;
   std::string write_buffer;
   bool request_complete;
   
-  explicit ClientConnection(FileDescriptor client_fd) 
-    : fd(client_fd), read_buffer(), write_buffer(), request_complete(false) {}
+  explicit ClientConnection(int client_fd) 
+    : fd_value(client_fd), read_buffer(), write_buffer(), request_complete(false) {}
   
   // Copy constructor
   ClientConnection(const ClientConnection &other)
-    : fd(other.fd), read_buffer(other.read_buffer), write_buffer(other.write_buffer),
+    : fd_value(other.fd_value), read_buffer(other.read_buffer), write_buffer(other.write_buffer),
       request_complete(other.request_complete) {}
   
   // Assignment operator
   ClientConnection& operator=(const ClientConnection &other) {
     if (this != &other) {
-      fd = other.fd;
+      fd_value = other.fd_value;
       read_buffer = other.read_buffer;
       write_buffer = other.write_buffer;
       request_complete = other.request_complete;
@@ -73,7 +73,7 @@ int main(const int argc, char *argv[]) {
   
   // For now, bind to a single port (8080) for testing
   // TODO: Extract ports from config
-  std::vector<FileDescriptor> listen_sockets;
+  std::vector<const FileDescriptor *> listen_sockets;  // Pointers to listen sockets in EPoll
   std::vector<unsigned short> ports;
   ports.push_back(8080);
   
@@ -133,8 +133,8 @@ int main(const int argc, char *argv[]) {
     }
     std::cout << "Socket added to epoll" << std::endl;
     
-    // Store the socket
-    listen_sockets.push_back(sock);
+    // Store pointer to the socket (which is now in EPoll's _events vector)
+    listen_sockets.push_back(radd.value());
     std::cout << "Listening on port " << ports[i] << std::endl;
   }
   
@@ -155,45 +155,48 @@ int main(const int argc, char *argv[]) {
       // Check if this is a listening socket
       bool is_listen_socket = false;
       for (size_t i = 0; i < listen_sockets.size(); ++i) {
-        if (ev->fd && *ev->fd == listen_sockets[i]) {
+        if (ev->fd && ev->fd == listen_sockets[i]) {
           is_listen_socket = true;
           
-          // Accept new client connection
-          struct sockaddr_in client_addr;
-          socklen_t client_len = sizeof(client_addr);
-          Result<FileDescriptor> rclient = listen_sockets[i].socket_accept(
-            reinterpret_cast<struct sockaddr *>(&client_addr), &client_len);
-          
-          if (!rclient.error().empty()) {
-            if (rclient.error() != Errors::try_again) {
-              std::cerr << "Accept failed: " << rclient.error() << std::endl;
+          // Accept all pending connections (edge-triggered mode)
+          while (true) {
+            struct sockaddr_in client_addr;
+            socklen_t client_len = sizeof(client_addr);
+            FileDescriptor *listen_sock = const_cast<FileDescriptor *>(listen_sockets[i]);
+            Result<FileDescriptor> rclient = listen_sock->socket_accept(
+              reinterpret_cast<struct sockaddr *>(&client_addr), &client_len);
+            
+            if (!rclient.error().empty()) {
+              if (rclient.error() != Errors::try_again) {
+                std::cerr << "Accept failed: " << rclient.error() << std::endl;
+              }
+              break;
             }
-            break;
+            
+            FileDescriptor client_fd = rclient.value();
+            int client_fd_val = client_fd.get_fd();  // Get fd value before moving
+            
+            // Set client socket to non-blocking
+            int flags = fcntl(client_fd_val, F_GETFL, 0);
+            if (flags < 0 || fcntl(client_fd_val, F_SETFL, flags | O_NONBLOCK) < 0) {
+              std::cerr << "Failed to set client socket non-blocking" << std::endl;
+              continue;
+            }
+            
+            // Add client to epoll
+            Event client_event(NULL, true, false, true, false, false, false);
+            Option client_opt(true, false, false, false);  // edge-triggered
+            Result<const FileDescriptor *> radd_client = ep.add_fd(client_fd, client_event, client_opt);
+            if (!radd_client.error().empty()) {
+              std::cerr << "Failed to add client to epoll: " << radd_client.error() << std::endl;
+              continue;
+            }
+            
+            // Create and store client connection
+            clients[client_fd_val] = new ClientConnection(client_fd_val);
+            
+            std::cout << "Accepted new client connection (fd=" << client_fd_val << ")" << std::endl;
           }
-          
-          FileDescriptor client_fd = rclient.value();
-          
-          // Set client socket to non-blocking
-          int flags = fcntl(client_fd.get_fd(), F_GETFL, 0);
-          if (flags < 0 || fcntl(client_fd.get_fd(), F_SETFL, flags | O_NONBLOCK) < 0) {
-            std::cerr << "Failed to set client socket non-blocking" << std::endl;
-            break;
-          }
-          
-          // Add client to epoll
-          Event client_event(NULL, true, false, true, false, false, false);
-          Option client_opt(true, false, false, false);  // edge-triggered
-          Result<const FileDescriptor *> radd_client = ep.add_fd(client_fd, client_event, client_opt);
-          if (!radd_client.error().empty()) {
-            std::cerr << "Failed to add client to epoll: " << radd_client.error() << std::endl;
-            break;
-          }
-          
-          // Store client connection
-          int client_fd_val = client_fd.get_fd();
-          clients[client_fd_val] = new ClientConnection(client_fd);
-          
-          std::cout << "Accepted new client connection (fd=" << client_fd_val << ")" << std::endl;
           break;
         }
       }
@@ -205,69 +208,83 @@ int main(const int argc, char *argv[]) {
         
         if (it != clients.end()) {
           ClientConnection *client = it->second;
+          FileDescriptor *client_fdptr = const_cast<FileDescriptor *>(ev->fd);
+          bool client_deleted = false;
           
           // Handle read event
           if (ev->in) {
-            char buffer[4096];
-            Result<ssize_t> rread = client->fd.sock_recv(buffer, sizeof(buffer) - 1);
+            bool client_closed = false;
+            bool read_error = false;
             
-            if (!rread.error().empty()) {
-              if (rread.error() != Errors::try_again) {
-                std::cerr << "Read error: " << rread.error() << std::endl;
-                ep.del_fd(client->fd);
-                delete client;
-                clients.erase(it);
+            // Read all available data (edge-triggered mode)
+            while (true) {
+              char buffer[4096];
+              Result<ssize_t> rread = client_fdptr->sock_recv(buffer, sizeof(buffer) - 1);
+              
+              if (!rread.error().empty()) {
+                if (rread.error() != Errors::try_again) {
+                  std::cerr << "Read error: " << rread.error() << std::endl;
+                  read_error = true;
+                }
+                break;
               }
-            } else {
+              
               ssize_t bytes_read = rread.value();
               if (bytes_read > 0) {
                 buffer[bytes_read] = '\0';
                 client->read_buffer.append(buffer, static_cast<size_t>(bytes_read));
-                
-                // Try to parse HTTP request
-                Result<std::pair<Http::Request, size_t> > rreq = 
-                  Http::Request::Parser::parse(client->read_buffer.c_str(), client->read_buffer.length());
-                
-                if (!rreq.error().empty()) {
-                  // Request not complete yet or parse error
-                  if (client->read_buffer.length() > 100000) {
-                    // Request too large
-                    std::cerr << "Request too large" << std::endl;
-                    ep.del_fd(client->fd);
-                    delete client;
-                    clients.erase(it);
-                  }
-                } else {
-                  // Request parsed successfully
-                  Http::Request request = rreq.value().first;
-                  client->request_complete = true;
-                  
-                  std::cout << "Received request: " << request.method() << " " << request.path() << std::endl;
-                  
-                  // Generate response
-                  client->write_buffer = generate_response(request);
-                  
-                  // Modify epoll to monitor for write readiness
-                  Event write_event(NULL, false, true, true, false, false, false);
-                  Option write_opt(true, false, false, false);
-                  Result<Void> rmod = ep.modify_fd(client->fd, write_event, write_opt);
-                  if (!rmod.error().empty()) {
-                    std::cerr << "Failed to modify epoll for writing: " << rmod.error() << std::endl;
-                  }
-                }
               } else if (bytes_read == 0) {
                 // Client closed connection
                 std::cout << "Client disconnected (fd=" << client_fd_val << ")" << std::endl;
-                ep.del_fd(client->fd);
-                delete client;
-                clients.erase(it);
+                client_closed = true;
+                break;
+              }
+            }
+            
+            if (client_closed || read_error) {
+              ep.del_fd(*client_fdptr);
+              delete client;
+              clients.erase(it);
+              client_deleted = true;
+            } else if (!client->read_buffer.empty()) {
+              // Try to parse HTTP request
+              Result<std::pair<Http::Request, size_t> > rreq = 
+                Http::Request::Parser::parse(client->read_buffer.c_str(), client->read_buffer.length());
+              
+              if (!rreq.error().empty()) {
+                // Request not complete yet or parse error
+                if (client->read_buffer.length() > 100000) {
+                  // Request too large
+                  std::cerr << "Request too large" << std::endl;
+                  ep.del_fd(*client_fdptr);
+                  delete client;
+                  clients.erase(it);
+                  client_deleted = true;
+                }
+              } else {
+                // Request parsed successfully
+                Http::Request request = rreq.value().first;
+                client->request_complete = true;
+                
+                std::cout << "Received request: " << request.method() << " " << request.path() << std::endl;
+                
+                // Generate response
+                client->write_buffer = generate_response(request);
+                
+                // Modify epoll to monitor for write readiness
+                Event write_event(NULL, false, true, true, false, false, false);
+                Option write_opt(true, false, false, false);
+                Result<Void> rmod = ep.modify_fd(*client_fdptr, write_event, write_opt);
+                if (!rmod.error().empty()) {
+                  std::cerr << "Failed to modify epoll for writing: " << rmod.error() << std::endl;
+                }
               }
             }
           }
           
           // Handle write event
-          if (ev->out && !client->write_buffer.empty()) {
-            ssize_t bytes_sent = send(client->fd.get_fd(), client->write_buffer.c_str(), 
+          if (!client_deleted && ev->out && !client->write_buffer.empty()) {
+            ssize_t bytes_sent = send(client->fd_value, client->write_buffer.c_str(), 
                                      client->write_buffer.length(), 0);
             
             if (bytes_sent > 0) {
@@ -276,22 +293,24 @@ int main(const int argc, char *argv[]) {
               if (client->write_buffer.empty()) {
                 // Response sent completely, close connection
                 std::cout << "Response sent, closing connection (fd=" << client_fd_val << ")" << std::endl;
-                ep.del_fd(client->fd);
+                ep.del_fd(*client_fdptr);
                 delete client;
                 clients.erase(it);
+                client_deleted = true;
               }
             } else if (bytes_sent < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
               std::cerr << "Send error" << std::endl;
-              ep.del_fd(client->fd);
+              ep.del_fd(*client_fdptr);
               delete client;
               clients.erase(it);
+              client_deleted = true;
             }
           }
           
           // Handle errors
-          if (ev->err || ev->hup) {
+          if (!client_deleted && (ev->err || ev->hup)) {
             std::cout << "Client error or hangup (fd=" << client_fd_val << ")" << std::endl;
-            ep.del_fd(client->fd);
+            ep.del_fd(*client_fdptr);
             delete client;
             clients.erase(it);
           }
