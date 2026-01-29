@@ -1,21 +1,13 @@
 #include "WebserverConfig.hpp"
 
-WebserverConfig::WebserverConfig(std::string config_file_name) {
-  if (config_file_name == "default.wbsrv") {
-    std::ifstream file(config_file_name.c_str());
-    if (!file.is_open()) {
-      std::cerr << "Error: Config file open err" << std::endl;
-      return;
-    }
-    if (!this->file_parsing(file)) {
-      std::cerr << "error while parsing the file." << std::endl;
-      return;
-    }
-    file.close();
-    std::cout << "Config file parsing succeeded." << std::endl;
+WebserverConfig::WebserverConfig(std::ifstream &file) {
+  is_success = false;
+  if (!this->file_parsing(file))
     return;
-  }
-  std::cerr << "Error: This is not a config file." << std::endl;
+  
+  file.close();
+  is_success = true;  
+  return;
 }
 
 bool WebserverConfig::file_parsing(std::ifstream &file) {
