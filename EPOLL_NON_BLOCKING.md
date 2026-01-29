@@ -67,12 +67,12 @@ while (true) {
 
 ### 1. Setting Non-Blocking Mode
 
-**Listening sockets** (main.cpp:92-96):
+**Listening sockets** (main.cpp:95):
 ```cpp
 Result<Void> rnonblock = sock.set_nonblocking();
 ```
 
-**Client sockets** (main.cpp:180-184):
+**Client sockets** (main.cpp:189):
 ```cpp
 Result<Void> rnonblock = client_fd.set_nonblocking();
 ```
@@ -93,14 +93,14 @@ Result<Void> FileDescriptor::set_nonblocking() {
 
 ### 2. Using Edge-Triggered Mode
 
-**EPoll configuration** (main.cpp:129, 192):
+**EPoll configuration** (main.cpp:134, 198):
 ```cpp
 Option opt_flags(true, false, false, false);  // et=true enables edge-triggered
 ```
 
 ### 3. Draining in Loops
 
-**Accepting connections** (main.cpp:169-203):
+**Accepting connections** (main.cpp:168-212):
 ```cpp
 // Accept all pending connections (edge-triggered mode)
 while (true) {
@@ -116,7 +116,7 @@ while (true) {
 }
 ```
 
-**Reading data** (main.cpp:225-246):
+**Reading data** (main.cpp:232-257):
 ```cpp
 // Read all available data (edge-triggered mode)
 while (true) {
