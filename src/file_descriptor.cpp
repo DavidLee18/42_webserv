@@ -184,6 +184,35 @@ Result<Http::PartialString> FileDescriptor::try_read_to_end() {
   return OK(Http::PartialString, Http::PartialString::partial(s));
 }
 
+Result<Void> FileDescriptor::set_nonblocking() {
+  int flags = fcntl(_fd, F_GETFL, 0);
+  if (flags < 0) {
+    return ERR(Void, "Failed to get file descriptor flags");
+  }
+  if (fcntl(_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+    return ERR(Void, "Failed to set non-blocking mode");
+  }
+  return OKV;
+}
+
+Result<Void> FileDescriptor::set_socket_option(int level, int optname, const void *optval, socklen_t optlen) {
+  if (setsockopt(_fd, level, optname, optval, optlen) < 0) {
+    return ERR(Void, "Failed to set socket option");
+  }
+  return OKV;
+}
+
+Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) {
+  ssize_t res = send(_fd, buf, size, 0);
+  if (res < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      return OK(ssize_t, 0);  // Return 0 for would block
+    }
+    return ERR(ssize_t, "send failed");
+  }
+  return OK(ssize_t, res);
+}
+
 bool operator==(const int &lhs, const FileDescriptor &rhs) {
   return lhs == rhs._fd;
 }

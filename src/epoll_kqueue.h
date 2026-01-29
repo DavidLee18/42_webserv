@@ -196,11 +196,12 @@ public:
   
   // Move-like copy constructor: transfers ownership from other, leaving it empty
   // Note: Uses const_cast to enable move semantics in C++98
-  EPoll(const EPoll &other) : _fd(other._fd), _events(other._events), _size(other._size) {
-    // Invalidate other - make it empty (cast away const for move semantics)
+  EPoll(const EPoll &other) : _fd(other._fd), _size(other._size) {
+    // Move the events vector instead of copying to avoid invalidating FileDescriptors
     EPoll &mutable_other = const_cast<EPoll&>(other);
+    _events.swap(mutable_other._events);
+    // Invalidate other - make it empty
     mutable_other._size = 0;
-    mutable_other._events.clear();
     // FileDescriptor will handle its own state
   }
   
@@ -208,15 +209,13 @@ public:
   // Note: Uses const_cast to enable move semantics in C++98
   EPoll& operator=(const EPoll &other) {
     if (this != &other) {
-      // Transfer resources
+      // Transfer resources using swap to avoid copying FileDescriptors
       _fd = other._fd;
-      _events = other._events;
       _size = other._size;
-      
-      // Invalidate other - make it empty (cast away const for move semantics)
       EPoll &mutable_other = const_cast<EPoll&>(other);
+      _events.swap(mutable_other._events);
+      // Invalidate other - make it empty
       mutable_other._size = 0;
-      mutable_other._events.clear();
     }
     return *this;
   }
@@ -225,8 +224,8 @@ public:
   Result<Events> wait(const int timeout_ms);
   Result<const FileDescriptor *> add_fd(FileDescriptor, const Event &,
                                         const Option &);
-  Result<Void> modify_fd(const FileDescriptor &, const Event &, const Option &);
-  Result<Void> del_fd(const FileDescriptor &);
+  Result<Void> modify_fd(FileDescriptor &, const Event &, const Option &);
+  Result<Void> del_fd(FileDescriptor &);
 };
 
 #endif // __APPLE__
