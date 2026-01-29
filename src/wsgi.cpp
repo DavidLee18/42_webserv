@@ -62,7 +62,11 @@ void WsgiInput::add_mvar(std::string const &name, std::string const &value) {
   } else if (name == "WSGI_RUN_ONCE") {
     var_name = WsgiMetaVar::WSGI_RUN_ONCE;
   } else {
+    // For HTTP headers, store as "NAME=value" in the value field
     var_name = WsgiMetaVar::HTTP_;
+    std::string combined = name + "=" + value;
+    mvars.push_back(WsgiMetaVar::create(var_name, combined));
+    return;
   }
   
   mvars.push_back(WsgiMetaVar::create(var_name, value));
@@ -129,16 +133,13 @@ char **WsgiInput::to_envp() const {
         name = "wsgi.run_once";
         break;
       case WsgiMetaVar::HTTP_:
-        // For HTTP headers, the value already contains the full name
-        name = mvar.get_value();
-        size_t eq_pos = name.find('=');
-        if (eq_pos != std::string::npos) {
-          std::string env_str = name;
+        // For HTTP headers, the value contains "NAME=value" format
+        {
+          std::string env_str = mvar.get_value();
           envp[i] = new char[env_str.length() + 1];
           std::strcpy(envp[i], env_str.c_str());
           continue;
         }
-        break;
     }
     
     std::string env_str = name + "=" + mvar.get_value();
@@ -194,8 +195,6 @@ Result<WsgiInput> WsgiInput::Parser::parse(Http::Request const &req) {
   // Add path info
   const std::string &path = req.path();
   std::string path_str = path;
-  input.add_mvar("PATH_INFO", path_str);
-  input.add_mvar("SCRIPT_NAME", "");
   
   // Parse query string from path if present
   std::string query_str;
@@ -203,8 +202,11 @@ Result<WsgiInput> WsgiInput::Parser::parse(Http::Request const &req) {
   if (query_pos != std::string::npos) {
     query_str = path.substr(query_pos + 1);
     // Update path info to not include query string
-    input.add_mvar("PATH_INFO", path.substr(0, query_pos));
+    path_str = path.substr(0, query_pos);
   }
+  
+  input.add_mvar("PATH_INFO", path_str);
+  input.add_mvar("SCRIPT_NAME", "");
   input.add_mvar("QUERY_STRING", query_str);
   
   // Add server info
@@ -349,7 +351,7 @@ Result<Http::Response *> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
 
   Result<FileDescriptor> stdout_fd_res = FileDescriptor::from_raw(stdout_pipe[0]);
   if (!stdout_fd_res.error().empty()) {
-    close(stdin_pipe[1]);
+    // stdin_pipe[1] is owned by stdin_fd, will be closed automatically
     close(stdout_pipe[0]);
     kill(pid, SIGKILL);
     waitpid(pid, NULL, 0);
@@ -408,8 +410,7 @@ Result<Http::Response *> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     Result<const FileDescriptor *> add_result = epoll->add_fd(stdin_fd, write_event, write_option);
     
     if (!add_result.error().empty()) {
-      close(stdin_pipe[1]);
-      close(stdout_pipe[0]);
+      // FileDescriptor destructors will close the pipes
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
       return ERR(Http::Response *, "Failed to add stdin to epoll");
@@ -421,8 +422,7 @@ Result<Http::Response *> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       Result<Events> wait_result = epoll->wait(timeout_ms);
       if (!wait_result.error().empty()) {
         epoll->del_fd(stdin_fd);
-        close(stdin_pipe[1]);
-        close(stdout_pipe[0]);
+        // FileDescriptor destructors will close the pipes
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
         return ERR(Http::Response *, "EPoll wait failed for stdin");
@@ -433,8 +433,7 @@ Result<Http::Response *> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       // Check if timeout occurred (no events returned)
       if (events.is_end()) {
         epoll->del_fd(stdin_fd);
-        close(stdin_pipe[1]);
-        close(stdout_pipe[0]);
+        // FileDescriptor destructors will close the pipes
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
         return ERR(Http::Response *, "Timeout waiting for stdin writability");
@@ -465,16 +464,14 @@ Result<Http::Response *> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
                               body_str.length() - total_written);
       if (written < 0) {
         epoll->del_fd(stdin_fd);
-        close(stdin_pipe[1]);
-        close(stdout_pipe[0]);
+        // FileDescriptor destructors will close the pipes
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
         return ERR(Http::Response *, "Failed to write to WSGI stdin");
       } else if (written == 0) {
         // Pipe closed by reader (child process)
         epoll->del_fd(stdin_fd);
-        close(stdin_pipe[1]);
-        close(stdout_pipe[0]);
+        // FileDescriptor destructors will close the pipes
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
         return ERR(Http::Response *, "WSGI process closed stdin prematurely");
@@ -485,7 +482,13 @@ Result<Http::Response *> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     // Remove stdin from epoll and close it
     epoll->del_fd(stdin_fd);
   }
-  close(stdin_pipe[1]); // Close stdin to signal end of input
+  // Close stdin by letting stdin_fd go out of scope
+  // (Manual close would be a double-close bug)
+  {
+    // Create a scope to destroy stdin_fd and close stdin_pipe[1]
+    FileDescriptor temp_fd = stdin_fd;
+    // temp_fd destructor will close stdin_pipe[1]
+  }
 
   // Add stdout_fd to epoll for reading
   const FileDescriptor *stdout_fd_ptr = const_cast<const FileDescriptor *>(&stdout_fd);
@@ -494,7 +497,7 @@ Result<Http::Response *> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   Result<const FileDescriptor *> add_stdout_result = epoll->add_fd(stdout_fd, read_event, read_option);
   
   if (!add_stdout_result.error().empty()) {
-    close(stdout_pipe[0]);
+    // stdout_fd destructor will close stdout_pipe[0]
     kill(pid, SIGKILL);
     waitpid(pid, NULL, 0);
     return ERR(Http::Response *, "Failed to add stdout to epoll");
@@ -509,7 +512,7 @@ Result<Http::Response *> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     Result<Events> wait_result = epoll->wait(timeout_ms);
     if (!wait_result.error().empty()) {
       epoll->del_fd(stdout_fd);
-      close(stdout_pipe[0]);
+      // stdout_fd destructor will close stdout_pipe[0]
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
       return ERR(Http::Response *, "EPoll wait failed for stdout");
@@ -520,7 +523,7 @@ Result<Http::Response *> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     // Check if timeout occurred (no events returned)
     if (events.is_end()) {
       epoll->del_fd(stdout_fd);
-      close(stdout_pipe[0]);
+      // stdout_fd destructor will close stdout_pipe[0]
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
       return ERR(Http::Response *, "WSGI execution timeout");
@@ -556,7 +559,7 @@ Result<Http::Response *> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     } else {
       // Read error
       epoll->del_fd(stdout_fd);
-      close(stdout_pipe[0]);
+      // stdout_fd destructor will close stdout_pipe[0]
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
       return ERR(Http::Response *, "Failed to read from WSGI stdout");
@@ -565,7 +568,7 @@ Result<Http::Response *> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
 
   // Remove stdout from epoll and close it
   epoll->del_fd(stdout_fd);
-  close(stdout_pipe[0]);
+  // stdout_fd destructor will close stdout_pipe[0] when it goes out of scope
 
   // Wait for child process
   int status;

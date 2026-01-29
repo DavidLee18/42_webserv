@@ -6,6 +6,7 @@
 #include <list>
 #include <map>
 #include <string>
+#include <vector>
 
 // Forward declarations
 class WsgiInput;
