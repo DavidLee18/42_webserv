@@ -114,7 +114,7 @@ bool WebserverConfig::set_type_map(std::ifstream &file) {
 
   while (std::getline(file, line) && is_tab_or_space(line, 1)) {
     if (!parse_type_line(line, keys, value)) {
-      std::cerr << "Error: \"" << line << "\" ";
+      err_meg = "Type syntax Error: " + line;
       return (false);
     }
     for (std::size_t i = 0; i < keys.size(); ++i) {
