@@ -94,6 +94,12 @@ public:
  * Option encapsulates a set of flags that define the behavior of epoll
  * operations, such as edge-triggered mode, one-shot behavior, wake-up events,
  * and exclusive event handling.
+ * 
+ * IMPORTANT: When using edge-triggered mode (et=true), file descriptors MUST be
+ * set to non-blocking mode using FileDescriptor::set_nonblocking(). This is
+ * because edge-triggered mode only notifies once per state change, requiring
+ * the application to drain all available data in a loop. Without non-blocking
+ * mode, operations could block indefinitely, freezing the event loop.
  */
 class Option {
 public:
@@ -185,6 +191,16 @@ private:
 /**
  * @class EPoll
  * @brief A simple epoll wrapper class.
+ * 
+ * This class wraps the Linux epoll API for scalable I/O event notification.
+ * When using edge-triggered mode (EPOLLET), file descriptors MUST be set to
+ * non-blocking mode. See Option class documentation for details.
+ * 
+ * Typical usage pattern:
+ * 1. Create EPoll instance with EPoll::create()
+ * 2. Create socket and call FileDescriptor::set_nonblocking()
+ * 3. Add socket to EPoll with add_fd() using edge-triggered Option
+ * 4. In event loop, drain all data with while(!EWOULDBLOCK) pattern
  */
 class EPoll {
   FileDescriptor _fd;

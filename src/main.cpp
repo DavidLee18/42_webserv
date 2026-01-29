@@ -89,6 +89,9 @@ int main(const int argc, char *argv[]) {
     std::cout << "Socket created" << std::endl;
     
     // Set socket to non-blocking mode
+    // REQUIRED for edge-triggered EPoll: ET mode only notifies once per state
+    // change, so we must accept/read in a loop until EAGAIN. Without non-blocking
+    // mode, operations could block indefinitely, freezing the event loop.
     Result<Void> rnonblock = sock.set_nonblocking();
     if (!rnonblock.error().empty()) {
       std::cerr << "Failed to set socket non-blocking: " << rnonblock.error() << std::endl;
@@ -126,6 +129,8 @@ int main(const int argc, char *argv[]) {
     // Add to epoll for monitoring
     std::cout << "Adding socket to epoll..." << std::endl;
     Event listen_event(NULL, true, false, false, false, false, false);
+    // Edge-triggered mode (et=true): Only notifies once per state change.
+    // This requires non-blocking sockets and draining all data in loops.
     Option opt_flags(true, false, false, false);  // edge-triggered
     Result<const FileDescriptor *> radd = ep.add_fd(sock, listen_event, opt_flags);
     if (!radd.error().empty()) {
@@ -161,6 +166,8 @@ int main(const int argc, char *argv[]) {
           is_listen_socket = true;
           
           // Accept all pending connections (edge-triggered mode)
+          // ET mode only notifies once, so we must drain the accept queue in a loop.
+          // This is why non-blocking mode is essential - otherwise accept() could block.
           while (true) {
             struct sockaddr_in client_addr;
             socklen_t client_len = sizeof(client_addr);
@@ -177,6 +184,8 @@ int main(const int argc, char *argv[]) {
             FileDescriptor client_fd = rclient.value();
             
             // Set client socket to non-blocking
+            // REQUIRED for edge-triggered EPoll: Allows recv() to return EAGAIN when
+            // no data is available, preventing the event loop from blocking.
             Result<Void> rnonblock = client_fd.set_nonblocking();
             if (!rnonblock.error().empty()) {
               std::cerr << "Failed to set client socket non-blocking: " << rnonblock.error() << std::endl;
@@ -185,6 +194,7 @@ int main(const int argc, char *argv[]) {
             
             // Add client to epoll
             Event client_event(NULL, true, false, true, false, false, false);
+            // Edge-triggered mode: Must drain all data in loops until EAGAIN
             Option client_opt(true, false, false, false);  // edge-triggered
             Result<const FileDescriptor *> radd_client = ep.add_fd(client_fd, client_event, client_opt);
             if (!radd_client.error().empty()) {
@@ -220,6 +230,8 @@ int main(const int argc, char *argv[]) {
             bool read_error = false;
             
             // Read all available data (edge-triggered mode)
+            // ET only notifies once per state change, so we must drain all data.
+            // Non-blocking mode allows recv() to return EAGAIN when no more data is ready.
             while (true) {
               char buffer[4096];
               Result<ssize_t> rread = client_fdptr->sock_recv(buffer, sizeof(buffer) - 1);
