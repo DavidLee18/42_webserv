@@ -1,9 +1,12 @@
 #include "ServerConfig.hpp"
 
-ServerConfig::ServerConfig() : is_success(false) {}
+ServerConfig::ServerConfig() : err_line("Empty server block"), serverResponseTime(0) {}
 
-ServerConfig::ServerConfig(std::ifstream &file) : serverResponseTime(3) {
-  is_success = set_ServerConfig(file);
+ServerConfig::ServerConfig(std::ifstream &file) : err_line(""), serverResponseTime(3) {
+  if (!set_ServerConfig(file)) {
+    return ;
+  }
+  return ;
 }
 
 ServerConfig::~ServerConfig() {}
@@ -15,15 +18,26 @@ bool ServerConfig::set_ServerConfig(std::ifstream &file) {
     if (is_tab_or_space(line, 0))
       continue;
     else if (is_tab_or_space(line, 1)) {
-      if (is_header(line))
-        parse_header_line(file, line);
+      if (is_header(line)) {
+        if (!parse_header_line(file, line)) {
+          err_line = "Header syntax Error: " + err_line;
+          return (false);
+        }
+      }
       else if (is_serverResponseTime(line))
         parse_serverResponseTime(line);
-      else if (is_RouteRule(line))
-        parse_RouteRule(line, file); // line을 같이 넘겨서 등록 추가
-      else
-        err_line.push_back(trim_space(line));
-    } else
+      else if (is_RouteRule(line)){
+        if(!parse_RouteRule(line, file)) {// line을 같이 넘겨서 등록 추가
+          err_line = "RouteRule syntax Error: " + err_line;
+            return (false);
+          }
+      }
+      else {
+        err_line = "Invalid line Error: " + trim_space(line);
+        return (false);
+      }
+    } 
+    else
       break;
   }
   // for (size_t i = 0; i < routes.size(); ++i)
@@ -36,13 +50,10 @@ bool ServerConfig::set_ServerConfig(std::ifstream &file) {
   //   }
   //   std::cout << std::endl;
   // }
-  for (size_t i = 0; i < err_line.size(); ++i) {
-    std::cout << "err_line: " << err_line[i] << std::endl;
-  }
   return (true);
 }
 
-bool ServerConfig::getis_succes(void) { return (is_success); }
+std::string ServerConfig::Geterr_line(void) { return (err_line); }
 
 // header method
 bool ServerConfig::is_header(const std::string &line) {
@@ -58,20 +69,22 @@ bool ServerConfig::parse_header_line(std::ifstream &file, std::string line) {
   std::string temp(line);
   std::vector<std::string> key_value = string_split(temp, ":");
 
+  err_line = temp;
   if (key_value.size() != 2)
     return (false);
-
   std::string key = trim_space(key_value[0]);
   temp = key_value[1];
   if (!is_header_key(key) || !parse_header_value(temp, key))
     return (false);
   while (!temp.empty() && temp[temp.length() - 1] == ';' &&
          getline(file, temp)) {
+    err_line = temp;
     if (!is_tab_or_space(temp, 2))
       return (false);
     if (!parse_header_value(temp, key))
       return (false);
   }
+  err_line = "";
   return (true);
 }
 
@@ -109,7 +122,7 @@ bool ServerConfig::parse_header_value(std::string value,
           return false;
       header[key][temp[0]] = temp[1];
     } else {
-      err_line.push_back(trim_space(value));
+      // err_line.push_back(trim_space(value));
       return (false);
     }
   }
@@ -286,7 +299,7 @@ RuleOperator ServerConfig::parse_RuleOperator(std::string indicator)
 bool ServerConfig::parse_Httpmethod(std::vector<std::string> data, std::vector<HttpMethod> mets) {
   RouteRule route;
   std::vector<std::vector<std::string> > path_url;
-  // std::vector<std::vector<std::string> > root_url;
+  std::vector<std::vector<std::string> > root_url;
 
   if (data.size() != 4)
     return (false);
@@ -298,14 +311,14 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data, std::vector<H
     route.authInfo = "";
     route.maxBodyMB = 1;
     path_url = expand_url_pattern(data[1]);
-    // root_url = expand_url_pattern(data[3]);
-    // if (path_url.size() < 1 || root_url.size() < 1)
-      // return (false);
+    root_url = expand_url_pattern(data[3]);
+    if (path_url.size() < 1 || root_url.size() < 1)
+      return (false);
     for (size_t i = 0; i < path_url.size(); ++i)
     {
-      // route.path = path_url[i];
-      // route.root = root_url[i];
-      // routes[std::make_pair(route.method, route.path)] = route;
+      route.path = path_url[i];
+      route.root = root_url[i];
+      routes[std::make_pair(route.method, route.path)] = route;
     }
   }
   return (true);
@@ -317,6 +330,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line, std::ifstream &file)
   std::vector<std::string> method_line_data = string_split(method_line, " ");
   std::vector<std::string> method = string_split(method_line_data[0], "|");
   
+  err_line = method_line;
   for (size_t i = 0; i < method.size(); ++i)
   {
     if (method[i] == "GET")
@@ -334,6 +348,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line, std::ifstream &file)
 
   while (std::getline(file, line))
   {
+    err_line = line;
     if (is_tab_or_space(line, 0))
       break;
     else if (is_tab_or_space(line, 2) != false)
@@ -343,6 +358,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line, std::ifstream &file)
     else
       return (false);
   }
+  err_line = "";
   return (true);
 }
 

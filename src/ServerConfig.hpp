@@ -75,10 +75,9 @@ public:
 class ServerConfig{
 private:
   Header header;
-  bool is_success;
   int serverResponseTime;
   std::map<std::pair<HttpMethod, Pathpattern>, RouteRule, std::less<>> routes;
-  std::vector<std::string> err_line;
+  std::string err_line;
 
   bool set_ServerConfig(std::ifstream &file);
   // header method
@@ -101,7 +100,7 @@ public:
   ServerConfig(std::ifstream &file);
   ~ServerConfig();
 
-  bool getis_succes(void);
+  std::string Geterr_line(void);
 };
 
 #endif

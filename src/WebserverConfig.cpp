@@ -1,12 +1,13 @@
 #include "WebserverConfig.hpp"
 
 WebserverConfig::WebserverConfig(std::ifstream &file) {
-  is_success = false;
-  if (!this->file_parsing(file))
+  err_meg = "";
+  if (!this->file_parsing(file)) {
+    file.close();
     return;
-  
+  }
+
   file.close();
-  is_success = true;  
   return;
 }
 
@@ -17,9 +18,15 @@ bool WebserverConfig::file_parsing(std::ifstream &file) {
     if (line == "types =" || line == "types=") {
       if (!set_type_map(file))
         return (false);
-    } else if (is_ServerConfig(line)) {
+    }
+    else if (is_ServerConfig(line)) {
       if (!set_ServerConfig_map(file, line))
         return (false);
+    }
+    else
+    {
+      err_meg = "Invalid line Error: " + line;
+      return (false);
     }
   }
   if (this->type_map.empty() || this->default_mime.length() == 0)
@@ -154,23 +161,28 @@ bool WebserverConfig::is_ServerConfig(const std::string &line) {
 
 bool WebserverConfig::set_ServerConfig_map(std::ifstream &file,
                                            const std::string &line) {
-  std::string key(line);
+  unsigned int key;
+  std::string temp(line);
   ServerConfig config(file);
 
-  key = parse_ServerConfig_key(key);
-  if (config.getis_succes() != true)
+  key = parse_ServerConfig_key(temp);
+  if (config.Geterr_line() != "") { // 서버블럭 확인
+    err_meg = temp + " " + config.Geterr_line();
     return (false);
-  if (ServerConfig_map.find(key) != ServerConfig_map.end())
+  }
+  if (ServerConfig_map.find(key) != ServerConfig_map.end()) {
+    err_meg = "Server block declared Error: " + line;
     return (false);
+  }
   ServerConfig_map[key] = config;
   return (true);
 }
 
-std::string WebserverConfig::parse_ServerConfig_key(std::string &key) {
+unsigned int WebserverConfig::parse_ServerConfig_key(std::string &key) {
   std::size_t i = 1;
   std::size_t start = i;
 
   while (i < key.size() && std::isdigit(static_cast<unsigned char>(key[i])))
     ++i;
-  return (key.substr(start, i - start));
+  return (atoi(key.substr(start, i - start).c_str()));
 }
