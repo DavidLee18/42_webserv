@@ -27,8 +27,8 @@ enum RuleOperator {
   PERMANENTREDIRECT, // 308
   AUTOINDEX,         // <i-
   POINT,             // ->
-  SEREVEFROM,        // <-
-  UNDEFINE,
+  SERVEFROM,         // <-
+  UNDEFINED,
 };
 
 class PartialString {
