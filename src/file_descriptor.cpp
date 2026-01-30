@@ -35,21 +35,22 @@ Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
 // Move-like copy constructor: transfers ownership from other
 FileDescriptor::FileDescriptor(const FileDescriptor &other) {
   _fd = other._fd;
-  // Invalidate source to transfer ownership (cast away const for move semantics)
-  const_cast<FileDescriptor&>(other)._fd = -1;
+  // Invalidate source to transfer ownership (cast away const for move
+  // semantics)
+  const_cast<FileDescriptor &>(other)._fd = -1;
 }
 
 // Move-like assignment operator: transfers ownership from other
-FileDescriptor& FileDescriptor::operator=(const FileDescriptor &other) {
+FileDescriptor &FileDescriptor::operator=(const FileDescriptor &other) {
   if (this != &other) {
     // Close current fd if valid
     if (_fd >= 0)
       close(_fd);
-    
+
     // Transfer ownership
     _fd = other._fd;
     // Invalidate source (cast away const for move semantics)
-    const_cast<FileDescriptor&>(other)._fd = -1;
+    const_cast<FileDescriptor &>(other)._fd = -1;
   }
   return *this;
 }
@@ -195,7 +196,9 @@ Result<Void> FileDescriptor::set_nonblocking() {
   return OKV;
 }
 
-Result<Void> FileDescriptor::set_socket_option(int level, int optname, const void *optval, socklen_t optlen) {
+Result<Void> FileDescriptor::set_socket_option(int level, int optname,
+                                               const void *optval,
+                                               socklen_t optlen) {
   if (setsockopt(_fd, level, optname, optval, optlen) < 0) {
     return ERR(Void, "Failed to set socket option");
   }
@@ -206,7 +209,7 @@ Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) {
   ssize_t res = send(_fd, buf, size, 0);
   if (res < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      return OK(ssize_t, 0);  // Return 0 for would block
+      return OK(ssize_t, 0); // Return 0 for would block
     }
     return ERR(ssize_t, "send failed");
   }

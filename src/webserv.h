@@ -8,11 +8,11 @@
 #include "ServerConfig.hpp"
 #include "WebserverConfig.hpp"
 #include "cgi_1_1.h"
-#include "wsgi.h"
 #include "epoll_kqueue.h"
 #include "errors.h"
 #include "http_1_1.h"
 #include "json.h"
+#include "wsgi.h"
 #include <algorithm>
 #include <arpa/inet.h>
 #include <cctype>

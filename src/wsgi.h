@@ -24,7 +24,7 @@ public:
     SERVER_NAME,
     SERVER_PORT,
     SERVER_PROTOCOL,
-    HTTP_,  // HTTP headers
+    HTTP_, // HTTP headers
     REMOTE_ADDR,
     WSGI_VERSION,
     WSGI_URL_SCHEME,
@@ -37,25 +37,26 @@ public:
 
   class Parser {
     virtual void phantom() = 0;
+
   public:
-    static Result<std::pair<WsgiMetaVar, size_t> >
-        parse(std::string const &, std::string const &);
+    static Result<std::pair<WsgiMetaVar, size_t> > parse(std::string const &,
+                                                        std::string const &);
   };
-  
+
   friend class WsgiInput;
-  
+
 public:
   WsgiMetaVar(const WsgiMetaVar &other);
-  WsgiMetaVar& operator=(const WsgiMetaVar &other);
+  WsgiMetaVar &operator=(const WsgiMetaVar &other);
   ~WsgiMetaVar();
-  
+
   Name const &get_name() const { return name; }
   std::string const &get_value() const { return value; }
 
 private:
   Name name;
   std::string value;
-  
+
   WsgiMetaVar(Name n, std::string v) : name(n), value(v) {}
   static WsgiMetaVar create(Name n, std::string v);
 };
@@ -76,13 +77,13 @@ public:
   public:
     static Result<WsgiInput> parse(Http::Request const &);
   };
-  
+
   friend class Parser;
   friend class WsgiDelegate;
 
   WsgiInput(const WsgiInput &other)
       : mvars(other.mvars), req_body(other.req_body) {}
-  WsgiInput& operator=(const WsgiInput &other) {
+  WsgiInput &operator=(const WsgiInput &other) {
     if (this != &other) {
       mvars = other.mvars;
       req_body = other.req_body;

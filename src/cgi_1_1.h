@@ -28,7 +28,7 @@ public:
       _other = NULL;
     }
   }
-  CgiAuthType& operator=(const CgiAuthType &other) {
+  CgiAuthType &operator=(const CgiAuthType &other) {
     if (this != &other) {
       delete _other;
       _type = other._type;
@@ -40,9 +40,7 @@ public:
     }
     return *this;
   }
-  ~CgiAuthType() {
-    delete _other;
-  }
+  ~CgiAuthType() { delete _other; }
   Type const &type() { return _type; }
   std::string const *other() { return _other; }
 
@@ -70,7 +68,7 @@ public:
       : type(ty), subtype(subty), params() {}
   ContentType(ContentType const &other)
       : type(other.type), subtype(other.subtype), params(other.params) {}
-  ContentType& operator=(const ContentType &other) {
+  ContentType &operator=(const ContentType &other) {
     if (this != &other) {
       type = other.type;
       subtype = other.subtype;
@@ -120,14 +118,14 @@ public:
       val.ipv4[3] = other.val.ipv4[3];
     }
   }
-  
-  ServerName& operator=(const ServerName &other) {
+
+  ServerName &operator=(const ServerName &other) {
     if (this != &other) {
       // Clean up existing value
       if (type == Host) {
         delete val.host_name;
       }
-      
+
       // Copy new value
       type = other.type;
       if (type == Host) {
@@ -141,7 +139,7 @@ public:
     }
     return *this;
   }
-  
+
   ~ServerName() {
     if (type == Host) {
       delete val.host_name;
@@ -156,7 +154,7 @@ private:
 
   static ServerName host(std::list<std::string>);
   static ServerName ipv4(unsigned char, unsigned char, unsigned char,
-                          unsigned char);
+                         unsigned char);
 };
 
 enum ServerProtocol { Http_1_1 };
@@ -171,7 +169,7 @@ public:
       : type(ty), name(n), value(v) {}
   EtcMetaVar(EtcMetaVar const &other)
       : type(other.type), name(other.name), value(other.value) {}
-  EtcMetaVar& operator=(const EtcMetaVar &other) {
+  EtcMetaVar &operator=(const EtcMetaVar &other) {
     if (this != &other) {
       type = other.type;
       name = other.name;
@@ -179,7 +177,7 @@ public:
     }
     return *this;
   }
-  
+
   Type const &get_type() const { return type; }
   std::string const &get_name() const { return name; }
   std::string const &get_value() const { return value; }
@@ -243,42 +241,35 @@ public:
         parse_content_type(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_gateway_interface(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> >
-        parse_path_info(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> > parse_path_info(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_path_translated(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_query_string(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_addr(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_host(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> > parse_remote_addr(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> > parse_remote_host(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_remote_ident(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_user(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> > parse_remote_user(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_request_method(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> >
-        parse_script_name(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> >
-        parse_server_name(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> >
-        parse_server_port(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> > parse_script_name(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> > parse_server_name(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> > parse_server_port(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_server_protocol(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_server_software(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> >
-        parse_custom_var(std::string, std::string);
+    static Result<std::pair<CgiMetaVar, size_t> > parse_custom_var(std::string,
+                                                                  std::string);
 
   public:
-    static Result<std::pair<CgiMetaVar, size_t> >
-        parse(std::string const &, std::string const &);
+    static Result<std::pair<CgiMetaVar, size_t> > parse(std::string const &,
+                                                       std::string const &);
   };
-  
+
   friend class CgiInput;
-  
+
 public:
   CgiMetaVar(const CgiMetaVar &other) : name(other.name) {
     switch (name) {
@@ -301,7 +292,8 @@ public:
       val.path_translated = new std::string(*other.val.path_translated);
       break;
     case QUERY_STRING:
-      val.query_string = new std::map<std::string, std::string>(*other.val.query_string);
+      val.query_string =
+          new std::map<std::string, std::string>(*other.val.query_string);
       break;
     case REMOTE_ADDR:
       val.remote_addr[0] = other.val.remote_addr[0];
@@ -341,8 +333,8 @@ public:
       break;
     }
   }
-  
-  CgiMetaVar& operator=(const CgiMetaVar &other) {
+
+  CgiMetaVar &operator=(const CgiMetaVar &other) {
     if (this != &other) {
       // Clean up existing value
       switch (name) {
@@ -382,7 +374,7 @@ public:
       default:
         break;
       }
-      
+
       // Copy new value
       name = other.name;
       switch (name) {
@@ -405,7 +397,8 @@ public:
         val.path_translated = new std::string(*other.val.path_translated);
         break;
       case QUERY_STRING:
-        val.query_string = new std::map<std::string, std::string>(*other.val.query_string);
+        val.query_string =
+            new std::map<std::string, std::string>(*other.val.query_string);
         break;
       case REMOTE_ADDR:
         val.remote_addr[0] = other.val.remote_addr[0];
@@ -447,7 +440,7 @@ public:
     }
     return *this;
   }
-  
+
   ~CgiMetaVar() {
     switch (name) {
     case AUTH_TYPE:
@@ -487,7 +480,7 @@ public:
       break;
     }
   }
-  
+
   Name const &get_name() const { return name; }
   Val const &get_val() const { return val; }
 
@@ -503,7 +496,7 @@ private:
   static CgiMetaVar path_translated(std::string);
   static CgiMetaVar query_string(std::map<std::string, std::string>);
   static CgiMetaVar remote_addr(unsigned char, unsigned char, unsigned char,
-                                 unsigned char);
+                                unsigned char);
   static CgiMetaVar remote_host(std::list<std::string>);
   static CgiMetaVar remote_ident(std::string);
   static CgiMetaVar remote_user(std::string);
@@ -532,13 +525,13 @@ public:
   public:
     static Result<CgiInput> parse(Http::Request const &);
   };
-  
+
   friend class Parser;
   friend class CgiDelegate;
 
   CgiInput(const CgiInput &other)
       : mvars(other.mvars), req_body(other.req_body) {}
-  CgiInput& operator=(const CgiInput &other) {
+  CgiInput &operator=(const CgiInput &other) {
     if (this != &other) {
       mvars = other.mvars;
       req_body = other.req_body;

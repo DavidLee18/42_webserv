@@ -37,12 +37,12 @@ Result<Events> Events::init(const std::vector<FileDescriptor> &all_events,
       operator delete((void *)es._events);
       return ERR(Events, Errors::not_found);
     }
-    new ((void *)(es._events + i)) Event(
-        fd, (events[i].events & EPOLLIN) != 0,
-        (events[i].events & EPOLLOUT) != 0,
-        (events[i].events & EPOLLRDHUP) != 0,
-        (events[i].events & EPOLLPRI) != 0, (events[i].events & EPOLLERR) != 0,
-        (events[i].events & EPOLLHUP) != 0);
+    new ((void *)(es._events + i)) Event(fd, (events[i].events & EPOLLIN) != 0,
+                                         (events[i].events & EPOLLOUT) != 0,
+                                         (events[i].events & EPOLLRDHUP) != 0,
+                                         (events[i].events & EPOLLPRI) != 0,
+                                         (events[i].events & EPOLLERR) != 0,
+                                         (events[i].events & EPOLLHUP) != 0);
   }
   delete[] events;
   return OK(Events, es);
@@ -88,7 +88,7 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   }
   EPoll ep;
   ep._size = sz;
-  ep._events.reserve(sz);  // Reserve space to avoid reallocation
+  ep._events.reserve(sz); // Reserve space to avoid reallocation
   Result<FileDescriptor> rfdesc = FileDescriptor::from_raw(fd);
   if (!rfdesc.error().empty()) {
     return ERR(EPoll, rfdesc.error());
@@ -143,8 +143,9 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
     }
   }
   _events.push_back(fd);
-  
-  // Return pointer to the FileDescriptor in the vector (last element just added)
+
+  // Return pointer to the FileDescriptor in the vector (last element just
+  // added)
   const FileDescriptor *fd_in = &_events.at(_events.size() - 1);
   return OK(const FileDescriptor *, fd_in);
 }

@@ -1,15 +1,14 @@
 #ifndef RESULT_H
 #define RESULT_H
 
+#include <cassert>
 #include <cstddef>
+#include <cstring>
 #include <iostream>
 #include <string>
-#include <cassert>
-#include <cstring>
 
 // Optional wrapper for C++98 - holds a value or nothing
-template <typename T>
-class Optional {
+template <typename T> class Optional {
   bool _has_value;
   // Use a union to ensure proper alignment for T
   union Storage {
@@ -18,36 +17,34 @@ class Optional {
     long _align1;
     double _align2;
     long double _align3;
-    void* _align4;
+    void *_align4;
   };
   Storage _storage;
 
-  T* ptr() { return reinterpret_cast<T*>(_storage._data); }
-  const T* ptr() const { return reinterpret_cast<const T*>(_storage._data); }
+  T *ptr() { return reinterpret_cast<T *>(_storage._data); }
+  const T *ptr() const { return reinterpret_cast<const T *>(_storage._data); }
 
 public:
   Optional() : _has_value(false) {
     // Storage is uninitialized, will be constructed via placement new if needed
   }
-  
-  Optional(const T& val) : _has_value(true) {
-    new (ptr()) T(val);
-  }
-  
-  Optional(const Optional& other) : _has_value(other._has_value) {
+
+  Optional(const T &val) : _has_value(true) { new (ptr()) T(val); }
+
+  Optional(const Optional &other) : _has_value(other._has_value) {
     if (_has_value) {
       new (ptr()) T(*other.ptr());
     }
     // If not has_value, storage remains uninitialized
   }
-  
+
   ~Optional() {
     if (_has_value) {
       ptr()->~T();
     }
   }
-  
-  Optional& operator=(const Optional& other) {
+
+  Optional &operator=(const Optional &other) {
     if (this != &other) {
       if (_has_value) {
         ptr()->~T();
@@ -60,15 +57,15 @@ public:
     }
     return *this;
   }
-  
+
   bool has_value() const { return _has_value; }
-  
-  const T& get() const {
+
+  const T &get() const {
     assert(_has_value);
     return *ptr();
   }
-  
-  T& get() {
+
+  T &get() {
     assert(_has_value);
     return *ptr();
   }
@@ -82,34 +79,34 @@ template <typename T> class Result {
 public:
   // Constructor for success case
   Result(const T &v, const std::string &e) : _val(v), _err(e) {}
-  
+
   // Constructor for error case
   explicit Result(const std::string &e) : _val(), _err(e) {}
-  
+
   // Copy constructor
-  Result(const Result& other) : _val(other._val), _err(other._err) {}
-  
+  Result(const Result &other) : _val(other._val), _err(other._err) {}
+
   // Assignment operator
-  Result& operator=(const Result& other) {
+  Result &operator=(const Result &other) {
     if (this != &other) {
       _val = other._val;
       _err = other._err;
     }
     return *this;
   }
-  
+
   bool has_value() const { return _val.has_value(); }
-  
-  const T &value() const { 
+
+  const T &value() const {
     assert(_val.has_value() && "Attempted to access value of an error Result");
-    return _val.get(); 
+    return _val.get();
   }
-  
-  T &value_mut() { 
+
+  T &value_mut() {
     assert(_val.has_value() && "Attempted to access value of an error Result");
-    return _val.get(); 
+    return _val.get();
   }
-  
+
   const std::string &error() const { return _err; }
 };
 
