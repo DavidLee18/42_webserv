@@ -5,7 +5,6 @@
 #include "http_1_1.h"
 
 typedef std::map<std::string, std::map<std::string, std::string> > Header;
-class Pathpattern;
 enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
 
 enum RuleOperator {
@@ -26,70 +25,20 @@ class Pathpattern {
 private:
   std::vector<std::string> path;
 
-  bool match(std::string wildcard, std::string path) {
-    std::vector<std::string> data = string_split(wildcard, "*");
-    if (2 < data.size())
-      return (false);
-    for (size_t i = 0; i < data.size(); ++i) {
-      size_t pos = std::string::npos;
-      if (path.find(data[i]) == std::string::npos)
-        return (false);
-      else if (pos == std::string::npos + 1)
-        return (false);
-    }
-    return (true);
-  }
+  bool match(std::string wildcard, std::string path) const;
 
 public:
-  Pathpattern() {};
-  Pathpattern(std::vector<std::string> path) { this->path = path; };
-  ~Pathpattern() {};
+  Pathpattern() : path() {}
+  Pathpattern(std::vector<std::string> path) : path(path) {}
 
-  bool operator==(std::string line) {
-    std::vector<std::string> d_1 = this->path;
-    std::vector<std::string> d_2 = string_split(line, "/");
-
-    for (size_t i = 0; i < d_1.size(); ++i) {
-      if (d_1[i] == d_2[i])
-        continue;
-      else if (d_1[i] == "*")
-        continue;
-      else if (d_1[i].find('*') != std::string::npos && match(d_1[i], d_2[i]))
-        continue;
-      else
-        return (false);
-    }
-    return (true);
-  }
-
-  friend bool operator==(std::string line, Pathpattern &path) {
+  bool operator==(const std::string &) const;
+  friend bool operator==(const std::string &line, const Pathpattern &path) {
     return (path == line);
   }
 
-  bool operator<(const Pathpattern &other) {
-    size_t l = path.size() < other.path.size() ? path.size() : other.path.size();
-    for (size_t i = 0; i < l; i++) {
-      size_t p1 = path[i].find("*"), p2 = other.path[i].find("*");
-      if (p1 == std::string::npos && p2 == std::string::npos) {
-        if (path[i] == other.path[i])
-          continue;
-        return path[i] < other.path[i];
-      } else if (p1 != std::string::npos && p2 == std::string::npos) {
-        if (p1 == 1)
-          continue;
-        int res = std::strncmp(path[i].c_str(), other.path[i].c_str(), p1);
-        if (res < 0)
-          return true;
-        if (res == 0) {
-          size_t j;
-          if ((j = other.path[i].find(path[i].substr(p1), p1)) == std::string::npos)
-            return true;
-        }
-        return false;
-      } else if (p1 == std::string::npos && p2 != std::string::npos) {}
-    }
-  }
+  bool operator<(const Pathpattern &) const;
 };
+
 struct RouteRule {
   Http::Method method; // GET | POST | DELETE 등
   Pathpattern path;    // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
@@ -113,7 +62,7 @@ private:
   std::map<std::pair<Http::Method, Pathpattern>, RouteRule, std::less<> > routes;
   std::string err_line;
 
-  bool set_ServerConfig(std::ifstream &file);
+  ServerConfig() : header(), serverResponseTime(-1), routes(), err_line() {}
   // header method
   bool is_header(const std::string &line);
   bool parse_header_line(std::ifstream &file, std::string line);
@@ -132,10 +81,6 @@ private:
   RuleOperator parse_RuleOperator(std::string indicator);
 
 public:
-  ServerConfig();
-  ServerConfig(std::ifstream &file);
-  ~ServerConfig();
-
   std::string Geterr_line(void);
 };
 

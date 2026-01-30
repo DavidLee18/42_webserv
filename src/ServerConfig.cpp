@@ -1,17 +1,63 @@
 #include "webserv.h"
 
-ServerConfig::ServerConfig()
-    : serverResponseTime(0), err_line("Empty server block") {}
-
-ServerConfig::ServerConfig(std::ifstream &file)
-    : serverResponseTime(3), err_line("") {
-  if (!set_ServerConfig(file)) {
-    return;
+bool Pathpattern::match(std::string wildcard, std::string path) const {
+  std::vector<std::string> data = string_split(wildcard, "*");
+  if (2 < data.size())
+    return (false);
+  for (size_t i = 0; i < data.size(); ++i) {
+    size_t pos = std::string::npos;
+    if (path.find(data[i]) == std::string::npos)
+      return (false);
+    else if (pos == std::string::npos + 1)
+      return (false);
   }
-  return;
+  return (true);
 }
 
-ServerConfig::~ServerConfig() {}
+bool Pathpattern::operator==(const std::string &line) const {
+  std::vector<std::string> d_1 = this->path;
+  std::vector<std::string> d_2 = string_split(line, "/");
+
+  for (size_t i = 0; i < d_1.size(); ++i) {
+    if (d_1[i] == d_2[i])
+      continue;
+    else if (d_1[i] == "*")
+      continue;
+    else if (d_1[i].find('*') != std::string::npos && match(d_1[i], d_2[i]))
+      continue;
+    else
+      return (false);
+  }
+  return (true);
+}
+
+bool Pathpattern::operator<(const Pathpattern &other) const {
+  size_t l = path.size() < other.path.size() ? path.size() : other.path.size();
+  for (size_t i = 0; i < l; i++) {
+    size_t p1 = path[i].find("*"), p2 = other.path[i].find("*");
+    switch (((p1 == std::string::npos) << 1) + (p2 == std::string::npos)) {
+      case 0: 
+      case 1:
+      case 2:
+      case 3: if (path[i] == other.path[i]) { continue; } return path[i] < other.path[i];
+    }
+    if (p1 != std::string::npos && p2 == std::string::npos) {
+      if (p1 == 1)
+        continue;
+      int res = std::strncmp(path[i].c_str(), other.path[i].c_str(), p1);
+      if (res < 0)
+        return true;
+      if (res == 0) {
+        size_t j;
+        if ((j = other.path[i].find(path[i].substr(p1), p1)) ==
+            std::string::npos)
+          return true;
+      }
+      return false;
+    } else if (p1 == std::string::npos && p2 != std::string::npos) {
+    }
+  }
+}
 
 bool ServerConfig::set_ServerConfig(std::ifstream &file) {
   std::string line;

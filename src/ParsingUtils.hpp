@@ -3,7 +3,6 @@
 
 #include <string>
 #include <vector>
-#include <list>
 
 bool is_have_space(const std::string &line);
 std::string trim_space(const std::string &s);
