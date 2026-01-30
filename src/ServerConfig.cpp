@@ -1,4 +1,4 @@
-#include "ServerConfig.hpp"
+#include "webserv.h"
 
 ServerConfig::ServerConfig() : err_line("Empty server block"), serverResponseTime(0) {}
 

@@ -1,4 +1,4 @@
-#include "WebserverConfig.hpp"
+#include "webserv.h"
 
 WebserverConfig::WebserverConfig(std::ifstream &file) {
   err_meg = "";
