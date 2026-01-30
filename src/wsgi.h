@@ -98,11 +98,9 @@ class WsgiDelegate {
   std::string script_path;
   Http::Request request;
 
-  WsgiDelegate(const Http::Request &req, const std::string &script);
-
 public:
-  static WsgiDelegate *create(const Http::Request &req, const std::string &script);
-  Result<Http::Response *> execute(int timeout_ms, EPoll *epoll);
+  WsgiDelegate(const Http::Request &req, const std::string &script);
+  Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
   ~WsgiDelegate();
 };
 
