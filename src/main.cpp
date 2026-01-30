@@ -48,12 +48,16 @@ std::string generate_response(const Http::Request &request) {
 }
 
 int main(const int argc, char *argv[]) {
-  if (argc != 2) {
-    std::cerr << "Usage: webserv <config_file>" << std::endl;
-    return 1;
-  }
-
-  // Parse configuration
+  (void)argc;
+  // if (argc != 3) {
+  //   std::cerr << "Usage: webserv <config_file>" << std::endl;
+  //   return 1;
+  // }
+  // Result<std::pair<Json *, size_t> > res = Json::Parser::parse(argv[2], '\0');
+  // PANIC(res)
+  // Json *js = res.value()->first;
+  // std::cout << *js << std::endl;
+  // delete js;
   WebserverConfig config(argv[1]);
 
   signal(SIGINT, wrap_up);

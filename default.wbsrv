@@ -13,7 +13,7 @@ types =
         object-src 'none'; script-src 'sha256-${$HASH($SCRIPT)}';
         base-uri 'none'; frame-ancestors 'none'
 
-    ...5s
+    ...30
 
     GET /old_stuff/* =301> /new_stuff/*
 
@@ -23,7 +23,8 @@ types =
 
     GET *.(jpg|jpeg|gif) <- /spool/www/*.(jpg|jpeg|gif)
 
-    GET|POST|DELETE * <- /spool/www/* ? index2.html
-        @auth_info
-        ->{} < 10MB
-        !404:/404.html
+    GET|POST|DELETE * <- /spool/www/*
+        ? index2.html
+        @ auth_info
+        ->{} 10MB
+        ! 404:/404.html

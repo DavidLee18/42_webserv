@@ -8,8 +8,23 @@
 class Http {
   virtual void phantom() = 0;
 
-public:
-  enum Method { GET, HEAD, OPTIONS, POST, DELETE, PUT, CONNECT, TRACE, PATCH };
+enum RuleOperator {
+  MULTIPLECHOICES,   // 300
+  REDIRECT,          // 301
+  FOUND,             // 302
+  SEEOTHER,          // 303
+  NOTMODIFIED,       // 304
+  TEMPORARYREDIRECT, // 307
+  PERMANENTREDIRECT, // 308
+  AUTOINDEX,         // <i-
+  POINT,             // ->
+  SERVEFROM,         // <-
+  UNDEFINED,
+};
+
+class PartialString {
+  enum { Partial, Full } kind;
+  char *part;
 
   class PartialString {
   public:
