@@ -18,13 +18,10 @@ bool WebserverConfig::file_parsing(std::ifstream &file) {
     if (line == "types =" || line == "types=") {
       if (!set_type_map(file))
         return (false);
-    }
-    else if (is_ServerConfig(line)) {
+    } else if (is_ServerConfig(line)) {
       if (!set_ServerConfig_map(file, line))
         return (false);
-    }
-    else
-    {
+    } else {
       err_meg = "Invalid line Error: " + line;
       return (false);
     }
@@ -41,8 +38,6 @@ bool WebserverConfig::file_parsing(std::ifstream &file) {
 //     std::cout << it->first << " = " << it->second << std::endl;
 // }
 // std::cout << default_mime << std::endl;
-
-WebserverConfig::~WebserverConfig() {};
 
 // type_map method
 std::vector<std::string> WebserverConfig::is_typeKey(const std::string &key) {
@@ -184,5 +179,6 @@ unsigned int WebserverConfig::parse_ServerConfig_key(std::string &key) {
 
   while (i < key.size() && std::isdigit(static_cast<unsigned char>(key[i])))
     ++i;
-  return (atoi(key.substr(start, i - start).c_str()));
+  return static_cast<unsigned int>(
+      std::atoi(key.substr(start, i - start).c_str()));
 }
