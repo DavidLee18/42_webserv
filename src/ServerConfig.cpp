@@ -1,6 +1,6 @@
 #include "webserv.h"
 
-bool Pathpattern::match(std::string wildcard, std::string path) const {
+bool PathPattern::match(std::string wildcard, std::string path) const {
   std::vector<std::string> data = string_split(wildcard, "*");
   if (2 < data.size())
     return (false);
@@ -14,49 +14,33 @@ bool Pathpattern::match(std::string wildcard, std::string path) const {
   return (true);
 }
 
-bool Pathpattern::operator==(const std::string &line) const {
-  std::vector<std::string> d_1 = this->path;
-  std::vector<std::string> d_2 = string_split(line, "/");
-
-  for (size_t i = 0; i < d_1.size(); ++i) {
-    if (d_1[i] == d_2[i])
-      continue;
-    else if (d_1[i] == "*")
-      continue;
-    else if (d_1[i].find('*') != std::string::npos && match(d_1[i], d_2[i]))
-      continue;
-    else
-      return (false);
-  }
-  return (true);
+bool PathPattern::operator==(const std::string &line) const {
+  return (!(*this < line) && !(line < *this));
 }
 
-bool Pathpattern::operator<(const Pathpattern &other) const {
-  size_t l = path.size() < other.path.size() ? path.size() : other.path.size();
+bool PathPattern::operator<(const PathPattern &other) const {
+  size_t l = MIN(path.size(), other.path.size());
   for (size_t i = 0; i < l; i++) {
-    size_t p1 = path[i].find("*"), p2 = other.path[i].find("*");
-    switch (((p1 == std::string::npos) << 1) + (p2 == std::string::npos)) {
-      case 0: 
-      case 1:
-      case 2:
-      case 3: if (path[i] == other.path[i]) { continue; } return path[i] < other.path[i];
-    }
-    if (p1 != std::string::npos && p2 == std::string::npos) {
-      if (p1 == 1)
-        continue;
-      int res = std::strncmp(path[i].c_str(), other.path[i].c_str(), p1);
-      if (res < 0)
-        return true;
-      if (res == 0) {
-        size_t j;
-        if ((j = other.path[i].find(path[i].substr(p1), p1)) ==
-            std::string::npos)
-          return true;
+    std::vector<std::string> ps1 = string_split(path[i], "*"),
+                             ps2 = string_split(other.path[i], "*");
+    size_t l_ = MIN(ps1.size(), ps2.size());
+    for (size_t j = 0; j < l_; j++) {
+      if (ps1[j] != "*" && ps2[j] != "*" && ps1[j] != ps2[j]) {
+        return ps1[j] < ps2[j];
       }
-      return false;
-    } else if (p1 == std::string::npos && p2 != std::string::npos) {
     }
+    if (ps1.size() != ps2.size())
+      return ps1.size() < ps2.size();
   }
+  return path.size() < other.path.size();
+}
+
+bool PathPattern::operator<(std::string const &other) const {
+  return (*this < PathPattern(string_split(other, "/")));
+}
+
+bool operator<(std::string const &l, PathPattern const &r) {
+  return (!(r < l) && !(l == r));
 }
 
 bool ServerConfig::set_ServerConfig(std::ifstream &file) {
@@ -234,10 +218,10 @@ static std::vector<std::string> get_pattern(std::string line) {
   return (temp);
 }
 
-static std::vector<std::vector<std::string> >
-make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
+static std::vector<std::vector<std::string>>
+make_paths_from_url_pattern(std::vector<std::vector<std::string>> paths,
                             std::vector<std::string> pattern, int index) {
-  std::vector<std::vector<std::string> > new_paths;
+  std::vector<std::vector<std::string>> new_paths;
   std::string seg = paths[0][static_cast<size_t>(index)];
   std::string prefix = "";
   std::string suffix = "";
@@ -259,10 +243,10 @@ make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
   return (new_paths);
 }
 
-static std::vector<std::vector<std::string> >
+static std::vector<std::vector<std::string>>
 expand_url_pattern(std::string line) {
   std::vector<std::string> path(string_split(line, "/"));
-  std::vector<std::vector<std::string> > paths;
+  std::vector<std::vector<std::string>> paths;
 
   paths.push_back(
       path); // path = /download/*.(jpg|jpeg|gif)을 string_split한 상태
@@ -337,8 +321,8 @@ RuleOperator ServerConfig::parse_RuleOperator(std::string indicator) {
 bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
                                     std::vector<Http::Method> mets) {
   RouteRule route;
-  std::vector<std::vector<std::string> > path_url;
-  std::vector<std::vector<std::string> > root_url;
+  std::vector<std::vector<std::string>> path_url;
+  std::vector<std::vector<std::string>> root_url;
 
   if (data.size() != 4)
     return (false);

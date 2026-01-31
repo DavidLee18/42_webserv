@@ -1,7 +1,6 @@
 #ifndef SERVERCONFIG_HPP
 #define SERVERCONFIG_HPP
 
-#include "ParsingUtils.hpp"
 #include "http_1_1.h"
 
 typedef std::map<std::string, std::map<std::string, std::string> > Header;
@@ -21,34 +20,36 @@ enum RuleOperator {
   UNDEFINED,
 };
 
-class Pathpattern {
+class PathPattern {
 private:
   std::vector<std::string> path;
 
   bool match(std::string wildcard, std::string path) const;
 
 public:
-  Pathpattern() : path() {}
-  Pathpattern(std::vector<std::string> path) : path(path) {}
+  PathPattern() : path() {}
+  PathPattern(std::vector<std::string> path) : path(path) {}
 
   bool operator==(const std::string &) const;
-  friend bool operator==(const std::string &line, const Pathpattern &path) {
+  friend bool operator==(const std::string &line, const PathPattern &path) {
     return (path == line);
   }
 
-  bool operator<(const Pathpattern &) const;
+  bool operator<(const PathPattern &) const;
+  bool operator<(std::string const &) const;
+  friend bool operator<(std::string const &, PathPattern const &);
 };
 
 struct RouteRule {
   Http::Method method; // GET | POST | DELETE 등
-  Pathpattern path;    // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
+  PathPattern path;    // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
   int status_code;     // 상태코드
 
   RuleOperator op;
   std::string redirectTarget;
 
   // 정적 파일 전용
-  Pathpattern root;                      // "/spool/www"
+  PathPattern root;                      // "/spool/www"
   std::string index;                     // "index2.html" (있으면)
   std::string authInfo;                  // "@auth_info"에서 추출
   long maxBodyMB;                        // "< 10MB" → 10 * 1024 * 1024
@@ -59,7 +60,9 @@ class ServerConfig {
 private:
   Header header;
   int serverResponseTime;
-  std::map<std::pair<Http::Method, Pathpattern>, RouteRule, std::less<> > routes;
+  std::map<std::pair<Http::Method, PathPattern>, RouteRule,
+           std::less<PathPattern> >
+      routes;
   std::string err_line;
 
   ServerConfig() : header(), serverResponseTime(-1), routes(), err_line() {}

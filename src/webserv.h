@@ -3,6 +3,8 @@
 
 #define BUFFER_SIZE 42
 #define LONG_DOUBLE_DIGITS 37
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) > (b) ? (b) : (a))
 
 #include "ParsingUtils.hpp"
 #include "ServerConfig.hpp"
