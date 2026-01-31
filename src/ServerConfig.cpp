@@ -162,19 +162,38 @@ void ServerConfig::parse_serverResponseTime(std::string line) {
 
 static bool is_pattern(std::string line)
 {
-  size_t string_pos = line.find("*");
-  if (string_pos == std::string::npos)
-    return (false);
-  size_t pattrn_pos = line.find(".(");
-  if (pattrn_pos == std::string::npos)
-    return (false);
-  // if (pattrn_pos <= string_pos)
-    // return (false);
-  // for (size_t i = 0; i < line.length(); ++i)
-  // {
-  //   if (
-  // }
-  return (true);
+  size_t pos = line.find("*.");
+  if (pos == std::string::npos)
+      return false;
+  pos = pos + 2;
+  if (pos >= line.size())
+      return false;
+  if (line[pos] != '(' || line.back() != ')')
+      return false;
+
+  std::string inside = line.substr(pos + 1, line.size() - pos - 2);
+  if (inside.empty())
+      return false;
+
+  size_t count = 0;
+  size_t start = 0;
+  while (1)
+  {
+      size_t pos = inside.find('|', start);
+      std::string ext = inside.substr(start, pos - start);
+      if (ext.empty())
+          return false;
+      for (size_t i = 0; i < ext.size(); ++i)
+      {
+          if (!std::isalnum(static_cast<unsigned char>(ext[i])))
+              return false;
+      }
+      count++;
+      if (pos == std::string::npos)
+          break;
+      start = pos + 1;
+  }
+  return count >= 2;
 }
 
 static std::vector<std::string> get_pattern(std::string line)
@@ -227,14 +246,13 @@ static std::vector<std::vector<std::string>> expand_url_pattern(std::string line
   std::vector<std::string> path(string_split(line, "/"));
   std::vector<std::vector<std::string>> paths;
 
-  paths.push_back(path); // path = /download/*.(jpg|jpeg|gif)을 string_split한 상태
+  paths.push_back(path);
   for (size_t i = 0; i < path.size(); ++i)
   {
-    if (is_pattern(path[i])) // path[i] = *.(jpg|jpeg|gif) 이때 참
+    if (is_pattern(path[i]))
     {
-      std::vector<std::string> pattern = get_pattern(path[i]); // jpg, jpeg, gif 등등 담은 백터
+      std::vector<std::string> pattern = get_pattern(path[i]);
       paths = make_paths_from_url_pattern(paths, pattern, i);
-      // /download/*.jpg, /download/*.jpeg, /download/*.gif이 3개 원소를 '/'으로 split한 백터
     }
     else
       continue;
@@ -312,7 +330,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data, std::vector<H
     route.maxBodyMB = 1;
     path_url = expand_url_pattern(data[1]);
     root_url = expand_url_pattern(data[3]);
-    if (path_url.size() < 1 || root_url.size() < 1)
+    if (path_url.size() < 1 || root_url.size() < 1 || path_url.size() != root_url.size())
       return (false);
     for (size_t i = 0; i < path_url.size(); ++i)
     {
