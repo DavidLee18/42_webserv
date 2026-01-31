@@ -20,7 +20,7 @@ Result<FileDescriptor> FileDescriptor::socket_new() {
     }
   }
   FileDescriptor fd;
-  fd.set_fd(sock);
+  fd._fd = sock;
   return OK(FileDescriptor, fd);
 }
 
@@ -28,35 +28,70 @@ Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
   if (raw_fd < 0)
     return ERR(FileDescriptor, Errors::invalid_fd);
   FileDescriptor fd;
-  fd.set_fd(raw_fd);
+  fd._fd = raw_fd;
+  return OK(FileDescriptor, fd);
+}
+
+Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
+  int _fd = open(path.c_str(), O_RDONLY);
+  if (_fd < 0)
+    return ERR(FileDescriptor,
+               Errors::invalid_fd); // TODO: specify error kind and message.
+  FileDescriptor fd;
+  fd._fd = _fd;
+  FILE *fp = fdopen(_fd, "r");
+  if (fp == NULL) {
+    switch (errno) {
+    case EMFILE:
+      return ERR(FileDescriptor, Errors::stream_too_many);
+    case EBADF:
+      return ERR(FileDescriptor, Errors::invalid_fd);
+    case ENOMEM:
+      return ERR(FileDescriptor, Errors::out_of_mem);
+    default:
+      std::stringstream ss("an unknown error occured; errno: ");
+      ss << errno;
+      return ERR(FileDescriptor, ss.str());
+    }
+  }
+  fd.fp = fp;
   return OK(FileDescriptor, fd);
 }
 
 // Move-like copy constructor: transfers ownership from other
-FileDescriptor::FileDescriptor(const FileDescriptor &other) {
-  _fd = other._fd;
+FileDescriptor::FileDescriptor(const FileDescriptor &other)
+    : _fd(other._fd), fp(other.fp) {
   // Invalidate source to transfer ownership (cast away const for move
   // semantics)
-  const_cast<FileDescriptor &>(other)._fd = -1;
+  FileDescriptor other_ = const_cast<FileDescriptor &>(other);
+  other_._fd = -1;
+  other_.fp = NULL;
 }
 
 // Move-like assignment operator: transfers ownership from other
 FileDescriptor &FileDescriptor::operator=(const FileDescriptor &other) {
   if (this != &other) {
     // Close current fd if valid
-    if (_fd >= 0)
+    if (fp != NULL)
+      std::fclose(fp);
+    else if (_fd >= 0)
       close(_fd);
 
     // Transfer ownership
     _fd = other._fd;
+    fp = other.fp;
     // Invalidate source (cast away const for move semantics)
-    const_cast<FileDescriptor &>(other)._fd = -1;
+    FileDescriptor &other_ = const_cast<FileDescriptor &>(other);
+    other_._fd = -1;
+    other_.fp = NULL;
   }
   return *this;
 }
 
 FileDescriptor::~FileDescriptor() {
-  if (_fd >= 0)
+  if (fp != NULL)
+    std::fclose(fp);
+  else if (_fd >= 0)
     close(_fd);
 }
 
@@ -118,7 +153,7 @@ Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
   int fd = accept(_fd, addr, len);
   if (fd >= 0) {
     FileDescriptor fd_;
-    fd_.set_fd(fd);
+    fd_._fd = fd;
     return OK(FileDescriptor, fd_);
   }
   switch (errno) {
@@ -214,6 +249,24 @@ Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) {
     return ERR(ssize_t, "send failed");
   }
   return OK(ssize_t, res);
+}
+
+Result<std::string> FileDescriptor::read_file_line() {
+  std::string res;
+  char *buf = new char[4097];
+  while (std::fgets(buf, 4096, fp)) {
+    res += buf;
+    if (std::strlen(buf) < 4096)
+      return (delete[] buf, OK(std::string, res));
+    delete[] buf;
+    buf = new char[4097];
+  }
+  if (!std::feof(fp))
+    return ERR(std::string,
+               "file read failed"); // TODO: specify error kind and message
+  res += buf;
+  delete[] buf;
+  return OK(std::string, res);
 }
 
 bool operator==(const int &lhs, const FileDescriptor &rhs) {

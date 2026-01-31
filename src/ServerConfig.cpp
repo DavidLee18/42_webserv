@@ -43,7 +43,7 @@ bool operator<(std::string const &l, PathPattern const &r) {
   return (!(r < l) && !(l == r));
 }
 
-bool ServerConfig::set_ServerConfig(std::ifstream &file) {
+Result<ServerConfig> ServerConfig::read_from_file(FileDescriptor &fd) {
   std::string line;
 
   while (std::getline(file, line)) {
@@ -94,7 +94,7 @@ bool ServerConfig::is_header(const std::string &line) {
   return (false);
 }
 
-bool ServerConfig::parse_header_line(std::ifstream &file, std::string line) {
+bool ServerConfig::parse_header_line(FileDescriptor &fd, std::string line) {
   std::string temp(line);
   std::vector<std::string> key_value = string_split(temp, ":");
 
@@ -218,10 +218,10 @@ static std::vector<std::string> get_pattern(std::string line) {
   return (temp);
 }
 
-static std::vector<std::vector<std::string>>
-make_paths_from_url_pattern(std::vector<std::vector<std::string>> paths,
+static std::vector<std::vector<std::string> >
+make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
                             std::vector<std::string> pattern, int index) {
-  std::vector<std::vector<std::string>> new_paths;
+  std::vector<std::vector<std::string> > new_paths;
   std::string seg = paths[0][static_cast<size_t>(index)];
   std::string prefix = "";
   std::string suffix = "";
@@ -243,10 +243,10 @@ make_paths_from_url_pattern(std::vector<std::vector<std::string>> paths,
   return (new_paths);
 }
 
-static std::vector<std::vector<std::string>>
+static std::vector<std::vector<std::string> >
 expand_url_pattern(std::string line) {
   std::vector<std::string> path(string_split(line, "/"));
-  std::vector<std::vector<std::string>> paths;
+  std::vector<std::vector<std::string> > paths;
 
   paths.push_back(
       path); // path = /download/*.(jpg|jpeg|gif)을 string_split한 상태
@@ -321,8 +321,8 @@ RuleOperator ServerConfig::parse_RuleOperator(std::string indicator) {
 bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
                                     std::vector<Http::Method> mets) {
   RouteRule route;
-  std::vector<std::vector<std::string>> path_url;
-  std::vector<std::vector<std::string>> root_url;
+  std::vector<std::vector<std::string> > path_url;
+  std::vector<std::vector<std::string> > root_url;
 
   if (data.size() != 4)
     return (false);
@@ -346,7 +346,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
 }
 
 bool ServerConfig::parse_RouteRule(std::string method_line,
-                                   std::ifstream &file) {
+                                   FileDescriptor &fd) {
   std::string line;
   std::vector<Http::Method> mets;
   std::vector<std::string> method_line_data = string_split(method_line, " ");

@@ -20,6 +20,7 @@
 #include <cctype>
 #include <cerrno>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <dirent.h>

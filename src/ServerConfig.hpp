@@ -1,6 +1,7 @@
 #ifndef SERVERCONFIG_HPP
 #define SERVERCONFIG_HPP
 
+#include "file_descriptor.h"
 #include "http_1_1.h"
 
 typedef std::map<std::string, std::map<std::string, std::string> > Header;
@@ -60,15 +61,13 @@ class ServerConfig {
 private:
   Header header;
   int serverResponseTime;
-  std::map<std::pair<Http::Method, PathPattern>, RouteRule,
-           std::less<PathPattern> >
-      routes;
+  std::map<std::pair<Http::Method, PathPattern>, RouteRule> routes;
   std::string err_line;
 
   ServerConfig() : header(), serverResponseTime(-1), routes(), err_line() {}
   // header method
   bool is_header(const std::string &line);
-  bool parse_header_line(std::ifstream &file, std::string line);
+  bool parse_header_line(FileDescriptor &fd, std::string line);
   bool is_header_key(std::string &key);
   bool parse_header_value(std::string value, const std::string key);
   // serverResponseTime method
@@ -76,7 +75,7 @@ private:
   void parse_serverResponseTime(std::string line);
   // RouteRule method
   bool is_RouteRule(std::string line);
-  bool parse_RouteRule(std::string line, std::ifstream &file);
+  bool parse_RouteRule(std::string line, FileDescriptor &fd);
   bool parse_Httpmethod(std::vector<std::string> data,
                         std::vector<Http::Method> mets);
   bool parse_Rule(std::vector<Http::Method> met, std::string key,
@@ -85,6 +84,7 @@ private:
 
 public:
   std::string Geterr_line(void);
+  Result<ServerConfig> read_from_file(FileDescriptor &);
 };
 
 #endif
