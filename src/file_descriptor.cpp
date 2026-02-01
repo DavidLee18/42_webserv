@@ -252,6 +252,8 @@ Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) {
 }
 
 Result<std::string> FileDescriptor::read_file_line() {
+  if (fp == NULL)
+    return ERR(std::string, "FILE not initialized");
   std::string res;
   char *buf = new char[4097];
   while (std::fgets(buf, 4096, fp)) {
