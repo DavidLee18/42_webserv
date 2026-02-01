@@ -260,8 +260,41 @@ static std::vector<std::vector<std::string>> expand_url_pattern(std::string line
   return (paths);
 }  
 
-bool ServerConfig::is_RouteRule(std::string line) {
-  (void)line;
+static bool is_url(std::string url)
+{
+  size_t i = 0;
+  int flag = 0;
+
+  for (; i < url.size(); ++i)
+  {
+    if (url[i] == '*')
+      flag += 1;
+    else if (url[i] == '/')
+      flag = 0;
+    if (flag > 1)
+      return (false);
+  }
+  return (true);
+}
+
+bool ServerConfig::is_RouteRule(std::string line) { // 메서드가 맞는지 정도만 확인, path,root이 정상적으로 생겻는지 판단
+  std::vector<std::string> split = string_split(line, " ");
+  
+  if (split.size() != 4 || parse_RuleOperator(split[2]) == UNDEFINE || is_url(split[1]) || is_url(split[3])) // 크기 확인, op확인
+    return (false);
+
+  std::vector<std::string> method = string_split(split[0], "|");
+  for (size_t i = 0; i < method.size(); ++i) // 메서드 확인
+  {
+    if (method[i] == "GET")
+      mets.push_back(GET);
+    else if (method[i] == "POST")
+      mets.push_back(POST);
+    else if (method[i] == "DELETE")
+      mets.push_back(DELETE);
+    else
+      return (false);
+  }
   return (true);
 }
 
@@ -324,7 +357,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data, std::vector<H
   for (size_t i = 0; i < mets.size(); ++i)
   {
     route.method = mets[i];
-    route.op = parse_RuleOperator(data[2]);
+    route.op = parse_RuleOperator(data[2]); // 타입 확인후 에러 처리 준비
     route.index = "";
     route.authInfo = "";
     route.maxBodyMB = 1;
@@ -332,7 +365,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data, std::vector<H
     root_url = expand_url_pattern(data[3]);
     if (path_url.size() < 1 || root_url.size() < 1 || path_url.size() != root_url.size())
       return (false);
-    for (size_t i = 0; i < path_url.size(); ++i)
+    for (size_t i = 0; i < path_url.size(); ++i) // path와 root이 정상적인지, 서로 패턴이 매칭이 되는지 확인
     {
       route.path = path_url[i];
       route.root = root_url[i];
