@@ -64,7 +64,7 @@ private:
   std::map<std::pair<Http::Method, PathPattern>, RouteRule> routes;
   std::string err_line;
 
-  ServerConfig() : header(), serverResponseTime(-1), routes(), err_line() {}
+  bool set_ServerConfig(FileDescriptor &fd);
   // header method
   bool is_header(const std::string &line);
   bool parse_header_line(FileDescriptor &fd, std::string line);
@@ -77,14 +77,16 @@ private:
   bool is_RouteRule(std::string line);
   bool parse_RouteRule(std::string line, FileDescriptor &fd);
   bool parse_Httpmethod(std::vector<std::string> data,
-                        std::vector<Http::Method> mets);
+  std::vector<Http::Method> mets);
   bool parse_Rule(std::vector<Http::Method> met, std::string key,
-                  std::string line);
+    std::string line);
   RuleOperator parse_RuleOperator(std::string indicator);
-
+      
 public:
+  ServerConfig(FileDescriptor &);
+  ServerConfig() : header(), serverResponseTime(-1), routes(), err_line() {}
   std::string Geterr_line(void);
-  Result<ServerConfig> read_from_file(FileDescriptor &);
+  // Result<ServerConfig> read_from_file(FileDescriptor &);
 };
 
 #endif

@@ -1,20 +1,22 @@
 #include "webserv.h"
 
-WebserverConfig::WebserverConfig(std::ifstream &file) {
+WebserverConfig::WebserverConfig(FileDescriptor &file) {
   err_meg = "";
   if (!this->file_parsing(file)) {
-    file.close();
     return;
   }
 
-  file.close();
   return;
 }
 
-bool WebserverConfig::file_parsing(std::ifstream &file) {
+bool WebserverConfig::file_parsing(FileDescriptor &file) {
   std::string line;
-
-  while (std::getline(file, line) && is_tab_or_space(line, 0)) {
+  
+  while (true) {
+    Result<std::string> temp = file.read_file_line();
+    line = temp.value();
+    if (temp.error() != "" && is_tab_or_space(line, 0))
+      break ;
     if (line == "types =" || line == "types=") {
       if (!set_type_map(file))
         return (false);
@@ -100,13 +102,17 @@ bool WebserverConfig::parse_type_line(const std::string &line,
   return (true);
 }
 
-bool WebserverConfig::set_type_map(std::ifstream &file) {
+bool WebserverConfig::set_type_map(FileDescriptor &file) {
   std::string line;
   std::string value;
   std::vector<std::string> keys;
   std::vector<std::string> map_data;
 
-  while (std::getline(file, line) && is_tab_or_space(line, 1)) {
+  while (true) {
+    Result<std::string> temp = file.read_file_line();
+    line = temp.value();
+    if ((temp.error() != "" && is_tab_or_space(line, 1)))
+      break ;
     if (!parse_type_line(line, keys, value)) {
       err_meg = "Type syntax Error: " + line;
       return (false);
@@ -146,7 +152,7 @@ bool WebserverConfig::is_ServerConfig(const std::string &line) {
   return (i == line.size());
 }
 
-bool WebserverConfig::set_ServerConfig_map(std::ifstream &file,
+bool WebserverConfig::set_ServerConfig_map(FileDescriptor &file,
                                            const std::string &line) {
   unsigned int key;
   std::string temp(line);

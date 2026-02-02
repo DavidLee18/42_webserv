@@ -11,9 +11,9 @@ private:
   std::map<unsigned int, ServerConfig>
       ServerConfig_map; // key unsigned int로 변환
 
-  bool file_parsing(std::ifstream &file);
+  bool file_parsing(FileDescriptor &file);
   // type_map method
-  bool set_type_map(std::ifstream &file);
+  bool set_type_map(FileDescriptor &file);
   bool parse_type_line(const std::string &line,
                        std::vector<std::string> &keys_out,
                        std::string &value_out);
@@ -21,17 +21,17 @@ private:
   bool is_typeValue(const std::string &value);
   // ServerConfig method
   bool is_ServerConfig(const std::string &line);
-  bool set_ServerConfig_map(std::ifstream &file, const std::string &line);
+  bool set_ServerConfig_map(FileDescriptor &file, const std::string &line);
   unsigned int parse_ServerConfig_key(std::string &key);
 
-  WebserverConfig(std::ifstream &file);
+  WebserverConfig(FileDescriptor &file);
 
 public:
   WebserverConfig(const WebserverConfig &other)
       : default_mime(other.default_mime), type_map(other.type_map),
         ServerConfig_map(other.ServerConfig_map) {};
 
-  static Result<WebserverConfig> parse(std::ifstream &file) {
+  static Result<WebserverConfig> parse(FileDescriptor &file) {
     WebserverConfig temp(file);
     // OK
     if (temp.err_meg == "")

@@ -58,7 +58,8 @@ int main(const int argc, char *argv[]) {
   // Json *js = res.value()->first;
   // std::cout << *js << std::endl;
   // delete js;
-  WebserverConfig config(argv[1]);
+  Result<FileDescriptor> fd = FileDescriptor::open_file(argv[1]);
+  Result<WebserverConfig> config = WebserverConfig::parse(const_cast<FileDescriptor&>(fd.value()));
 
   signal(SIGINT, wrap_up);
 
