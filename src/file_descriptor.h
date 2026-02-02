@@ -17,15 +17,17 @@ class Event;
 
 class FileDescriptor {
   int _fd;
-
-  void set_fd(int fd) { _fd = fd; }
-  FileDescriptor() { _fd = -1; }
+  FILE *fp;
+  
+  FileDescriptor() : _fd(-1), fp(NULL) {}
 
 public:
   static Result<FileDescriptor> from_raw(int);
 
   static Result<FileDescriptor> socket_new();
-
+  
+  static Result<FileDescriptor> open_file(std::string const &);
+  
   // Move-like copy constructor: transfers ownership from other
   FileDescriptor(const FileDescriptor &other);
 
@@ -79,6 +81,8 @@ public:
                                  socklen_t optlen);
 
   Result<ssize_t> sock_send(const void *buf, size_t size);
+
+  Result<std::string> read_file_line();
 
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {

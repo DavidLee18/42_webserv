@@ -29,3 +29,5 @@ const std::string Errors::too_long_num = "Too long numbers";
 const std::string Errors::out_of_rng = "value out of range";
 const std::string Errors::invalid_json =
     "String is not of a valid JSON format.";
+const std::string Errors::stream_too_many =
+    "The maximum number of streams are currently open in the calling process.";

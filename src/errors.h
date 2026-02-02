@@ -31,6 +31,7 @@ public:
   const static std::string too_long_num;
   const static std::string out_of_rng;
   const static std::string invalid_json;
+  const static std::string stream_too_many;
 };
 
 #endif // ERRORS_H
