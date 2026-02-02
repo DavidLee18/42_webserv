@@ -102,9 +102,9 @@ bool ServerConfig::is_header_key(std::string &key) {
 bool ServerConfig::parse_header_value(std::string value,
                                       const std::string key) {
   if (value.empty())
-    return (false);
+    return false;
   if (value[value.length() - 1] == ' ' || value[value.length() - 1] == '\t')
-    return (false);
+    return false;
   std::vector<std::string> values = string_split(trim_space(value), ";");
   std::vector<std::string> temp;
   for (size_t i = 0; i < values.size(); i++) {
@@ -121,12 +121,11 @@ bool ServerConfig::parse_header_value(std::string value,
         if (temp[1][j] == '\'')
           return false;
       header[key][temp[0]] = temp[1];
-    } else {
-      // err_line.push_back(trim_space(value));
-      return (false);
     }
+    else
+      return false;
   }
-  return (true);
+  return true;
 }
 
 // serverResponseTime method

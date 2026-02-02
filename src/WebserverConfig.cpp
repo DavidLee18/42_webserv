@@ -33,14 +33,6 @@ bool WebserverConfig::file_parsing(std::ifstream &file) {
     return (false);
   return (true);
 }
-// for (std::map<std::string, std::string>::iterator it =
-// this->type_map.begin();
-//      it != this->type_map.end();
-//      ++it)
-// {
-//     std::cout << it->first << " = " << it->second << std::endl;
-// }
-// std::cout << default_mime << std::endl;
 
 WebserverConfig::~WebserverConfig() {};
 
@@ -166,7 +158,7 @@ bool WebserverConfig::set_ServerConfig_map(std::ifstream &file,
   ServerConfig config(file);
 
   key = parse_ServerConfig_key(temp);
-  if (config.Geterr_line() != "") { // 서버블럭 확인
+  if (config.Geterr_line() != "") {
     err_meg = temp + " " + config.Geterr_line();
     return (false);
   }
