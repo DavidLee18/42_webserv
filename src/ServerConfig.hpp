@@ -3,6 +3,7 @@
 
 #include "file_descriptor.h"
 #include "http_1_1.h"
+#include <unistd.h>
 
 typedef std::map<std::string, std::map<std::string, std::string> > Header;
 enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
