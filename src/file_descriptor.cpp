@@ -63,9 +63,8 @@ FileDescriptor::FileDescriptor(const FileDescriptor &other)
     : _fd(other._fd), fp(other.fp) {
   // Invalidate source to transfer ownership (cast away const for move
   // semantics)
-  FileDescriptor other_ = const_cast<FileDescriptor &>(other);
-  other_._fd = -1;
-  other_.fp = NULL;
+  (const_cast<FileDescriptor &>(other))._fd = -1;
+  (const_cast<FileDescriptor &>(other)).fp = NULL;
 }
 
 // Move-like assignment operator: transfers ownership from other
@@ -81,9 +80,8 @@ FileDescriptor &FileDescriptor::operator=(const FileDescriptor &other) {
     _fd = other._fd;
     fp = other.fp;
     // Invalidate source (cast away const for move semantics)
-    FileDescriptor &other_ = const_cast<FileDescriptor &>(other);
-    other_._fd = -1;
-    other_.fp = NULL;
+    (const_cast<FileDescriptor &>(other))._fd = -1;
+    (const_cast<FileDescriptor &>(other)).fp = NULL;
   }
   return *this;
 }
