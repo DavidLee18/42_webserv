@@ -62,7 +62,7 @@ int main(const int argc, char *argv[]) {
   Result<FileDescriptor> fd = FileDescriptor::open_file(argv[1]);
   write(1, "2\n", 2);
   Result<WebserverConfig> config = WebserverConfig::parse(const_cast<FileDescriptor&>(fd.value()));
-
+  (void)config;
   // signal(SIGINT, wrap_up);
 // 
 // #ifdef __APPLE__

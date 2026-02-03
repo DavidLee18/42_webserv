@@ -317,19 +317,18 @@ static bool is_url(std::string url)
 bool ServerConfig::is_RouteRule(std::string line) { // 메서드가 맞는지 정도만 확인, path,root이 정상적으로 생겻는지 판단
   std::vector<std::string> split = string_split(line, " ");
   
-  if (split.size() != 4 || parse_RuleOperator(split[2]) == UNDEFINED || is_url(split[1]) || is_url(split[3])) // 크기 확인, op확인
+  if (split.size() != 4 || parse_RuleOperator(split[2]) == UNDEFINED || !is_url(split[1]) || !is_url(split[3])) // 크기 확인, op확인
     return (false);
 
   std::vector<std::string> method = string_split(split[0], "|");
-  std::vector<Http::Method> mets;
   for (size_t i = 0; i < method.size(); ++i) // 메서드 확인
   {
     if (method[i] == "GET")
-      mets.push_back(Http::GET);
+      continue ;
     else if (method[i] == "POST")
-      mets.push_back(Http::POST);
+      continue ;
     else if (method[i] == "DELETE")
-      mets.push_back(Http::DELETE);
+      continue ;
     else
       return (false);
   }
@@ -432,7 +431,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
       return (false);
   }
 
-  if (parse_Httpmethod(method_line_data, mets))
+  if (!parse_Httpmethod(method_line_data, mets))
     return (false);
 
   while (true) {
