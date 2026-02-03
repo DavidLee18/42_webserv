@@ -43,22 +43,35 @@ bool operator<(std::string const &l, PathPattern const &r) {
   return (!(r < l) && !(l == r));
 }
 
-Result<ServerConfig> ServerConfig::read_from_file(FileDescriptor &fd) {
+ServerConfig::ServerConfig(FileDescriptor &file) {
+  err_line = "";
+  serverResponseTime = 3;
+  if (!set_ServerConfig(file)) {
+    return ;
+  }
+  return ;
+}
+
+bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
   std::string line;
 
-  while (std::getline(file, line)) {
+  while (true) {
+    Result<std::string> temp = fd.read_file_line();
+    line = temp.value();
+    if (temp.error() != "")
+      break;
     if (is_tab_or_space(line, 0))
       continue;
     else if (is_tab_or_space(line, 1)) {
       if (is_header(line)) {
-        if (!parse_header_line(file, line)) {
+        if (!parse_header_line(fd, line)) {
           err_line = "Header syntax Error: " + err_line;
           return (false);
         }
       } else if (is_serverResponseTime(line))
         parse_serverResponseTime(line);
       else if (is_RouteRule(line)) {
-        if (!parse_RouteRule(line, file)) { // line을 같이 넘겨서 등록 추가
+        if (!parse_RouteRule(line, fd)) { // line을 같이 넘겨서 등록 추가
           err_line = "RouteRule syntax Error: " + err_line;
           return (false);
         }
@@ -105,8 +118,11 @@ bool ServerConfig::parse_header_line(FileDescriptor &fd, std::string line) {
   temp = key_value[1];
   if (!is_header_key(key) || !parse_header_value(temp, key))
     return (false);
-  while (!temp.empty() && temp[temp.length() - 1] == ';' &&
-         getline(file, temp)) {
+  while (!temp.empty() && temp[temp.length() - 1] == ';') {
+    Result<std::string> fd_line = fd.read_file_line();
+    if (fd_line.error() != "")
+      break ;
+    temp = fd_line.value();
     err_line = temp;
     if (!is_tab_or_space(temp, 2))
       return (false);
@@ -131,9 +147,9 @@ bool ServerConfig::is_header_key(std::string &key) {
 bool ServerConfig::parse_header_value(std::string value,
                                       const std::string key) {
   if (value.empty())
-    return (false);
+    return false;
   if (value[value.length() - 1] == ' ' || value[value.length() - 1] == '\t')
-    return (false);
+    return false;
   std::vector<std::string> values = string_split(trim_space(value), ";");
   std::vector<std::string> temp;
   for (size_t i = 0; i < values.size(); i++) {
@@ -150,12 +166,11 @@ bool ServerConfig::parse_header_value(std::string value,
         if (temp[1][j] == '\'')
           return false;
       header[key][temp[0]] = temp[1];
-    } else {
-      // err_line.push_back(trim_space(value));
-      return (false);
     }
+    else
+      return false;
   }
-  return (true);
+  return true;
 }
 
 // serverResponseTime method
@@ -186,20 +201,40 @@ void ServerConfig::parse_serverResponseTime(std::string line) {
 
 // RouteRule method
 
-static bool is_pattern(std::string line) {
-  size_t string_pos = line.find("*");
-  if (string_pos == std::string::npos)
-    return (false);
-  size_t pattrn_pos = line.find(".(");
-  if (pattrn_pos == std::string::npos)
-    return (false);
-  // if (pattrn_pos <= string_pos)
-  // return (false);
-  // for (size_t i = 0; i < line.length(); ++i)
-  // {
-  //   if (
-  // }
-  return (true);
+static bool is_pattern(std::string line)
+{
+  size_t pos = line.find("*.");
+  if (pos == std::string::npos)
+      return false;
+  pos = pos + 2;
+  if (pos >= line.size())
+      return false;
+  if (line[pos] != '(' || line[line.length() - 1] != ')')
+      return false;
+
+  std::string inside = line.substr(pos + 1, line.size() - pos - 2);
+  if (inside.empty())
+      return false;
+
+  size_t count = 0;
+  size_t start = 0;
+  while (1)
+  {
+      size_t pos = inside.find('|', start);
+      std::string ext = inside.substr(start, pos - start);
+      if (ext.empty())
+          return false;
+      for (size_t i = 0; i < ext.size(); ++i)
+      {
+          if (!std::isalnum(static_cast<unsigned char>(ext[i])))
+              return false;
+      }
+      count++;
+      if (pos == std::string::npos)
+          break;
+      start = pos + 1;
+  }
+  return count >= 2;
 }
 
 static std::vector<std::string> get_pattern(std::string line) {
@@ -220,9 +255,9 @@ static std::vector<std::string> get_pattern(std::string line) {
 
 static std::vector<std::vector<std::string> >
 make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
-                            std::vector<std::string> pattern, int index) {
+                            std::vector<std::string> pattern, size_t index) {
   std::vector<std::vector<std::string> > new_paths;
-  std::string seg = paths[0][static_cast<size_t>(index)];
+  std::string seg = paths[0][index];
   std::string prefix = "";
   std::string suffix = "";
 
@@ -236,7 +271,7 @@ make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
   for (size_t i = 0; i < paths.size(); ++i) {
     for (size_t j = 0; j < pattern.size(); ++j) {
       std::vector<std::string> new_path = paths[i];
-      new_path[static_cast<size_t>(index)] = prefix + pattern[j] + suffix;
+      new_path[index] = prefix + pattern[j] + suffix;
       new_paths.push_back(new_path);
     }
   }
@@ -248,24 +283,55 @@ expand_url_pattern(std::string line) {
   std::vector<std::string> path(string_split(line, "/"));
   std::vector<std::vector<std::string> > paths;
 
-  paths.push_back(
-      path); // path = /download/*.(jpg|jpeg|gif)을 string_split한 상태
-  for (size_t i = 0; i < path.size(); ++i) {
-    if (is_pattern(path[i])) // path[i] = *.(jpg|jpeg|gif) 이때 참
+  paths.push_back(path);
+  for (size_t i = 0; i < path.size(); ++i)
+  {
+    if (is_pattern(path[i]))
     {
-      std::vector<std::string> pattern =
-          get_pattern(path[i]); // jpg, jpeg, gif 등등 담은 백터
-      paths = make_paths_from_url_pattern(paths, pattern, static_cast<int>(i));
-      // /download/*.jpg, /download/*.jpeg, /download/*.gif이 3개 원소를 '/'으로
-      // split한 백터
-    } else
+      std::vector<std::string> pattern = get_pattern(path[i]);
+      paths = make_paths_from_url_pattern(paths, pattern, i);
+    }
+    else
       continue;
   }
   return (paths);
 }
 
-bool ServerConfig::is_RouteRule(std::string line) {
-  (void)line;
+static bool is_url(std::string url)
+{
+  size_t i = 0;
+  int flag = 0;
+
+  for (; i < url.size(); ++i)
+  {
+    if (url[i] == '*')
+      flag += 1;
+    else if (url[i] == '/')
+      flag = 0;
+    if (flag > 1)
+      return (false);
+  }
+  return (true);
+}
+
+bool ServerConfig::is_RouteRule(std::string line) { // 메서드가 맞는지 정도만 확인, path,root이 정상적으로 생겻는지 판단
+  std::vector<std::string> split = string_split(line, " ");
+  
+  if (split.size() != 4 || parse_RuleOperator(split[2]) == UNDEFINED || !is_url(split[1]) || !is_url(split[3])) // 크기 확인, op확인
+    return (false);
+
+  std::vector<std::string> method = string_split(split[0], "|");
+  for (size_t i = 0; i < method.size(); ++i) // 메서드 확인
+  {
+    if (method[i] == "GET")
+      continue ;
+    else if (method[i] == "POST")
+      continue ;
+    else if (method[i] == "DELETE")
+      continue ;
+    else
+      return (false);
+  }
   return (true);
 }
 
@@ -328,15 +394,16 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
     return (false);
   for (size_t i = 0; i < mets.size(); ++i) {
     route.method = mets[i];
-    route.op = parse_RuleOperator(data[2]);
+    route.op = parse_RuleOperator(data[2]); // 타입 확인후 에러 처리 준비
     route.index = "";
     route.authInfo = "";
     route.maxBodyMB = 1;
     path_url = expand_url_pattern(data[1]);
     root_url = expand_url_pattern(data[3]);
-    if (path_url.size() < 1 || root_url.size() < 1)
+    if (path_url.size() < 1 || root_url.size() < 1 || path_url.size() != root_url.size())
       return (false);
-    for (size_t i = 0; i < path_url.size(); ++i) {
+    for (size_t i = 0; i < path_url.size(); ++i) // path와 root이 정상적인지, 서로 패턴이 매칭이 되는지 확인
+    {
       route.path = path_url[i];
       route.root = root_url[i];
       routes[std::make_pair(route.method, route.path)] = route;
@@ -364,10 +431,14 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
       return (false);
   }
 
-  if (parse_Httpmethod(method_line_data, mets))
+  if (!parse_Httpmethod(method_line_data, mets))
     return (false);
 
-  while (std::getline(file, line)) {
+  while (true) {
+    Result<std::string> temp = fd.read_file_line();
+    line = temp.value();
+    if (temp.error() != "")
+      break;
     err_line = line;
     if (is_tab_or_space(line, 0))
       break;
