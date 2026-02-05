@@ -7,6 +7,7 @@ types =
     png      -> image/png
     _        -> application/octet-stream
 
+
 :80 =
 	[] +<= X-Content-Type-Options: "nosniff"
 	[] +<= Content-Security-Policy: default-src 'self';

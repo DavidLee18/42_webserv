@@ -57,12 +57,14 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
-    line = temp.value();
     if (temp.error() != "")
+      return (false);
+    else if (temp.value() == "")
       break;
-    if (is_tab_or_space(line, 0))
-      continue;
-    else if (is_tab_or_space(line, 1)) {
+    else if (temp.value() == "\n")
+      continue ;
+    line = trim_char(temp.value(), '\n');
+    if (is_tab_or_space(line, 1)) {
       if (is_header(line)) {
         if (!parse_header_line(fd, line)) {
           err_line = "Header syntax Error: " + err_line;
@@ -121,8 +123,10 @@ bool ServerConfig::parse_header_line(FileDescriptor &fd, std::string line) {
   while (!temp.empty() && temp[temp.length() - 1] == ';') {
     Result<std::string> fd_line = fd.read_file_line();
     if (fd_line.error() != "")
+      return (false);
+    if (fd_line.value() == "\n" || fd_line.value() == "")
       break ;
-    temp = fd_line.value();
+    temp = line = trim_char(fd_line.value(), '\n');
     err_line = temp;
     if (!is_tab_or_space(temp, 2))
       return (false);
@@ -436,13 +440,14 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
-    line = temp.value();
+    std::cout << temp.value();
     if (temp.error() != "")
+      return (false);
+    if (temp.value() == "\n" || temp.value() == "")
       break;
+    line = trim_char(temp.value(), '\n');
     err_line = line;
-    if (is_tab_or_space(line, 0))
-      break;
-    else if (is_tab_or_space(line, 2) != false)
+    if (is_tab_or_space(line, 2) == false)
       return (false);
     else if (parse_Rule(mets, method_line_data[1], line))
       continue;
