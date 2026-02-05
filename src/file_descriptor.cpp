@@ -254,6 +254,7 @@ Result<std::string> FileDescriptor::read_file_line() {
     return ERR(std::string, "FILE not initialized");
   std::string res;
   char *buf = new char[4097];
+  std::memset(reinterpret_cast<void *>(buf), 0, 4097);
   while (std::fgets(buf, 4096, fp)) {
     res += buf;
     if (std::strlen(buf) < 4096)
@@ -262,8 +263,9 @@ Result<std::string> FileDescriptor::read_file_line() {
     buf = new char[4097];
   }
   if (!std::feof(fp))
-    return ERR(std::string,
-               "file read failed"); // TODO: specify error kind and message
+    return (delete[] buf,
+            ERR(std::string,
+                "file read failed")); // TODO: specify error kind and message
   res += buf;
   delete[] buf;
   return OK(std::string, res);
