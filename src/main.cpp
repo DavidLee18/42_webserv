@@ -61,25 +61,25 @@ int main(const int argc, char *argv[]) {
     std::cerr << "file open failed: " << fd.error() << std::endl;
     return 1;
   }
-  while (true) {
-    Result<std::string> line = fd.value_mut().read_file_line();
-    if (!line.error().empty()) {
-      std::cerr << line.error() << std::endl;
-      break;
-    }
-    if (line.value().size() == 0) {
-      break;
-    }
-    std::cout << line.value() << std::endl;
-    std::string a;
-    std::getline(std::cin, a);
-  }
-
-  // Result<WebserverConfig> config = WebserverConfig::parse(fd.value_mut());
-  // if (!config.error().empty()) {
-  //   std::cerr << "config parsing failed: " << config.error() << std::endl;
-  //   return 1;
+  // while (true) {
+  //   Result<std::string> line = fd.value_mut().read_file_line();
+  //   if (!line.error().empty()) {
+  //     std::cerr << line.error() << std::endl;
+  //     break;
+  //   }
+  //   if (line.value().size() == 0) {
+  //     break;
+  //   }
+  //   std::cout << line.value() << std::endl;
+  //   std::string a;
+  //   std::getline(std::cin, a);
   // }
+
+  Result<WebserverConfig> config = WebserverConfig::parse(fd.value_mut());
+  if (!config.error().empty()) {
+    std::cerr << "config parsing failed: " << config.error() << std::endl;
+    return 1;
+  }
   return 0;
 }
 

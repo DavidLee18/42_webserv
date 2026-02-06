@@ -73,7 +73,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
       } else if (is_serverResponseTime(line))
         parse_serverResponseTime(line);
       else if (is_RouteRule(line)) {
-        if (!parse_RouteRule(line, fd)) { // line을 같이 넘겨서 등록 추가
+        if (!parse_RouteRule(line, fd)) {
           err_line = "RouteRule syntax Error: " + err_line;
           return (false);
         }
@@ -318,14 +318,14 @@ static bool is_url(std::string url)
   return (true);
 }
 
-bool ServerConfig::is_RouteRule(std::string line) { // 메서드가 맞는지 정도만 확인, path,root이 정상적으로 생겻는지 판단
+bool ServerConfig::is_RouteRule(std::string line) {
   std::vector<std::string> split = string_split(line, " ");
   
   if (split.size() != 4 || parse_RuleOperator(split[2]) == UNDEFINED || !is_url(split[1]) || !is_url(split[3])) // 크기 확인, op확인
     return (false);
 
   std::vector<std::string> method = string_split(split[0], "|");
-  for (size_t i = 0; i < method.size(); ++i) // 메서드 확인
+  for (size_t i = 0; i < method.size(); ++i)
   {
     if (method[i] == "GET")
       continue ;
@@ -398,7 +398,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
     return (false);
   for (size_t i = 0; i < mets.size(); ++i) {
     route.method = mets[i];
-    route.op = parse_RuleOperator(data[2]); // 타입 확인후 에러 처리 준비
+    route.op = parse_RuleOperator(data[2]);
     route.index = "";
     route.authInfo = "";
     route.maxBodyMB = 1;
@@ -406,7 +406,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
     root_url = expand_url_pattern(data[3]);
     if (path_url.size() < 1 || root_url.size() < 1 || path_url.size() != root_url.size())
       return (false);
-    for (size_t i = 0; i < path_url.size(); ++i) // path와 root이 정상적인지, 서로 패턴이 매칭이 되는지 확인
+    for (size_t i = 0; i < path_url.size(); ++i)
     {
       route.path = path_url[i];
       route.root = root_url[i];
@@ -440,7 +440,6 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
-    std::cout << temp.value();
     if (temp.error() != "")
       return (false);
     if (temp.value() == "\n" || temp.value() == "")
