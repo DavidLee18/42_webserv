@@ -53,32 +53,19 @@ int main(const int argc, char *argv[]) {
     std::cerr << "Usage: webserv <config_file>" << std::endl;
     return 1;
   }
-  // Result<std::pair<Json *, size_t> > res = Json::Parser::parse(argv[2],
-  // '\0'); PANIC(res) Json *js = res.value()->first; std::cout << *js <<
-  // std::endl; delete js;
   Result<FileDescriptor> fd = FileDescriptor::open_file(argv[1]);
   if (!fd.error().empty()) {
     std::cerr << "file open failed: " << fd.error() << std::endl;
     return 1;
   }
-  // while (true) {
-  //   Result<std::string> line = fd.value_mut().read_file_line();
-  //   if (!line.error().empty()) {
-  //     std::cerr << line.error() << std::endl;
-  //     break;
-  //   }
-  //   if (line.value().size() == 0) {
-  //     break;
-  //   }
-  //   std::cout << line.value() << std::endl;
-  //   std::string a;
-  //   std::getline(std::cin, a);
-  // }
-
-  Result<WebserverConfig> config = WebserverConfig::parse(fd.value_mut());
-  if (!config.error().empty()) {
-    std::cerr << "config parsing failed: " << config.error() << std::endl;
+  Result<WebserverConfig> result_config = WebserverConfig::parse(fd.value_mut());
+  if (!result_config.error().empty()) {
+    std::cerr << "config parsing failed: " << result_config.error() << std::endl;
     return 1;
+  }
+  else {
+    WebserverConfig config = result_config.value();
+    // std::cout << a << std::endl;
   }
   return 0;
 }

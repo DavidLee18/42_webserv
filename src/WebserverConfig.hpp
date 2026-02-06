@@ -30,7 +30,10 @@ public:
   WebserverConfig(const WebserverConfig &other)
       : default_mime(other.default_mime), type_map(other.type_map),
         ServerConfig_map(other.ServerConfig_map) {};
-
+  
+  const std::string Get_default_mime(void) { return(default_mime); }
+  const std::map<std::string, std::string> Get_Type_map (void) { return(type_map); }
+  const std::map<unsigned int, ServerConfig> Get_ServerConfig_map(void) { return(ServerConfig_map); }
   static Result<WebserverConfig> parse(FileDescriptor &file) {
     WebserverConfig temp(file);
     // OK
@@ -39,5 +42,7 @@ public:
     return ERR(WebserverConfig, temp.err_meg);
   }
 };
+
+std::ostream& operator<<(std::ostream& os, const WebserverConfig& data);
 
 #endif

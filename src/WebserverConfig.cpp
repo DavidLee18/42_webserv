@@ -185,3 +185,8 @@ unsigned int WebserverConfig::parse_ServerConfig_key(std::string &key) {
   return static_cast<unsigned int>(
       std::atoi(key.substr(start, i - start).c_str()));
 }
+
+std::ostream& operator<<(std::ostream& os, const WebserverConfig& data)
+{
+  return (os);
+}
