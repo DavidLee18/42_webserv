@@ -190,7 +190,8 @@ std::ostream& operator<<(std::ostream& os, const WebserverConfig& data)
 {
   std::map<std::string, std::string> ty = data.Get_Type_map();
   std::map<std::string, std::string>::iterator ty_it;
-
+  
+  os << "========================================================" << std::endl;
   os << "Type_map\n" <<std::endl;
   for (ty_it = ty.begin(); ty_it != ty.end(); ++ty_it)
   {

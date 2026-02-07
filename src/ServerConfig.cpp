@@ -375,9 +375,9 @@ static std::string index_parse(std::string line)
     return ("");
 }
 
-static unsigned int errPage_parse(std::string& line)
+static int errPage_parse(std::string& line)
 {
-  unsigned int key = 0;
+  int key = 0;
   std::vector<std::string> key_and_value = string_split(line, ":");
 
   if (key_and_value.size() != 2)
@@ -423,7 +423,7 @@ bool ServerConfig::parse_Rule(std::vector<Http::Method> mets, std::string key, s
       routes[std::make_pair(mets[i], key)].maxBodyKB = max;
   }
   else if (rule[0] == "!") {
-    unsigned int err_key = errPage_parse(rule[1]);
+    int err_key = errPage_parse(rule[1]);
     if (err_key == 0 || size != 2)
       return (false);
     for (size_t i = 0; i < mets.size(); ++i)
@@ -579,16 +579,15 @@ std::ostream& operator<<(std::ostream& os, const ServerConfig& data)
   os << "\nHeader";
   for (header_it = header.begin(); header_it != header.end(); ++header_it)
   {
-    os << "\nkey: " << header_it->first << std::endl;
+    os << "\n\tkey: " << header_it->first << std::endl;
     if (header_it->second.empty())
-      os << "value: nosniff" << std::endl;
+      os << "\tvalue: nosniff" << std::endl;
     else {
       std::map<std::string, std::string>::iterator temp;
       for (temp = header_it->second.begin(); temp != header_it->second.end(); ++temp)
-          os << "value: " << temp->first << " " << temp->second << std::endl;
+          os << "\tvalue: " << temp->first << " " << temp->second << std::endl;
     }
   }
-  os << "========================================================" << std::endl;
 
   std::map<std::pair<Http::Method, PathPattern>, RouteRule> routes = data.Get_Routes();
   std::map<std::pair<Http::Method, PathPattern>, RouteRule>::iterator routes_it;
@@ -597,7 +596,7 @@ std::ostream& operator<<(std::ostream& os, const ServerConfig& data)
   {
     const std::pair<Http::Method, PathPattern>& key = routes_it->first;
     const RouteRule value = routes_it->second;
-    os << "\nRoute key: ";
+    os << "\n\nRoute key: ";
     if (key.first == Http::GET)
       os << "GET, ";
     else if (key.first == Http::POST)
@@ -621,7 +620,11 @@ std::ostream& operator<<(std::ostream& os, const ServerConfig& data)
     os << "\n\tRoot: " << value.root << std::endl;
     os << "\tIndex: " << value.index << std::endl;
     os << "\tAuto Info: " << value.authInfo << std::endl;
-    os << "\tMax Body(KB): " << value.maxBodyKB << std::endl;
+    os << "\tMax Body(KB): " << value.maxBodyKB;
+    std::map<int, std::string>::const_iterator err_it;
+    for (err_it = value.errorPages.begin(); err_it != value.errorPages.end(); ++err_it)
+      os << "\n\tError Page: " << err_it->first << " "  << err_it->second;
   }
+  os << "\n========================================================";
   return (os);
 }
