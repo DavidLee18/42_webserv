@@ -317,7 +317,9 @@ static bool is_url(std::string url)
 }
 
 bool ServerConfig::is_RouteRule(std::string line) {
-  if (std::isspace(line[line.size() - 1]))
+  if (line.empty())
+    return (false);
+  if (std::isspace(static_cast<unsigned char>(line[line.size() - 1])))
     return (false);
   std::vector<std::string> split = string_split(line, " ");
   if (split.size() != 4 || parse_RuleOperator(split[2]) == UNDEFINED || !is_url(split[1]) || !is_url(split[3])) // 크기 확인, op확인
