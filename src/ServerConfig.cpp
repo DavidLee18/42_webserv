@@ -484,6 +484,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
     {
       route.path = path_url[i];
       route.root = root_url[i];
+      // if () //path 와 root의 규칙이 맞는지 확인하는 부분 추가
       if (route.op == REDIRECT)
         route.redirectTarget = root_url[i];
       routes[std::make_pair(route.method, route.path)] = route;
@@ -621,9 +622,13 @@ std::ostream& operator<<(std::ostream& os, const ServerConfig& data)
     os << "\tIndex: " << value.index << std::endl;
     os << "\tAuto Info: " << value.authInfo << std::endl;
     os << "\tMax Body(KB): " << value.maxBodyKB;
-    std::map<int, std::string>::const_iterator err_it;
-    for (err_it = value.errorPages.begin(); err_it != value.errorPages.end(); ++err_it)
-      os << "\n\tError Page: " << err_it->first << " "  << err_it->second;
+    if (value.errorPages.empty())
+      os << "\n\tError Page: " << "empty map";
+    else {
+      std::map<int, std::string>::const_iterator err_it;
+      for (err_it = value.errorPages.begin(); err_it != value.errorPages.end(); ++err_it)
+        os << "\n\tError Page: " << err_it->first << " "  << err_it->second;
+    }
   }
   os << "\n========================================================";
   return (os);
