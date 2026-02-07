@@ -87,9 +87,9 @@ private:
 public:
   ServerConfig(FileDescriptor &);
   ServerConfig() : header(), serverResponseTime(-1), routes(), err_line() {}
-  const Header Get_Header(void) const { return(header); }
+  const Header& Get_Header(void) const { return header; }
   int Get_ServerResponseTime(void) const { return(serverResponseTime); }
-  const std::map<std::pair<Http::Method, PathPattern>, RouteRule> Get_Routes (void) const { return(routes); }
+  const std::map<std::pair<Http::Method, PathPattern>, RouteRule>& Get_Routes (void) const { return routes; }
   std::string Geterr_line(void) { return (err_line); }
   // Result<ServerConfig> read_from_file(FileDescriptor &);
 };
