@@ -346,7 +346,7 @@ static int maxBodyKB_parse(std::string line)
   int maxbody = 0;
   for (; i < line.size(); ++i)
   {
-    if (!std::isdigit(line[i]))
+    if (!std::isdigit(static_cast<unsigned char>(line[i])))
       break;
     maxbody = maxbody * 10 + (line[i] - '0');
   }
@@ -386,7 +386,7 @@ static int errPage_parse(std::string& line)
     return (0);
   for (size_t i = 0; i < key_and_value[0].size(); ++i)
   {
-    if (!std::isdigit(key_and_value[0][i]))
+    if (!std::isdigit(static_cast<unsigned char>(key_and_value[0][i])))
       return (0);
     key = key * 10 + (key_and_value[0][i] - '0');
   }
