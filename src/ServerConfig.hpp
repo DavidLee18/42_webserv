@@ -37,7 +37,7 @@ public:
   friend bool operator==(const std::string &line, const PathPattern &path) {
     return (path == line);
   }
-  std::vector<std::string> Get_path(void) const { return(path); }
+  const std::vector<std::string> &Get_path(void) const { return path; }
   bool operator<(const PathPattern &) const;
   bool operator<(std::string const &) const;
   friend bool operator<(std::string const &, PathPattern const &);
