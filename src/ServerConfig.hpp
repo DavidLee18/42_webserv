@@ -1,6 +1,7 @@
 #ifndef SERVERCONFIG_HPP
 #define SERVERCONFIG_HPP
 
+#include "ParsingUtils.hpp"
 #include "file_descriptor.h"
 #include "http_1_1.h"
 #include <unistd.h>
