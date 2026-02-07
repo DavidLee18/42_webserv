@@ -579,8 +579,8 @@ std::ostream& operator<<(std::ostream& os, const ServerConfig& data)
 {
   os << "Server Response Time(s): " << data.Get_ServerResponseTime() << std::endl;
 
-  Header header = data.Get_Header();
-  Header::iterator header_it;
+  const Header& header = data.Get_Header();
+  Header::const_iterator header_it;
   os << "\nHeader";
   for (header_it = header.begin(); header_it != header.end(); ++header_it)
   {
@@ -588,19 +588,19 @@ std::ostream& operator<<(std::ostream& os, const ServerConfig& data)
     if (header_it->second.empty())
       os << "\tvalue: nosniff" << std::endl;
     else {
-      std::map<std::string, std::string>::iterator temp;
+      std::map<std::string, std::string>::const_iterator temp;
       for (temp = header_it->second.begin(); temp != header_it->second.end(); ++temp)
           os << "\tvalue: " << temp->first << " " << temp->second << std::endl;
     }
   }
 
-  std::map<std::pair<Http::Method, PathPattern>, RouteRule> routes = data.Get_Routes();
-  std::map<std::pair<Http::Method, PathPattern>, RouteRule>::iterator routes_it;
+  const std::map<std::pair<Http::Method, PathPattern>, RouteRule>& routes = data.Get_Routes();
+  std::map<std::pair<Http::Method, PathPattern>, RouteRule>::const_iterator routes_it;
   os << "\nRoutes";
   for (routes_it = routes.begin(); routes_it != routes.end(); ++routes_it)
   {
     const std::pair<Http::Method, PathPattern>& key = routes_it->first;
-    const RouteRule value = routes_it->second;
+    const RouteRule& value = routes_it->second;
     os << "\n\nRoute key: ";
     if (key.first == Http::GET)
       os << "GET, ";
