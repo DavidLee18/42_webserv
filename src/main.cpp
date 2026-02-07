@@ -65,7 +65,7 @@ int main(const int argc, char *argv[]) {
   }
   else {
     WebserverConfig config = result_config.value();
-    // std::cout << a << std::endl;
+    std::cout << config << std::endl;
   }
   return 0;
 }

@@ -97,8 +97,6 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
   return (true);
 }
 
-std::string ServerConfig::Geterr_line(void) { return (err_line); }
-
 // header method
 bool ServerConfig::is_header(const std::string &line) {
   std::string temp = trim_space(line);
@@ -319,8 +317,9 @@ static bool is_url(std::string url)
 }
 
 bool ServerConfig::is_RouteRule(std::string line) {
+  if (std::isspace(line[line.size() - 1]))
+    return (false);
   std::vector<std::string> split = string_split(line, " ");
-  
   if (split.size() != 4 || parse_RuleOperator(split[2]) == UNDEFINED || !is_url(split[1]) || !is_url(split[3])) // 크기 확인, op확인
     return (false);
 
@@ -339,22 +338,75 @@ bool ServerConfig::is_RouteRule(std::string line) {
   return (true);
 }
 
-bool ServerConfig::parse_Rule(std::vector<Http::Method> mets, std::string key,
-                              std::string line) {
-  (void)mets;
-  (void)key;
-  (void)line;
-  // std::vector<std::string> rule = string_split(line, " ");
+static int maxBodyKB_parse(std::string line)
+{
+  size_t i = 0;
+  int maxbody = 0;
+  for (; i < line.size(); ++i)
+  {
+    if (!std::isdigit(line[i]))
+      break;
+    maxbody = maxbody * 10 + (line[i] - '0');
+  }
+  line = line.substr(i);
+  if (line.empty() || line == "KB" || line == "KiB")
+    return (maxbody);
+  else if (line == "MB")
+    return (maxbody * 1000);
+  else if (line == "MiB")
+    return (maxbody * 1024);
+  return (-1);
+}
 
-  // if (rule[0] == "?")
-  //   for (size_t i = 0; i < mets.size(); ++i)
-  //     routes[std::make_pair(mets[i], key)].index = rule[1];
-  // else if (rule[0] == "@")
-  //   for (size_t i = 0; i < mets.size(); ++i)
-  //     routes[std::make_pair(mets[i], key)].authInfo = rule[1];
-  // else if (rule[0] == "->{}")
-  //   for (size_t i = 0; i < mets.size(); ++i)
-  //     routes[std::make_pair(mets[i], key)].maxBodyMB = rule[1];
+static std::string index_parse(std::string line)
+{
+  size_t i = 0;
+  
+  for (; i < line.size(); ++i)
+  {
+    if (line[i] == '.')
+      break;
+  }
+  std::string extension = line.substr(i);
+  if (extension.empty())
+    return ("");
+  else if (extension == ".html" || extension == ".htm")
+    return (line);
+  else
+    return ("");
+}
+
+bool ServerConfig::parse_Rule(std::vector<Http::Method> mets, std::string key, std::string line)
+{
+  if (std::isspace(line[line.size() - 1]))
+    return (false);
+
+  std::vector<std::string> rule = string_split(trim_space(line), " ");
+  size_t size = rule.size();
+
+  if (size < 2)
+    return (false);
+  if (rule[0] == "?") {
+    std::string index = parse_index(rule[1]);
+    if (size != 2 || index == "")
+      return (false);
+    for (size_t i = 0; i < mets.size(); ++i)
+      routes[std::make_pair(mets[i], key)].index = index;
+  }
+  else if (rule[0] == "@") {
+    if (size != 2)
+      return (false);
+    for (size_t i = 0; i < mets.size(); ++i)
+      routes[std::make_pair(mets[i], key)].authInfo = rule[1];
+  }
+  else if (rule[0] == "->{}") {
+    for (size_t i = 0; i < mets.size(); ++i) {
+      int max = maxBodyKB_parse(rule[1]);
+      if (max == -1 || size != 2)
+        return (false);
+      routes[std::make_pair(mets[i], key)].maxBodyKB = max;
+    }
+  }
   // else if (rule[0] == "!")
   //   for (size_t i = 0; i < mets.size(); ++i)
   //     routes[std::make_pair(mets[i], key)].errorPages = rule[1];
@@ -397,11 +449,14 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
   if (data.size() != 4)
     return (false);
   for (size_t i = 0; i < mets.size(); ++i) {
+    route.status_code = 200;
     route.method = mets[i];
     route.op = parse_RuleOperator(data[2]);
+    if (route.op == UNDEFINED)
+      return (false);
     route.index = "";
     route.authInfo = "";
-    route.maxBodyMB = 1;
+    route.maxBodyKB = 1;
     path_url = expand_url_pattern(data[1]);
     root_url = expand_url_pattern(data[3]);
     if (path_url.size() < 1 || root_url.size() < 1 || path_url.size() != root_url.size())
@@ -410,6 +465,8 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
     {
       route.path = path_url[i];
       route.root = root_url[i];
+      if (route.op == REDIRECT)
+        route.redirectTarget = root_url[i];
       routes[std::make_pair(route.method, route.path)] = route;
     }
   }
@@ -455,4 +512,97 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
   }
   err_line = "";
   return (true);
+}
+
+std::ostream& operator<<(std::ostream& os, const PathPattern& data)
+{
+  std::vector<std::string> path = data.Get_path();
+  size_t max = path.size();
+  for (size_t i = 0; i < max; ++i)
+  {
+    os << path[i];
+    if (i + 1 < max)
+      os << "/";
+  }
+  return (os);
+}
+
+static std::string what_RuleOperator(RuleOperator op)
+{
+  if (op == MULTIPLECHOICES)
+    return ("MULTIPLECHOICES (=300>)");
+  else if (op == REDIRECT)
+    return ("REDIRECT (=301>)");
+  else if (op == FOUND)
+    return ("FOUND (=302>)");
+  else if (op == SEEOTHER)
+    return ("SEEOTHER (=303>)");
+  else if (op == NOTMODIFIED)
+    return ("NOTMODIFIED (=304>)");
+  else if (op == TEMPORARYREDIRECT)
+    return ("TEMPORARYREDIRECT (=307>)");
+  else if (op == PERMANENTREDIRECT)
+    return ("PERMANENTREDIRECT (=308>)");
+  else if (op == AUTOINDEX)
+    return ("AUTOINDEX (<i-)");
+  else if (op == POINT)
+    return ("POINT (->)");
+  else
+    return ("SERVEFROM (<-)");
+}
+
+std::ostream& operator<<(std::ostream& os, const ServerConfig& data)
+{
+  os << "Server Response Time(s): " << data.Get_ServerResponseTime() << std::endl;
+
+  Header header = data.Get_Header();
+  Header::iterator header_it;
+  os << "\nHeader";
+  for (header_it = header.begin(); header_it != header.end(); ++header_it)
+  {
+    os << "\nkey: " << header_it->first << std::endl;
+    if (header_it->second.empty())
+      os << "value: nosniff" << std::endl;
+    else {
+      std::map<std::string, std::string>::iterator temp;
+      for (temp = header_it->second.begin(); temp != header_it->second.end(); ++temp)
+          os << "value: " << temp->first << " " << temp->second << std::endl;
+    }
+  }
+  os << "========================================================" << std::endl;
+
+  std::map<std::pair<Http::Method, PathPattern>, RouteRule> routes = data.Get_Routes();
+  std::map<std::pair<Http::Method, PathPattern>, RouteRule>::iterator routes_it;
+  os << "\nRoutes";
+  for (routes_it = routes.begin(); routes_it != routes.end(); ++routes_it)
+  {
+    const std::pair<Http::Method, PathPattern>& key = routes_it->first;
+    const RouteRule value = routes_it->second;
+    os << "\nRoute key: ";
+    if (key.first == Http::GET)
+      os << "GET, ";
+    else if (key.first == Http::POST)
+      os << "POST, ";
+    else if (key.first == Http::DELETE)
+      os << "DELETE, ";
+    os << key.second << std::endl;
+    os << "\tMethod: ";
+    if (key.first == Http::GET)
+      os << "GET";
+    else if (key.first == Http::POST)
+      os << "POST";
+    else if (key.first == Http::DELETE)
+      os << "DELETE";
+    os << "\n\tPath: " << value.path << std::endl;
+    os << "\tStatus code: " << value.status_code << std::endl;
+
+    os << "\n\tRuleOperator: " << what_RuleOperator(value.op) << std::endl;
+    os << "\tRedirect Target: " << value.redirectTarget << std::endl;
+
+    os << "\n\tRoot: " << value.root << std::endl;
+    os << "\tIndex: " << value.index << std::endl;
+    os << "\tAuto Info: " << value.authInfo << std::endl;
+    os << "\tMax Body(KB): " << value.maxBodyKB << std::endl;
+  }
+  return (os);
 }

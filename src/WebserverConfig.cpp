@@ -188,5 +188,24 @@ unsigned int WebserverConfig::parse_ServerConfig_key(std::string &key) {
 
 std::ostream& operator<<(std::ostream& os, const WebserverConfig& data)
 {
+  std::map<std::string, std::string> ty = data.Get_Type_map();
+  std::map<std::string, std::string>::iterator ty_it;
+
+  os << "Type_map\n" <<std::endl;
+  for (ty_it = ty.begin(); ty_it != ty.end(); ++ty_it)
+  {
+    os << "Type key: " << ty_it->first
+    << ", Tpye value: " << ty_it->second << std::endl;
+  }
+  os << "default_mime: " << data.Get_default_mime() << std::endl;
+  os << "========================================================" << std::endl;
+  std::map<unsigned int, ServerConfig> Server_map = data.Get_ServerConfig_map();
+  std::map<unsigned int, ServerConfig>::iterator Server_map_it;
+  os << "Server_map\n" <<std::endl;
+  for (Server_map_it = Server_map.begin(); Server_map_it != Server_map.end(); ++Server_map_it)
+  {
+    os << "Serve key: " << Server_map_it->first << std::endl;
+    os << Server_map_it->second;
+  }
   return (os);
 }
