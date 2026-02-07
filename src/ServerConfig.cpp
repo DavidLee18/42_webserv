@@ -361,7 +361,6 @@ static int maxBodyKB_parse(std::string line)
 static std::string index_parse(std::string line)
 {
   size_t i = 0;
-  
   for (; i < line.size(); ++i)
   {
     if (line[i] == '.')
@@ -376,6 +375,23 @@ static std::string index_parse(std::string line)
     return ("");
 }
 
+static unsigned int errPage_parse(std::string& line)
+{
+  unsigned int key = 0;
+  std::vector<std::string> key_and_value = string_split(line, ":");
+
+  if (key_and_value.size() != 2)
+    return (0);
+  for (size_t i = 0; i < key_and_value[0].size(); ++i)
+  {
+    if (!std::isdigit(key_and_value[0][i]))
+      return (0);
+    key = key * 10 + (key_and_value[0][i] - '0');
+  }
+  line = key_and_value[1];
+  return(key);
+}
+
 bool ServerConfig::parse_Rule(std::vector<Http::Method> mets, std::string key, std::string line)
 {
   if (std::isspace(line[line.size() - 1]))
@@ -387,7 +403,7 @@ bool ServerConfig::parse_Rule(std::vector<Http::Method> mets, std::string key, s
   if (size < 2)
     return (false);
   if (rule[0] == "?") {
-    std::string index = parse_index(rule[1]);
+    std::string index = index_parse(rule[1]);
     if (size != 2 || index == "")
       return (false);
     for (size_t i = 0; i < mets.size(); ++i)
@@ -400,18 +416,21 @@ bool ServerConfig::parse_Rule(std::vector<Http::Method> mets, std::string key, s
       routes[std::make_pair(mets[i], key)].authInfo = rule[1];
   }
   else if (rule[0] == "->{}") {
-    for (size_t i = 0; i < mets.size(); ++i) {
-      int max = maxBodyKB_parse(rule[1]);
-      if (max == -1 || size != 2)
-        return (false);
+    int max = maxBodyKB_parse(rule[1]);
+    if (max == -1 || size != 2)
+      return (false);
+    for (size_t i = 0; i < mets.size(); ++i)
       routes[std::make_pair(mets[i], key)].maxBodyKB = max;
-    }
   }
-  // else if (rule[0] == "!")
-  //   for (size_t i = 0; i < mets.size(); ++i)
-  //     routes[std::make_pair(mets[i], key)].errorPages = rule[1];
-  // else
-  //   return (false);
+  else if (rule[0] == "!") {
+    unsigned int err_key = errPage_parse(rule[1]);
+    if (err_key == 0 || size != 2)
+      return (false);
+    for (size_t i = 0; i < mets.size(); ++i)
+      routes[std::make_pair(mets[i], key)].errorPages[err_key] = rule[1];
+  }
+  else
+    return (false);
   return (true);
 }
 
