@@ -196,7 +196,7 @@ std::ostream& operator<<(std::ostream& os, const WebserverConfig& data)
   for (ty_it = ty.begin(); ty_it != ty.end(); ++ty_it)
   {
     os << "Type key: " << ty_it->first
-    << ", Tpye value: " << ty_it->second << std::endl;
+    << ", Type value: " << ty_it->second << std::endl;
   }
   os << "default_mime: " << data.Get_default_mime() << std::endl;
   os << "========================================================" << std::endl;
@@ -205,7 +205,7 @@ std::ostream& operator<<(std::ostream& os, const WebserverConfig& data)
   os << "Server_map\n" <<std::endl;
   for (Server_map_it = Server_map.begin(); Server_map_it != Server_map.end(); ++Server_map_it)
   {
-    os << "Serve key: " << Server_map_it->first << std::endl;
+    os << "Server key: " << Server_map_it->first << std::endl;
     os << Server_map_it->second;
   }
   return (os);

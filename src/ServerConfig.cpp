@@ -624,7 +624,7 @@ std::ostream& operator<<(std::ostream& os, const ServerConfig& data)
 
     os << "\n\tRoot: " << value.root << std::endl;
     os << "\tIndex: " << value.index << std::endl;
-    os << "\tAuto Info: " << value.authInfo << std::endl;
+    os << "\tAuth Info: " << value.authInfo << std::endl;
     os << "\tMax Body(KB): " << value.maxBodyKB;
     if (value.errorPages.empty())
       os << "\n\tError Page: " << "empty map";
