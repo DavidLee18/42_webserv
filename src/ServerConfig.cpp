@@ -396,7 +396,9 @@ static int errPage_parse(std::string& line)
 
 bool ServerConfig::parse_Rule(std::vector<Http::Method> mets, std::string key, std::string line)
 {
-  if (std::isspace(line[line.size() - 1]))
+  if (line.empty())
+    return (false);
+  if (std::isspace(static_cast<unsigned char>(line[line.size() - 1])))
     return (false);
 
   std::vector<std::string> rule = string_split(trim_space(line), " ");
