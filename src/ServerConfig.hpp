@@ -4,6 +4,7 @@
 #include "ParsingUtils.hpp"
 #include "file_descriptor.h"
 #include "http_1_1.h"
+#include <iosfwd>
 #include <unistd.h>
 
 typedef std::map<std::string, std::map<std::string, std::string> > Header;
