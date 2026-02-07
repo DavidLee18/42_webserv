@@ -2,6 +2,7 @@
 #define WEBSERVERCONFIG_HPP
 
 #include "ServerConfig.hpp"
+#include <iosfwd>
 
 class WebserverConfig {
 private:
