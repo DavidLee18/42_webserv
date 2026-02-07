@@ -52,7 +52,7 @@ bool is_tab_or_space(std::string line, size_t num) {
 
   if (line.empty())
     return (num == 0);
-  while (line[i] == ' ' || line[i] == '\t') {
+  while (i < line.size() && (line[i] == ' ' || line[i] == '\t')) {
     if (line[i] == ' ')
       len += 1;
     else
