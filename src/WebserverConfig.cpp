@@ -188,8 +188,8 @@ unsigned int WebserverConfig::parse_ServerConfig_key(std::string &key) {
 
 std::ostream& operator<<(std::ostream& os, const WebserverConfig& data)
 {
-  std::map<std::string, std::string> ty = data.Get_Type_map();
-  std::map<std::string, std::string>::iterator ty_it;
+  const std::map<std::string, std::string>& ty = data.Get_Type_map();
+  std::map<std::string, std::string>::const_iterator ty_it;
   
   os << "========================================================" << std::endl;
   os << "Type_map\n" <<std::endl;
@@ -200,8 +200,8 @@ std::ostream& operator<<(std::ostream& os, const WebserverConfig& data)
   }
   os << "default_mime: " << data.Get_default_mime() << std::endl;
   os << "========================================================" << std::endl;
-  std::map<unsigned int, ServerConfig> Server_map = data.Get_ServerConfig_map();
-  std::map<unsigned int, ServerConfig>::iterator Server_map_it;
+  const std::map<unsigned int, ServerConfig>& Server_map = data.Get_ServerConfig_map();
+  std::map<unsigned int, ServerConfig>::const_iterator Server_map_it;
   os << "Server_map\n" <<std::endl;
   for (Server_map_it = Server_map.begin(); Server_map_it != Server_map.end(); ++Server_map_it)
   {
