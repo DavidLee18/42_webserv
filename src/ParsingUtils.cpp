@@ -46,20 +46,20 @@ std::string trim_space(const std::string &s) {
   return s.substr(start, end - start + 1);
 }
 
-bool is_tab_or_space(std::string line, int num) {
+bool is_tab_or_space(std::string line, size_t num) {
   size_t len = 0;
   size_t i = 0;
 
   if (line.empty())
     return (num == 0);
-  while (line[i] == ' ' || line[i] == '\t') {
+  while (i < line.size() && (line[i] == ' ' || line[i] == '\t')) {
     if (line[i] == ' ')
       len += 1;
     else
       len += 4;
     i++;
   }
-  return (len == static_cast<size_t>(num * 4));
+  return (len == (num * 4));
 }
 
 std::vector<std::string> string_split(const std::string &line,
@@ -78,4 +78,11 @@ std::vector<std::string> string_split(const std::string &line,
     tokens.push_back(line.substr(start));
 
   return tokens;
+}
+
+std::string trim_char(std::string s, char ch)
+{
+  s.erase(std::remove(s.begin(), s.end(), ch), s.end());
+
+  return (s);
 }

@@ -144,7 +144,7 @@ Result<std::pair<Json, size_t> > Json::Parser::_arr(const char *raw) {
   std::vector<Json> recs;
   const size_t rawlen = std::strlen(raw);
   for (size_t i = 1; i < rawlen;) {
-    while (std::isspace(raw[i]))
+    while (std::isspace(static_cast<unsigned char>(raw[i])))
       i++;
     switch ((static_cast<size_t>(recs.empty()) << 2) +
             (static_cast<size_t>(raw[i] == ',') << 1) +
@@ -161,7 +161,7 @@ Result<std::pair<Json, size_t> > Json::Parser::_arr(const char *raw) {
     default:
       return ERR_PAIR(Json, size_t, Errors::invalid_format);
     }
-    while (std::isspace(raw[i]))
+    while (std::isspace(static_cast<unsigned char>(raw[i])))
       i++;
     TRY_PARSE(null_or_undef, rec, recs, i, raw)
     TRY_PARSE(_boolean, rec1, recs, i, raw)
@@ -181,7 +181,7 @@ Result<std::pair<Json, size_t> > Json::Parser::_obj(const char *raw) {
     return ERR_PAIR(Json, size_t, Errors::invalid_format);
   std::vector<std::pair<std::string, Json> > recs;
   for (size_t i = 1; i < std::strlen(raw);) {
-    while (std::isspace(raw[i]))
+    while (std::isspace(static_cast<unsigned char>(raw[i])))
       i++;
     switch ((static_cast<size_t>(recs.empty()) << 2) +
             (static_cast<size_t>(raw[i] == ',') << 1) +
@@ -198,7 +198,7 @@ Result<std::pair<Json, size_t> > Json::Parser::_obj(const char *raw) {
     default:
       return ERR_PAIR(Json, size_t, Errors::invalid_format);
     }
-    while (std::isspace(raw[i]))
+    while (std::isspace(static_cast<unsigned char>(raw[i])))
       i++;
     Result<std::pair<Json, size_t> > rec = _str(raw + i);
     std::pair<Json, size_t> k;
@@ -207,12 +207,12 @@ Result<std::pair<Json, size_t> > Json::Parser::_obj(const char *raw) {
       return ERR_PAIR(Json, size_t, Errors::invalid_json);
     i += k.second;
     std::string _k(*k.first.value()._str);
-    while (std::isspace(raw[i]))
+    while (std::isspace(static_cast<unsigned char>(raw[i])))
       i++;
     if (raw[i] != ':')
       return ERR_PAIR(Json, size_t, Errors::invalid_format);
     i++;
-    while (std::isspace(raw[i]))
+    while (std::isspace(static_cast<unsigned char>(raw[i])))
       i++;
 
     TRY_PARSE_PAIR(null_or_undef, _k, rec0, recs, i, raw)

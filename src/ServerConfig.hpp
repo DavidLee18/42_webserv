@@ -1,8 +1,10 @@
 #ifndef SERVERCONFIG_HPP
 #define SERVERCONFIG_HPP
 
+#include "ParsingUtils.hpp"
 #include "file_descriptor.h"
 #include "http_1_1.h"
+#include <iosfwd>
 #include <unistd.h>
 
 typedef std::map<std::string, std::map<std::string, std::string> > Header;
@@ -30,13 +32,14 @@ private:
 
 public:
   PathPattern() : path() {}
+  explicit PathPattern(const std::string &pathStr) : path(string_split(pathStr, "/")) {}
   PathPattern(std::vector<std::string> path) : path(path) {}
 
   bool operator==(const std::string &) const;
   friend bool operator==(const std::string &line, const PathPattern &path) {
     return (path == line);
   }
-
+  const std::vector<std::string> &Get_path(void) const { return path; }
   bool operator<(const PathPattern &) const;
   bool operator<(std::string const &) const;
   friend bool operator<(std::string const &, PathPattern const &);
@@ -48,13 +51,13 @@ struct RouteRule {
   int status_code;     // 상태코드
 
   RuleOperator op;
-  std::string redirectTarget;
+  PathPattern redirectTarget;
 
   // 정적 파일 전용
   PathPattern root;                      // "/spool/www"
   std::string index;                     // "index2.html" (있으면)
   std::string authInfo;                  // "@auth_info"에서 추출
-  long maxBodyMB;                        // "< 10MB" → 10 * 1024 * 1024
+  int maxBodyKB;                        // "< 10MB" → 10 * 1024 * 1024
   std::map<int, std::string> errorPages; // 404 → "/404.html"
 };
 
@@ -86,8 +89,14 @@ private:
 public:
   ServerConfig(FileDescriptor &);
   ServerConfig() : header(), serverResponseTime(-1), routes(), err_line() {}
-  std::string Geterr_line(void);
+  const Header& Get_Header(void) const { return header; }
+  int Get_ServerResponseTime(void) const { return(serverResponseTime); }
+  const std::map<std::pair<Http::Method, PathPattern>, RouteRule>& Get_Routes (void) const { return routes; }
+  const std::string& Geterr_line(void) const { return err_line; }
   // Result<ServerConfig> read_from_file(FileDescriptor &);
 };
+
+std::ostream& operator<<(std::ostream& os, const ServerConfig& data);
+std::ostream& operator<<(std::ostream& os, const PathPattern& data);
 
 #endif
