@@ -84,16 +84,6 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
     } else
       break;
   }
-  // for (size_t i = 0; i < routes.size(); ++i)
-  // {
-  //   std::cout << "routes: " << routes[i].method << std::endl;
-  //   std::cout << "path: ";
-  //   for (size_t j = 0; j < routes[i].path.size(); ++j)
-  //   {
-  //     std::cout << routes[i].path[j] << " ";
-  //   }
-  //   std::cout << std::endl;
-  // }
   return (true);
 }
 

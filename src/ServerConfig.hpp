@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 typedef std::map<std::string, std::map<std::string, std::string> > Header;
-enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
+// enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
 
 enum RuleOperator {
   MULTIPLECHOICES,   // 300
@@ -46,19 +46,18 @@ public:
 };
 
 struct RouteRule {
-  Http::Method method; // GET | POST | DELETE 등
-  PathPattern path;    // "/old_stuff/*", "*.(jpg|jpeg|gif)" 등
-  int status_code;     // 상태코드
+  Http::Method method;
+  PathPattern path;
+  int status_code;
 
   RuleOperator op;
   PathPattern redirectTarget;
 
-  // 정적 파일 전용
-  PathPattern root;                      // "/spool/www"
-  std::string index;                     // "index2.html" (있으면)
-  std::string authInfo;                  // "@auth_info"에서 추출
-  int maxBodyKB;                        // "< 10MB" → 10 * 1024 * 1024
-  std::map<int, std::string> errorPages; // 404 → "/404.html"
+  PathPattern root;
+  std::string index;
+  std::string authInfo;
+  int maxBodyKB; 
+  std::map<int, std::string> errorPages; 
 };
 
 class ServerConfig {
