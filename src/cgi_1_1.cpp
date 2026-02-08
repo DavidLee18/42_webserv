@@ -43,10 +43,6 @@ ServerName::Parser::parse_host(std::string raw) {
       }
       if (!std::isalnum(static_cast<unsigned char>(part[part.size() - 1])))
         return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
-    } else {
-      // Single-character part must be alphanumeric
-      if (!std::isalnum(static_cast<unsigned char>(part[0])))
-        return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
     }
     j += part.size();
     std::getline(ss, part, '.');
@@ -64,10 +60,6 @@ ServerName::Parser::parse_host(std::string raw) {
         return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
     }
     if (!std::isalnum(static_cast<unsigned char>(part[part.size() - 1])))
-      return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
-  } else {
-    // Single-character part must be alphanumeric
-    if (!std::isalnum(static_cast<unsigned char>(part[0])))
       return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   }
   return OK_PAIR(ServerName, size_t, ServerName::host(parts), j + part.size());
