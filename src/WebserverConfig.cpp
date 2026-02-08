@@ -13,11 +13,11 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
   
   while (true) {
     Result<std::string> temp = file.read_file_line();
-    if (temp.error() != "")
+    if (temp.error() != "" || !is_tab_or_space(temp.value(), 0))
       return (false);
     else if (temp.value() == "")
       break ;
-    else if (temp.value() == "\n" && is_tab_or_space(line, 0))
+    else if (temp.value() == "\n")
       continue;
     line = trim_char(temp.value(), '\n');
     if (line == "types =" || line == "types=") {
@@ -115,8 +115,10 @@ bool WebserverConfig::set_type_map(FileDescriptor &file) {
     Result<std::string> temp = file.read_file_line();
     if (temp.error() != "")
       return (false);
-    if ((temp.value() == "\n" && is_tab_or_space(line, 1)) || temp.value() == "")
+    if (temp.value() == "\n" || temp.value() == "")
       break ;
+    if (!is_tab_or_space(temp.value(), 1))
+      return (false);
     line = trim_char(temp.value(), '\n');
     if (!parse_type_line(line, keys, value)) {
       err_meg = "Type syntax Error: " + line;
