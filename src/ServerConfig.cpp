@@ -540,7 +540,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
 
 std::ostream& operator<<(std::ostream& os, const PathPattern& data)
 {
-  std::vector<std::string> path = data.Get_path();
+  const std::vector<std::string>& path = data.Get_path();
   size_t max = path.size();
   for (size_t i = 0; i < max; ++i)
   {
