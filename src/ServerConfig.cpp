@@ -484,13 +484,13 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
     root_url = expand_url_pattern(data[3]);
     if (path_url.size() < 1 || root_url.size() < 1 || path_url.size() != root_url.size())
       return (false);
-    for (size_t i = 0; i < path_url.size(); ++i)
+    for (size_t j = 0; j < path_url.size(); ++j)
     {
-      route.path = path_url[i];
-      route.root = root_url[i];
+      route.path = path_url[j];
+      route.root = root_url[j];
       // if () //path 와 root의 규칙이 맞는지 확인하는 부분 추가
       if (route.op == REDIRECT)
-        route.redirectTarget = root_url[i];
+        route.redirectTarget = root_url[j];
       routes[std::make_pair(route.method, route.path)] = route;
     }
   }
