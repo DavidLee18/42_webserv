@@ -32,7 +32,7 @@ private:
 
 public:
   PathPattern() : path() {}
-  explicit PathPattern(const std::string &pathStr) : path(string_split(pathStr, "/")) {}
+  PathPattern(const std::string &pathStr) : path(string_split(pathStr, "/")) {}
   PathPattern(std::vector<std::string> path) : path(path) {}
 
   bool operator==(const std::string &) const;
