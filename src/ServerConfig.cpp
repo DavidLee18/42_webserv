@@ -57,8 +57,10 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
-    if (temp.error() != "")
+    if (temp.error() != "") {
+      err_line = "FileDescriptor Error: " + temp.error();
       return (false);
+    }
     else if (temp.value() == "")
       break;
     else if (temp.value() == "\n")
@@ -110,8 +112,10 @@ bool ServerConfig::parse_header_line(FileDescriptor &fd, std::string line) {
     return (false);
   while (!temp.empty() && temp[temp.length() - 1] == ';') {
     Result<std::string> fd_line = fd.read_file_line();
-    if (fd_line.error() != "")
+    if (fd_line.error() != "") {
+      err_line = "FileDescriptor Error: " + fd_line.error();
       return (false);
+    }
     if (fd_line.value() == "\n" || fd_line.value() == "")
       break ;
     temp = line = trim_char(fd_line.value(), '\n');
@@ -511,8 +515,10 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
-    if (temp.error() != "")
+    if (temp.error() != "") {
+      err_line = "FileDescriptor Error: " + temp.error();
       return (false);
+    }
     if (temp.value() == "\n" || temp.value() == "")
       break;
     line = trim_char(temp.value(), '\n');
