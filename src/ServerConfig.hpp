@@ -28,8 +28,6 @@ class PathPattern {
 private:
   std::vector<std::string> path;
 
-  bool match(std::string wildcard, std::string path) const;
-
 public:
   PathPattern() : path() {}
   PathPattern(const std::string &pathStr) : path(string_split(pathStr, "/")) {}
@@ -79,6 +77,7 @@ private:
   void parse_serverResponseTime(std::string line);
   // RouteRule method
   bool is_RouteRule(std::string line);
+  bool is_matching(PathPattern path, PathPattern root);
   bool parse_RouteRule(std::string line, FileDescriptor &fd);
   bool parse_Httpmethod(std::vector<std::string> data,
   std::vector<Http::Method> mets);

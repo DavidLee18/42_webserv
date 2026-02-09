@@ -36,6 +36,7 @@ types =
         ! 404:/404.html
 
 
+
 :40 =
 	[] +<= X-Content-Type-Options: "nosniff"
 	[] +<= Content-Security-Policy: default-src 'self';
@@ -57,5 +58,3 @@ types =
         @ auth_info
         ->{} 10MB
         ! 404:/404.html
-
-

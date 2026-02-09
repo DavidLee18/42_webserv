@@ -1,18 +1,5 @@
 #include "webserv.h"
 
-bool PathPattern::match(std::string wildcard, std::string path) const {
-  std::vector<std::string> data = string_split(wildcard, "*");
-  if (2 < data.size())
-    return (false);
-  for (size_t i = 0; i < data.size(); ++i) {
-    size_t pos = std::string::npos;
-    if (path.find(data[i]) == std::string::npos)
-      return (false);
-    else if (pos == std::string::npos + 1)
-      return (false);
-  }
-  return (true);
-}
 
 bool PathPattern::operator==(const std::string &line) const {
   return (!(*this < line) && !(line < *this));
@@ -466,6 +453,50 @@ RuleOperator ServerConfig::parse_RuleOperator(std::string indicator) {
     return (UNDEFINED);
 }
 
+// static bool match(const std::string& wildcard, const std::string& path) {
+//   std::vector<std::string> parts = string_split(wildcard, "*");
+//   size_t pos = 0;
+
+//   if (2 < parts.size())
+//     return (false);
+//   for (size_t i = 0; i < parts.size(); ++i) {
+//       pos = path.find(parts[i], pos);
+//       if (pos == std::string::npos)
+//           return false;
+//       pos += parts[i].length();
+//   }
+//   if (pos != path.size())
+//     return false;
+//   return true;
+// }
+
+bool ServerConfig::is_matching(PathPattern path, PathPattern root)
+{
+  std::vector<std::string> path_pattern = path.Get_path();
+  std::vector<std::string> root_pattern = root.Get_path();
+  
+  int path_wild = 0;
+  int root_wild = 0;
+  size_t j = 0;
+  for (size_t i = 0; i < path_pattern.size(); ++i) {
+    if (std::string::npos != path_pattern[i].find('*')) {
+      path_wild++;
+      for (; j < root_pattern.size(); ++j) {
+        if (path_pattern[i] == root_pattern[j] || 
+          (path_pattern[i] == "*" && std::string::npos != root_pattern[j].find('*'))) {
+          j++;
+          root_wild++;
+          break ;
+        }
+      }
+    }
+  }
+  if (path_wild != root_wild)
+    return false;
+  return true;
+}
+
+
 bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
                                     std::vector<Http::Method> mets) {
   RouteRule route;
@@ -491,7 +522,8 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
     {
       route.path = path_url[j];
       route.root = root_url[j];
-      // if () //path 와 root의 규칙이 맞는지 확인하는 부분 추가
+      if (!is_matching(route.path, route.root))
+        return (false);
       if (route.op == REDIRECT)
         route.redirectTarget = root_url[j];
       routes[std::make_pair(route.method, route.path)] = route;
@@ -550,11 +582,7 @@ std::ostream& operator<<(std::ostream& os, const PathPattern& data)
   const std::vector<std::string>& path = data.Get_path();
   size_t max = path.size();
   for (size_t i = 0; i < max; ++i)
-  {
-    os << path[i];
-    if (i + 1 < max)
-      os << "/";
-  }
+    os << "/" << path[i];
   return (os);
 }
 
