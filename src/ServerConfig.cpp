@@ -67,6 +67,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
       continue ;
     line = trim_char(temp.value(), '\n');
     if (is_tab_or_space(line, 1)) {
+      line = trim_space(line);
       if (is_header(line)) {
         if (!parse_header_line(fd, line)) {
           err_line = "Header syntax Error: " + err_line;
