@@ -124,7 +124,7 @@ bool WebserverConfig::set_type_map(FileDescriptor &file) {
     if (temp.value() == "\n" || temp.value() == "")
       break ;
     if (!is_tab_or_space(temp.value(), 1)) {
-      err_meg = "Type syntax Error: " + line;
+      err_meg = "Type syntax Error: " + trim_char(temp.value(), '\n');
       return (false);
     }
     line = trim_char(temp.value(), '\n');
