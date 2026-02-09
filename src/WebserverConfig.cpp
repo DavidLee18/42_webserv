@@ -16,7 +16,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     if (temp.error() != "" || !is_tab_or_space(temp.value(), 0)) {
       err_meg = "FileDescriptor Error: " + temp.error();
       if (temp.error() == "")
-        err_meg = "Invalid line Error: " + temp.value();
+        err_meg = "Invalid line Error: " + trim_space(trim_char(temp.value(), '\n'));
       return (false);
     }
     else if (temp.value() == "")
@@ -124,7 +124,7 @@ bool WebserverConfig::set_type_map(FileDescriptor &file) {
     if (temp.value() == "\n" || temp.value() == "")
       break ;
     if (!is_tab_or_space(temp.value(), 1)) {
-      err_meg = "Type syntax Error: " + trim_char(temp.value(), '\n');
+      err_meg = "Type syntax Error: " + trim_space(trim_char(temp.value(), '\n'));
       return (false);
     }
     line = trim_char(temp.value(), '\n');
