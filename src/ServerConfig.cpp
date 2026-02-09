@@ -49,14 +49,14 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
       err_line = "FileDescriptor Error: " + temp.error();
       return (false);
     }
-    else if (temp.value() == "")
-      break;
     else if (temp.value() == "\n") {
       end_flag += 1;
       if (end_flag == 2)
         break;
       continue ;
     }
+    else if (temp.value() == "")
+      break;
     end_flag = 0;
     line = trim_char(temp.value(), '\n');
     if (is_tab_or_space(line, 1)) {
@@ -78,7 +78,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
         return (false);
       }
     } else
-      break;
+        return (false);
   }
   return (true);
 }
@@ -340,6 +340,8 @@ static int maxBodyKB_parse(std::string line)
       break;
     maxbody = maxbody * 10 + (line[i] - '0');
   }
+  if (i <= 0)
+    return (-1);
   line = line.substr(i);
   if (line.empty() || line == "KB" || line == "KiB")
     return (maxbody);
