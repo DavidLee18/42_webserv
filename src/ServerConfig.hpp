@@ -66,6 +66,7 @@ private:
   int serverResponseTime;
   std::map<std::pair<Http::Method, PathPattern>, RouteRule> routes;
   std::string err_line;
+  int end_flag;
 
   bool set_ServerConfig(FileDescriptor &fd);
   // header method
@@ -87,7 +88,7 @@ private:
       
 public:
   ServerConfig(FileDescriptor &);
-  ServerConfig() : header(), serverResponseTime(-1), routes(), err_line() {}
+  ServerConfig() : header(), serverResponseTime(-1), routes(), err_line(), end_flag(0) {}
   const Header& Get_Header(void) const { return header; }
   int Get_ServerResponseTime(void) const { return(serverResponseTime); }
   const std::map<std::pair<Http::Method, PathPattern>, RouteRule>& Get_Routes (void) const { return routes; }

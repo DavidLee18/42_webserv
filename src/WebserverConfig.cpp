@@ -15,6 +15,8 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     Result<std::string> temp = file.read_file_line();
     if (temp.error() != "" || !is_tab_or_space(temp.value(), 0)) {
       err_meg = "FileDescriptor Error: " + temp.error();
+      if (temp.error() == "")
+        err_meg = "Invalid line Error: " + temp.value();
       return (false);
     }
     else if (temp.value() == "")
@@ -210,10 +212,10 @@ std::ostream& operator<<(std::ostream& os, const WebserverConfig& data)
   os << "========================================================" << std::endl;
   const std::map<unsigned int, ServerConfig>& Server_map = data.Get_ServerConfig_map();
   std::map<unsigned int, ServerConfig>::const_iterator Server_map_it;
-  os << "Server_map\n" <<std::endl;
+  os << "Server_map" <<std::endl;
   for (Server_map_it = Server_map.begin(); Server_map_it != Server_map.end(); ++Server_map_it)
   {
-    os << "Server key: " << Server_map_it->first << std::endl;
+    os << "\nServer key: " << Server_map_it->first << std::endl;
     os << Server_map_it->second;
   }
   return (os);

@@ -46,6 +46,7 @@ bool operator<(std::string const &l, PathPattern const &r) {
 ServerConfig::ServerConfig(FileDescriptor &file) {
   err_line = "";
   serverResponseTime = 3;
+  end_flag = 0;
   if (!set_ServerConfig(file)) {
     return ;
   }
@@ -63,8 +64,13 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
     }
     else if (temp.value() == "")
       break;
-    else if (temp.value() == "\n")
+    else if (temp.value() == "\n") {
+      end_flag += 1;
+      if (end_flag == 2)
+        break;
       continue ;
+    }
+    end_flag = 0;
     line = trim_char(temp.value(), '\n');
     if (is_tab_or_space(line, 1)) {
       line = trim_space(line);
@@ -117,8 +123,10 @@ bool ServerConfig::parse_header_line(FileDescriptor &fd, std::string line) {
       err_line = "FileDescriptor Error: " + fd_line.error();
       return (false);
     }
-    if (fd_line.value() == "\n" || fd_line.value() == "")
+    if (fd_line.value() == "\n" || fd_line.value() == "") {
+      end_flag += 1;
       break ;
+    }
     temp = line = trim_char(fd_line.value(), '\n');
     err_line = temp;
     if (!is_tab_or_space(temp, 2))
@@ -520,8 +528,10 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
       err_line = "FileDescriptor Error: " + temp.error();
       return (false);
     }
-    if (temp.value() == "\n" || temp.value() == "")
+    if (temp.value() == "\n" || temp.value() == "") {
+      end_flag += 1;
       break;
+    }
     line = trim_char(temp.value(), '\n');
     err_line = line;
     if (is_tab_or_space(line, 2) == false)
