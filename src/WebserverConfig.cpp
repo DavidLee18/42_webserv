@@ -5,7 +5,6 @@ WebserverConfig::WebserverConfig(FileDescriptor &file) {
   if (!this->file_parsing(file)) {
     return;
   }
-
   return;
 }
 
@@ -14,9 +13,17 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
   
   while (true) {
     Result<std::string> temp = file.read_file_line();
-    line = temp.value();
-    if (temp.error() != "" && is_tab_or_space(line, 0))
+    if (temp.error() != "" || !is_tab_or_space(temp.value(), 0)) {
+      err_meg = "FileDescriptor Error: " + temp.error();
+      if (temp.error() == "")
+        err_meg = "Invalid line Error: " + trim_space(trim_char(temp.value(), '\n'));
+      return (false);
+    }
+    else if (temp.value() == "")
       break ;
+    else if (temp.value() == "\n")
+      continue;
+    line = trim_char(temp.value(), '\n');
     if (line == "types =" || line == "types=") {
       if (!set_type_map(file))
         return (false);
@@ -110,9 +117,17 @@ bool WebserverConfig::set_type_map(FileDescriptor &file) {
 
   while (true) {
     Result<std::string> temp = file.read_file_line();
-    line = temp.value();
-    if ((temp.error() != "" && is_tab_or_space(line, 1)))
+    if (temp.error() != "") {
+      err_meg = "FileDescriptor Error: " + temp.error();
+      return (false);
+    }
+    if (temp.value() == "\n" || temp.value() == "")
       break ;
+    if (!is_tab_or_space(temp.value(), 1)) {
+      err_meg = "Type syntax Error: " + trim_space(trim_char(temp.value(), '\n'));
+      return (false);
+    }
+    line = trim_char(temp.value(), '\n');
     if (!parse_type_line(line, keys, value)) {
       err_meg = "Type syntax Error: " + line;
       return (false);
@@ -179,4 +194,29 @@ unsigned int WebserverConfig::parse_ServerConfig_key(std::string &key) {
     ++i;
   return static_cast<unsigned int>(
       std::atoi(key.substr(start, i - start).c_str()));
+}
+
+std::ostream& operator<<(std::ostream& os, const WebserverConfig& data)
+{
+  const std::map<std::string, std::string>& ty = data.Get_Type_map();
+  std::map<std::string, std::string>::const_iterator ty_it;
+  
+  os << "========================================================" << std::endl;
+  os << "Type_map\n" <<std::endl;
+  for (ty_it = ty.begin(); ty_it != ty.end(); ++ty_it)
+  {
+    os << "Type key: " << ty_it->first
+    << ", Type value: " << ty_it->second << std::endl;
+  }
+  os << "default_mime: " << data.Get_default_mime() << std::endl;
+  os << "========================================================" << std::endl;
+  const std::map<unsigned int, ServerConfig>& Server_map = data.Get_ServerConfig_map();
+  std::map<unsigned int, ServerConfig>::const_iterator Server_map_it;
+  os << "Server_map" <<std::endl;
+  for (Server_map_it = Server_map.begin(); Server_map_it != Server_map.end(); ++Server_map_it)
+  {
+    os << "\nServer key: " << Server_map_it->first << std::endl;
+    os << Server_map_it->second;
+  }
+  return (os);
 }
