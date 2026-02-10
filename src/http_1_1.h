@@ -11,7 +11,7 @@ class Http {
 public:
   enum Method { GET, HEAD, OPTIONS, POST, DELETE, PUT, CONNECT, TRACE, PATCH };
 
-class PartialString {
+  class PartialString {
   public:
     enum Type { Partial, Full };
     static PartialString partial(char *input) {
@@ -64,7 +64,7 @@ class PartialString {
         break;
       }
     }
-    Body& operator=(const Body &other) {
+    Body &operator=(const Body &other) {
       if (this != &other) {
         // Clean up existing value
         switch (_type) {
@@ -80,7 +80,7 @@ class PartialString {
         default:
           break;
         }
-        
+
         // Copy new value
         _type = other._type;
         switch (other._type) {
@@ -137,26 +137,33 @@ class PartialString {
   public:
     class Parser {
       virtual void phantom() = 0;
-      
-      static Result<std::pair<Request, size_t> > parse_request_line(const char *, size_t);
-      static Result<std::pair<Method, size_t> > parse_method(const char *, size_t);
-      static Result<std::pair<std::string, size_t> > parse_path(const char *, size_t);
-      static Result<std::pair<std::string, size_t> > parse_http_version(const char *, size_t);
-      static Result<std::pair<std::map<std::string, std::string>, size_t> > parse_headers(const char *, size_t);
-      static Result<std::pair<Body, size_t> > parse_body(const char *, size_t, std::map<std::string, std::string> const &);
+
+      static Result<std::pair<Request, size_t> > parse_request_line(const char *,
+                                                                   size_t);
+      static Result<std::pair<Method, size_t> > parse_method(const char *,
+                                                            size_t);
+      static Result<std::pair<std::string, size_t> > parse_path(const char *,
+                                                               size_t);
+      static Result<std::pair<std::string, size_t> >
+      parse_http_version(const char *, size_t);
+      static Result<std::pair<std::map<std::string, std::string>, size_t> >
+      parse_headers(const char *, size_t);
+      static Result<std::pair<Body, size_t> >
+      parse_body(const char *, size_t,
+                 std::map<std::string, std::string> const &);
 
     public:
       static Result<std::pair<Request, size_t> > parse(const char *, size_t);
     };
-    
+
     friend class Parser;
 
     Request(Method m, std::string p, Body b)
         : _method(m), _headers(), _path(p), _body(b) {}
     Request(const Request &other)
-        : _method(other._method), _headers(other._headers), 
-          _path(other._path), _body(other._body) {}
-    Request& operator=(const Request &other) {
+        : _method(other._method), _headers(other._headers), _path(other._path),
+          _body(other._body) {}
+    Request &operator=(const Request &other) {
       if (this != &other) {
         _method = other._method;
         _headers = other._headers;
@@ -166,7 +173,9 @@ class PartialString {
       return *this;
     }
     const Method &method() const { return _method; }
-    const std::map<std::string, std::string> &headers() const { return _headers; }
+    const std::map<std::string, std::string> &headers() const {
+      return _headers;
+    }
     const std::string &path() const { return _path; }
     const Body &body() const { return _body; }
     static Result<std::pair<Request *, size_t> > parse(const char *, char);
@@ -181,9 +190,9 @@ class PartialString {
     Response(int status, std::map<std::string, std::string> headers, Body b)
         : _status_code(status), _headers(headers), _body(b) {}
     Response(const Response &other)
-        : _status_code(other._status_code), _headers(other._headers), 
+        : _status_code(other._status_code), _headers(other._headers),
           _body(other._body) {}
-    Response& operator=(const Response &other) {
+    Response &operator=(const Response &other) {
       if (this != &other) {
         _status_code = other._status_code;
         _headers = other._headers;
@@ -191,11 +200,13 @@ class PartialString {
       }
       return *this;
     }
-    
+
     const int &status_code() const { return _status_code; }
-    const std::map<std::string, std::string> &headers() const { return _headers; }
+    const std::map<std::string, std::string> &headers() const {
+      return _headers;
+    }
     const Body &body() const { return _body; }
-    
+
     std::map<std::string, std::string> &headers_mut() { return _headers; }
     void set_header(const std::string &name, const std::string &value) {
       _headers[name] = value;

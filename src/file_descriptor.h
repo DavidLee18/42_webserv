@@ -18,16 +18,16 @@ class Event;
 class FileDescriptor {
   int _fd;
   FILE *fp;
-  
+
   FileDescriptor() : _fd(-1), fp(NULL) {}
 
 public:
   static Result<FileDescriptor> from_raw(int);
 
   static Result<FileDescriptor> socket_new();
-  
+
   static Result<FileDescriptor> open_file(std::string const &);
-  
+
   // Move-like copy constructor: transfers ownership from other
   FileDescriptor(const FileDescriptor &other);
 

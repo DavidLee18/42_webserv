@@ -33,12 +33,14 @@ ServerName::Parser::parse_host(std::string raw) {
   while (ss && !ss.eof()) {
     if (part.empty())
       return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
-    if ((!dom_end && !std::isalnum(static_cast<unsigned char>(part[0]))) || !std::isalpha(static_cast<unsigned char>(part[0])))
+    if ((!dom_end && !std::isalnum(static_cast<unsigned char>(part[0]))) ||
+        !std::isalpha(static_cast<unsigned char>(part[0])))
       return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
     j++;
     if (part.size() > 1) {
       for (size_t i = 1; i < part.size() - 1; i++) {
-        if (!std::isalnum(static_cast<unsigned char>(part[i])) && part[i] != '-')
+        if (!std::isalnum(static_cast<unsigned char>(part[i])) &&
+            part[i] != '-')
           return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
       }
       if (!std::isalnum(static_cast<unsigned char>(part[part.size() - 1])))
@@ -51,7 +53,8 @@ ServerName::Parser::parse_host(std::string raw) {
     return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   if (part.empty())
     return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
-  if ((!dom_end && !std::isalnum(static_cast<unsigned char>(part[0]))) || !std::isalpha(static_cast<unsigned char>(part[0])))
+  if ((!dom_end && !std::isalnum(static_cast<unsigned char>(part[0]))) ||
+      !std::isalpha(static_cast<unsigned char>(part[0])))
     return ERR_PAIR(ServerName, size_t, Errors::invalid_format);
   j++;
   if (part.size() > 1) {

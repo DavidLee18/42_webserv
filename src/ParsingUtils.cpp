@@ -80,8 +80,7 @@ std::vector<std::string> string_split(const std::string &line,
   return tokens;
 }
 
-std::string trim_char(std::string s, char ch)
-{
+std::string trim_char(std::string s, char ch) {
   s.erase(std::remove(s.begin(), s.end(), ch), s.end());
 
   return (s);

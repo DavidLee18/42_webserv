@@ -127,13 +127,15 @@ Http::Request::Parser::parse_http_version(const char *input, size_t offset) {
 
   // Validate version format: HTTP/x.y where x and y are digits
   size_t slash_pos = 5; // Position after "HTTP/"
-  if (slash_pos >= version.length() || !std::isdigit(static_cast<unsigned char>(version[slash_pos]))) {
+  if (slash_pos >= version.length() ||
+      !std::isdigit(static_cast<unsigned char>(version[slash_pos]))) {
     return ERR_PAIR(std::string, size_t, Errors::invalid_format);
   }
 
   // Skip major version digits
   size_t dot_pos = slash_pos;
-  while (dot_pos < version.length() && std::isdigit(static_cast<unsigned char>(version[dot_pos]))) {
+  while (dot_pos < version.length() &&
+         std::isdigit(static_cast<unsigned char>(version[dot_pos]))) {
     dot_pos++;
   }
 
@@ -144,7 +146,8 @@ Http::Request::Parser::parse_http_version(const char *input, size_t offset) {
 
   // Check minor version has at least one digit
   dot_pos++;
-  if (dot_pos >= version.length() || !std::isdigit(static_cast<unsigned char>(version[dot_pos]))) {
+  if (dot_pos >= version.length() ||
+      !std::isdigit(static_cast<unsigned char>(version[dot_pos]))) {
     return ERR_PAIR(std::string, size_t, Errors::invalid_format);
   }
 

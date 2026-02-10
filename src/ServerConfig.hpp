@@ -54,8 +54,8 @@ struct RouteRule {
   PathPattern root;
   std::string index;
   std::string authInfo;
-  int maxBodyKB; 
-  std::map<int, std::string> errorPages; 
+  int maxBodyKB;
+  std::map<int, std::string> errorPages;
 };
 
 class ServerConfig {
@@ -80,22 +80,26 @@ private:
   bool is_matching(PathPattern path, PathPattern root);
   bool parse_RouteRule(std::string line, FileDescriptor &fd);
   bool parse_Httpmethod(std::vector<std::string> data,
-  std::vector<Http::Method> mets);
+                        std::vector<Http::Method> mets);
   bool parse_Rule(std::vector<Http::Method> met, std::string key,
-    std::string line);
+                  std::string line);
   RuleOperator parse_RuleOperator(std::string indicator);
-      
+
 public:
   ServerConfig(FileDescriptor &);
-  ServerConfig() : header(), serverResponseTime(-1), routes(), err_line(), end_flag(0) {}
-  const Header& Get_Header(void) const { return header; }
-  int Get_ServerResponseTime(void) const { return(serverResponseTime); }
-  const std::map<std::pair<Http::Method, PathPattern>, RouteRule>& Get_Routes (void) const { return routes; }
-  const std::string& Geterr_line(void) const { return err_line; }
+  ServerConfig()
+      : header(), serverResponseTime(-1), routes(), err_line(), end_flag(0) {}
+  const Header &Get_Header(void) const { return header; }
+  int Get_ServerResponseTime(void) const { return (serverResponseTime); }
+  const std::map<std::pair<Http::Method, PathPattern>, RouteRule> &
+  Get_Routes(void) const {
+    return routes;
+  }
+  const std::string &Geterr_line(void) const { return err_line; }
   // Result<ServerConfig> read_from_file(FileDescriptor &);
 };
 
-std::ostream& operator<<(std::ostream& os, const ServerConfig& data);
-std::ostream& operator<<(std::ostream& os, const PathPattern& data);
+std::ostream &operator<<(std::ostream &os, const ServerConfig &data);
+std::ostream &operator<<(std::ostream &os, const PathPattern &data);
 
 #endif
