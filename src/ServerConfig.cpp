@@ -7,11 +7,14 @@ bool PathPattern::operator==(const std::string &line) const {
 bool PathPattern::operator<(const PathPattern &other) const {
   size_t l = MIN(path.size(), other.path.size());
   for (size_t i = 0; i < l; i++) {
+    std::cout << "[DEBUG] this->path[" << i << "] = \"" << this->path[i] << "\", other.path[" << i << "] = \"" << other.path[i] << "\"" << std::endl;
     std::vector<std::string> ps1 = string_split(path[i], "*"),
                              ps2 = string_split(other.path[i], "*");
     size_t l_ = MIN(ps1.size(), ps2.size());
     for (size_t j = 0; j < l_; j++) {
+      std::cout << "[DEBUG] ps1[" << j << "] = \"" << ps1[j] << "\", ps2[" << j << "] = \"" << ps2[j] << "\"" << std::endl;
       if (ps1[j] != "*" && ps2[j] != "*" && ps1[j] != ps2[j]) {
+        std::cout << "[DEBUG] \"" << ps1[j] << (ps1[j] < ps2[j] ? "\" < \"" : "\" > \"") << ps2[j] << "\"" << std::endl;
         return ps1[j] < ps2[j];
       }
     }
@@ -22,11 +25,11 @@ bool PathPattern::operator<(const PathPattern &other) const {
 }
 
 bool PathPattern::operator<(std::string const &other) const {
-  return (*this < PathPattern(string_split(other, "/")));
+  return (*this < PathPattern(other));
 }
 
 bool operator<(std::string const &l, PathPattern const &r) {
-  return (!(r < l) && !(l == r));
+  return (PathPattern(l) < r);
 }
 
 ServerConfig::ServerConfig(FileDescriptor &file) {

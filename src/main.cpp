@@ -2,51 +2,6 @@
 
 volatile sig_atomic_t sig = 0;
 
-// Structure to hold client connection state
-struct ClientConnection {
-  intptr_t fd_key; // Pointer-based key for tracking
-  std::string read_buffer;
-  std::string write_buffer;
-  bool request_complete;
-
-  explicit ClientConnection(intptr_t key)
-      : fd_key(key), read_buffer(), write_buffer(), request_complete(false) {}
-
-  // Copy constructor
-  ClientConnection(const ClientConnection &other)
-      : fd_key(other.fd_key), read_buffer(other.read_buffer),
-        write_buffer(other.write_buffer),
-        request_complete(other.request_complete) {}
-
-  // Assignment operator
-  ClientConnection &operator=(const ClientConnection &other) {
-    if (this != &other) {
-      fd_key = other.fd_key;
-      read_buffer = other.read_buffer;
-      write_buffer = other.write_buffer;
-      request_complete = other.request_complete;
-    }
-    return *this;
-  }
-};
-
-// Generate a simple HTTP response
-std::string generate_response(const Http::Request &request) {
-  (void)request; // Suppress unused warning for now
-
-  // Simple 200 OK response
-  std::ostringstream response;
-  response << "HTTP/1.1 200 OK\r\n";
-  response << "Content-Type: text/html\r\n";
-  std::string body = "<html><body><h1>Hello from webserv!</h1></body></html>";
-  response << "Content-Length: " << body.length() << "\r\n";
-  response << "Connection: close\r\n";
-  response << "\r\n";
-  response << body;
-
-  return response.str();
-}
-
 int main(const int argc, char *argv[]) {
   (void)argc;
   if (argc != 2) {
@@ -66,9 +21,10 @@ int main(const int argc, char *argv[]) {
     return 1;
   } else {
     const WebserverConfig &config = result_config.value();
+    std::cout << "main(): " << std::endl;
     ServerConfig const &sconf = config.Get_ServerConfig_map().at(80);
     RouteRule const &rule =
-        sconf.Get_Routes().at(std::make_pair(Http::GET, "download"));
+        sconf.Get_Routes().at(std::make_pair(Http::GET, "old_stuff"));
     std::cout << rule.path << std::endl;
   }
   return 0;
