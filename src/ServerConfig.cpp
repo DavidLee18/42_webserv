@@ -386,7 +386,7 @@ static int errPage_parse(std::string& line)
   return(key);
 }
 
-bool ServerConfig::parse_Rule(std::vector<Http::Method> mets, std::string key, std::string line)
+bool ServerConfig::parse_Rule(std::vector<Http::Method> mets, std::string key_data, std::string line)
 {
   if (line.empty())
     return (false);
@@ -395,6 +395,7 @@ bool ServerConfig::parse_Rule(std::vector<Http::Method> mets, std::string key, s
 
   std::vector<std::string> rule = string_split(trim_space(line), " ");
   size_t size = rule.size();
+  PathPattern key(key_data);
 
   if (size < 2)
     return (false);
