@@ -27,6 +27,8 @@ enum RuleOperator {
 class PathPattern {
 private:
   std::vector<std::string> path;
+  static bool precedes(const std::vector<std::string> &,
+                       const std::vector<std::string> &);
 
 public:
   PathPattern() : path() {}
