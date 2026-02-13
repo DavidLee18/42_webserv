@@ -1,46 +1,133 @@
 #include "webserv.h"
 
-bool PathPattern::operator==(const std::string &line) const {
-  return (!(*this < line) && !(line < *this));
+// Helper function to check if a segment matches a pattern
+// Pattern can contain * as wildcard
+bool PathPattern::segmentMatches(const std::string &pattern, const std::string &segment) {
+  // If pattern is exactly "*", it matches anything
+  if (pattern == "*") {
+    return true;
+  }
+  
+  // If no wildcard in pattern, must match exactly
+  if (pattern.find('*') == std::string::npos) {
+    return pattern == segment;
+  }
+  
+  // Split pattern by * to get parts that must match
+  std::vector<std::string> parts = string_split(pattern, "*");
+  
+  size_t pos = 0;
+  for (size_t i = 0; i < parts.size(); ++i) {
+    if (parts[i].empty()) {
+      continue;  // Skip empty parts from consecutive *
+    }
+    
+    // Find this part in the segment
+    size_t found = segment.find(parts[i], pos);
+    if (found == std::string::npos) {
+      return false;  // Required part not found
+    }
+    
+    // For the first part, it should be at the beginning (unless pattern starts with *)
+    if (i == 0 && pattern[0] != '*' && found != 0) {
+      return false;
+    }
+    
+    pos = found + parts[i].length();
+  }
+  
+  // If pattern ends with a non-wildcard part, check that we matched to the end
+  if (!parts.empty() && !parts[parts.size() - 1].empty() && 
+      pattern[pattern.length() - 1] != '*') {
+    return pos == segment.length();
+  }
+  
+  return true;
 }
 
-bool PathPattern::operator<(const PathPattern &other) const {
-  return precedes(path, other.path);
-}
-
-bool PathPattern::operator<(std::string const &other) const {
-  return (*this < PathPattern(other));
-}
-
-bool operator<(std::string const &l, PathPattern const &r) {
-  return (PathPattern(l) < r);
-}
-
-bool PathPattern::precedes(const std::vector<std::string> &l,
-                           const std::vector<std::string> &r) {
-  // TODO
-  size_t len = MIN(l.size(), r.size());
-  for (size_t i = 0; i < len; i++) {
-    std::cout << "[DEBUG] l[" << i << "] = \"" << l[i]
-              << "\", r[" << i << "] = \"" << r[i] << "\""
-              << std::endl;
-    std::vector<std::string> ps1(string_split(l[i], "*")),
-        ps2(string_split(r[i], "*"));
-    size_t l_ = MIN(ps1.size(), ps2.size());
-    for (size_t j = 0; j < l_; j++) {
-      std::cout << "[DEBUG] ps1[" << j << "] = \"" << ps1[j] << "\", ps2[" << j
-                << "] = \"" << ps2[j] << "\"" << std::endl;
-      if (ps1[j] != "*" && ps2[j] != "*" && ps1[j] != ps2[j]) {
-        std::cout << "[DEBUG] \"" << ps1[j]
-                  << (ps1[j] < ps2[j] ? "\" < \"" : "\" > \"") << ps2[j] << "\""
-                  << std::endl;
-        return ps1[j] < ps2[j];
+// Check if this pattern matches another PathPattern
+bool PathPattern::matches(const PathPattern &other) const {
+  // If this pattern is exactly "*", it matches anything
+  if (isWildcard()) {
+    return true;
+  }
+  
+  // If other is "*", we need to check if our pattern would match it
+  // In this case, only "*" matches "*"
+  if (other.isWildcard()) {
+    return isWildcard();
+  }
+  
+  // If the path lengths are different and neither has wildcards, no match
+  // But if we have wildcards, we need more complex matching
+  
+  // Check if any of our segments contain wildcards
+  bool hasWildcard = false;
+  for (size_t i = 0; i < path.size(); ++i) {
+    if (path[i].find('*') != std::string::npos) {
+      hasWildcard = true;
+      break;
+    }
+  }
+  
+  if (!hasWildcard && path.size() != other.path.size()) {
+    return false;
+  }
+  
+  // If we have wildcards, do more flexible matching
+  if (hasWildcard) {
+    // For patterns like "*.jpg", we want to match any path ending with .jpg
+    // regardless of directory depth
+    if (path.size() == 1 && path[0].find('*') != std::string::npos) {
+      // Single segment pattern like "*.jpg"
+      // Check if any segment in other matches this pattern
+      for (size_t i = 0; i < other.path.size(); ++i) {
+        if (segmentMatches(path[0], other.path[i])) {
+          return true;
+        }
+      }
+      return false;
+    }
+    
+    // For multi-segment patterns, match segment by segment
+    if (path.size() != other.path.size()) {
+      return false;
+    }
+    
+    for (size_t i = 0; i < path.size(); ++i) {
+      if (!segmentMatches(path[i], other.path[i])) {
+        return false;
       }
     }
-    if (ps1.size() != ps2.size())
-      return ps1.size() < ps2.size();
+    return true;
   }
-  return l.size() < r.size();
+  
+  // No wildcards - exact match required
+  for (size_t i = 0; i < path.size(); ++i) {
+    if (path[i] != other.path[i]) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+// Check if this pattern matches a path string
+bool PathPattern::matches(const std::string &pathStr) const {
+  return matches(PathPattern(pathStr));
+}
+
+// Convert PathPattern to string for debugging/display
+std::string PathPattern::toString() const {
+  if (path.empty()) {
+    return "/";
+  }
+  std::string result;
+  for (size_t i = 0; i < path.size(); ++i) {
+    result += "/";
+    result += path[i];
+  }
+  return result;
 }
 
 ServerConfig::ServerConfig(FileDescriptor &file) {
@@ -395,31 +482,71 @@ bool ServerConfig::parse_Rule(std::vector<Http::Method> mets,
 
   if (size < 2)
     return (false);
-  if (rule[0] == "?") {
-    std::string index = index_parse(rule[1]);
-    if (size != 2 || index == "")
+  
+  // Find or create routes for each method with this path pattern
+  for (size_t i = 0; i < mets.size(); ++i) {
+    size_t targetRouteIndex = routes.size();  // Will be set to existing route index or stay as size (indicating new route)
+    
+    // Find existing route with matching method and path (exact match for updating properties)
+    for (size_t j = 0; j < routes.size(); ++j) {
+      // For updating route properties, we need exact path match, not wildcard match
+      if (routes[j].method == mets[i]) {
+        // Compare path segments for exact match
+        const std::vector<std::string> &routePath = routes[j].path.Get_path();
+        const std::vector<std::string> &keyPath = key.Get_path();
+        if (routePath.size() == keyPath.size()) {
+          bool exactMatch = true;
+          for (size_t k = 0; k < routePath.size(); ++k) {
+            if (routePath[k] != keyPath[k]) {
+              exactMatch = false;
+              break;
+            }
+          }
+          if (exactMatch) {
+            targetRouteIndex = j;
+            break;
+          }
+        }
+      }
+    }
+    
+    // If not found, create a new route
+    if (targetRouteIndex == routes.size()) {
+      RouteRule newRoute;
+      newRoute.method = mets[i];
+      newRoute.path = key;
+      newRoute.status_code = 200;
+      newRoute.op = UNDEFINED;
+      newRoute.maxBodyKB = 1;
+      routes.push_back(newRoute);
+      // targetRouteIndex is already set to the correct value (old size, which is the new index)
+    }
+    
+    // Update the route based on rule type (using index to avoid pointer invalidation)
+    if (rule[0] == "?") {
+      std::string index = index_parse(rule[1]);
+      if (size != 2 || index == "")
+        return (false);
+      routes[targetRouteIndex].index = index;
+    } else if (rule[0] == "@") {
+      if (size != 2)
+        return (false);
+      routes[targetRouteIndex].authInfo = rule[1];
+    } else if (rule[0] == "->{}") {
+      int max = maxBodyKB_parse(rule[1]);
+      if (max == -1 || size != 2)
+        return (false);
+      routes[targetRouteIndex].maxBodyKB = max;
+    } else if (rule[0] == "!") {
+      std::string errPageLine = rule[1];  // Make a copy to avoid modification
+      int err_key = errPage_parse(errPageLine);
+      if (err_key == 0 || size != 2)
+        return (false);
+      routes[targetRouteIndex].errorPages[err_key] = errPageLine;
+    } else
       return (false);
-    for (size_t i = 0; i < mets.size(); ++i)
-      routes[std::make_pair(mets[i], key)].index = index;
-  } else if (rule[0] == "@") {
-    if (size != 2)
-      return (false);
-    for (size_t i = 0; i < mets.size(); ++i)
-      routes[std::make_pair(mets[i], key)].authInfo = rule[1];
-  } else if (rule[0] == "->{}") {
-    int max = maxBodyKB_parse(rule[1]);
-    if (max == -1 || size != 2)
-      return (false);
-    for (size_t i = 0; i < mets.size(); ++i)
-      routes[std::make_pair(mets[i], key)].maxBodyKB = max;
-  } else if (rule[0] == "!") {
-    int err_key = errPage_parse(rule[1]);
-    if (err_key == 0 || size != 2)
-      return (false);
-    for (size_t i = 0; i < mets.size(); ++i)
-      routes[std::make_pair(mets[i], key)].errorPages[err_key] = rule[1];
-  } else
-    return (false);
+  }
+  
   return (true);
 }
 
@@ -513,6 +640,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
     if (path_url.size() < 1 || root_url.size() < 1 ||
         path_url.size() != root_url.size())
       return (false);
+    
     for (size_t j = 0; j < path_url.size(); ++j) {
       route.path = path_url[j];
       route.root = root_url[j];
@@ -520,7 +648,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
         return (false);
       if (route.op == REDIRECT)
         route.redirectTarget = root_url[j];
-      routes[std::make_pair(route.method, route.path)] = route;
+      routes.push_back(route);
     }
   }
   return (true);
@@ -569,6 +697,20 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
   }
   err_line = "";
   return (true);
+}
+
+// Find a route that matches the given method and path
+RouteRule const *ServerConfig::findRoute(Http::Method method, const std::string &path) const {
+  PathPattern pathPattern(path);
+  
+  // Iterate through all routes to find a match
+  for (size_t i = 0; i < routes.size(); ++i) {
+    if (routes[i].method == method && routes[i].path.matches(pathPattern)) {
+      return &routes[i];
+    }
+  }
+  
+  return NULL;
 }
 
 std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
@@ -621,44 +763,32 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
     }
   }
 
-  const std::map<std::pair<Http::Method, PathPattern>, RouteRule> &routes =
-      data.Get_Routes();
-  std::map<std::pair<Http::Method, PathPattern>, RouteRule>::const_iterator
-      routes_it;
+  const std::vector<RouteRule> &routes = data.Get_Routes();
   os << "\nRoutes";
-  for (routes_it = routes.begin(); routes_it != routes.end(); ++routes_it) {
-    const std::pair<Http::Method, PathPattern> &key = routes_it->first;
-    const RouteRule &value = routes_it->second;
-    os << "\n\nRoute key: ";
-    if (key.first == Http::GET)
-      os << "GET, ";
-    else if (key.first == Http::POST)
-      os << "POST, ";
-    else if (key.first == Http::DELETE)
-      os << "DELETE, ";
-    os << key.second << std::endl;
-    os << "\tMethod: ";
-    if (key.first == Http::GET)
+  for (size_t i = 0; i < routes.size(); ++i) {
+    const RouteRule &route = routes[i];
+    os << "\n\nRoute: ";
+    if (route.method == Http::GET)
       os << "GET";
-    else if (key.first == Http::POST)
+    else if (route.method == Http::POST)
       os << "POST";
-    else if (key.first == Http::DELETE)
+    else if (route.method == Http::DELETE)
       os << "DELETE";
-    os << "\n\tPath: " << value.path << std::endl;
-    os << "\tStatus code: " << value.status_code << std::endl;
+    os << " " << route.path << std::endl;
+    os << "\tStatus code: " << route.status_code << std::endl;
 
-    os << "\n\tRuleOperator: " << what_RuleOperator(value.op) << std::endl;
-    os << "\tRedirect Target: " << value.redirectTarget << std::endl;
+    os << "\n\tRuleOperator: " << what_RuleOperator(route.op) << std::endl;
+    os << "\tRedirect Target: " << route.redirectTarget << std::endl;
 
-    os << "\n\tRoot: " << value.root << std::endl;
-    os << "\tIndex: " << value.index << std::endl;
-    os << "\tAuth Info: " << value.authInfo << std::endl;
-    os << "\tMax Body(KB): " << value.maxBodyKB;
-    if (value.errorPages.empty())
+    os << "\n\tRoot: " << route.root << std::endl;
+    os << "\tIndex: " << route.index << std::endl;
+    os << "\tAuth Info: " << route.authInfo << std::endl;
+    os << "\tMax Body(KB): " << route.maxBodyKB;
+    if (route.errorPages.empty())
       os << "\n\tError Page: " << "empty map";
     else {
       std::map<int, std::string>::const_iterator err_it;
-      for (err_it = value.errorPages.begin(); err_it != value.errorPages.end();
+      for (err_it = route.errorPages.begin(); err_it != route.errorPages.end();
            ++err_it)
         os << "\n\tError Page: " << err_it->first << " " << err_it->second;
     }
