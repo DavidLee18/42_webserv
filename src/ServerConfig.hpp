@@ -29,13 +29,13 @@ private:
   std::vector<std::string> path;
   static bool precedes(const std::vector<std::string> &,
                        const std::vector<std::string> &);
-  bool isWildcard() const { return (path.size() == 1 && path[0] == "*"); }
 
 public:
   PathPattern() : path() {}
   PathPattern(const std::string &pathStr) : path(string_split(pathStr, "/")) {}
   PathPattern(std::vector<std::string> path) : path(path) {}
 
+  bool isWildcard() const { return (path.size() == 1 && path[0] == "*"); }
   bool operator==(const std::string &) const;
   friend bool operator==(const std::string &line, const PathPattern &path) {
     return (path == line);
