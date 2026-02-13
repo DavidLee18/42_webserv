@@ -29,6 +29,7 @@ private:
   std::vector<std::string> path;
   static bool precedes(const std::vector<std::string> &,
                        const std::vector<std::string> &);
+  static bool segmentMatches(const std::string &pattern, const std::string &segment);
 
 public:
   PathPattern() : path() {}
@@ -36,6 +37,8 @@ public:
   PathPattern(std::vector<std::string> path) : path(path) {}
 
   bool isWildcard() const { return (path.size() == 1 && path[0] == "*"); }
+  bool matches(const PathPattern &other) const;
+  bool matches(const std::string &pathStr) const;
   bool operator==(const std::string &) const;
   friend bool operator==(const std::string &line, const PathPattern &path) {
     return (path == line);
