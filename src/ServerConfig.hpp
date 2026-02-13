@@ -27,8 +27,6 @@ enum RuleOperator {
 class PathPattern {
 private:
   std::vector<std::string> path;
-  static bool precedes(const std::vector<std::string> &,
-                       const std::vector<std::string> &);
   static bool segmentMatches(const std::string &pattern, const std::string &segment);
 
 public:
@@ -39,18 +37,8 @@ public:
   bool isWildcard() const { return (path.size() == 1 && path[0] == "*"); }
   bool matches(const PathPattern &other) const;
   bool matches(const std::string &pathStr) const;
-  bool operator==(const std::string &) const;
-  friend bool operator==(const std::string &line, const PathPattern &path) {
-    return (path == line);
-  }
-  bool operator!=(std::string const &other) const { return !(*this == other); }
-  friend bool operator!=(std::string const &s, PathPattern const &p) {
-    return (p != s);
-  }
   const std::vector<std::string> &Get_path(void) const { return path; }
-  bool operator<(const PathPattern &) const;
-  bool operator<(std::string const &) const;
-  friend bool operator<(std::string const &, PathPattern const &);
+  std::string toString() const;
 };
 
 struct RouteRule {
@@ -72,7 +60,7 @@ class ServerConfig {
 private:
   Header header;
   int serverResponseTime;
-  std::map<std::pair<Http::Method, PathPattern>, RouteRule> routes;
+  std::vector<RouteRule> routes;
   std::string err_line;
   int end_flag;
 
@@ -101,10 +89,10 @@ public:
       : header(), serverResponseTime(-1), routes(), err_line(), end_flag(0) {}
   const Header &Get_Header(void) const { return header; }
   int Get_ServerResponseTime(void) const { return (serverResponseTime); }
-  const std::map<std::pair<Http::Method, PathPattern>, RouteRule> &
-  Get_Routes(void) const {
+  const std::vector<RouteRule> &Get_Routes(void) const {
     return routes;
   }
+  RouteRule const *findRoute(Http::Method method, const std::string &path) const;
   const std::string &Geterr_line(void) const { return err_line; }
   // Result<ServerConfig> read_from_file(FileDescriptor &);
 };

@@ -23,12 +23,30 @@ int main(const int argc, char *argv[]) {
     const WebserverConfig &config = result_config.value();
     std::cout << "main(): " << std::endl;
     ServerConfig const &sconf = config.Get_ServerConfig_map().at(80);
-    try {
-      RouteRule const &rule =
-          sconf.Get_Routes().at(std::make_pair(Http::GET, "old_stuff"));
-      std::cout << rule.path << std::endl;
-    } catch (const std::out_of_range &e) {
-      std::cout << "Note: Original test route not found (expected with current config)" << std::endl;
+    
+    // Test the new findRoute method
+    std::cout << "\n=== Testing Route Matching ===" << std::endl;
+    RouteRule const *rule = sconf.findRoute(Http::GET, "old_stuff");
+    if (rule) {
+      std::cout << "Found route for GET old_stuff: " << rule->path.toString() << std::endl;
+    } else {
+      std::cout << "No route found for GET old_stuff" << std::endl;
+    }
+    
+    // Try with a path that should match wildcard
+    rule = sconf.findRoute(Http::GET, "/some/path/image.jpg");
+    if (rule) {
+      std::cout << "Found route for GET /some/path/image.jpg: " << rule->path.toString() << std::endl;
+    } else {
+      std::cout << "No route found for GET /some/path/image.jpg" << std::endl;
+    }
+    
+    // Try POST wildcard
+    rule = sconf.findRoute(Http::POST, "/any/path");
+    if (rule) {
+      std::cout << "Found route for POST /any/path: " << rule->path.toString() << std::endl;
+    } else {
+      std::cout << "No route found for POST /any/path" << std::endl;
     }
   }
   
