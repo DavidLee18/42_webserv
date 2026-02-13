@@ -29,6 +29,7 @@ private:
   std::vector<std::string> path;
   static bool precedes(const std::vector<std::string> &,
                        const std::vector<std::string> &);
+  bool isWildcard() const { return (path.size() == 1 && path[0] == "*"); }
 
 public:
   PathPattern() : path() {}

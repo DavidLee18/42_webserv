@@ -2,14 +2,14 @@
 
 bool PathPattern::operator==(const std::string &line) const {
   // PathPattern("*") equals every PathPattern for nginx-like route matching
-  if (path.size() == 1 && path[0] == "*") {
+  if (isWildcard()) {
     return true;
   }
   PathPattern other(line);
-  if (other.path.size() == 1 && other.path[0] == "*") {
+  if (other.isWildcard()) {
     return true;
   }
-  return (!(*this < line) && !(line < *this));
+  return (!(*this < other) && !(other < *this));
 }
 
 bool PathPattern::operator<(const PathPattern &other) const {
