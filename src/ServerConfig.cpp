@@ -13,6 +13,11 @@ bool PathPattern::operator==(const std::string &line) const {
 }
 
 bool PathPattern::operator<(const PathPattern &other) const {
+  // PathPattern("*") equals every PathPattern for map lookup
+  // This allows map::at() to find wildcard routes for any path
+  if (isWildcard() || other.isWildcard()) {
+    return false;
+  }
   return precedes(path, other.path);
 }
 
