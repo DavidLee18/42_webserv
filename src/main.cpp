@@ -23,24 +23,9 @@ int main(const int argc, char *argv[]) {
     const WebserverConfig &config = result_config.value();
     std::cout << "main(): " << std::endl;
     ServerConfig const &sconf = config.Get_ServerConfig_map().at(80);
-    
-    // Debug: print all routes
-    std::cout << "\n=== DEBUG: All routes in map ===" << std::endl;
-    const std::map<std::pair<Http::Method, PathPattern>, RouteRule> &routes = sconf.Get_Routes();
-    std::cout << "Total routes: " << routes.size() << std::endl;
-    std::map<std::pair<Http::Method, PathPattern>, RouteRule>::const_iterator it;
-    for (it = routes.begin(); it != routes.end(); ++it) {
-      std::cout << "  ";
-      if (it->first.first == Http::GET) std::cout << "GET";
-      else if (it->first.first == Http::POST) std::cout << "POST";
-      else if (it->first.first == Http::DELETE) std::cout << "DELETE";
-      std::cout << " " << it->first.second << std::endl;
-    }
-    std::cout << "=== END DEBUG ===" << std::endl;
-    
     RouteRule const &rule =
         sconf.Get_Routes().at(std::make_pair(Http::GET, "old_stuff"));
-    std::cout << "Success! Found route: " << rule.path << std::endl;
+    std::cout << rule.path << std::endl;
   }
   return 0;
 }

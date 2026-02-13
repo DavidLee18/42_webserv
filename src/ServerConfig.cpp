@@ -510,8 +510,6 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
   std::vector<std::vector<std::string> > path_url;
   std::vector<std::vector<std::string> > root_url;
 
-  std::cout << "[PARSE_HTTP] Called with path=" << data[1] << ", methods=" << mets.size() << std::endl;
-  
   if (data.size() != 4)
     return (false);
   for (size_t i = 0; i < mets.size(); ++i) {
@@ -529,36 +527,14 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
         path_url.size() != root_url.size())
       return (false);
     
-    // Insert wildcard routes first to ensure proper key in map
-    std::cout << "[DEBUG] Inserting wildcards first for method " << mets[i] << std::endl;
     for (size_t j = 0; j < path_url.size(); ++j) {
-      PathPattern p(path_url[j]);
-      if (p.isWildcard()) {
-        std::cout << "[DEBUG]   Wildcard found: " << path_url[j] << std::endl;
-        route.path = path_url[j];
-        route.root = root_url[j];
-        if (!is_matching(route.path, route.root))
-          return (false);
-        if (route.op == REDIRECT)
-          route.redirectTarget = root_url[j];
-        routes[std::make_pair(route.method, route.path)] = route;
-      }
-    }
-    
-    // Then insert non-wildcard routes
-    std::cout << "[DEBUG] Inserting non-wildcards for method " << mets[i] << std::endl;
-    for (size_t j = 0; j < path_url.size(); ++j) {
-      PathPattern p(path_url[j]);
-      if (!p.isWildcard()) {
-        std::cout << "[DEBUG]   Non-wildcard: " << path_url[j] << std::endl;
-        route.path = path_url[j];
-        route.root = root_url[j];
-        if (!is_matching(route.path, route.root))
-          return (false);
-        if (route.op == REDIRECT)
-          route.redirectTarget = root_url[j];
-        routes[std::make_pair(route.method, route.path)] = route;
-      }
+      route.path = path_url[j];
+      route.root = root_url[j];
+      if (!is_matching(route.path, route.root))
+        return (false);
+      if (route.op == REDIRECT)
+        route.redirectTarget = root_url[j];
+      routes[std::make_pair(route.method, route.path)] = route;
     }
   }
   return (true);
