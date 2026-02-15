@@ -494,3 +494,81 @@ Http::Request::parse(const char *input, char delimiter) {
                  new Http::Request(result.value().first),
                  result.value().second);
 }
+
+static std::string HttpMethod_to_string(Http::Method m)
+{
+  switch (m)
+  {
+    case GET:     return "GET";
+    case HEAD:    return "HEAD";
+    case OPTIONS: return "OPTIONS";
+    case POST:    return "POST";
+    case DELETE:  return "DELETE";
+    case PUT:     return "PUT";
+    case CONNECT: return "CONNECT";
+    case TRACE:   return "TRACE";
+    case PATCH:   return "PATCH";
+    default:      return "";
+  }
+}
+
+//<METHOD> <REQUEST-TARGET> HTTP/1.1\r\n
+static std::string serialize_Request_Line(Http::Method m, std::string path)
+{
+  // if (HttpMethod_to_string(m) == "")
+  //   return "";
+  return HttpMethod_to_string(m) + " " + path + " HTTP/1.1\r\n";
+}
+
+//<Header-Name>: <Header-Value>\r\n
+static std::string serialize_headers(std::map<std::string, std::string> header)
+{
+  std::string s = "";
+  std::map<std::string, std::string>::const_iterator it = header.begin();
+
+  for (; it != header.end(); ++it) {
+    s += it->first + ": " + it->second + "\r\n";
+  }
+  return s;
+}
+
+// Method가 GET / HEAD → 빈 문자열
+// Body 타입이 Empty → 빈 문자열
+// Body 타입이 Json → JSON 문자열
+// Body 타입이 Form → key1=value1&key2=value2&key3=value3
+// Body 타입이 Html → raw 문자열
+static std::string Request_serialize_body(Http::Method m, Http::Body b)
+{
+  Http::Body::Type body_type = b.type();
+  if (m == GET || m == HEAD || body_type == Empty) return "";
+  else if (body_type == HttpJson) {
+    return json_to_string(b.value().json);
+  }
+  else if (body_type == HttpFormUrlEncoded) {
+    std::map<std::string, std::string> map = *b.value().form;
+    std::map<std::string, std::string>::const_iterator it = map.begin();
+    std::string s = "";
+    for (; it != map.end(); ++it) {
+      if (it != map.begin())
+        s += "&";
+      s += it->first + "=" + it->second;
+    }
+    return s;
+  }
+  else if (body_type == Html) {
+    return *b.value().html_raw ;
+  }
+  return "";
+}
+
+std::string Http::Request::serialize() const
+{
+  std::string serialize = "";
+
+  serialize += serialize_Request_Line(_method, _path);
+  serialize += serialize_headers(_headers);
+  serialize += "\r\n";
+  serialize += Request_serialize_body(_method, _body);
+
+  return (serialize);
+}
