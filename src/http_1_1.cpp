@@ -513,7 +513,7 @@ static std::string HttpMethod_to_string(Http::Method m)
 }
 
 //<METHOD> <REQUEST-TARGET> HTTP/1.1\r\n
-static std::string serialize_Request_Line(Http::Method m, std::string path)
+static std::string serialize_Request_Line(Http::Method m, const std::string &path)
 {
   return HttpMethod_to_string(m) + " " + path + " HTTP/1.1\r\n";
 }
