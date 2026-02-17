@@ -23,6 +23,7 @@ int main(const int argc, char *argv[]) {
     const WebserverConfig &config = result_config.value();
     std::cout << "main(): " << std::endl;
     ServerConfig const &sconf = config.Get_ServerConfig_map().at(80);
+    (void)sconf;
   
   
 
@@ -154,6 +155,7 @@ int main(const int argc, char *argv[]) {
   // std::cout << "\n========== End of Pattern Matching Tests ==========" << std::endl;
   
   // return 0;
+  }
 }
 
 void wrap_up(const int signum) throw() { sig = signum; }
