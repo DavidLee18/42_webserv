@@ -525,7 +525,7 @@ Http::Request::parse(const char *input, char delimiter) {
                  result.value().second);
 }
 
-static std::string HttpMethod_to_string(Http::Method m)
+static std::string http_method_to_string(Http::Method m)
 {
   switch (m)
   {
@@ -543,13 +543,13 @@ static std::string HttpMethod_to_string(Http::Method m)
 }
 
 //<METHOD> <REQUEST-TARGET> HTTP/1.1\r\n
-static std::string serialize_Request_Line(Http::Method m, const std::string &path)
+static std::string serialize_request_line(Http::Method m, const std::string &path)
 {
-  return HttpMethod_to_string(m) + " " + path + " HTTP/1.1\r\n";
+  return http_method_to_string(m) + " " + path + " HTTP/1.1\r\n";
 }
 
 // <HTTP-VERSION> <STATUS-CODE> <REASON-PHRASE>\r\n
-static std::string serialize_Response_Line(int status)
+static std::string serialize_response_line(int status)
 {
   std::ostringstream oss;
   std::string reason_phrase = " ";
@@ -623,7 +623,7 @@ static std::string serialize_body(const Http::Body& b)
   return "";
 }
 
-static std::string Request_serialize_body(Http::Method m, const Http::Body& b)
+static std::string request_serialize_body(Http::Method m, const Http::Body& b)
 {
   const Http::Body::Type& body_type = b.type();
 
@@ -672,8 +672,8 @@ std::string Http::Request::serialize() const
 {
   std::map<std::string, std::string> headers = _headers;
 
-  std::string start_line = serialize_Request_Line(_method, _path);
-  std::string body = Request_serialize_body(_method, _body);
+  std::string start_line = serialize_request_line(_method, _path);
+  std::string body = request_serialize_body(_method, _body);
   sync_headers_with_body(headers, body.size());
   std::string header = serialize_headers(headers);
 
@@ -684,7 +684,7 @@ std::string Http::Response::serialize() const
 {
   std::map<std::string, std::string> headers = _headers;
 
-  std::string start_line = serialize_Response_Line(_status_code);
+  std::string start_line = serialize_response_line(_status_code);
   std::string body = "";
   if (!(_status_code > 99 && _status_code < 200) && _status_code != 204 && _status_code != 304)
     body = serialize_body(_body);
