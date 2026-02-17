@@ -576,7 +576,7 @@ static std::string serialize_body(const Http::Body& b)
       return "";
     const std::map<std::string, std::string>& map = *b.value().form;
     std::map<std::string, std::string>::const_iterator it = map.begin();
-    std::string s = "";
+    std::string s;
 
     for (; it != map.end(); ++it) {
       if (it != map.begin())
@@ -588,7 +588,7 @@ static std::string serialize_body(const Http::Body& b)
   else if (body_type == Http::Body::Html) {
     if (!b.value().html_raw)
       return "";
-    return *b.value().html_raw ;
+    return *b.value().html_raw;
   }
   return "";
 }
