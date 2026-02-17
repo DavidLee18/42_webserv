@@ -544,13 +544,13 @@ static std::string serialize_Response_Line(int status)
 //<Header-Name>: <Header-Value>\r\n
 static std::string serialize_headers(const std::map<std::string, std::string>& header)
 {
-  std::string s = "";
+  std::ostringstream oss;
   std::map<std::string, std::string>::const_iterator it = header.begin();
 
   for (; it != header.end(); ++it) {
-    s += it->first + ": " + it->second + "\r\n";
+    oss << it->first << ": " << it->second << "\r\n";
   }
-  return s;
+  return oss.str();
 }
 
 // Method가 GET / HEAD → 빈 문자열
@@ -564,7 +564,7 @@ static std::string serialize_body(const Http::Body& b)
   
   if (body_type == Http::Body::HttpJson) {
     std::ostringstream oss;
-    std::string temp;
+
 
     if (!b.value().json)
       return "";
@@ -603,15 +603,39 @@ static std::string Request_serialize_body(Http::Method m, const Http::Body& b)
 
 static bool sync_headers_with_body(std::map<std::string, std::string> &headers, size_t body_size)
 {
-  std::string content_length = headers["content-length"];
-  size_t size = std::strtoull(content_length.c_str(), 0, 10);
-  if (size != body_size) {
-    std::ostringstream oss;
+  // Look for an existing Content-Length header in a case-insensitive way.
+  // If found, update its value; otherwise, insert a normalized "content-length".
+  const std::string normalized_key = "content-length";
+  std::map<std::string, std::string>::iterator it = headers.end();
 
-    oss << body_size;
-    headers["content-length"] = oss.str();
+  for (std::map<std::string, std::string>::iterator hit = headers.begin();
+       hit != headers.end(); ++hit) {
+    if (normalize_header_name(hit->first) == normalized_key) {
+      it = hit;
+      break;
+    }
   }
-  return (true); 
+
+  bool has_existing = (it != headers.end());
+  size_t existing_size = 0;
+  if (has_existing) {
+    existing_size = std::strtoull(it->second.c_str(), 0, 10);
+  }
+
+  if (!has_existing || existing_size != body_size) {
+    std::ostringstream oss;
+    oss << body_size;
+
+    if (has_existing) {
+      // Update the existing header (preserve original casing of the key).
+      it->second = oss.str();
+    } else {
+      // Insert a new, normalized Content-Length header.
+      headers[normalized_key] = oss.str();
+    }
+  }
+
+  return true;
 }
 
 std::string Http::Request::serialize() const
