@@ -527,8 +527,7 @@ Http::Request::parse(const char *input, char delimiter) {
 
 static std::string http_method_to_string(Http::Method m)
 {
-  switch (m)
-  {
+  switch (m) {
     case Http::GET:     return "GET";
     case Http::HEAD:    return "HEAD";
     case Http::OPTIONS: return "OPTIONS";
