@@ -300,6 +300,35 @@ static std::string url_decode(const std::string &encoded) {
   return decoded;
 }
 
+// Helper function for URL encoding (application/x-www-form-urlencoded)
+static std::string url_encode(const std::string &decoded) {
+  std::string encoded;
+  
+  for (size_t i = 0; i < decoded.length(); ++i) {
+    unsigned char c = static_cast<unsigned char>(decoded[i]);
+    
+    // Encode spaces as '+'
+    if (c == ' ') {
+      encoded += '+';
+    }
+    // Keep alphanumeric and certain safe characters unencoded
+    else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+             (c >= '0' && c <= '9') || c == '-' || c == '_' || 
+             c == '.' || c == '~') {
+      encoded += c;
+    }
+    // Encode everything else as %XX
+    else {
+      encoded += '%';
+      const char hex[] = "0123456789ABCDEF";
+      encoded += hex[(c >> 4) & 0x0F];
+      encoded += hex[c & 0x0F];
+    }
+  }
+  
+  return encoded;
+}
+
 // Parse application/x-www-form-urlencoded body
 static Result<std::pair<std::map<std::string, std::string>, size_t> >
 parse_form_urlencoded(const char *input, size_t offset, size_t body_length) {
@@ -581,7 +610,7 @@ static std::string serialize_body(const Http::Body& b)
     for (; it != map.end(); ++it) {
       if (it != map.begin())
         s += "&";
-      s += it->first + "=" + it->second;
+      s += url_encode(it->first) + "=" + url_encode(it->second);
     }
     return s;
   }
