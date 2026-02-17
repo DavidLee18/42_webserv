@@ -179,6 +179,7 @@ public:
     const std::string &path() const { return _path; }
     const Body &body() const { return _body; }
     static Result<std::pair<Request *, size_t> > parse(const char *, char);
+    std::string serialize() const;
   };
 
   class Response {
@@ -211,6 +212,8 @@ public:
     void set_header(const std::string &name, const std::string &value) {
       _headers[name] = value;
     }
+
+    std::string serialize() const;
   };
 };
 #endif
