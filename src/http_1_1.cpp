@@ -300,6 +300,36 @@ static std::string url_decode(const std::string &encoded) {
   return decoded;
 }
 
+// Helper function for URL encoding (application/x-www-form-urlencoded)
+static std::string url_encode(const std::string &decoded) {
+  std::string encoded;
+  size_t len = decoded.length();
+  
+  for (size_t i = 0; i < len; ++i) {
+    unsigned char c = static_cast<unsigned char>(decoded[i]);
+    
+    // Encode spaces as '+'
+    if (c == ' ') {
+      encoded += '+';
+    }
+    // Keep alphanumeric and certain safe characters unencoded
+    else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+             (c >= '0' && c <= '9') || c == '-' || c == '_' || 
+             c == '.' || c == '~') {
+      encoded += c;
+    }
+    // Encode everything else as %XX
+    else {
+      encoded += '%';
+      const char hex[] = "0123456789ABCDEF";
+      encoded += hex[(c >> 4) & 0x0F];
+      encoded += hex[c & 0x0F];
+    }
+  }
+  
+  return encoded;
+}
+
 // Parse application/x-www-form-urlencoded body
 static Result<std::pair<std::map<std::string, std::string>, size_t> >
 parse_form_urlencoded(const char *input, size_t offset, size_t body_length) {
@@ -513,7 +543,7 @@ static std::string http_method_to_string(Http::Method m)
 }
 
 //<METHOD> <REQUEST-TARGET> HTTP/1.1\r\n
-static std::string serialize_request_line(Http::Method m, std::string path)
+static std::string serialize_request_line(Http::Method m, const std::string &path)
 {
   return http_method_to_string(m) + " " + path + " HTTP/1.1\r\n";
 }
@@ -576,19 +606,19 @@ static std::string serialize_body(const Http::Body& b)
       return "";
     const std::map<std::string, std::string>& map = *b.value().form;
     std::map<std::string, std::string>::const_iterator it = map.begin();
-    std::string s = "";
+    std::string s;
 
     for (; it != map.end(); ++it) {
       if (it != map.begin())
         s += "&";
-      s += it->first + "=" + it->second;
+      s += url_encode(it->first) + "=" + url_encode(it->second);
     }
     return s;
   }
   else if (body_type == Http::Body::Html) {
     if (!b.value().html_raw)
       return "";
-    return *b.value().html_raw ;
+    return *b.value().html_raw;
   }
   return "";
 }
