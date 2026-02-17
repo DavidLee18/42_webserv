@@ -518,14 +518,28 @@ static std::string serialize_Request_Line(Http::Method m, std::string path)
   return HttpMethod_to_string(m) + " " + path + " HTTP/1.1\r\n";
 }
 
-//<HTTP-VERSION> <STATUS-CODE> <REASON-PHRASE>\r\n
-// static std::string serialize_Response_Line(int status, std::string path)
-// {
-//   std::ostringstream oss;
+// <HTTP-VERSION> <STATUS-CODE> <REASON-PHRASE>\r\n
+static std::string serialize_Response_Line(int status)
+{
+  std::ostringstream oss;
+  std::string reason_phrase = " ";
 
-//   oss << status;
-//   return "HTTP/1.1 " + oss.str() + "\r\n";
-// }
+  oss << status;
+  if (status == 200) reason_phrase = " OK";
+  else if (status == 201) reason_phrase = " Created";
+  else if (status == 204) reason_phrase = " No Content";
+  else if (status == 301) reason_phrase = " Moved Permanently";
+  else if (status == 302) reason_phrase = " Found";
+  else if (status == 400) reason_phrase = " Bad Request";
+  else if (status == 403) reason_phrase = " Forbidden";
+  else if (status == 404) reason_phrase = " Not Found";
+  else if (status == 405) reason_phrase = " Method Not Allowed";
+  else if (status == 413) reason_phrase = " Payload Too Large";
+  else if (status == 500) reason_phrase = " Internal Server Error";
+  else if (status == 502) reason_phrase = " Bad Gateway";
+  else if (status == 503) reason_phrase = " Service Unavailable";
+  return "HTTP/1.1 " + oss.str() + reason_phrase + "\r\n";
+}
 
 //<Header-Name>: <Header-Value>\r\n
 static std::string serialize_headers(const std::map<std::string, std::string>& header)
@@ -544,18 +558,22 @@ static std::string serialize_headers(const std::map<std::string, std::string>& h
 // Body 타입이 Json → JSON 문자열
 // Body 타입이 Form → key1=value1&key2=value2&key3=value3
 // Body 타입이 Html → raw 문자열
-static std::string Request_serialize_body(Http::Method m, const Http::Body& b)
+static std::string serialize_body(const Http::Body& b)
 {
-  Http::Body::Type body_type = b.type();
-  if (m == Http::GET || m == Http::HEAD || body_type == Http::Body::Empty) return "";
-  else if (body_type == Http::Body::HttpJson) {
+  const Http::Body::Type& body_type = b.type();
+  
+  if (body_type == Http::Body::HttpJson) {
     std::ostringstream oss;
     std::string temp;
 
+    if (!b.value().json)
+      return "";
     oss << *b.value().json;
     return oss.str();
   }
   else if (body_type == Http::Body::HttpFormUrlEncoded) {
+    if (!b.value().form)
+      return "";
     const std::map<std::string, std::string>& map = *b.value().form;
     std::map<std::string, std::string>::const_iterator it = map.begin();
     std::string s = "";
@@ -575,10 +593,18 @@ static std::string Request_serialize_body(Http::Method m, const Http::Body& b)
   return "";
 }
 
+static std::string Request_serialize_body(Http::Method m, const Http::Body& b)
+{
+  const Http::Body::Type& body_type = b.type();
+
+  if (m == Http::GET || m == Http::HEAD || body_type == Http::Body::Empty) return "";
+  return serialize_body(b);
+}
+
 static bool sync_headers_with_body(std::map<std::string, std::string> &headers, size_t body_size)
 {
-  std::string content_lenght = headers["content-length"];
-  size_t size = std::strtoull(content_lenght.c_str(), 0, 10);
+  std::string content_length = headers["content-length"];
+  size_t size = std::strtoull(content_length.c_str(), 0, 10);
   if (size != body_size) {
     std::ostringstream oss;
 
@@ -600,14 +626,16 @@ std::string Http::Request::serialize() const
   return start_line + header + "\r\n" + body;
 }
 
-// std::string Http::Response::serialize() const
-// {
-  // std::map<std::string, std::string> headers = _headers;
+std::string Http::Response::serialize() const
+{
+  std::map<std::string, std::string> headers = _headers;
 
-  // std::string start_line = serialize_Request_Line(_method, _path);
-  // std::string body = Request_serialize_body(_method, _body);
-  // sync_headers_with_body(headers, body.size());
-  // std::string header = serialize_headers(headers);
+  std::string start_line = serialize_Response_Line(_status_code);
+  std::string body = "";
+  if (!(_status_code > 99 && _status_code < 200) && _status_code != 204 && _status_code != 304)
+    body = serialize_body(_body);
+  sync_headers_with_body(headers, body.size());
+  std::string header = serialize_headers(headers);
 
-  // return start_line + header + "\r\n" + body;
-// }
+  return start_line + header + "\r\n" + body;
+}
