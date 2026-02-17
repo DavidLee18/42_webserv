@@ -303,8 +303,9 @@ static std::string url_decode(const std::string &encoded) {
 // Helper function for URL encoding (application/x-www-form-urlencoded)
 static std::string url_encode(const std::string &decoded) {
   std::string encoded;
+  size_t len = decoded.length();
   
-  for (size_t i = 0; i < decoded.length(); ++i) {
+  for (size_t i = 0; i < len; ++i) {
     unsigned char c = static_cast<unsigned char>(decoded[i]);
     
     // Encode spaces as '+'
