@@ -10,7 +10,7 @@ private:
   std::string default_mime;
   std::map<std::string, std::string> type_map;
   std::map<unsigned int, ServerConfig>
-      ServerConfig_map; // key unsigned int로 변환
+      ServerConfig_map;
 
   bool file_parsing(FileDescriptor &file);
   // type_map method

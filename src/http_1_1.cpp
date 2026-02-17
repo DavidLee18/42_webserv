@@ -499,15 +499,15 @@ static std::string HttpMethod_to_string(Http::Method m)
 {
   switch (m)
   {
-    case GET:     return "GET";
-    case HEAD:    return "HEAD";
-    case OPTIONS: return "OPTIONS";
-    case POST:    return "POST";
-    case DELETE:  return "DELETE";
-    case PUT:     return "PUT";
-    case CONNECT: return "CONNECT";
-    case TRACE:   return "TRACE";
-    case PATCH:   return "PATCH";
+    case Http::GET:     return "GET";
+    case Http::HEAD:    return "HEAD";
+    case Http::OPTIONS: return "OPTIONS";
+    case Http::POST:    return "POST";
+    case Http::DELETE:  return "DELETE";
+    case Http::PUT:     return "PUT";
+    case Http::CONNECT: return "CONNECT";
+    case Http::TRACE:   return "TRACE";
+    case Http::PATCH:   return "PATCH";
     default:      return "";
   }
 }
@@ -515,13 +515,20 @@ static std::string HttpMethod_to_string(Http::Method m)
 //<METHOD> <REQUEST-TARGET> HTTP/1.1\r\n
 static std::string serialize_Request_Line(Http::Method m, std::string path)
 {
-  // if (HttpMethod_to_string(m) == "")
-  //   return "";
   return HttpMethod_to_string(m) + " " + path + " HTTP/1.1\r\n";
 }
 
+//<HTTP-VERSION> <STATUS-CODE> <REASON-PHRASE>\r\n
+// static std::string serialize_Response_Line(int status, std::string path)
+// {
+//   std::ostringstream oss;
+
+//   oss << status;
+//   return "HTTP/1.1 " + oss.str() + "\r\n";
+// }
+
 //<Header-Name>: <Header-Value>\r\n
-static std::string serialize_headers(std::map<std::string, std::string> header)
+static std::string serialize_headers(const std::map<std::string, std::string>& header)
 {
   std::string s = "";
   std::map<std::string, std::string>::const_iterator it = header.begin();
@@ -537,17 +544,22 @@ static std::string serialize_headers(std::map<std::string, std::string> header)
 // Body 타입이 Json → JSON 문자열
 // Body 타입이 Form → key1=value1&key2=value2&key3=value3
 // Body 타입이 Html → raw 문자열
-static std::string Request_serialize_body(Http::Method m, Http::Body b)
+static std::string Request_serialize_body(Http::Method m, const Http::Body& b)
 {
   Http::Body::Type body_type = b.type();
-  if (m == GET || m == HEAD || body_type == Empty) return "";
-  else if (body_type == HttpJson) {
-    return json_to_string(b.value().json);
+  if (m == Http::GET || m == Http::HEAD || body_type == Http::Body::Empty) return "";
+  else if (body_type == Http::Body::HttpJson) {
+    std::ostringstream oss;
+    std::string temp;
+
+    oss << *b.value().json;
+    return oss.str();
   }
-  else if (body_type == HttpFormUrlEncoded) {
-    std::map<std::string, std::string> map = *b.value().form;
+  else if (body_type == Http::Body::HttpFormUrlEncoded) {
+    const std::map<std::string, std::string>& map = *b.value().form;
     std::map<std::string, std::string>::const_iterator it = map.begin();
     std::string s = "";
+
     for (; it != map.end(); ++it) {
       if (it != map.begin())
         s += "&";
@@ -555,20 +567,47 @@ static std::string Request_serialize_body(Http::Method m, Http::Body b)
     }
     return s;
   }
-  else if (body_type == Html) {
+  else if (body_type == Http::Body::Html) {
+    if (!b.value().html_raw)
+      return "";
     return *b.value().html_raw ;
   }
   return "";
 }
 
+static bool sync_headers_with_body(std::map<std::string, std::string> &headers, size_t body_size)
+{
+  std::string content_lenght = headers["content-length"];
+  size_t size = std::strtoull(content_lenght.c_str(), 0, 10);
+  if (size != body_size) {
+    std::ostringstream oss;
+
+    oss << body_size;
+    headers["content-length"] = oss.str();
+  }
+  return (true); 
+}
+
 std::string Http::Request::serialize() const
 {
-  std::string serialize = "";
+  std::map<std::string, std::string> headers = _headers;
 
-  serialize += serialize_Request_Line(_method, _path);
-  serialize += serialize_headers(_headers);
-  serialize += "\r\n";
-  serialize += Request_serialize_body(_method, _body);
+  std::string start_line = serialize_Request_Line(_method, _path);
+  std::string body = Request_serialize_body(_method, _body);
+  sync_headers_with_body(headers, body.size());
+  std::string header = serialize_headers(headers);
 
-  return (serialize);
+  return start_line + header + "\r\n" + body;
 }
+
+// std::string Http::Response::serialize() const
+// {
+  // std::map<std::string, std::string> headers = _headers;
+
+  // std::string start_line = serialize_Request_Line(_method, _path);
+  // std::string body = Request_serialize_body(_method, _body);
+  // sync_headers_with_body(headers, body.size());
+  // std::string header = serialize_headers(headers);
+
+  // return start_line + header + "\r\n" + body;
+// }
