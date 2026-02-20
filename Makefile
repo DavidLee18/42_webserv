@@ -9,7 +9,8 @@ SRC_DIR := src
 
 SRCS := src/errors.cpp src/epoll_kqueue.cpp \
 	src/ParsingUtils.cpp src/ServerConfig.cpp src/WebserverConfig.cpp \
-	src/file_descriptor.cpp src/json.cpp src/cgi_1_1.cpp src/wsgi.cpp src/http_1_1.cpp src/main.cpp
+	src/file_descriptor.cpp src/json.cpp src/cgi_1_1.cpp src/wsgi.cpp src/http_1_1.cpp src/main.cpp \
+	src/ServerSocket.cpp
 OBJS := $(patsubst src/%.cpp, build/%.o, $(SRCS))
 
 all: $(NAME)
