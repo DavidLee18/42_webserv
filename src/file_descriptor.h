@@ -6,13 +6,6 @@
 #include "result.h"
 #include <sys/socket.h>
 
-#ifdef __APPLE__
-class KQueue;
-#else
-class EPoll;
-class Option;
-#endif
-
 class Event;
 
 class FileDescriptor {
