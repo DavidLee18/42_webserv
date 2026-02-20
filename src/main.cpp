@@ -25,6 +25,7 @@ int main(const int argc, char *argv[]) {
     ServerConfig const &sconf = config.Get_ServerConfig_map().at(80);
     (void)sconf;
     
+    // Added to init and generate server. Couldn't test due to parsing issue. TODO
     std::set<const FileDescriptor*> server_fds;
     Result<EPoll> epoll_res = init_servers(config, server_fds);
     if (!epoll_res.has_value()) {
