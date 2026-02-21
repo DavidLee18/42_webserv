@@ -143,7 +143,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 							break;
 						}
 						// 읽은 데이터를 버퍼에 저장
-						clients.at(fd).read_buffer.append(buf, bytes);
+						clients.at(fd).read_buffer.append(buf, static_cast<std::size_t>(bytes));
 					}
 
 					// TODO: 여기서 HTTP 파싱 로직 호출
@@ -177,7 +177,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 								break; // EWOULDBLOCK: 소켓 버퍼가 꽉 차서 더 못 보냄
 							}
 							ssize_t bytes = send_res.value();
-							client.write_buffer.erase(0, bytes); // 보낸 만큼 버퍼에서 삭제
+							client.write_buffer.erase(0, static_cast<std::size_t>(bytes)); // 보낸 만큼 버퍼에서 삭제
 							if (client.write_buffer.empty())
 							{
 								break; // 다 보냈음
