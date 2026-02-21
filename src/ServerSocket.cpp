@@ -10,7 +10,7 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 		return epoll_res;
 	EPoll epoll = epoll_res.value();
 
-	// 2. 설정 파일에 있는 모든 포트에 대해 서버 소켓 생성
+	// 설정 파일에 있는 모든 포트에 대해 서버 소켓 생성
 	const std::map<unsigned int, ServerConfig> &servers = config.Get_ServerConfig_map();
 	for (std::map<unsigned int, ServerConfig>::const_iterator it = servers.begin(); it != servers.end(); ++it)
 	{

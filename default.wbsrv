@@ -37,7 +37,7 @@ types =
 
 
 
-:40 =
+:8040 =
 	[] +<= X-Content-Type-Options: "nosniff"
 	[] +<= Content-Security-Policy: default-src 'self';
         object-src 'none'; script-src 'sha256-${$HASH($SCRIPT)}';
