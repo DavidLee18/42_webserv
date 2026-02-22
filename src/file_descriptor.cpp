@@ -94,7 +94,7 @@ FileDescriptor::~FileDescriptor() {
 }
 
 Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
-                                         unsigned short port) {
+                                         unsigned short port) const {
   sockaddr_in _addr;
   std::memset(&_addr, 0, sizeof(_addr));
   _addr.sin_family = AF_INET;
@@ -131,7 +131,7 @@ Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
   return OKV;
 }
 
-Result<Void> FileDescriptor::socket_listen(unsigned short backlog) {
+Result<Void> FileDescriptor::socket_listen(unsigned short backlog) const {
   if (listen(_fd, backlog) < 0) {
     switch (errno) {
     case EADDRINUSE:
@@ -147,7 +147,7 @@ Result<Void> FileDescriptor::socket_listen(unsigned short backlog) {
 }
 
 Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
-                                                     socklen_t *len) {
+                                                     socklen_t *len) const {
   int fd = accept(_fd, addr, len);
   if (fd >= 0) {
     FileDescriptor fd_;
@@ -186,14 +186,14 @@ Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
   }
 }
 
-Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) {
+Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) const {
   ssize_t res = recv(_fd, buf, size, 0);
   if (res < 0)
     return ERR(ssize_t, "`recv` failed");
   return OK(ssize_t, res);
 }
 
-Result<Http::PartialString> FileDescriptor::try_read_to_end() {
+Result<Http::PartialString> FileDescriptor::try_read_to_end() const {
   std::stringstream ss;
   char buf[BUFFER_SIZE];
 
@@ -218,7 +218,7 @@ Result<Http::PartialString> FileDescriptor::try_read_to_end() {
   return OK(Http::PartialString, Http::PartialString::partial(s));
 }
 
-Result<Void> FileDescriptor::set_nonblocking() {
+Result<Void> FileDescriptor::set_nonblocking() const {
   int flags = fcntl(_fd, F_GETFL, 0);
   if (flags < 0) {
     return ERR(Void, "Failed to get file descriptor flags");
@@ -231,14 +231,14 @@ Result<Void> FileDescriptor::set_nonblocking() {
 
 Result<Void> FileDescriptor::set_socket_option(int level, int optname,
                                                const void *optval,
-                                               socklen_t optlen) {
+                                               socklen_t optlen) const {
   if (setsockopt(_fd, level, optname, optval, optlen) < 0) {
     return ERR(Void, "Failed to set socket option");
   }
   return OKV;
 }
 
-Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) {
+Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) const {
   ssize_t res = send(_fd, buf, size, 0);
   if (res < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {

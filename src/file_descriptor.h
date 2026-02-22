@@ -29,15 +29,15 @@ public:
 
   ~FileDescriptor();
 
-  Result<Void> socket_bind(struct in_addr addr, unsigned short port);
+  Result<Void> socket_bind(struct in_addr addr, unsigned short port) const;
 
-  Result<Void> socket_listen(unsigned short backlog);
+  Result<Void> socket_listen(unsigned short backlog) const;
 
-  Result<FileDescriptor> socket_accept(struct sockaddr *addr, socklen_t *len);
+  Result<FileDescriptor> socket_accept(struct sockaddr *addr, socklen_t *len) const;
 
-  Result<ssize_t> sock_recv(void *buf, size_t size);
+  Result<ssize_t> sock_recv(void *buf, size_t size) const;
 
-  Result<Http::PartialString> try_read_to_end();
+  Result<Http::PartialString> try_read_to_end() const;
 
   /**
    * @brief Sets the file descriptor to non-blocking mode.
@@ -68,12 +68,12 @@ public:
    *
    * @return Result<Void> Success or error message
    */
-  Result<Void> set_nonblocking();
+  Result<Void> set_nonblocking() const;
 
   Result<Void> set_socket_option(int level, int optname, const void *optval,
-                                 socklen_t optlen);
+                                 socklen_t optlen) const;
 
-  Result<ssize_t> sock_send(const void *buf, size_t size);
+  Result<ssize_t> sock_send(const void *buf, size_t size) const;
 
   Result<std::string> read_file_line();
 
