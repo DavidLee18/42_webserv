@@ -12,24 +12,28 @@
 #include <map>
 
 // Structure to hold client connection state
-class ClientConnection {
+class ClientConnection
+{
 public:
-  intptr_t fd_key; // Pointer-based key for tracking
+  const FileDescriptor *fd_ptr; // Pointer-based key for tracking
   std::string read_buffer;
   std::string write_buffer;
   bool request_complete;
 
-  explicit ClientConnection(intptr_t key)
-      : fd_key(key), read_buffer(), write_buffer(), request_complete(false) {}
+  explicit ClientConnection(const FileDescriptor *ptr)
+      : fd_ptr(ptr), read_buffer(), write_buffer(), request_complete(false) {}
 
   ClientConnection(const ClientConnection &other)
-      : fd_key(other.fd_key), read_buffer(other.read_buffer),
+      : fd_ptr(other.fd_ptr),
+        read_buffer(other.read_buffer),
         write_buffer(other.write_buffer),
         request_complete(other.request_complete) {}
 
-  ClientConnection &operator=(const ClientConnection &other) {
-    if (this != &other) {
-      fd_key = other.fd_key;
+  ClientConnection &operator=(const ClientConnection &other)
+  {
+    if (this != &other)
+    {
+      fd_ptr = other.fd_ptr;
       read_buffer = other.read_buffer;
       write_buffer = other.write_buffer;
       request_complete = other.request_complete;
@@ -38,7 +42,7 @@ public:
   }
 };
 
-Result<EPoll> init_servers(const WebserverConfig& config, std::set<const FileDescriptor*>& server_fds);
-void run_server(EPoll& epoll, const std::set<const FileDescriptor*>& server_fds);
+Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds);
+void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds);
 
 #endif

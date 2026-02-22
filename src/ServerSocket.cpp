@@ -5,10 +5,10 @@
 Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds)
 {
 	// EPoll 생성
-	Result<EPoll> epoll_res = EPoll::create(MAX_FDS);
-	if (!epoll_res.has_value())
-		return epoll_res;
-	EPoll epoll = epoll_res.value();
+	Result<EPoll> epoll_result = EPoll::create(MAX_FDS);
+	if (!epoll_result.has_value())
+		return epoll_result;
+	EPoll epoll = epoll_result.value();
 
 	// 설정 파일에 있는 모든 포트에 대해 서버 소켓 생성
 	const std::map<unsigned int, ServerConfig> &servers = config.Get_ServerConfig_map();
@@ -17,15 +17,15 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 		unsigned int port = it->first;
 
 		// 소켓 생성
-		Result<FileDescriptor> sock_res = FileDescriptor::socket_new();
-		if (!sock_res.has_value())
-			return ERR(EPoll, sock_res.error());
-		FileDescriptor server_fd = sock_res.value();
+		Result<FileDescriptor> sock_result = FileDescriptor::socket_new();
+		if (!sock_result.has_value())
+			return ERR(EPoll, sock_result.error());
+		FileDescriptor server_fd = sock_result.value();
 
 		// 논블로킹 설정 (Edge-Triggered 사용을 위해 필수)
-		Result<Void> nb_res = server_fd.set_nonblocking();
-		if (!nb_res.has_value())
-			return ERR(EPoll, nb_res.error());
+		Result<Void> nb_result = server_fd.set_nonblocking();
+		if (!nb_result.has_value())
+			return ERR(EPoll, nb_result.error());
 
 		// 포트 재사용 옵션 설정 (서버 재시작 시 "Address already in use" 에러 방지)
 		int opt = 1;
@@ -105,7 +105,9 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					if (add_res.has_value())
 					{
 						const FileDescriptor *new_client_ptr = add_res.value();
-						clients.insert(std::make_pair(new_client_ptr, ClientConnection(reinterpret_cast<intptr_t>(new_client_ptr))));
+						clients.insert(std::make_pair(
+											new_client_ptr,
+											ClientConnection(new_client_ptr)));
 						std::cout << "New client connected!" << std::endl;
 					}
 				}
