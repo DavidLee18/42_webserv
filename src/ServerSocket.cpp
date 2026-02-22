@@ -64,12 +64,17 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 
 	while (true)
 	{
-		// 이벤트 대기 (-1은 무한 대기)
-		Result<Events> events_res = epoll.wait(-1);
-		if (!events_res.has_value())
-			continue;
+		// Waiting for events
+		Result<Events> events_result = epoll.wait(-1);
+		if (!events_result.has_value())
+		{
+			if (events_result.error() == Errors::interrupted)
+				continue;
+			else
+				std::cerr << "ERROR: " << events_result.error() << std::endl; 
+		}
 
-		Events events = events_res.value();
+		Events events = events_result.value();
 		while (!events.is_end())
 		{
 			Result<const Event *> ev_res = *events;
