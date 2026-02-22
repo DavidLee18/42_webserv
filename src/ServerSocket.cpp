@@ -71,7 +71,10 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 			if (events_result.error() == Errors::interrupted)
 				continue;
 			else
-				std::cerr << "ERROR: " << events_result.error() << std::endl; 
+			{
+				std::cerr << "ERROR: " << events_result.error() << std::endl;
+				break;
+			}
 		}
 
 		Events events = events_result.value();
