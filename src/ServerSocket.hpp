@@ -11,7 +11,7 @@
 #include <set>
 #include <map>
 
-// Structure to hold client connection state
+// Class holding client connection state
 class ClientConnection
 {
 public:

@@ -1,59 +1,57 @@
 #include "ServerSocket.hpp"
 
-#define MAX_FDS 1024
-
 Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds)
 {
-	// EPoll 생성
-	Result<EPoll> epoll_result = EPoll::create(MAX_FDS);
+	// EPoll init
+	Result<EPoll> epoll_result = EPoll::create(1024);
 	if (!epoll_result.has_value())
 		return epoll_result;
 	EPoll epoll = epoll_result.value();
 
-	// 설정 파일에 있는 모든 포트에 대해 서버 소켓 생성
+	// Init server socket for every port listed on configuration file
 	const std::map<unsigned int, ServerConfig> &servers = config.Get_ServerConfig_map();
 	for (std::map<unsigned int, ServerConfig>::const_iterator it = servers.begin(); it != servers.end(); ++it)
 	{
-		unsigned int port = it->first;
+		unsigned short port = static_cast<unsigned short>(it->first);
 
-		// 소켓 생성
+		// Init socket
 		Result<FileDescriptor> sock_result = FileDescriptor::socket_new();
 		if (!sock_result.has_value())
 			return ERR(EPoll, sock_result.error());
 		FileDescriptor server_fd = sock_result.value();
 
-		// 논블로킹 설정 (Edge-Triggered 사용을 위해 필수)
+		// Non-blocking socket for ET(edge triggered)
 		Result<Void> nb_result = server_fd.set_nonblocking();
 		if (!nb_result.has_value())
 			return ERR(EPoll, nb_result.error());
 
-		// 포트 재사용 옵션 설정 (서버 재시작 시 "Address already in use" 에러 방지)
+		// Port reusing option
 		int opt = 1;
 		server_fd.set_socket_option(SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-		// Bind (IP와 포트 연결)
+		// Bind (IP-Port connect)
 		struct in_addr addr;
-		addr.s_addr = htonl(INADDR_ANY); // 모든 IP 허용
-		Result<Void> bind_res = server_fd.socket_bind(addr, static_cast<unsigned short>(port));
-		if (!bind_res.has_value())
-			return ERR(EPoll, bind_res.error());
+		addr.s_addr = htonl(INADDR_ANY); // All IP
+		Result<Void> bind_result = server_fd.socket_bind(addr, port);
+		if (!bind_result.has_value())
+			return ERR(EPoll, bind_result.error());
 
-		// Listen (연결 대기열 크기 128로 설정)
-		Result<Void> listen_res = server_fd.socket_listen(128);
-		if (!listen_res.has_value())
-			return ERR(EPoll, listen_res.error());
+		// Listen (max queue length)
+		Result<Void> listen_result = server_fd.socket_listen(SOMAXCONN);
+		if (!listen_result.has_value())
+			return ERR(EPoll, listen_result.error());
 
-		// EPoll에 등록할 이벤트 설정 (읽기 감지, Edge-Triggered 모드)
+		// EPoll event and option setting
 		Event ev(&server_fd, true, false, false, false, false, false); // in=true
 		Option op(true, false, false, false);						   // et=true
 
-		// EPoll에 소켓 추가 (add_fd는 소켓의 소유권을 가져가고, 내부 저장소의 포인터를 반환함)
-		Result<const FileDescriptor *> add_res = epoll.add_fd(server_fd, ev, op);
-		if (!add_res.has_value())
-			return ERR(EPoll, add_res.error());
+		// Add server socket to EPoll
+		Result<const FileDescriptor *> add_result = epoll.add_fd(server_fd, ev, op);
+		if (!add_result.has_value())
+			return ERR(EPoll, add_result.error());
 
-		// 반환된 포인터를 서버 소켓 목록에 저장 (나중에 클라이언트 소켓과 구분하기 위함)
-		server_fds.insert(add_res.value());
+		// Saving to separate Server socket and Client sockets 
+		server_fds.insert(add_result.value());
 		std::cout << "Server listening on port " << port << std::endl;
 	}
 
@@ -101,10 +99,10 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					Event client_ev(&client_fd, true, true, false, false, false, false); // in=true, out=true
 					Option client_op(true, false, false, false);						 // et=true
 
-					Result<const FileDescriptor *> add_res = epoll.add_fd(client_fd, client_ev, client_op);
-					if (add_res.has_value())
+					Result<const FileDescriptor *> add_result = epoll.add_fd(client_fd, client_ev, client_op);
+					if (add_result.has_value())
 					{
-						const FileDescriptor *new_client_ptr = add_res.value();
+						const FileDescriptor *new_client_ptr = add_result.value();
 						clients.insert(std::make_pair(
 											new_client_ptr,
 											ClientConnection(new_client_ptr)));
