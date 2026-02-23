@@ -119,7 +119,7 @@ Result<int> EPoll::add_fd(FileDescriptor fd, const Event &ev,
     }
   }
   int raw = fd._fd;
-  _events.push_back(fd);
+  _events.insert(std::make_pair(raw, fd));
 
   // Return the raw file descriptor integer (avoids storing pointers into the
   // vector, which could be invalidated on reallocation)
