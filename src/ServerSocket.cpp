@@ -123,6 +123,11 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					} else {
 						std::cerr << "ERROR: failed to add client to epoll: " << add_result.error() << std::endl;
 					}
+					else
+					{
+						std::cerr << "ERROR: failed to add client fd to epoll: " << add_result.error() << std::endl;
+						// client_fd goes out of scope here and is closed via RAII
+					}
 				}
 			}
 			// 2. Event on a client socket (data send/receive)
