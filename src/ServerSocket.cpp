@@ -87,18 +87,18 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 			const FileDescriptor *fd = event->fd;
 			int fd_raw = fd->raw_fd();
 
-			// 1. Event occurred on server socket (new client connection)
+			// 1. Event on server socket (new client connection)
 			if (server_fds.find(fd) != server_fds.end())
 			{
 				while (true)
-				{ // Must accept all pending connections since Edge-Triggered mode
+				{ // Must accept all pending connections since Edge-Triggered
 					Result<FileDescriptor> client_res = fd->socket_accept(NULL, NULL);
 					if (!client_res.has_value())
 					{
 						break; // EWOULDBLOCK: no more pending connections
 					}
 					FileDescriptor client_fd = client_res.value();
-					auto nb_res = client_fd.set_nonblocking(); // Client socket must also be set to non-blocking
+					auto nb_res = client_fd.set_nonblocking(); // Client socket must also be non-blocking!
 					if (!nb_res.has_value())
 					{
 						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
@@ -126,10 +126,10 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 					}
 				}
 			}
-			// 2. Event occurred on client socket (data send/receive)
+			// 2. Event on client socket (data send/receive)
 			else
 			{
-				// Detect error or connection close
+				// Detect error or connection closure
 				if (event->err || event->hup || event->rdhup)
 				{
 					std::cout << "Client disconnected (error/hup)" << std::endl;
@@ -146,7 +146,7 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 				if (event->in)
 				{
 					while (true)
-					{ // Must read all available data since Edge-Triggered mode
+					{ // Must read all data since Edge-Triggered
 						char buf[4096];
 						Result<ssize_t> recv_res = fd->sock_recv(buf, sizeof(buf));
 						if (!recv_res.has_value())
@@ -163,12 +163,12 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 							clients.erase(fd);
 							break;
 						}
-						// Store received data in buffer
+						// Store read data in buffer
 						clients.at(fd).read_buffer.append(buf, static_cast<std::size_t>(bytes));
 					}
 
 					// TODO: call HTTP parsing logic here
-					// Temporary: send a fixed response for any incoming data
+					// Temporarily, send a fixed response whenever data arrives
 					if (clients.find(fd) != clients.end() && !clients.at(fd).read_buffer.empty())
 					{
 						std::string body = "<html><body><h1>Hello from webserv!</h1></body></html>";
@@ -184,14 +184,14 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 					}
 				}
 
-				// Write event (can send data to client)
+				// Write event (ready to send data to client)
 				if (event->out && clients.find(fd) != clients.end())
 				{
 					ClientConnection &client = clients.at(fd_raw);
 					if (!client.write_buffer.empty())
 					{
 						while (true)
-						{ // Must send as much data as possible since Edge-Triggered mode
+						{ // Must send as much as possible since Edge-Triggered
 							Result<ssize_t> send_res = fd->sock_send(client.write_buffer.c_str(), client.write_buffer.length());
 							if (!send_res.has_value())
 							{
@@ -200,7 +200,7 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 							ssize_t bytes = send_res.value();
 							if (bytes == 0)
 							{
-								break; // Cannot send more, exit loop to prevent infinite loop
+								break; // No more data to send, exit loop (prevent infinite loop)
 							}
 							client.write_buffer.erase(0, static_cast<std::size_t>(bytes)); // Remove sent bytes from buffer
 							if (client.write_buffer.empty())
