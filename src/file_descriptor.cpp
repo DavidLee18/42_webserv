@@ -262,16 +262,6 @@ Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) const {
   return OK(ssize_t, res);
 }
 
-void FileDescriptor::close() {
-  if (fp != NULL) {
-    std::fclose(fp);
-    fp = NULL;
-  } else if (_fd >= 0) {
-    ::close(_fd);
-    _fd = -1;
-  }
-}
-
 Result<std::string> FileDescriptor::read_file_line() {
   if (fp == NULL)
     return ERR(std::string, "FILE not initialized");
