@@ -76,8 +76,8 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   return OK(EPoll, ep);
 }
 
-Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
-                                             const Option &op) {
+Result<int> EPoll::add_fd(FileDescriptor fd, const Event &ev,
+                          const Option &op) {
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -103,31 +103,27 @@ Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   if (epoll_ctl(_fd._fd, EPOLL_CTL_ADD, fd._fd, &event) == -1) {
     switch (errno) {
     case EEXIST:
-      return ERR(FileDescriptor *,
-                 "this fd is already registered to this epoll");
+      return ERR(int, "this fd is already registered to this epoll");
     case EINVAL:
-      return ERR(FileDescriptor *, Errors::invalid_fd);
+      return ERR(int, Errors::invalid_fd);
     case ELOOP:
-      return ERR(FileDescriptor *, Errors::epoll_loop);
+      return ERR(int, Errors::epoll_loop);
     case ENOMEM:
-      return ERR(FileDescriptor *, Errors::out_of_mem);
+      return ERR(int, Errors::out_of_mem);
     case ENOSPC:
-      return ERR(FileDescriptor *, Errors::epoll_full);
+      return ERR(int, Errors::epoll_full);
     case EPERM:
-      return ERR(FileDescriptor *, Errors::not_supported);
+      return ERR(int, Errors::not_supported);
     default:
-      return ERR(FileDescriptor *,
-                 "an unknown error occured during EPOLL_CTL_ADD");
+      return ERR(int, "an unknown error occured during EPOLL_CTL_ADD");
     }
   }
-  if (_events.size() >= _events.capacity())
-    return ERR(const FileDescriptor *, Errors::epoll_full);
+  int raw = fd._fd;
   _events.push_back(fd);
 
-  // Return pointer to the FileDescriptor in the vector (last element just
-  // added)
-  FileDescriptor *fd_in = &_events.at(_events.size() - 1);
-  return OK(FileDescriptor *, fd_in);
+  // Return the raw file descriptor integer (avoids storing pointers into the
+  // vector, which could be invalidated on reallocation)
+  return OK(int, raw);
 }
 
 Result<Void> EPoll::modify_fd(FileDescriptor &fd, const Event &ev,

@@ -21,16 +21,16 @@
 class ClientConnection
 {
 public:
-  FileDescriptor *fd_ptr; // Non-const pointer for explicit close() calls
+  int fd_int; // Raw fd integer for tracking
   std::string read_buffer;
   std::string write_buffer;
   bool request_complete;
 
-  explicit ClientConnection(FileDescriptor *ptr)
-      : fd_ptr(ptr), read_buffer(), write_buffer(), request_complete(false) {}
+  explicit ClientConnection(int fd)
+      : fd_int(fd), read_buffer(), write_buffer(), request_complete(false) {}
 
   ClientConnection(const ClientConnection &other)
-      : fd(other.fd),
+      : fd_int(other.fd_int),
         read_buffer(other.read_buffer),
         write_buffer(other.write_buffer),
         request_complete(other.request_complete) {}
@@ -39,7 +39,7 @@ public:
   {
     if (this != &other)
     {
-      fd = other.fd;
+      fd_int = other.fd_int;
       read_buffer = other.read_buffer;
       write_buffer = other.write_buffer;
       request_complete = other.request_complete;

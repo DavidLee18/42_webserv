@@ -93,6 +93,16 @@ FileDescriptor::~FileDescriptor() {
     ::close(_fd);
 }
 
+void FileDescriptor::close() {
+  if (fp != NULL) {
+    std::fclose(fp);
+    fp = NULL;
+  } else if (_fd >= 0) {
+    ::close(_fd);
+  }
+  _fd = -1;
+}
+
 Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
                                          unsigned short port) const {
   sockaddr_in _addr;
