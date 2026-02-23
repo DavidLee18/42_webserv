@@ -25,7 +25,7 @@ int main(const int argc, char *argv[]) {
     std::cout << "main(): " << std::endl;
     
     // Initiate and generate server.
-    std::set<const FileDescriptor*> server_fds;
+    std::set<int> server_fds;
     Result<EPoll> epoll_result = init_servers(config, server_fds);
     if (!epoll_result.has_value()) {
       std::cerr << "Server initialization failed: " << epoll_result.error() << std::endl;

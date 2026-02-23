@@ -33,9 +33,9 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 		if (!reuseaddr_result.has_value())
 			return ERR(EPoll, reuseaddr_result.error());
 
-		// Bind (IP-Port connect)
+		// Bind (associate IP and port)
 		struct in_addr addr;
-		addr.s_addr = htonl(INADDR_ANY); // All IP
+		addr.s_addr = htonl(INADDR_ANY); // All IPs
 		Result<Void> bind_result = server_fd.socket_bind(addr, port);
 		if (!bind_result.has_value())
 			return ERR(EPoll, bind_result.error());
@@ -50,7 +50,7 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 		Option op(true, false, false, false);                              // et=true
 
 		// Add server socket to EPoll
-		Result<const FileDescriptor *> add_result = epoll.add_fd(server_fd, event, op);
+		Result<FileDescriptor *> add_result = epoll.add_fd(server_fd, event, op);
 		if (!add_result.has_value())
 			return ERR(EPoll, add_result.error());
 
@@ -85,7 +85,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				continue;
 			}
 			const Event *event = ev_result.value();
-			const FileDescriptor *fd = event->fd;
+			int raw_fd = event->fd->get_fd();
 
 			// 1. Event on a server socket (new client connection)
 			if (server_fds.find(fd) != server_fds.end()) {
@@ -202,3 +202,4 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 		}
 	}
 }
+

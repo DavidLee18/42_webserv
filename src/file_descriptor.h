@@ -75,7 +75,11 @@ public:
 
   Result<ssize_t> sock_send(const void *buf, size_t size) const;
 
+  void close();
+
   Result<std::string> read_file_line();
+
+  int get_fd() const { return _fd; }
 
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {
