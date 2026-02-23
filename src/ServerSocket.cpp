@@ -124,9 +124,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				if (event->err || event->hup || event->rdhup)
 				{
 					std::cout << "Client disconnected (error/hup)" << std::endl;
-					FileDescriptor *client_fd = const_cast<FileDescriptor *>(fd);
-					epoll.del_fd(*client_fd);
-					client_fd->close(); // Close underlying socket to avoid FD leak
+					epoll.del_fd(*const_cast<FileDescriptor *>(fd));
 					clients.erase(fd);
 					++events;
 					continue;
@@ -141,7 +139,13 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						Result<ssize_t> recv_res = fd->sock_recv(buf, sizeof(buf));
 						if (!recv_res.has_value())
 						{
-							break; // EWOULDBLOCK: 더 이상 읽을 데이터 없음
+							if (recv_res.error() == Errors::try_again)
+								break; // EAGAIN/EWOULDBLOCK: 더 이상 읽을 데이터 없음
+							// Real recv error (e.g. ECONNRESET): close and remove client
+							std::cerr << "Client recv error: " << recv_res.error() << std::endl;
+							epoll.del_fd(*const_cast<FileDescriptor *>(fd));
+							clients.erase(fd);
+							break;
 						}
 						ssize_t bytes = recv_res.value();
 						if (bytes == 0)
