@@ -172,7 +172,7 @@ Result<Void> EPoll::modify_fd(FileDescriptor &fd, const Event &ev,
   return OKV;
 }
 
-Result<Void> EPoll::del_fd(FileDescriptor &fd) {
+Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
   epoll_event event = {};
   event.data.fd = fd._fd;
   if (epoll_ctl(_fd._fd, EPOLL_CTL_DEL, fd._fd, &event) == -1) {

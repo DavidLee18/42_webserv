@@ -167,7 +167,7 @@ public:
   Result<const FileDescriptor *> add_fd(FileDescriptor, const Event &,
                                         const Option &);
   Result<Void> modify_fd(FileDescriptor &, const Event &, const Option &);
-  Result<Void> del_fd(FileDescriptor &);
+  Result<Void> del_fd(const FileDescriptor &);
 };
 
 #endif
