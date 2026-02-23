@@ -1,3 +1,4 @@
+#include "webserv.h"
 #include "ServerSocket.hpp"
 
 Result<EPoll> init_servers(const WebserverConfig &config, std::set<int> &server_fds) {
@@ -147,7 +148,7 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds) {
 				// 읽기 이벤트 (클라이언트가 데이터를 보냄)
 				if (event->in) {
 					while (true) { // Edge-Triggered이므로 모든 데이터를 읽어야 함
-						char buf[4096];
+						char buf[NETWORK_BUFFER_SIZE];
 						Result<ssize_t> recv_res = fd->sock_recv(buf, sizeof(buf));
 						if (!recv_res.has_value()) {
 							break; // EWOULDBLOCK: 더 이상 읽을 데이터 없음
