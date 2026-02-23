@@ -186,6 +186,10 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 								break; // EWOULDBLOCK: 소켓 버퍼가 꽉 차서 더 못 보냄
 							}
 							ssize_t bytes = send_res.value();
+							if (bytes == 0)
+							{
+								break; // 더 이상 보낼 수 없으므로 루프 종료 (무한 루프 방지)
+							}
 							client.write_buffer.erase(0, static_cast<std::size_t>(bytes)); // 보낸 만큼 버퍼에서 삭제
 							if (client.write_buffer.empty())
 							{
