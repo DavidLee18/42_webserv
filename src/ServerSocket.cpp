@@ -1,14 +1,9 @@
 #include "ServerSocket.hpp"
-#include "errors.h"
-#include <sstream>
 
-// NOTE: The FileDescriptor pointers stored in server_fds and clients refer to
-// elements inside EPoll's internal _events vector. These pointers remain valid
-// because EPoll::create() calls _events.reserve(sz), preventing reallocation
-// as long as the number of file descriptors does not exceed the reserved
-// capacity. Additionally, the EPoll copy/assignment operators use swap() to
-// transfer the vector without copying, preserving pointer validity. Do not add
-// more file descriptors than the capacity passed to EPoll::create().
+#define RECV_BUFFER_SIZE 4096
+
+extern volatile sig_atomic_t sig;
+
 Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds) {
 	// EPoll init
 	Result<EPoll> epoll_result = EPoll::create(1024);
@@ -27,7 +22,7 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 			return ERR(EPoll, sock_result.error());
 		FileDescriptor server_fd = sock_result.value();
 
-		// Non-blocking socket for ET (edge triggered)
+		// Non-blocking socket for ET (edge-triggered)
 		Result<Void> nb_result = server_fd.set_nonblocking();
 		if (!nb_result.has_value())
 			return ERR(EPoll, nb_result.error());
@@ -52,14 +47,14 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 
 		// EPoll event and option setting
 		Event event(&server_fd, true, false, false, false, false, false); // in=true
-		Option op(true, false, false, false);                             // et=true
+		Option op(true, false, false, false);                              // et=true
 
 		// Add server socket to EPoll
 		Result<FileDescriptor *> add_result = epoll.add_fd(server_fd, event, op);
 		if (!add_result.has_value())
 			return ERR(EPoll, add_result.error());
 
-		// Save to separate server socket set to distinguish from client sockets
+		// Save to distinguish server sockets from client sockets
 		server_fds.insert(add_result.value());
 		std::cout << "Server listening on port " << port << std::endl;
 	}
@@ -70,7 +65,7 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds) {
 	std::map<const FileDescriptor *, ClientConnection> clients;
 
-	while (sig == 0) { // Loop until a signal (e.g., SIGINT) requests shutdown
+	while (sig == 0) {
 		// Wait for events
 		Result<Events> events_result = epoll.wait(-1);
 		if (!events_result.has_value()) {
@@ -94,31 +89,39 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 
 			// 1. Event on a server socket (new client connection)
 			if (server_fds.find(fd) != server_fds.end()) {
-				while (true) { // Accept all pending connections (edge-triggered)
+				while (true) { // Edge-triggered: must accept all pending connections
 					Result<FileDescriptor> client_res = fd->socket_accept(NULL, NULL);
 					if (!client_res.has_value()) {
-						break; // EWOULDBLOCK: no more pending connections
+						const std::string &err = client_res.error();
+						if (err == Errors::try_again)
+							break; // EWOULDBLOCK: no more pending connections
+						else if (err == Errors::interrupted)
+							continue; // EINTR: retry accept
+						else {
+							std::cerr << "ERROR: accept failed: " << err << std::endl;
+							break;
+						}
 					}
 					FileDescriptor client_fd = client_res.value();
-					Result<Void> nb_res = client_fd.set_nonblocking(); // Client socket must also be non-blocking
+					// Client socket must also be non-blocking for edge-triggered epoll
+					Result<Void> nb_res = client_fd.set_nonblocking();
 					if (!nb_res.has_value()) {
 						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
-						continue; // skip this client; do not register with epoll
+						// Skip this client; do not register with epoll
+						continue;
 					}
 
 					// Register client socket in EPoll (monitor read/write, edge-triggered)
 					Event client_ev(&client_fd, true, true, false, false, false, false); // in=true, out=true
-					Option client_op(true, false, false, false);                         // et=true
+					Option client_op(true, false, false, false);                         // et=true (edge-triggered)
 
-					Result<FileDescriptor *> add_result = epoll.add_fd(client_fd, client_ev, client_op);
+					Result<const FileDescriptor *> add_result = epoll.add_fd(client_fd, client_ev, client_op);
 					if (add_result.has_value()) {
-						FileDescriptor *new_client_ptr = add_result.value();
-						clients.insert(std::make_pair(
-							static_cast<const FileDescriptor *>(new_client_ptr),
-							ClientConnection(new_client_ptr)));
+						const FileDescriptor *new_client_ptr = add_result.value();
+						clients.insert(std::make_pair(new_client_ptr, ClientConnection(new_client_ptr)));
 						std::cout << "New client connected!" << std::endl;
 					} else {
-						std::cerr << "ERROR: failed to register client with epoll: " << add_result.error() << std::endl;
+						std::cerr << "ERROR: failed to add client to epoll: " << add_result.error() << std::endl;
 					}
 				}
 			}
@@ -127,62 +130,43 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				// Detect error or connection closure
 				if (event->err || event->hup || event->rdhup) {
 					std::cout << "Client disconnected (error/hup)" << std::endl;
-					Result<Void> del_res = epoll.del_fd(*fd);
-					if (!del_res.has_value())
-						std::cerr << "ERROR: epoll del_fd failed: " << del_res.error() << std::endl;
-					if (clients.find(fd) != clients.end()) {
-						clients.at(fd).fd_ptr->close(); // Close underlying socket to avoid FD leak
-						clients.erase(fd);
-					}
-					disconnect_client(epoll, clients, raw_fd);
+					Result<Void> del_result = epoll.del_fd(*fd);
+					if (!del_result.has_value())
+						std::cerr << "ERROR: del_fd failed: " << del_result.error() << std::endl;
+					clients.erase(fd);
 					++events;
 					continue;
 				}
 
 				// Read event (client sent data)
 				if (event->in) {
-					while (true) { // Read all available data (edge-triggered)
-						char buf[NETWORK_BUFFER_SIZE];
+					bool client_eof = false;
+					while (true) { // Edge-triggered: must read all available data
+						char buf[RECV_BUFFER_SIZE];
 						Result<ssize_t> recv_res = fd->sock_recv(buf, sizeof(buf));
-						if (!recv_res.has_value()) {
-							break; // EWOULDBLOCK: no more data to read
-						}
+						if (!recv_res.has_value())
+							break; // EWOULDBLOCK: no more data available
 						ssize_t bytes = recv_res.value();
-						if (bytes == 0) { // Client closed connection (EOF)
+						if (bytes == 0) { // Client closed connection normally (EOF)
 							std::cout << "Client disconnected (EOF)" << std::endl;
-							Result<Void> del_res = epoll.del_fd(*fd);
-							if (!del_res.has_value())
-								std::cerr << "ERROR: epoll del_fd failed: " << del_res.error() << std::endl;
-							if (clients.find(fd) != clients.end()) {
-								clients.at(fd).fd_ptr->close(); // Close underlying socket to avoid FD leak
-								clients.erase(fd);
-							}
+							Result<Void> del_result = epoll.del_fd(*fd);
+							if (!del_result.has_value())
+								std::cerr << "ERROR: del_fd failed: " << del_result.error() << std::endl;
+							clients.erase(fd);
+							client_eof = true;
 							break;
 						}
-						// Append received data to buffer
+						// Store received data in buffer
 						clients.at(fd).read_buffer.append(buf, static_cast<std::size_t>(bytes));
 					}
-
-					// TODO: invoke HTTP parsing logic here
-					// Temporary: respond with a fixed response on any incoming data
-					if (clients.find(fd) != clients.end() && !clients.at(fd).read_buffer.empty()) {
-							break; // EWOULDBLOCK: no more data to read
-						}
-						ssize_t bytes = recv_res.value();
-						if (bytes == 0)
-						{ // Client closed connection cleanly (EOF)
-							std::cout << "Client disconnected (EOF)" << std::endl;
-							disconnect_client(epoll, clients, raw_fd);
-							break;
-						}
-						// Store received data in the read buffer
-						clients.at(raw_fd).read_buffer.append(buf, static_cast<std::size_t>(bytes));
+					if (client_eof) {
+						++events;
+						continue; // Move to next event; skip write processing for this fd
 					}
 
-					// TODO: call HTTP parsing logic here
-					// For now, send a fixed response whenever data is received
-					if (clients.find(raw_fd) != clients.end() && !clients.at(raw_fd).read_buffer.empty())
-					{
+					// TODO: Call HTTP parsing logic here
+					// Temporarily, send a fixed response whenever data arrives
+					if (!clients.at(fd).read_buffer.empty()) {
 						std::string body = "<html><body><h1>Hello from webserv!</h1></body></html>";
 						std::ostringstream response;
 						response << "HTTP/1.1 200 OK\r\n";
@@ -192,27 +176,24 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						response << body;
 
 						clients.at(fd).write_buffer = response.str();
-						clients.at(fd).read_buffer.clear(); // Clear read buffer after processing
+						clients.at(fd).read_buffer.clear(); // Clear read data after processing
 					}
 				}
 
-				// Write event (socket ready to send data to client)
+				// Write event (can send data to client)
 				if (event->out && clients.find(fd) != clients.end()) {
 					ClientConnection &client = clients.at(fd);
 					if (!client.write_buffer.empty()) {
-						while (true) { // Send as much data as possible (edge-triggered)
+						while (true) { // Edge-triggered: send as much as possible
 							Result<ssize_t> send_res = fd->sock_send(client.write_buffer.c_str(), client.write_buffer.length());
-							if (!send_res.has_value()) {
+							if (!send_res.has_value())
 								break; // EWOULDBLOCK: socket buffer full
-							}
 							ssize_t bytes = send_res.value();
-							if (bytes == 0) {
-								break; // No bytes sent; break to avoid infinite loop
-							}
-							client.write_buffer.erase(0, static_cast<std::size_t>(bytes)); // Remove sent bytes
-							if (client.write_buffer.empty()) {
+							if (bytes == 0)
+								break; // Would block: stop sending to prevent infinite loop
+							client.write_buffer.erase(0, static_cast<std::size_t>(bytes)); // Remove sent data from buffer
+							if (client.write_buffer.empty())
 								break; // All data sent
-							}
 						}
 					}
 				}
