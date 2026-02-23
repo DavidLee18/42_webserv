@@ -65,8 +65,9 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds) {
 	std::map<const FileDescriptor *, ClientConnection> clients;
 
-	while (sig == 0) {
-		// Wait for events
+	while (!sig)
+	{
+		// Waiting for events
 		Result<Events> events_result = epoll.wait(-1);
 		if (!events_result.has_value()) {
 			if (events_result.error() == Errors::interrupted)
@@ -103,9 +104,9 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						}
 					}
 					FileDescriptor client_fd = client_res.value();
-					// Client socket must also be non-blocking for edge-triggered epoll
-					Result<Void> nb_res = client_fd.set_nonblocking();
-					if (!nb_res.has_value()) {
+					Result<Void> nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
+					if (!nb_res.has_value())
+					{
 						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
 						// Skip this client; do not register with epoll
 						continue;
@@ -135,9 +136,8 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				// Detect error or connection closure
 				if (event->err || event->hup || event->rdhup) {
 					std::cout << "Client disconnected (error/hup)" << std::endl;
-					Result<Void> del_result = epoll.del_fd(*fd);
-					if (!del_result.has_value())
-						std::cerr << "ERROR: del_fd failed: " << del_result.error() << std::endl;
+					FileDescriptor *client_fd = const_cast<FileDescriptor *>(fd);
+					epoll.del_fd(*client_fd);
 					clients.erase(fd);
 					++events;
 					continue;
@@ -206,5 +206,13 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 			++events;
 		}
 	}
+
+	// Graceful shutdown: close all client connections
+	for (std::map<const FileDescriptor *, ClientConnection>::iterator it = clients.begin(); it != clients.end(); ++it)
+	{
+		FileDescriptor *client_fd = const_cast<FileDescriptor *>(it->first);
+		epoll.del_fd(*client_fd);
+	}
+	clients.clear();
 }
 
