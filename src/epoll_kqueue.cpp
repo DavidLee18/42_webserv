@@ -1,6 +1,6 @@
 #include "webserv.h"
 
-Result<Events> Events::init(const std::vector<FileDescriptor> &all_events,
+Result<Events> Events::init(const std::map<int, FileDescriptor> &all_events,
                             size_t size, const epoll_event *events) {
   Events es;
   es._len = size;
@@ -8,12 +8,10 @@ Result<Events> Events::init(const std::vector<FileDescriptor> &all_events,
   es._events = static_cast<Event *>(operator new(sizeof(Event) * size));
   for (size_t i = 0; i < size; i++) {
     const FileDescriptor *fd = NULL;
-    for (size_t j = 0; j < all_events.size(); j++) {
-      if (events[i].data.fd == all_events.at(j)) {
-        fd = &all_events.at(j);
-        break;
-      }
-    }
+    std::map<int, FileDescriptor>::const_iterator it =
+        all_events.find(events[i].data.fd);
+    if (it != all_events.end())
+      fd = &it->second;
     if (fd == NULL) {
       operator delete((void *)es._events);
       return ERR(Events, Errors::not_found);
@@ -69,7 +67,6 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   }
   EPoll ep;
   ep._size = sz;
-  ep._events.reserve(sz); // Reserve space to avoid reallocation
   Result<FileDescriptor> rfdesc = FileDescriptor::from_raw(fd);
   if (!rfdesc.error().empty()) {
     return ERR(EPoll, rfdesc.error());
@@ -123,11 +120,11 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
                  "an unknown error occured during EPOLL_CTL_ADD");
     }
   }
-  _events.push_back(fd);
+  int raw_fd = fd._fd;
+  _events.insert(std::make_pair(raw_fd, fd));
 
-  // Return pointer to the FileDescriptor in the vector (last element just
-  // added)
-  const FileDescriptor *fd_in = &_events.at(_events.size() - 1);
+  // Return pointer to the FileDescriptor in the map (stable across insertions)
+  const FileDescriptor *fd_in = &_events.at(raw_fd);
   return OK(const FileDescriptor *, fd_in);
 }
 
