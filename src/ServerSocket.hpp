@@ -1,30 +1,36 @@
 #ifndef SERVERSOCKET_HPP
 #define SERVERSOCKET_HPP
 
-#include "webserv.h"
+#include "epoll_kqueue.h"
+#include "WebserverConfig.hpp"
+#include "errors.h"
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <csignal>
 #include <iostream>
+#include <sstream>
 #include <cstring>
 #include <set>
 #include <map>
+#include <string>
 
 // Class holding client connection state
 class ClientConnection
 {
 public:
-  const FileDescriptor *fd_ptr; // Pointer-based key for tracking
+  FileDescriptor *fd_ptr; // Non-const pointer for explicit close() calls
   std::string read_buffer;
   std::string write_buffer;
   bool request_complete;
 
-  explicit ClientConnection(const FileDescriptor *ptr)
+  explicit ClientConnection(FileDescriptor *ptr)
       : fd_ptr(ptr), read_buffer(), write_buffer(), request_complete(false) {}
 
   ClientConnection(const ClientConnection &other)
-      : fd_ptr(other.fd_ptr),
+      : fd(other.fd),
         read_buffer(other.read_buffer),
         write_buffer(other.write_buffer),
         request_complete(other.request_complete) {}
@@ -33,7 +39,7 @@ public:
   {
     if (this != &other)
     {
-      fd_ptr = other.fd_ptr;
+      fd = other.fd;
       read_buffer = other.read_buffer;
       write_buffer = other.write_buffer;
       request_complete = other.request_complete;
@@ -42,7 +48,7 @@ public:
   }
 };
 
-Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds);
-void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds);
+Result<EPoll> init_servers(const WebserverConfig &config, std::set<int> &server_fds);
+void run_server(EPoll &epoll, const std::set<int> &server_fds);
 
 #endif
