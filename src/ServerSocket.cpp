@@ -27,7 +27,9 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 
 		// Port reusing option
 		int opt = 1;
-		server_fd.set_socket_option(SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+		Result<Void> reuseaddr_result = server_fd.set_socket_option(SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+		if (!reuseaddr_result.has_value())
+			return ERR(EPoll, reuseaddr_result.error());
 
 		// Bind (IP-Port connect)
 		struct in_addr addr;
@@ -100,7 +102,13 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						break; // EWOULDBLOCK: 더 이상 대기 중인 연결이 없음
 					}
 					FileDescriptor client_fd = client_res.value();
-					client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
+					auto nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
+					if (!nb_res.has_value())
+					{
+						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
+						// skip this client; do not register with epoll
+						continue;
+					}
 
 					// 클라이언트 소켓을 EPoll에 등록 (읽기/쓰기 감지, Edge-Triggered)
 					Event client_ev(&client_fd, true, true, false, false, false, false); // in=true, out=true
@@ -184,6 +192,10 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 								break; // EWOULDBLOCK: 소켓 버퍼가 꽉 차서 더 못 보냄
 							}
 							ssize_t bytes = send_res.value();
+							if (bytes == 0)
+							{
+								break; // 더 이상 보낼 수 없으므로 루프 종료 (무한 루프 방지)
+							}
 							client.write_buffer.erase(0, static_cast<std::size_t>(bytes)); // 보낸 만큼 버퍼에서 삭제
 							if (client.write_buffer.empty())
 							{
