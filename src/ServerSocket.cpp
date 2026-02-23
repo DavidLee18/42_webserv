@@ -1,7 +1,6 @@
 #include "ServerSocket.hpp"
 
-Result<EPoll> init_servers(const WebserverConfig &config, std::set<int> &server_fds)
-{
+Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds) {
 	// EPoll init
 	Result<EPoll> epoll_result = EPoll::create(1024);
 	if (!epoll_result.has_value())
@@ -59,12 +58,10 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<int> &server_
 	return OK(EPoll, epoll);
 }
 
-void run_server(EPoll &epoll, const std::set<int> &server_fds)
-{
-	std::map<int, ClientConnection> clients;
+void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds) {
+	std::map<const FileDescriptor *, ClientConnection> clients;
 
-	while (!sig)
-	{
+	while (true) {
 		// Waiting for events
 		Result<Events> events_result = epoll.wait(-1);
 		if (!events_result.has_value()) {
@@ -87,20 +84,16 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 			const FileDescriptor *fd = event->fd;
 			int fd_raw = fd->raw_fd();
 
-			// 1. Event on server socket (new client connection)
-			if (server_fds.find(fd) != server_fds.end())
-			{
-				while (true)
-				{ // Must accept all pending connections since Edge-Triggered
+			// 1. 서버 소켓에 이벤트가 발생한 경우 (새로운 클라이언트 접속)
+			if (server_fds.find(fd) != server_fds.end()) {
+				while (true) { // Edge-Triggered이므로 가능한 모든 연결을 accept 해야 함
 					Result<FileDescriptor> client_res = fd->socket_accept(NULL, NULL);
-					if (!client_res.has_value())
-					{
-						break; // EWOULDBLOCK: no more pending connections
+					if (!client_res.has_value()) {
+						break; // EWOULDBLOCK: 더 이상 대기 중인 연결이 없음
 					}
 					FileDescriptor client_fd = client_res.value();
-					auto nb_res = client_fd.set_nonblocking(); // Client socket must also be non-blocking!
-					if (!nb_res.has_value())
-					{
+					auto nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
+					if (!nb_res.has_value()) {
 						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
 						// Skip this client; do not register with epoll
 						continue;
@@ -110,11 +103,12 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 					Event client_ev(&client_fd, true, true, false, false, false, false); // in=true, out=true
 					Option client_op(true, false, false, false);                         // et=true (edge-triggered)
 
-					Result<int> add_result = epoll.add_fd(client_fd, client_ev, client_op);
-					if (add_result.has_value())
-					{
-						clients.insert(std::make_pair(add_result.value(),
-											ClientConnection(add_result.value())));
+					Result<const FileDescriptor *> add_result = epoll.add_fd(client_fd, client_ev, client_op);
+					if (add_result.has_value()) {
+						const FileDescriptor *new_client_ptr = add_result.value();
+						clients.insert(std::make_pair(
+											new_client_ptr,
+											ClientConnection(new_client_ptr)));
 						std::cout << "New client connected!" << std::endl;
 					} else {
 						std::cerr << "ERROR: failed to add client to epoll: " << add_result.error() << std::endl;
@@ -126,12 +120,10 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 					}
 				}
 			}
-			// 2. Event on client socket (data send/receive)
-			else
-			{
-				// Detect error or connection closure
-				if (event->err || event->hup || event->rdhup)
-				{
+			// 2. 클라이언트 소켓에 이벤트가 발생한 경우 (데이터 송수신)
+			else {
+				// 에러나 연결 종료 감지
+				if (event->err || event->hup || event->rdhup) {
 					std::cout << "Client disconnected (error/hup)" << std::endl;
 					epoll.del_fd(*fd);
 					const_cast<FileDescriptor *>(fd)->close(); // Close underlying socket to avoid FD leak
@@ -140,20 +132,16 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 					continue;
 				}
 
-				// Read event (client sent data)
-				if (event->in)
-				{
-					while (true)
-					{ // Must read all data since Edge-Triggered
+				// 읽기 이벤트 (클라이언트가 데이터를 보냄)
+				if (event->in) {
+					while (true) { // Edge-Triggered이므로 모든 데이터를 읽어야 함
 						char buf[4096];
 						Result<ssize_t> recv_res = fd->sock_recv(buf, sizeof(buf));
-						if (!recv_res.has_value())
-						{
-							break; // EWOULDBLOCK: no more data to read
+						if (!recv_res.has_value()) {
+							break; // EWOULDBLOCK: 더 이상 읽을 데이터 없음
 						}
 						ssize_t bytes = recv_res.value();
-						if (bytes == 0)
-						{ // Client closed connection normally (EOF)
+						if (bytes == 0) { // 클라이언트가 정상적으로 연결 종료 (EOF)
 							std::cout << "Client disconnected (EOF)" << std::endl;
 							epoll.del_fd(*fd);
 							clients.erase(fd);
@@ -163,10 +151,9 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 						clients.at(fd).read_buffer.append(buf, static_cast<std::size_t>(bytes));
 					}
 
-					// TODO: call HTTP parsing logic here
-					// Temporarily, send a fixed response whenever data arrives
-					if (clients.find(fd) != clients.end() && !clients.at(fd).read_buffer.empty())
-					{
+					// TODO: 여기서 HTTP 파싱 로직 호출
+					// 임시로, 데이터가 들어오면 무조건 고정된 응답을 보내도록 설정
+					if (clients.find(fd) != clients.end() && !clients.at(fd).read_buffer.empty()) {
 						std::string body = "<html><body><h1>Hello from webserv!</h1></body></html>";
 						std::ostringstream response;
 						response << "HTTP/1.1 200 OK\r\n";
@@ -180,28 +167,22 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 					}
 				}
 
-				// Write event (ready to send data to client)
-				if (event->out && clients.find(fd) != clients.end())
-				{
-					ClientConnection &client = clients.at(fd_raw);
-					if (!client.write_buffer.empty())
-					{
-						while (true)
-						{ // Must send as much as possible since Edge-Triggered
+				// 쓰기 이벤트 (클라이언트에게 데이터를 보낼 수 있음)
+				if (event->out && clients.find(fd) != clients.end()) {
+					ClientConnection &client = clients.at(fd);
+					if (!client.write_buffer.empty()) {
+						while (true) { // Edge-Triggered이므로 보낼 수 있는 만큼 다 보내야 함
 							Result<ssize_t> send_res = fd->sock_send(client.write_buffer.c_str(), client.write_buffer.length());
-							if (!send_res.has_value())
-							{
-								break; // EWOULDBLOCK: socket buffer full, cannot send more
+							if (!send_res.has_value()) {
+								break; // EWOULDBLOCK: 소켓 버퍼가 꽉 차서 더 못 보냄
 							}
 							ssize_t bytes = send_res.value();
-							if (bytes == 0)
-							{
-								break; // No more data to send, exit loop (prevent infinite loop)
+							if (bytes == 0) {
+								break; // 더 이상 보낼 수 없으므로 루프 종료 (무한 루프 방지)
 							}
-							client.write_buffer.erase(0, static_cast<std::size_t>(bytes)); // Remove sent bytes from buffer
-							if (client.write_buffer.empty())
-							{
-								break; // All data sent
+							client.write_buffer.erase(0, static_cast<std::size_t>(bytes)); // 보낸 만큼 버퍼에서 삭제
+							if (client.write_buffer.empty()) {
+								break; // 다 보냈음
 							}
 						}
 					}
