@@ -1,6 +1,6 @@
 #include "ServerSocket.hpp"
 
-Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds)
+Result<EPoll> init_servers(const WebserverConfig &config, std::set<int> &server_fds)
 {
 	// EPoll init
 	Result<EPoll> epoll_result = EPoll::create(1024);
@@ -10,8 +10,7 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 
 	// Init server socket for every port listed on configuration file
 	const std::map<unsigned int, ServerConfig> &servers = config.Get_ServerConfig_map();
-	for (std::map<unsigned int, ServerConfig>::const_iterator it = servers.begin(); it != servers.end(); ++it)
-	{
+	for (std::map<unsigned int, ServerConfig>::const_iterator it = servers.begin(); it != servers.end(); ++it) {
 		unsigned short port = static_cast<unsigned short>(it->first);
 
 		// Init socket
@@ -20,7 +19,7 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 			return ERR(EPoll, sock_result.error());
 		FileDescriptor server_fd = sock_result.value();
 
-		// Non-blocking socket for ET(edge triggered)
+		// Non-blocking socket for ET (edge-triggered)
 		Result<Void> nb_result = server_fd.set_nonblocking();
 		if (!nb_result.has_value())
 			return ERR(EPoll, nb_result.error());
@@ -31,9 +30,9 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 		if (!reuseaddr_result.has_value())
 			return ERR(EPoll, reuseaddr_result.error());
 
-		// Bind (IP-Port connect)
+		// Bind (associate IP and port)
 		struct in_addr addr;
-		addr.s_addr = htonl(INADDR_ANY); // All IP
+		addr.s_addr = htonl(INADDR_ANY); // All IPs
 		Result<Void> bind_result = server_fd.socket_bind(addr, port);
 		if (!bind_result.has_value())
 			return ERR(EPoll, bind_result.error());
@@ -45,14 +44,14 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 
 		// EPoll event and option setting
 		Event event(&server_fd, true, false, false, false, false, false); // in=true
-		Option op(true, false, false, false);						   // et=true
+		Option op(true, false, false, false);                              // et=true
 
 		// Add server socket to EPoll
-		Result<const FileDescriptor *> add_result = epoll.add_fd(server_fd, event, op);
+		Result<int> add_result = epoll.add_fd(server_fd, event, op);
 		if (!add_result.has_value())
 			return ERR(EPoll, add_result.error());
 
-		// Saving to separate Server socket and Client sockets 
+		// Save raw fd integer to distinguish server sockets from client sockets
 		server_fds.insert(add_result.value());
 		std::cout << "Server listening on port " << port << std::endl;
 	}
@@ -60,36 +59,33 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 	return OK(EPoll, epoll);
 }
 
-void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds)
+void run_server(EPoll &epoll, const std::set<int> &server_fds)
 {
-	std::map<const FileDescriptor *, ClientConnection> clients;
+	std::map<int, ClientConnection> clients;
 
-	while (true)
+	while (!sig)
 	{
 		// Waiting for events
 		Result<Events> events_result = epoll.wait(-1);
-		if (!events_result.has_value())
-		{
+		if (!events_result.has_value()) {
 			if (events_result.error() == Errors::interrupted)
 				continue;
-			else
-			{
+			else {
 				std::cerr << "ERROR: " << events_result.error() << std::endl;
 				break;
 			}
 		}
 
 		Events events = events_result.value();
-		while (!events.is_end())
-		{
+		while (!events.is_end()) {
 			Result<const Event *> ev_result = *events;
-			if (!ev_result.has_value())
-			{
+			if (!ev_result.has_value()) {
 				++events;
 				continue;
 			}
 			const Event *event = ev_result.value();
 			const FileDescriptor *fd = event->fd;
+			int fd_raw = fd->raw_fd();
 
 			// 1. Event occurred on server socket (new client connection)
 			if (server_fds.find(fd) != server_fds.end())
@@ -106,22 +102,27 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					if (!nb_res.has_value())
 					{
 						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
-						// skip this client; do not register with epoll
+						// Skip this client; do not register with epoll
 						continue;
 					}
 
 					// Register client socket with EPoll (read/write detection, Edge-Triggered)
 					Event client_ev(&client_fd, true, true, false, false, false, false); // in=true, out=true
-					Option client_op(true, false, false, false);						 // et=true
+					Option client_op(true, false, false, false);                         // et=true (edge-triggered)
 
-					Result<const FileDescriptor *> add_result = epoll.add_fd(client_fd, client_ev, client_op);
+					Result<int> add_result = epoll.add_fd(client_fd, client_ev, client_op);
 					if (add_result.has_value())
 					{
-						const FileDescriptor *new_client_ptr = add_result.value();
-						clients.insert(std::make_pair(
-											new_client_ptr,
-											ClientConnection(new_client_ptr)));
+						clients.insert(std::make_pair(add_result.value(),
+											ClientConnection(add_result.value())));
 						std::cout << "New client connected!" << std::endl;
+					} else {
+						std::cerr << "ERROR: failed to add client to epoll: " << add_result.error() << std::endl;
+					}
+					else
+					{
+						std::cerr << "ERROR: failed to add client fd to epoll: " << add_result.error() << std::endl;
+						// client_fd goes out of scope here and is closed via RAII
 					}
 				}
 			}
@@ -133,8 +134,9 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				{
 					std::cout << "Client disconnected (error/hup)" << std::endl;
 					FileDescriptor *client_fd = const_cast<FileDescriptor *>(fd);
-					epoll.del_fd(*client_fd);
-					client_fd->close(); // Close underlying socket to avoid FD leak
+					Result<Void> del_res1 = epoll.del_fd(*client_fd);
+					if (!del_res1.has_value())
+						std::cerr << "ERROR: epoll.del_fd() failed on disconnect: " << del_res1.error() << std::endl;
 					clients.erase(fd);
 					++events;
 					continue;
@@ -155,7 +157,9 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						if (bytes == 0)
 						{ // Client closed connection normally (EOF)
 							std::cout << "Client disconnected (EOF)" << std::endl;
-							epoll.del_fd(*const_cast<FileDescriptor *>(fd));
+							Result<Void> del_res2 = epoll.del_fd(*const_cast<FileDescriptor *>(fd));
+							if (!del_res2.has_value())
+								std::cerr << "ERROR: epoll.del_fd() failed on EOF: " << del_res2.error() << std::endl;
 							clients.erase(fd);
 							break;
 						}
@@ -183,7 +187,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				// Write event (can send data to client)
 				if (event->out && clients.find(fd) != clients.end())
 				{
-					ClientConnection &client = clients.at(fd);
+					ClientConnection &client = clients.at(fd_raw);
 					if (!client.write_buffer.empty())
 					{
 						while (true)
@@ -210,4 +214,13 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 			++events;
 		}
 	}
+
+	// Graceful shutdown: close all client connections
+	for (std::map<const FileDescriptor *, ClientConnection>::iterator it = clients.begin(); it != clients.end(); ++it)
+	{
+		FileDescriptor *client_fd = const_cast<FileDescriptor *>(it->first);
+		epoll.del_fd(*client_fd);
+	}
+	clients.clear();
 }
+
