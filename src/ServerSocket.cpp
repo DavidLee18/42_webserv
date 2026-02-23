@@ -27,7 +27,9 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 
 		// Port reusing option
 		int opt = 1;
-		server_fd.set_socket_option(SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+		Result<Void> reuseaddr_result = server_fd.set_socket_option(SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+		if (!reuseaddr_result.has_value())
+			return ERR(EPoll, reuseaddr_result.error());
 
 		// Bind (IP-Port connect)
 		struct in_addr addr;
