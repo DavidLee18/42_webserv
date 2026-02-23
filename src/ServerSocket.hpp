@@ -1,15 +1,21 @@
 #ifndef SERVERSOCKET_HPP
 #define SERVERSOCKET_HPP
 
-#include "webserv.h"
+#include "epoll_kqueue.h"
+#include "WebserverConfig.hpp"
+#include "errors.h"
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <csignal>
 #include <iostream>
+#include <sstream>
 #include <cstring>
 #include <set>
 #include <map>
+#include <string>
 
 // Class holding client connection state
 class ClientConnection

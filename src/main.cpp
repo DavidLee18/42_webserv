@@ -1,4 +1,5 @@
 #include "webserv.h"
+#include "ServerSocket.hpp"
 
 volatile sig_atomic_t sig = 0;
 
