@@ -102,7 +102,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						break; // EWOULDBLOCK: 더 이상 대기 중인 연결이 없음
 					}
 					FileDescriptor client_fd = client_res.value();
-					auto nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
+					Result<Void> nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
 					if (!nb_res.has_value())
 					{
 						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
@@ -133,8 +133,9 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				{
 					std::cout << "Client disconnected (error/hup)" << std::endl;
 					FileDescriptor *client_fd = const_cast<FileDescriptor *>(fd);
-					epoll.del_fd(*client_fd);
-					client_fd->close(); // Close underlying socket to avoid FD leak
+					Result<Void> del_res1 = epoll.del_fd(*client_fd);
+					if (!del_res1.has_value())
+						std::cerr << "ERROR: epoll.del_fd() failed on disconnect: " << del_res1.error() << std::endl;
 					clients.erase(fd);
 					++events;
 					continue;
@@ -155,7 +156,9 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						if (bytes == 0)
 						{ // 클라이언트가 정상적으로 연결 종료 (EOF)
 							std::cout << "Client disconnected (EOF)" << std::endl;
-							epoll.del_fd(*const_cast<FileDescriptor *>(fd));
+							Result<Void> del_res2 = epoll.del_fd(*const_cast<FileDescriptor *>(fd));
+							if (!del_res2.has_value())
+								std::cerr << "ERROR: epoll.del_fd() failed on EOF: " << del_res2.error() << std::endl;
 							clients.erase(fd);
 							break;
 						}
