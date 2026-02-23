@@ -1,6 +1,6 @@
 #include "ServerSocket.hpp"
 
-Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds)
+Result<EPoll> init_servers(const WebserverConfig &config, std::set<int> &server_fds)
 {
 	// EPoll init
 	Result<EPoll> epoll_result = EPoll::create(1024);
@@ -48,11 +48,11 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 		Option op(true, false, false, false);						   // et=true
 
 		// Add server socket to EPoll
-		Result<const FileDescriptor *> add_result = epoll.add_fd(server_fd, event, op);
+		Result<int> add_result = epoll.add_fd(server_fd, event, op);
 		if (!add_result.has_value())
 			return ERR(EPoll, add_result.error());
 
-		// Saving to separate Server socket and Client sockets 
+		// Save raw fd integer to distinguish server sockets from client sockets
 		server_fds.insert(add_result.value());
 		std::cout << "Server listening on port " << port << std::endl;
 	}
@@ -60,9 +60,9 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 	return OK(EPoll, epoll);
 }
 
-void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds)
+void run_server(EPoll &epoll, const std::set<int> &server_fds)
 {
-	std::map<const FileDescriptor *, ClientConnection> clients;
+	std::map<int, ClientConnection> clients;
 
 	while (true)
 	{
@@ -90,9 +90,10 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 			}
 			const Event *event = ev_result.value();
 			const FileDescriptor *fd = event->fd;
+			int fd_raw = fd->raw_fd();
 
 			// 1. 서버 소켓에 이벤트가 발생한 경우 (새로운 클라이언트 접속)
-			if (server_fds.find(fd) != server_fds.end())
+			if (server_fds.find(fd_raw) != server_fds.end())
 			{
 				while (true)
 				{ // Edge-Triggered이므로 가능한 모든 연결을 accept 해야 함
@@ -102,7 +103,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						break; // EWOULDBLOCK: 더 이상 대기 중인 연결이 없음
 					}
 					FileDescriptor client_fd = client_res.value();
-					auto nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
+					Result<Void> nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
 					if (!nb_res.has_value())
 					{
 						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
@@ -114,13 +115,11 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					Event client_ev(&client_fd, true, true, false, false, false, false); // in=true, out=true
 					Option client_op(true, false, false, false);						 // et=true
 
-					Result<const FileDescriptor *> add_result = epoll.add_fd(client_fd, client_ev, client_op);
+					Result<int> add_result = epoll.add_fd(client_fd, client_ev, client_op);
 					if (add_result.has_value())
 					{
-						const FileDescriptor *new_client_ptr = add_result.value();
-						clients.insert(std::make_pair(
-											new_client_ptr,
-											ClientConnection(new_client_ptr)));
+						clients.insert(std::make_pair(add_result.value(),
+											ClientConnection(add_result.value())));
 						std::cout << "New client connected!" << std::endl;
 					}
 				}
@@ -132,10 +131,10 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				if (event->err || event->hup || event->rdhup)
 				{
 					std::cout << "Client disconnected (error/hup)" << std::endl;
-					FileDescriptor *client_fd = const_cast<FileDescriptor *>(fd);
-					epoll.del_fd(*client_fd);
-					client_fd->close(); // Close underlying socket to avoid FD leak
-					clients.erase(fd);
+					FileDescriptor *mutable_fd = const_cast<FileDescriptor *>(fd);
+					epoll.del_fd(*mutable_fd);
+					mutable_fd->close();
+					clients.erase(fd_raw);
 					++events;
 					continue;
 				}
@@ -155,17 +154,19 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						if (bytes == 0)
 						{ // 클라이언트가 정상적으로 연결 종료 (EOF)
 							std::cout << "Client disconnected (EOF)" << std::endl;
-							epoll.del_fd(*const_cast<FileDescriptor *>(fd));
-							clients.erase(fd);
+							FileDescriptor *mutable_fd_eof = const_cast<FileDescriptor *>(fd);
+							epoll.del_fd(*mutable_fd_eof);
+							mutable_fd_eof->close();
+							clients.erase(fd_raw);
 							break;
 						}
 						// 읽은 데이터를 버퍼에 저장
-						clients.at(fd).read_buffer.append(buf, static_cast<std::size_t>(bytes));
+						clients.at(fd_raw).read_buffer.append(buf, static_cast<std::size_t>(bytes));
 					}
 
 					// TODO: 여기서 HTTP 파싱 로직 호출
 					// 임시로, 데이터가 들어오면 무조건 고정된 응답을 보내도록 설정
-					if (clients.find(fd) != clients.end() && !clients.at(fd).read_buffer.empty())
+					if (clients.find(fd_raw) != clients.end() && !clients.at(fd_raw).read_buffer.empty())
 					{
 						std::string body = "<html><body><h1>Hello from webserv!</h1></body></html>";
 						std::ostringstream response;
@@ -175,15 +176,15 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						response << "Connection: keep-alive\r\n\r\n";
 						response << body;
 
-						clients.at(fd).write_buffer = response.str();
-						clients.at(fd).read_buffer.clear(); // 읽은 데이터 비우기
+						clients.at(fd_raw).write_buffer = response.str();
+						clients.at(fd_raw).read_buffer.clear(); // 읽은 데이터 비우기
 					}
 				}
 
 				// 쓰기 이벤트 (클라이언트에게 데이터를 보낼 수 있음)
-				if (event->out && clients.find(fd) != clients.end())
+				if (event->out && clients.find(fd_raw) != clients.end())
 				{
-					ClientConnection &client = clients.at(fd);
+					ClientConnection &client = clients.at(fd_raw);
 					if (!client.write_buffer.empty())
 					{
 						while (true)

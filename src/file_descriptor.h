@@ -77,6 +77,10 @@ public:
 
   Result<std::string> read_file_line();
 
+  int raw_fd() const { return _fd; }
+
+  void close();
+
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {
     return _fd == other._fd;
