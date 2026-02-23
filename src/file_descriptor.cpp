@@ -74,7 +74,7 @@ FileDescriptor &FileDescriptor::operator=(const FileDescriptor &other) {
     if (fp != NULL)
       std::fclose(fp);
     else if (_fd >= 0)
-      close(_fd);
+      ::close(_fd);
 
     // Transfer ownership
     _fd = other._fd;
@@ -90,7 +90,17 @@ FileDescriptor::~FileDescriptor() {
   if (fp != NULL)
     std::fclose(fp);
   else if (_fd >= 0)
-    close(_fd);
+    ::close(_fd);
+}
+
+void FileDescriptor::close() {
+  if (fp != NULL) {
+    std::fclose(fp);
+    fp = NULL;
+  } else if (_fd >= 0) {
+    ::close(_fd);
+  }
+  _fd = -1;
 }
 
 Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
@@ -188,8 +198,11 @@ Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
 
 Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) const {
   ssize_t res = recv(_fd, buf, size, 0);
-  if (res < 0)
-    return ERR(ssize_t, "`recv` failed");
+  if (res < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK)
+      return ERR(ssize_t, Errors::try_again);
+    return ERR(ssize_t, std::string("`recv` failed: ") + strerror(errno));
+  }
   return OK(ssize_t, res);
 }
 
@@ -247,6 +260,16 @@ Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) const {
     return ERR(ssize_t, "send failed");
   }
   return OK(ssize_t, res);
+}
+
+void FileDescriptor::close() {
+  if (fp != NULL) {
+    std::fclose(fp);
+    fp = NULL;
+  } else if (_fd >= 0) {
+    ::close(_fd);
+    _fd = -1;
+  }
 }
 
 Result<std::string> FileDescriptor::read_file_line() {

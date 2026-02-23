@@ -406,7 +406,7 @@ Result<Http::Response> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         const_cast<const FileDescriptor *>(&stdin_fd);
     Event write_event(stdin_fd_ptr, false, true, false, false, false, false);
     Option write_option(false, false, false, false);
-    Result<const FileDescriptor *> add_result =
+    Result<FileDescriptor *> add_result =
         epoll->add_fd(stdin_fd, write_event, write_option);
 
     if (!add_result.error().empty()) {
@@ -494,7 +494,7 @@ Result<Http::Response> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       const_cast<const FileDescriptor *>(&stdout_fd);
   Event read_event(stdout_fd_ptr, true, false, false, false, false, false);
   Option read_option(false, false, false, false);
-  Result<const FileDescriptor *> add_stdout_result =
+  Result<FileDescriptor *> add_stdout_result =
       epoll->add_fd(stdout_fd, read_event, read_option);
 
   if (!add_stdout_result.error().empty()) {
