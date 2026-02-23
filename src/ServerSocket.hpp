@@ -17,13 +17,13 @@
 class ClientConnection
 {
 public:
-  int fd; // Raw fd for stable key tracking (no dangling pointer risk)
+  FileDescriptor *fd_ptr; // Non-const pointer for explicit close() calls
   std::string read_buffer;
   std::string write_buffer;
   bool request_complete;
 
-  explicit ClientConnection(int fd)
-      : fd(fd), read_buffer(), write_buffer(), request_complete(false) {}
+  explicit ClientConnection(FileDescriptor *ptr)
+      : fd_ptr(ptr), read_buffer(), write_buffer(), request_complete(false) {}
 
   ClientConnection(const ClientConnection &other)
       : fd(other.fd),

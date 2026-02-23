@@ -164,10 +164,10 @@ public:
 
   static Result<EPoll> create(unsigned short);
   Result<Events> wait(const int timeout_ms);
-  Result<const FileDescriptor *> add_fd(FileDescriptor, const Event &,
+  Result<FileDescriptor *> add_fd(FileDescriptor, const Event &,
                                         const Option &);
   Result<Void> modify_fd(FileDescriptor &, const Event &, const Option &);
-  Result<Void> del_fd(FileDescriptor &);
+  Result<Void> del_fd(const FileDescriptor &);
 };
 
 #endif

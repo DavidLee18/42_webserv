@@ -75,6 +75,8 @@ public:
 
   Result<ssize_t> sock_send(const void *buf, size_t size) const;
 
+  void close();
+
   Result<std::string> read_file_line();
 
   int get_fd() const { return _fd; }
