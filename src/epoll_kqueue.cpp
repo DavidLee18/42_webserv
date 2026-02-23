@@ -195,7 +195,10 @@ Result<Events> EPoll::wait(const int timeout_ms) {
   struct epoll_event *events = new struct epoll_event[_size];
   int n = epoll_wait(_fd._fd, events, _size, timeout_ms);
   if (n == -1) {
-    return ERR(Events, Errors::interrupted);
+    delete[] events;
+    if (errno == EINTR)
+      return ERR(Events, Errors::interrupted);
+    return ERR(Events, std::string("epoll_wait failed: ") + strerror(errno));
   }
   return Events::init(_events, static_cast<size_t>(n), events);
 }
