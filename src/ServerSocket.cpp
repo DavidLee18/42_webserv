@@ -123,6 +123,11 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 											ClientConnection(new_client_ptr)));
 						std::cout << "New client connected!" << std::endl;
 					}
+					else
+					{
+						std::cerr << "ERROR: failed to add client fd to epoll: " << add_result.error() << std::endl;
+						// client_fd goes out of scope here and is closed via RAII
+					}
 				}
 			}
 			// 2. 클라이언트 소켓에 이벤트가 발생한 경우 (데이터 송수신)
