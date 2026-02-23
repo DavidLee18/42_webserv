@@ -93,18 +93,8 @@ FileDescriptor::~FileDescriptor() {
     ::close(_fd);
 }
 
-void FileDescriptor::close() {
-  if (fp != NULL) {
-    std::fclose(fp);
-    fp = NULL;
-  } else if (_fd >= 0) {
-    ::close(_fd);
-  }
-  _fd = -1;
-}
-
 Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
-                                         unsigned short port) const {
+                                         unsigned short port) {
   sockaddr_in _addr;
   std::memset(&_addr, 0, sizeof(_addr));
   _addr.sin_family = AF_INET;
@@ -141,7 +131,7 @@ Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
   return OKV;
 }
 
-Result<Void> FileDescriptor::socket_listen(unsigned short backlog) const {
+Result<Void> FileDescriptor::socket_listen(unsigned short backlog) {
   if (listen(_fd, backlog) < 0) {
     switch (errno) {
     case EADDRINUSE:
@@ -231,7 +221,7 @@ Result<Http::PartialString> FileDescriptor::try_read_to_end() const {
   return OK(Http::PartialString, Http::PartialString::partial(s));
 }
 
-Result<Void> FileDescriptor::set_nonblocking() const {
+Result<Void> FileDescriptor::set_nonblocking() {
   int flags = fcntl(_fd, F_GETFL, 0);
   if (flags < 0) {
     return ERR(Void, "Failed to get file descriptor flags");
@@ -244,7 +234,7 @@ Result<Void> FileDescriptor::set_nonblocking() const {
 
 Result<Void> FileDescriptor::set_socket_option(int level, int optname,
                                                const void *optval,
-                                               socklen_t optlen) const {
+                                               socklen_t optlen) {
   if (setsockopt(_fd, level, optname, optval, optlen) < 0) {
     return ERR(Void, "Failed to set socket option");
   }

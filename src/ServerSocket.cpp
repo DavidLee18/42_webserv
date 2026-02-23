@@ -137,7 +137,6 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds) {
 				if (event->err || event->hup || event->rdhup) {
 					std::cout << "Client disconnected (error/hup)" << std::endl;
 					epoll.del_fd(*fd);
-					const_cast<FileDescriptor *>(fd)->close(); // Close underlying socket to avoid FD leak
 					clients.erase(fd_raw);
 					++events;
 					continue;
