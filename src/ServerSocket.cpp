@@ -138,10 +138,12 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 				// Detect error or connection closure
 				if (event->err || event->hup || event->rdhup) {
 					std::cout << "Client disconnected (error/hup)" << std::endl;
-					FileDescriptor *mutable_fd = const_cast<FileDescriptor *>(fd);
-					epoll.del_fd(*mutable_fd);
-					mutable_fd->close();
-					clients.erase(fd_raw);
+					FileDescriptor *client_fd = const_cast<FileDescriptor *>(fd);
+					Result<Void> del_result = epoll.del_fd(*client_fd);
+					if (!del_result.has_value())
+						std::cerr << "epoll.del_fd failed: " << del_result.error() << std::endl;
+					client_fd->close(); // Close underlying socket to avoid FD leak
+					clients.erase(fd);
 					++events;
 					continue;
 				}
@@ -157,10 +159,10 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 						ssize_t bytes = recv_res.value();
 						if (bytes == 0) { // Client closed connection normally (EOF)
 							std::cout << "Client disconnected (EOF)" << std::endl;
-							FileDescriptor *mutable_fd_eof = const_cast<FileDescriptor *>(fd);
-							epoll.del_fd(*mutable_fd_eof);
-							mutable_fd_eof->close();
-							clients.erase(fd_raw);
+							Result<Void> del_result = epoll.del_fd(*const_cast<FileDescriptor *>(fd));
+							if (!del_result.has_value())
+								std::cerr << "epoll.del_fd failed: " << del_result.error() << std::endl;
+							clients.erase(fd);
 							break;
 						}
 						// 읽은 데이터를 버퍼에 저장
