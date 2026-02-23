@@ -28,7 +28,7 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<int> &server_
 		int opt = 1;
 		Result<Void> reuseaddr_result = server_fd.set_socket_option(SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 		if (!reuseaddr_result.has_value())
-			return ERR(EPoll, reuseaddr_result.error());
+			std::cerr << "WARNING: SO_REUSEADDR failed: " << reuseaddr_result.error() << std::endl;
 
 		// Bind (associate IP and port)
 		struct in_addr addr;
