@@ -1,5 +1,8 @@
 #include "ServerSocket.hpp"
+<<<<<<< copilot/sub-pr-37-please-work
 #include "errors.h"
+=======
+>>>>>>> sipyeon
 #include <sstream>
 
 // Remove a client from epoll and close the underlying file descriptor.
@@ -163,7 +166,12 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 				if (event->err || event->hup || event->rdhup)
 				{
 					std::cout << "Client disconnected (error/hup)" << std::endl;
+<<<<<<< copilot/sub-pr-37-please-work
 					disconnect_client(epoll, clients, raw_fd);
+=======
+					epoll.del_fd(*const_cast<FileDescriptor *>(fd));
+					clients.erase(fd);
+>>>>>>> sipyeon
 					++events;
 					continue;
 				}
@@ -177,7 +185,17 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 						Result<ssize_t> recv_res = event->fd->sock_recv(buf, sizeof(buf));
 						if (!recv_res.has_value())
 						{
+<<<<<<< copilot/sub-pr-37-please-work
 							break; // EWOULDBLOCK: no more data to read
+=======
+							if (recv_res.error() == Errors::try_again)
+								break; // EAGAIN/EWOULDBLOCK: 더 이상 읽을 데이터 없음
+							// Real recv error (e.g. ECONNRESET): close and remove client
+							std::cerr << "Client recv error: " << recv_res.error() << std::endl;
+							epoll.del_fd(*const_cast<FileDescriptor *>(fd));
+							clients.erase(fd);
+							break;
+>>>>>>> sipyeon
 						}
 						ssize_t bytes = recv_res.value();
 						if (bytes == 0)
