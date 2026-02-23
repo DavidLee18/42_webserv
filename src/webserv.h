@@ -2,6 +2,7 @@
 #define WEBSERV_H
 
 #define BUFFER_SIZE 42
+#define NETWORK_BUFFER_SIZE 4096
 #define LONG_DOUBLE_DIGITS 37
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
@@ -15,7 +16,6 @@
 #include "http_1_1.h"
 #include "json.h"
 #include "wsgi.h"
-#include "ServerSocket.hpp"
 #include <algorithm>
 #include <arpa/inet.h>
 #include <cctype>
@@ -38,5 +38,8 @@
 #include <unistd.h>
 
 void wrap_up(int) throw();
+extern volatile sig_atomic_t sig;
+
+extern volatile sig_atomic_t sig;
 
 #endif
