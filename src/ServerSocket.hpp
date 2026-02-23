@@ -15,12 +15,12 @@
 class ClientConnection
 {
 public:
-  const FileDescriptor *fd_ptr; // Pointer-based key for tracking
+  FileDescriptor *fd_ptr; // Non-const pointer for explicit close() calls
   std::string read_buffer;
   std::string write_buffer;
   bool request_complete;
 
-  explicit ClientConnection(const FileDescriptor *ptr)
+  explicit ClientConnection(FileDescriptor *ptr)
       : fd_ptr(ptr), read_buffer(), write_buffer(), request_complete(false) {}
 
   ClientConnection(const ClientConnection &other)

@@ -79,7 +79,7 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   return OK(EPoll, ep);
 }
 
-Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
+Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
                                              const Option &op) {
   epoll_event event = {};
   if (ev.in)
@@ -106,20 +106,20 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   if (epoll_ctl(_fd._fd, EPOLL_CTL_ADD, fd._fd, &event) == -1) {
     switch (errno) {
     case EEXIST:
-      return ERR(const FileDescriptor *,
+      return ERR(FileDescriptor *,
                  "this fd is already registered to this epoll");
     case EINVAL:
-      return ERR(const FileDescriptor *, Errors::invalid_fd);
+      return ERR(FileDescriptor *, Errors::invalid_fd);
     case ELOOP:
-      return ERR(const FileDescriptor *, Errors::epoll_loop);
+      return ERR(FileDescriptor *, Errors::epoll_loop);
     case ENOMEM:
-      return ERR(const FileDescriptor *, Errors::out_of_mem);
+      return ERR(FileDescriptor *, Errors::out_of_mem);
     case ENOSPC:
-      return ERR(const FileDescriptor *, Errors::epoll_full);
+      return ERR(FileDescriptor *, Errors::epoll_full);
     case EPERM:
-      return ERR(const FileDescriptor *, Errors::not_supported);
+      return ERR(FileDescriptor *, Errors::not_supported);
     default:
-      return ERR(const FileDescriptor *,
+      return ERR(FileDescriptor *,
                  "an unknown error occured during EPOLL_CTL_ADD");
     }
   }
@@ -127,8 +127,8 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
 
   // Return pointer to the FileDescriptor in the vector (last element just
   // added)
-  const FileDescriptor *fd_in = &_events.at(_events.size() - 1);
-  return OK(const FileDescriptor *, fd_in);
+  FileDescriptor *fd_in = &_events.at(_events.size() - 1);
+  return OK(FileDescriptor *, fd_in);
 }
 
 Result<Void> EPoll::modify_fd(FileDescriptor &fd, const Event &ev,
@@ -172,7 +172,7 @@ Result<Void> EPoll::modify_fd(FileDescriptor &fd, const Event &ev,
   return OKV;
 }
 
-Result<Void> EPoll::del_fd(FileDescriptor &fd) {
+Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
   epoll_event event = {};
   event.data.fd = fd._fd;
   if (epoll_ctl(_fd._fd, EPOLL_CTL_DEL, fd._fd, &event) == -1) {

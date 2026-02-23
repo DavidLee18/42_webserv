@@ -75,6 +75,8 @@ public:
 
   Result<ssize_t> sock_send(const void *buf, size_t size) const;
 
+  void close();
+
   Result<std::string> read_file_line();
 
   bool operator==(const int &other) const { return _fd == other; }
