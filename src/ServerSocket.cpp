@@ -188,13 +188,10 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds) {
 								break; // EWOULDBLOCK 등: 소켓 버퍼가 꽉 차서 더 못 보냄
 							}
 							ssize_t bytes = send_res.value();
-							if (bytes == 0)
-							{
-								// sock_send()가 0을 반환하면 더 이상 보낼 수 없음을 의미하므로 루프 종료
-								break;
-							}
 							if (bytes == 0) {
-								break; // 더 이상 보낼 수 없으므로 루프 종료 (무한 루프 방지)
+								// sock_send()가 0을 반환하면 더 이상 보낼 수 없으므로,
+								// 더 진행해도 진전이 없고 무한 루프가 될 수 있어 루프를 종료한다.
+								break;
 							}
 							client.write_buffer.erase(0, static_cast<std::size_t>(bytes)); // 보낸 만큼 버퍼에서 삭제
 							if (client.write_buffer.empty()) {
