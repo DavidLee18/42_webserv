@@ -133,7 +133,9 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				{
 					std::cout << "Client disconnected (error/hup)" << std::endl;
 					FileDescriptor *client_fd = const_cast<FileDescriptor *>(fd);
-					epoll.del_fd(*client_fd);
+					Result<Void> del_result = epoll.del_fd(*client_fd);
+					if (!del_result.has_value())
+						std::cerr << "epoll.del_fd failed: " << del_result.error() << std::endl;
 					client_fd->close(); // Close underlying socket to avoid FD leak
 					clients.erase(fd);
 					++events;
@@ -155,7 +157,9 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						if (bytes == 0)
 						{ // 클라이언트가 정상적으로 연결 종료 (EOF)
 							std::cout << "Client disconnected (EOF)" << std::endl;
-							epoll.del_fd(*const_cast<FileDescriptor *>(fd));
+							Result<Void> del_result = epoll.del_fd(*const_cast<FileDescriptor *>(fd));
+							if (!del_result.has_value())
+								std::cerr << "epoll.del_fd failed: " << del_result.error() << std::endl;
 							clients.erase(fd);
 							break;
 						}
