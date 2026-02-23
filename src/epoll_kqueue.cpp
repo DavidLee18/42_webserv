@@ -120,11 +120,13 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
                  "an unknown error occured during EPOLL_CTL_ADD");
     }
   }
-  int raw_fd = fd._fd;
-  _events.insert(std::make_pair(raw_fd, fd));
+  if (_events.size() >= _events.capacity())
+    return ERR(const FileDescriptor *, Errors::epoll_full);
+  _events.push_back(fd);
 
-  // Return pointer to the FileDescriptor in the map (stable across insertions)
-  const FileDescriptor *fd_in = &_events.at(raw_fd);
+  // Return pointer to the FileDescriptor in the vector (last element just
+  // added). Safe because capacity is enforced above to prevent reallocation.
+  const FileDescriptor *fd_in = &_events.at(_events.size() - 1);
   return OK(const FileDescriptor *, fd_in);
 }
 
