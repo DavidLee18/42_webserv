@@ -89,7 +89,23 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				while (true) { // Edge-Triggered이므로 가능한 모든 연결을 accept 해야 함
 					Result<FileDescriptor> client_res = fd->socket_accept(NULL, NULL);
 					if (!client_res.has_value()) {
-						break; // EWOULDBLOCK: 더 이상 대기 중인 연결이 없음
+						const std::string &err = client_res.error();
+						if (err == Errors::try_again)
+						{
+							// EWOULDBLOCK: 더 이상 대기 중인 연결이 없음
+							break;
+						}
+						else if (err == Errors::interrupted)
+						{
+							// EINTR: accept 재시도
+							continue;
+						}
+						else
+						{
+							// 기타 오류: 로그만 남기고 해당 이벤트에 대한 accept 루프 종료
+							std::cerr << "ERROR: accept failed: " << err << std::endl;
+							break;
+						}
 					}
 					FileDescriptor client_fd = client_res.value();
 					auto nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
@@ -174,9 +190,14 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						while (true) { // Edge-Triggered이므로 보낼 수 있는 만큼 다 보내야 함
 							Result<ssize_t> send_res = fd->sock_send(client.write_buffer.c_str(), client.write_buffer.length());
 							if (!send_res.has_value()) {
-								break; // EWOULDBLOCK: 소켓 버퍼가 꽉 차서 더 못 보냄
+								break; // EWOULDBLOCK 등: 소켓 버퍼가 꽉 차서 더 못 보냄
 							}
 							ssize_t bytes = send_res.value();
+							if (bytes == 0)
+							{
+								// sock_send()가 0을 반환하면 더 이상 보낼 수 없음을 의미하므로 루프 종료
+								break;
+							}
 							if (bytes == 0) {
 								break; // 더 이상 보낼 수 없으므로 루프 종료 (무한 루프 방지)
 							}
