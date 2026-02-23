@@ -14,6 +14,7 @@ SRC_FILES := errors.cpp epoll_kqueue.cpp file_descriptor.cpp	\
 	main.cpp 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 OBJS := $(addprefix $(BUILD_DIR)/, $(SRC_FILES:.cpp=.o))
+DEPS := $(addprefix $(BUILD_DIR)/, $(SRC_FILES:.cpp=.d))
 
 all: $(NAME)
 
@@ -22,9 +23,7 @@ $(NAME): $(OBJS)
 
 build/%.o: src/%.cpp
 	mkdir -p $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -c $< -o $@
-
-$(OBJS): $(SRC_DIR)/webserv.h
+	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -MMD -MP -c $< -o $@
 
 clean:
 	rm -rf $(BUILD_DIR)
@@ -34,4 +33,6 @@ fclean:	clean
 
 re:	fclean all
 
-.PNONY: all clean fclean re bonus rebo
+-include $(DEPS)
+
+.PHONY: all clean fclean re bonus rebo
