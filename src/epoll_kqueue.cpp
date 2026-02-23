@@ -58,6 +58,7 @@ Result<EPoll> EPoll::create(unsigned short sz) {
     switch (errno) {
     case EINVAL:
       return ERR(EPoll, "the epoll size is zero");
+    case EMFILE:
     case ENFILE:
       return ERR(EPoll, Errors::fd_too_many);
     case ENOMEM:
