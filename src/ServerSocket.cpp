@@ -64,7 +64,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 {
 	std::map<const FileDescriptor *, ClientConnection> clients;
 
-	while (true)
+	while (!sig)
 	{
 		// Waiting for events
 		Result<Events> events_result = epoll.wait(-1);
@@ -102,7 +102,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						break; // EWOULDBLOCK: 더 이상 대기 중인 연결이 없음
 					}
 					FileDescriptor client_fd = client_res.value();
-					auto nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
+					Result<Void> nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
 					if (!nb_res.has_value())
 					{
 						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
@@ -134,7 +134,6 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					std::cout << "Client disconnected (error/hup)" << std::endl;
 					FileDescriptor *client_fd = const_cast<FileDescriptor *>(fd);
 					epoll.del_fd(*client_fd);
-					client_fd->close(); // Close underlying socket to avoid FD leak
 					clients.erase(fd);
 					++events;
 					continue;
@@ -210,4 +209,12 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 			++events;
 		}
 	}
+
+	// Graceful shutdown: close all client connections
+	for (std::map<const FileDescriptor *, ClientConnection>::iterator it = clients.begin(); it != clients.end(); ++it)
+	{
+		FileDescriptor *client_fd = const_cast<FileDescriptor *>(it->first);
+		epoll.del_fd(*client_fd);
+	}
+	clients.clear();
 }
