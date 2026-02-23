@@ -1,4 +1,6 @@
 #include "ServerSocket.hpp"
+#include "errors.h"
+#include <sstream>
 
 // NOTE: The FileDescriptor pointers stored in server_fds and clients refer to
 // elements inside EPoll's internal _events vector. These pointers remain valid
@@ -36,9 +38,9 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 		if (!reuseaddr_result.has_value())
 			return ERR(EPoll, reuseaddr_result.error());
 
-		// Bind (IP-Port connect)
+		// Bind (associate IP and port)
 		struct in_addr addr;
-		addr.s_addr = htonl(INADDR_ANY); // All IP
+		addr.s_addr = htonl(INADDR_ANY); // All IPs
 		Result<Void> bind_result = server_fd.socket_bind(addr, port);
 		if (!bind_result.has_value())
 			return ERR(EPoll, bind_result.error());
@@ -88,7 +90,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				continue;
 			}
 			const Event *event = ev_result.value();
-			const FileDescriptor *fd = event->fd;
+			int raw_fd = event->fd->get_fd();
 
 			// 1. Event on a server socket (new client connection)
 			if (server_fds.find(fd) != server_fds.end()) {
@@ -132,6 +134,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						clients.at(fd).fd_ptr->close(); // Close underlying socket to avoid FD leak
 						clients.erase(fd);
 					}
+					disconnect_client(epoll, clients, raw_fd);
 					++events;
 					continue;
 				}
@@ -163,6 +166,23 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					// TODO: invoke HTTP parsing logic here
 					// Temporary: respond with a fixed response on any incoming data
 					if (clients.find(fd) != clients.end() && !clients.at(fd).read_buffer.empty()) {
+							break; // EWOULDBLOCK: no more data to read
+						}
+						ssize_t bytes = recv_res.value();
+						if (bytes == 0)
+						{ // Client closed connection cleanly (EOF)
+							std::cout << "Client disconnected (EOF)" << std::endl;
+							disconnect_client(epoll, clients, raw_fd);
+							break;
+						}
+						// Store received data in the read buffer
+						clients.at(raw_fd).read_buffer.append(buf, static_cast<std::size_t>(bytes));
+					}
+
+					// TODO: call HTTP parsing logic here
+					// For now, send a fixed response whenever data is received
+					if (clients.find(raw_fd) != clients.end() && !clients.at(raw_fd).read_buffer.empty())
+					{
 						std::string body = "<html><body><h1>Hello from webserv!</h1></body></html>";
 						std::ostringstream response;
 						response << "HTTP/1.1 200 OK\r\n";
@@ -201,3 +221,4 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 		}
 	}
 }
+
