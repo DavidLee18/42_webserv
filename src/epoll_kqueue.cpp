@@ -169,8 +169,9 @@ Result<Void> EPoll::modify_fd(FileDescriptor &fd, const Event &ev,
 
 Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
   epoll_event event = {};
-  event.data.fd = fd._fd;
-  if (epoll_ctl(_fd._fd, EPOLL_CTL_DEL, fd._fd, &event) == -1) {
+  int raw = fd._fd;
+  event.data.fd = raw;
+  if (epoll_ctl(_fd._fd, EPOLL_CTL_DEL, raw, &event) == -1) {
     switch (errno) {
     case EINVAL:
       return ERR(Void, Errors::invalid_operation);
@@ -184,6 +185,7 @@ Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
       return ERR(Void, "an unknown error occured during EPOLL_CTL_DEL");
     }
   }
+  _events.erase(raw);
   return OKV;
 }
 

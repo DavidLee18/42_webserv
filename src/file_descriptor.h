@@ -29,9 +29,9 @@ public:
 
   ~FileDescriptor();
 
-  Result<Void> socket_bind(struct in_addr addr, unsigned short port) const;
+  Result<Void> socket_bind(struct in_addr addr, unsigned short port);
 
-  Result<Void> socket_listen(unsigned short backlog) const;
+  Result<Void> socket_listen(unsigned short backlog);
 
   Result<FileDescriptor> socket_accept(struct sockaddr *addr, socklen_t *len) const;
 
@@ -68,14 +68,12 @@ public:
    *
    * @return Result<Void> Success or error message
    */
-  Result<Void> set_nonblocking() const;
+  Result<Void> set_nonblocking();
 
   Result<Void> set_socket_option(int level, int optname, const void *optval,
-                                 socklen_t optlen) const;
+                                 socklen_t optlen);
 
   Result<ssize_t> sock_send(const void *buf, size_t size) const;
-
-  void close();
 
   Result<std::string> read_file_line();
 
