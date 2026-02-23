@@ -139,10 +139,9 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 				if (event->err || event->hup || event->rdhup) {
 					std::cout << "Client disconnected (error/hup)" << std::endl;
 					FileDescriptor *client_fd = const_cast<FileDescriptor *>(fd);
-					Result<Void> del_result = epoll.del_fd(*client_fd);
-					if (!del_result.has_value())
-						std::cerr << "epoll.del_fd failed: " << del_result.error() << std::endl;
-					client_fd->close(); // Close underlying socket to avoid FD leak
+					Result<Void> del_res1 = epoll.del_fd(*client_fd);
+					if (!del_res1.has_value())
+						std::cerr << "ERROR: epoll.del_fd() failed on disconnect: " << del_res1.error() << std::endl;
 					clients.erase(fd);
 					++events;
 					continue;
@@ -159,9 +158,9 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds)
 						ssize_t bytes = recv_res.value();
 						if (bytes == 0) { // Client closed connection normally (EOF)
 							std::cout << "Client disconnected (EOF)" << std::endl;
-							Result<Void> del_result = epoll.del_fd(*const_cast<FileDescriptor *>(fd));
-							if (!del_result.has_value())
-								std::cerr << "epoll.del_fd failed: " << del_result.error() << std::endl;
+							Result<Void> del_res2 = epoll.del_fd(*const_cast<FileDescriptor *>(fd));
+							if (!del_res2.has_value())
+								std::cerr << "ERROR: epoll.del_fd() failed on EOF: " << del_res2.error() << std::endl;
 							clients.erase(fd);
 							break;
 						}
