@@ -122,10 +122,8 @@ void run_server(EPoll &epoll, const std::set<int> &server_fds) {
 
 					Result<int> add_result = epoll.add_fd(client_fd, client_ev, client_op);
 					if (add_result.has_value()) {
-						int new_client_fd = add_result.value();
-						clients.insert(std::make_pair(
-											new_client_fd,
-											ClientConnection(new_client_fd)));
+						clients.insert(std::make_pair(add_result.value(),
+												ClientConnection(add_result.value())));
 						std::cout << "New client connected!" << std::endl;
 					} else {
 						std::cerr << "ERROR: failed to add client fd to epoll: " << add_result.error() << std::endl;
