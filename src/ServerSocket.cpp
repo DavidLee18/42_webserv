@@ -123,7 +123,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					if (add_result.has_value()) {
 						FileDescriptor *client_ptr = add_result.value();
 						clients.insert(std::make_pair(client_ptr,
-												ClientConnection(client_ptr->raw_fd())));
+												ClientConnection()));
 						std::cout << "New client connected!" << std::endl;
 					} else {
 						std::cerr << "ERROR: failed to add client fd to epoll: " << add_result.error() << std::endl;

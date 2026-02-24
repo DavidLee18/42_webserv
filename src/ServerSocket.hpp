@@ -21,17 +21,15 @@
 class ClientConnection
 {
 public:
-  int fd_int; // Raw fd integer for tracking
   std::string read_buffer;
   std::string write_buffer;
   bool request_complete;
 
-  explicit ClientConnection(int fd)
-      : fd_int(fd), read_buffer(), write_buffer(), request_complete(false) {}
+  ClientConnection()
+      : read_buffer(), write_buffer(), request_complete(false) {}
 
   ClientConnection(const ClientConnection &other)
-      : fd_int(other.fd_int),
-        read_buffer(other.read_buffer),
+      : read_buffer(other.read_buffer),
         write_buffer(other.write_buffer),
         request_complete(other.request_complete) {}
 
@@ -39,7 +37,6 @@ public:
   {
     if (this != &other)
     {
-      fd_int = other.fd_int;
       read_buffer = other.read_buffer;
       write_buffer = other.write_buffer;
       request_complete = other.request_complete;
