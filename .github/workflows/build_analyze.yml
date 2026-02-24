@@ -93,7 +93,7 @@ jobs:
       - uses: actions/upload-artifact@v6
         with:
           name: codeql-results-${{ matrix.language }}
-          path: { { steps.analyze.outputs.sarif_file } }
+          path: ${{ steps.analyze.outputs.sarif_file }}
   flawfinder:
     name: Flawfinder
     runs-on: ubuntu-latest
