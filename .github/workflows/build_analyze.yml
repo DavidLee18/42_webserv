@@ -177,7 +177,12 @@ jobs:
         with:
           name: codacy
           path: results
-      - name: Upload CodeQL Analysis
+      - name: merge SARIF files
+        uses: microsoft/sarif-actions@v0.1
+        with:
+          # Command to be sent to SARIF Multitool
+          command: "merge ${{github.workspace}}/results/*.sarif --output-directory=${{github.workspace}}/ --output-file=merged.sarif"
+      - name: Upload Analysis
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: results
+          sarif_file: merged.sarif
