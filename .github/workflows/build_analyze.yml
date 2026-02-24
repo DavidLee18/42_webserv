@@ -172,17 +172,12 @@ jobs:
         with:
           name: flawfinder
           path: results
-      - name: Download Codacy results
-        uses: actions/download-artifact@v7
-        with:
-          name: codacy
-          path: results
-      - name: merge SARIF files
-        uses: microsoft/sarif-actions@v0.1
-        with:
-          # Command to be sent to SARIF Multitool
-          command: "merge ${{github.workspace}}/results/*.sarif --output-directory=${{github.workspace}}/ --output-file=merged.sarif"
+      # - name: Download Codacy results
+      #   uses: actions/download-artifact@v7
+      #   with:
+      #     name: codacy
+      #     path: results
       - name: Upload Analysis
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: merged.sarif
+          sarif_file: results
