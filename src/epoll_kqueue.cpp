@@ -1,6 +1,6 @@
 #include "webserv.h"
 
-Result<Events> Events::init(const std::vector<FileDescriptor> &all_events,
+Result<Events> Events::init(const std::list<FileDescriptor> &all_events,
                             size_t size, const epoll_event *events) {
   Events es;
   es._len = size;
@@ -8,9 +8,10 @@ Result<Events> Events::init(const std::vector<FileDescriptor> &all_events,
   es._events = static_cast<Event *>(operator new(sizeof(Event) * size));
   for (size_t i = 0; i < size; i++) {
     const FileDescriptor *fd = NULL;
-    for (size_t j = 0; j < all_events.size(); j++) {
-      if (events[i].data.fd == all_events.at(j)) {
-        fd = &all_events.at(j);
+    for (std::list<FileDescriptor>::const_iterator it = all_events.begin();
+         it != all_events.end(); ++it) {
+      if (*it == events[i].data.fd) {
+        fd = &*it;
         break;
       }
     }
@@ -69,7 +70,6 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   }
   EPoll ep;
   ep._size = sz;
-  ep._events.reserve(sz); // Reserve space to avoid reallocation
   Result<FileDescriptor> rfdesc = FileDescriptor::from_raw(fd);
   if (!rfdesc.error().empty()) {
     return ERR(EPoll, rfdesc.error());
@@ -79,8 +79,8 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   return OK(EPoll, ep);
 }
 
-Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
-                                             const Option &op) {
+Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
+                          const Option &op) {
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -106,29 +106,23 @@ Result<const FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   if (epoll_ctl(_fd._fd, EPOLL_CTL_ADD, fd._fd, &event) == -1) {
     switch (errno) {
     case EEXIST:
-      return ERR(const FileDescriptor *,
-                 "this fd is already registered to this epoll");
+      return ERR(FileDescriptor *, "this fd is already registered to this epoll");
     case EINVAL:
-      return ERR(const FileDescriptor *, Errors::invalid_fd);
+      return ERR(FileDescriptor *, Errors::invalid_fd);
     case ELOOP:
-      return ERR(const FileDescriptor *, Errors::epoll_loop);
+      return ERR(FileDescriptor *, Errors::epoll_loop);
     case ENOMEM:
-      return ERR(const FileDescriptor *, Errors::out_of_mem);
+      return ERR(FileDescriptor *, Errors::out_of_mem);
     case ENOSPC:
-      return ERR(const FileDescriptor *, Errors::epoll_full);
+      return ERR(FileDescriptor *, Errors::epoll_full);
     case EPERM:
-      return ERR(const FileDescriptor *, Errors::not_supported);
+      return ERR(FileDescriptor *, Errors::not_supported);
     default:
-      return ERR(const FileDescriptor *,
-                 "an unknown error occured during EPOLL_CTL_ADD");
+      return ERR(FileDescriptor *, "an unknown error occured during EPOLL_CTL_ADD");
     }
   }
   _events.push_back(fd);
-
-  // Return pointer to the FileDescriptor in the vector (last element just
-  // added)
-  const FileDescriptor *fd_in = &_events.at(_events.size() - 1);
-  return OK(const FileDescriptor *, fd_in);
+  return OK(FileDescriptor *, &_events.back());
 }
 
 Result<Void> EPoll::modify_fd(FileDescriptor &fd, const Event &ev,
@@ -172,10 +166,11 @@ Result<Void> EPoll::modify_fd(FileDescriptor &fd, const Event &ev,
   return OKV;
 }
 
-Result<Void> EPoll::del_fd(FileDescriptor &fd) {
+Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
   epoll_event event = {};
-  event.data.fd = fd._fd;
-  if (epoll_ctl(_fd._fd, EPOLL_CTL_DEL, fd._fd, &event) == -1) {
+  int raw = fd._fd;
+  event.data.fd = raw;
+  if (epoll_ctl(_fd._fd, EPOLL_CTL_DEL, raw, &event) == -1) {
     switch (errno) {
     case EINVAL:
       return ERR(Void, Errors::invalid_operation);
@@ -189,6 +184,13 @@ Result<Void> EPoll::del_fd(FileDescriptor &fd) {
       return ERR(Void, "an unknown error occured during EPOLL_CTL_DEL");
     }
   }
+  for (std::list<FileDescriptor>::iterator it = _events.begin();
+       it != _events.end(); ++it) {
+    if (*it == fd) {
+      _events.erase(it);
+      break;
+    }
+  }
   return OKV;
 }
 
@@ -196,7 +198,10 @@ Result<Events> EPoll::wait(const int timeout_ms) {
   struct epoll_event *events = new struct epoll_event[_size];
   int n = epoll_wait(_fd._fd, events, _size, timeout_ms);
   if (n == -1) {
-    return ERR(Events, Errors::interrupted);
+    delete[] events;
+    if (errno == EINTR)
+      return ERR(Events, Errors::interrupted);
+    return ERR(Events, std::string("epoll_wait failed: ") + strerror(errno));
   }
   return Events::init(_events, static_cast<size_t>(n), events);
 }

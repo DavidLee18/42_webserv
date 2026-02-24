@@ -74,7 +74,7 @@ FileDescriptor &FileDescriptor::operator=(const FileDescriptor &other) {
     if (fp != NULL)
       std::fclose(fp);
     else if (_fd >= 0)
-      close(_fd);
+      ::close(_fd);
 
     // Transfer ownership
     _fd = other._fd;
@@ -90,7 +90,7 @@ FileDescriptor::~FileDescriptor() {
   if (fp != NULL)
     std::fclose(fp);
   else if (_fd >= 0)
-    close(_fd);
+    ::close(_fd);
 }
 
 Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
@@ -147,7 +147,7 @@ Result<Void> FileDescriptor::socket_listen(unsigned short backlog) {
 }
 
 Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
-                                                     socklen_t *len) {
+                                                     socklen_t *len) const {
   int fd = accept(_fd, addr, len);
   if (fd >= 0) {
     FileDescriptor fd_;
@@ -186,14 +186,17 @@ Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
   }
 }
 
-Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) {
+Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) const {
   ssize_t res = recv(_fd, buf, size, 0);
-  if (res < 0)
-    return ERR(ssize_t, "`recv` failed");
+  if (res < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK)
+      return ERR(ssize_t, Errors::try_again);
+    return ERR(ssize_t, std::string("`recv` failed: ") + strerror(errno));
+  }
   return OK(ssize_t, res);
 }
 
-Result<Http::PartialString> FileDescriptor::try_read_to_end() {
+Result<Http::PartialString> FileDescriptor::try_read_to_end() const {
   std::stringstream ss;
   char buf[BUFFER_SIZE];
 
@@ -238,7 +241,7 @@ Result<Void> FileDescriptor::set_socket_option(int level, int optname,
   return OKV;
 }
 
-Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) {
+Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) const {
   ssize_t res = send(_fd, buf, size, 0);
   if (res < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {

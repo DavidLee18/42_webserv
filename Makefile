@@ -7,10 +7,14 @@ NAME := webserv
 BUILD_DIR := build
 SRC_DIR := src
 
-SRCS := src/errors.cpp src/epoll_kqueue.cpp \
-	src/ParsingUtils.cpp src/ServerConfig.cpp src/WebserverConfig.cpp \
-	src/file_descriptor.cpp src/json.cpp src/cgi_1_1.cpp src/wsgi.cpp src/http_1_1.cpp src/main.cpp
-OBJS := $(patsubst src/%.cpp, build/%.o, $(SRCS))
+SRC_FILES := errors.cpp epoll_kqueue.cpp file_descriptor.cpp	\
+	ParsingUtils.cpp ServerConfig.cpp WebserverConfig.cpp		\
+	json.cpp cgi_1_1.cpp wsgi.cpp http_1_1.cpp					\
+	ServerSocket.cpp 											\
+	main.cpp 
+SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
+OBJS := $(addprefix $(BUILD_DIR)/, $(SRC_FILES:.cpp=.o))
+DEPS := $(addprefix $(BUILD_DIR)/, $(SRC_FILES:.cpp=.d))
 
 all: $(NAME)
 
@@ -19,9 +23,7 @@ $(NAME): $(OBJS)
 
 build/%.o: src/%.cpp
 	mkdir -p $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -c $< -o $@
-
-$(SRCS): $(SRC_DIR)/webserv.h
+	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -MMD -MP -c $< -o $@
 
 clean:
 	rm -rf $(BUILD_DIR)
@@ -31,4 +33,6 @@ fclean:	clean
 
 re:	fclean all
 
-.PNONY: all clean fclean re bonus rebo
+-include $(DEPS)
+
+.PHONY: all clean fclean re bonus rebo

@@ -6,13 +6,6 @@
 #include "result.h"
 #include <sys/socket.h>
 
-#ifdef __APPLE__
-class KQueue;
-#else
-class EPoll;
-class Option;
-#endif
-
 class Event;
 
 class FileDescriptor {
@@ -40,11 +33,11 @@ public:
 
   Result<Void> socket_listen(unsigned short backlog);
 
-  Result<FileDescriptor> socket_accept(struct sockaddr *addr, socklen_t *len);
+  Result<FileDescriptor> socket_accept(struct sockaddr *addr, socklen_t *len) const;
 
-  Result<ssize_t> sock_recv(void *buf, size_t size);
+  Result<ssize_t> sock_recv(void *buf, size_t size) const;
 
-  Result<Http::PartialString> try_read_to_end();
+  Result<Http::PartialString> try_read_to_end() const;
 
   /**
    * @brief Sets the file descriptor to non-blocking mode.
@@ -80,7 +73,7 @@ public:
   Result<Void> set_socket_option(int level, int optname, const void *optval,
                                  socklen_t optlen);
 
-  Result<ssize_t> sock_send(const void *buf, size_t size);
+  Result<ssize_t> sock_send(const void *buf, size_t size) const;
 
   Result<std::string> read_file_line();
 

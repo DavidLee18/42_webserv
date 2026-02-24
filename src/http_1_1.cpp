@@ -306,7 +306,7 @@ static std::string url_encode(const std::string &decoded) {
   size_t len = decoded.length();
   
   for (size_t i = 0; i < len; ++i) {
-    unsigned char c = static_cast<unsigned char>(decoded[i]);
+    char c = static_cast<char>(decoded[i]);
     
     // Encode spaces as '+'
     if (c == ' ') {
