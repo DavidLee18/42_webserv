@@ -4,7 +4,7 @@
 #include "file_descriptor.h"
 #include <cstddef>
 #include <iterator>
-#include <map>
+#include <list>
 
 #include <sys/epoll.h>
 
@@ -102,7 +102,7 @@ public:
   }
 
   ~Events();
-  static Result<Events> init(const std::map<int, FileDescriptor> &, size_t,
+  static Result<Events> init(const std::list<FileDescriptor> &, size_t,
                              const epoll_event *);
   bool is_end() const;
   Result<Void> operator++();
@@ -129,7 +129,7 @@ private:
  */
 class EPoll {
   FileDescriptor _fd;
-  std::map<int, FileDescriptor> _events;
+  std::list<FileDescriptor> _events;
   unsigned short _size;
 
 public:
@@ -164,7 +164,7 @@ public:
 
   static Result<EPoll> create(unsigned short);
   Result<Events> wait(const int timeout_ms);
-  Result<int> add_fd(FileDescriptor, const Event &, const Option &);
+  Result<FileDescriptor *> add_fd(FileDescriptor, const Event &, const Option &);
   Result<Void> modify_fd(FileDescriptor &, const Event &, const Option &);
   Result<Void> del_fd(const FileDescriptor &);
 };

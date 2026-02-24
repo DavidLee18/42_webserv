@@ -1160,22 +1160,23 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         const_cast<const FileDescriptor *>(&stdin_fd);
     Event write_event(stdin_fd_ptr, false, true, false, false, false, false);
     Option write_option(false, false, false, false);
-    Result<int> add_result =
+    Result<FileDescriptor *> add_result =
         epoll->add_fd(stdin_fd, write_event, write_option);
 
-    if (!add_result.error().empty()) {
+    if (!add_result.has_value()) {
       // FileDescriptor destructors will close the pipes
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
       return ERR(Http::Response, "Failed to add stdin to epoll");
     }
+    FileDescriptor *stdin_epoll = add_result.value();
 
     size_t total_written = 0;
     while (total_written < body_str.length()) {
       // Wait for the fd to be writable
       Result<Events> wait_result = epoll->wait(timeout_ms);
       if (!wait_result.error().empty()) {
-        epoll->del_fd(stdin_fd);
+        epoll->del_fd(*stdin_epoll);
         // FileDescriptor destructors will close the pipes
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
@@ -1186,7 +1187,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
 
       // Check if timeout occurred (no events returned)
       if (events.is_end()) {
-        epoll->del_fd(stdin_fd);
+        epoll->del_fd(*stdin_epoll);
         // FileDescriptor destructors will close the pipes
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
@@ -1216,14 +1217,14 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       ssize_t written = write(stdin_pipe[1], body_str.c_str() + total_written,
                               body_str.length() - total_written);
       if (written < 0) {
-        epoll->del_fd(stdin_fd);
+        epoll->del_fd(*stdin_epoll);
         // FileDescriptor destructors will close the pipes
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
         return ERR(Http::Response, "Failed to write to CGI stdin");
       } else if (written == 0) {
         // Pipe closed by reader (child process)
-        epoll->del_fd(stdin_fd);
+        epoll->del_fd(*stdin_epoll);
         // FileDescriptor destructors will close the pipes
         kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
@@ -1233,7 +1234,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     }
 
     // Remove stdin from epoll and close it
-    epoll->del_fd(stdin_fd);
+    epoll->del_fd(*stdin_epoll);
   }
   // Close stdin by letting stdin_fd go out of scope
   // (Manual close would be a double-close bug)
@@ -1248,15 +1249,16 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       const_cast<const FileDescriptor *>(&stdout_fd);
   Event read_event(stdout_fd_ptr, true, false, false, false, false, false);
   Option read_option(false, false, false, false);
-  Result<int> add_stdout_result =
+  Result<FileDescriptor *> add_stdout_result =
       epoll->add_fd(stdout_fd, read_event, read_option);
 
-  if (!add_stdout_result.error().empty()) {
+  if (!add_stdout_result.has_value()) {
     // stdout_fd destructor will close stdout_pipe[0]
     kill(pid, SIGKILL);
     waitpid(pid, NULL, 0);
     return ERR(Http::Response, "Failed to add stdout to epoll");
   }
+  FileDescriptor *stdout_epoll = add_stdout_result.value();
 
   // Read output using EPoll to check readability
   std::string output;
@@ -1266,7 +1268,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     // Wait for data to be available
     Result<Events> wait_result = epoll->wait(timeout_ms);
     if (!wait_result.error().empty()) {
-      epoll->del_fd(stdout_fd);
+      epoll->del_fd(*stdout_epoll);
       // stdout_fd destructor will close stdout_pipe[0]
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
@@ -1277,7 +1279,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
 
     // Check if timeout occurred (no events returned)
     if (events.is_end()) {
-      epoll->del_fd(stdout_fd);
+      epoll->del_fd(*stdout_epoll);
       // stdout_fd destructor will close stdout_pipe[0]
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
@@ -1313,7 +1315,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       break;
     } else {
       // Read error
-      epoll->del_fd(stdout_fd);
+      epoll->del_fd(*stdout_epoll);
       // stdout_fd destructor will close stdout_pipe[0]
       kill(pid, SIGKILL);
       waitpid(pid, NULL, 0);
@@ -1322,7 +1324,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   }
 
   // Remove stdout from epoll and close it
-  epoll->del_fd(stdout_fd);
+  epoll->del_fd(*stdout_epoll);
   // stdout_fd destructor will close stdout_pipe[0] when it goes out of scope
 
   // Wait for child process
