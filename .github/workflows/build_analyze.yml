@@ -90,12 +90,10 @@ jobs:
         with:
           category: "/language:${{matrix.language}}"
           upload: "never"
-      - run: |
-          echo "SARIF file path: ${{ steps.analyze.outputs.sarif_file }}"
       - uses: actions/upload-artifact@v6
         with:
           name: codeql-results-${{ matrix.language }}
-          path: ${{ steps.analyze.outputs.sarif_file }}
+          path: ${{ steps.analyze.outputs.sarif-output }}
   flawfinder:
     name: Flawfinder
     runs-on: ubuntu-latest
