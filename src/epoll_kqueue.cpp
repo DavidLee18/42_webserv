@@ -1,6 +1,6 @@
 #include "webserv.h"
 
-Result<Events> Events::init(const std::map<int, FileDescriptor> &all_events,
+Result<Events> Events::init(const std::list<FileDescriptor> &all_events,
                             size_t size, const epoll_event *events) {
   Events es;
   es._len = size;
@@ -8,10 +8,13 @@ Result<Events> Events::init(const std::map<int, FileDescriptor> &all_events,
   es._events = static_cast<Event *>(operator new(sizeof(Event) * size));
   for (size_t i = 0; i < size; i++) {
     const FileDescriptor *fd = NULL;
-    std::map<int, FileDescriptor>::const_iterator it =
-        all_events.find(events[i].data.fd);
-    if (it != all_events.end())
-      fd = &it->second;
+    for (std::list<FileDescriptor>::const_iterator it = all_events.begin();
+         it != all_events.end(); ++it) {
+      if (*it == events[i].data.fd) {
+        fd = &*it;
+        break;
+      }
+    }
     if (fd == NULL) {
       operator delete((void *)es._events);
       return ERR(Events, Errors::not_found);
@@ -76,7 +79,7 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   return OK(EPoll, ep);
 }
 
-Result<int> EPoll::add_fd(FileDescriptor fd, const Event &ev,
+Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
                           const Option &op) {
   epoll_event event = {};
   if (ev.in)
@@ -103,27 +106,23 @@ Result<int> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   if (epoll_ctl(_fd._fd, EPOLL_CTL_ADD, fd._fd, &event) == -1) {
     switch (errno) {
     case EEXIST:
-      return ERR(int, "this fd is already registered to this epoll");
+      return ERR(FileDescriptor *, "this fd is already registered to this epoll");
     case EINVAL:
-      return ERR(int, Errors::invalid_fd);
+      return ERR(FileDescriptor *, Errors::invalid_fd);
     case ELOOP:
-      return ERR(int, Errors::epoll_loop);
+      return ERR(FileDescriptor *, Errors::epoll_loop);
     case ENOMEM:
-      return ERR(int, Errors::out_of_mem);
+      return ERR(FileDescriptor *, Errors::out_of_mem);
     case ENOSPC:
-      return ERR(int, Errors::epoll_full);
+      return ERR(FileDescriptor *, Errors::epoll_full);
     case EPERM:
-      return ERR(int, Errors::not_supported);
+      return ERR(FileDescriptor *, Errors::not_supported);
     default:
-      return ERR(int, "an unknown error occured during EPOLL_CTL_ADD");
+      return ERR(FileDescriptor *, "an unknown error occured during EPOLL_CTL_ADD");
     }
   }
-  int raw = fd._fd;
-  _events.insert(std::make_pair(raw, fd));
-
-  // Return the raw file descriptor integer (avoids storing pointers into the
-  // vector, which could be invalidated on reallocation)
-  return OK(int, raw);
+  _events.push_back(fd);
+  return OK(FileDescriptor *, &_events.back());
 }
 
 Result<Void> EPoll::modify_fd(FileDescriptor &fd, const Event &ev,
@@ -185,7 +184,13 @@ Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
       return ERR(Void, "an unknown error occured during EPOLL_CTL_DEL");
     }
   }
-  _events.erase(raw);
+  for (std::list<FileDescriptor>::iterator it = _events.begin();
+       it != _events.end(); ++it) {
+    if (*it == fd) {
+      _events.erase(it);
+      break;
+    }
+  }
   return OKV;
 }
 

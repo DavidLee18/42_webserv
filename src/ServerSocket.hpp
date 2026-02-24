@@ -48,7 +48,7 @@ public:
   }
 };
 
-Result<EPoll> init_servers(const WebserverConfig &config, std::set<int> &server_fds);
-void run_server(EPoll &epoll, const std::set<int> &server_fds);
+Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds);
+void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds);
 
 #endif
