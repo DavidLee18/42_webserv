@@ -31,6 +31,16 @@ public:
       : default_mime(other.default_mime), type_map(other.type_map),
         ServerConfig_map(other.ServerConfig_map) {};
 
+  WebserverConfig &operator=(const WebserverConfig &other) {
+    if (this != &other) {
+      this->default_mime = other.default_mime;
+      this->type_map = other.type_map;
+      this->ServerConfig_map = other.ServerConfig_map;
+      this->err_meg.clear();
+    }
+    return *this;
+  }
+
   const std::string &Get_default_mime(void) const { return default_mime; }
   const std::map<std::string, std::string> &Get_Type_map(void) const {
     return type_map;
