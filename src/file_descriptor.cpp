@@ -42,19 +42,20 @@ Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
                Errors::invalid_fd); // TODO: specify error kind and message.
   }
 
-  struct stat st;
-  if (stat(resolvedPath, &st) != 0 || !S_ISREG(st.st_mode)) {
-    // Ensure the target is an existing regular file.
-    free(resolvedPath);
-    return ERR(FileDescriptor,
-               Errors::invalid_fd); // TODO: specify error kind and message.
-  }
-
-  int _fd = open(resolvedPath, O_RDONLY);
+  int _fd = open(resolvedPath, O_RDONLY | O_NOFOLLOW);
   free(resolvedPath);
   if (_fd < 0)
     return ERR(FileDescriptor,
                Errors::invalid_fd); // TODO: specify error kind and message.
+
+  struct stat st;
+  if (fstat(_fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+    // Ensure the target is an existing regular file.
+    close(_fd);
+    return ERR(FileDescriptor,
+               Errors::invalid_fd); // TODO: specify error kind and message.
+  }
+
   FileDescriptor fd;
   fd._fd = _fd;
   FILE *fp = fdopen(_fd, "r");
