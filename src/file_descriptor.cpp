@@ -33,7 +33,25 @@ Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
 }
 
 Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
-  int _fd = open(path.c_str(), O_RDONLY);
+  // Normalize and validate the path before opening to avoid using
+  // uncontrolled user input directly in a file access.
+  char *resolvedPath = realpath(path.c_str(), NULL);
+  if (resolvedPath == NULL) {
+    // Path could not be resolved (does not exist or is otherwise invalid).
+    return ERR(FileDescriptor,
+               Errors::invalid_fd); // TODO: specify error kind and message.
+  }
+
+  struct stat st;
+  if (stat(resolvedPath, &st) != 0 || !S_ISREG(st.st_mode)) {
+    // Ensure the target is an existing regular file.
+    free(resolvedPath);
+    return ERR(FileDescriptor,
+               Errors::invalid_fd); // TODO: specify error kind and message.
+  }
+
+  int _fd = open(resolvedPath, O_RDONLY);
+  free(resolvedPath);
   if (_fd < 0)
     return ERR(FileDescriptor,
                Errors::invalid_fd); // TODO: specify error kind and message.
