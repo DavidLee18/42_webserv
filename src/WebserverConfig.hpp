@@ -36,6 +36,7 @@ public:
       this->default_mime = other.default_mime;
       this->type_map = other.type_map;
       this->ServerConfig_map = other.ServerConfig_map;
+      this->err_meg.clear();
     }
     return *this;
   }
