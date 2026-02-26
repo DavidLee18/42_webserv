@@ -119,7 +119,7 @@ CgiMetaVar CgiMetaVar::content_length(unsigned int l) {
   return CgiMetaVar(CONTENT_LENGTH, (CgiMetaVar::Val){.content_length = l});
 }
 
-CgiMetaVar CgiMetaVar::content_type(ContentType ty) {
+CgiMetaVar CgiMetaVar::content_type(const ContentType &ty) {
   return CgiMetaVar(CONTENT_TYPE,
                     (CgiMetaVar::Val){.content_type = new ContentType(ty)});
 }
