@@ -48,7 +48,7 @@ Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
   }
 
   // Build the safe path: current working directory + "/" + basename.
-  char cwd_buf[4096];
+  char cwd_buf[PATH_MAX];
   if (getcwd(cwd_buf, sizeof(cwd_buf)) == NULL) {
     return ERR(FileDescriptor,
                Errors::invalid_fd); // TODO: specify error kind and message.
