@@ -33,10 +33,52 @@ Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
 }
 
 Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
-  int _fd = open(path.c_str(), O_RDONLY);
+  // Extract just the filename (basename) to prevent directory traversal.
+  std::string::size_type slash_pos = path.rfind('/');
+  std::string filename =
+      (slash_pos == std::string::npos) ? path : path.substr(slash_pos + 1);
+
+  // Only allow files with the ".wbsrv" extension.
+  static const std::string ext = ".wbsrv";
+  if (filename.length() < ext.length() ||
+      filename.compare(filename.length() - ext.length(), ext.length(), ext) !=
+          0) {
+    return ERR(FileDescriptor,
+               Errors::invalid_fd); // TODO: specify error kind and message.
+  }
+
+  // Build the safe path: current working directory + "/" + basename.
+  char cwd_buf[PATH_MAX];
+  if (getcwd(cwd_buf, sizeof(cwd_buf)) == NULL) {
+    return ERR(FileDescriptor,
+               Errors::invalid_fd); // TODO: specify error kind and message.
+  }
+  std::string safe_path = std::string(cwd_buf) + "/" + filename;
+
+  // Use lstat to inspect the path without following symlinks.
+  struct stat st;
+  if (lstat(safe_path.c_str(), &st) != 0) {
+    // Path does not exist or is otherwise invalid.
+    return ERR(FileDescriptor,
+               Errors::invalid_fd); // TODO: specify error kind and message.
+  }
+  if (S_ISLNK(st.st_mode)) {
+    // Reject symbolic links.
+    return ERR(FileDescriptor,
+               Errors::invalid_fd); // TODO: specify error kind and message.
+  }
+  if (!S_ISREG(st.st_mode)) {
+    // Ensure the target is a regular file.
+    return ERR(FileDescriptor,
+               Errors::invalid_fd); // TODO: specify error kind and message.
+  }
+
+  // O_NOFOLLOW provides defense-in-depth against TOCTOU races with symlinks.
+  int _fd = open(safe_path.c_str(), O_RDONLY | O_NOFOLLOW);
   if (_fd < 0)
     return ERR(FileDescriptor,
                Errors::invalid_fd); // TODO: specify error kind and message.
+
   FileDescriptor fd;
   fd._fd = _fd;
   FILE *fp = fdopen(_fd, "r");

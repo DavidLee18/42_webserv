@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #include <cctype>
 #include <cerrno>
+#include <climits>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
