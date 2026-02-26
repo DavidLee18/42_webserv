@@ -490,7 +490,7 @@ private:
   CgiMetaVar(Name n, Val v) : name(n), val(v) {}
   static CgiMetaVar auth_type(CgiAuthType);
   static CgiMetaVar content_length(unsigned int);
-  static CgiMetaVar content_type(ContentType);
+  static CgiMetaVar content_type(const ContentType &);
   static CgiMetaVar gateway_interface(GatewayInterface);
   static CgiMetaVar path_info(std::list<std::string>);
   static CgiMetaVar path_translated(std::string);
