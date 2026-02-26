@@ -33,28 +33,29 @@ Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
 }
 
 Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
-  // Normalize and validate the path before opening to avoid using
-  // uncontrolled user input directly in a file access.
-  char *resolvedPath = realpath(path.c_str(), NULL);
-  if (resolvedPath == NULL) {
-    // Path could not be resolved (does not exist or is otherwise invalid).
+  // Use lstat to inspect the path without following symlinks.
+  struct stat st;
+  if (lstat(path.c_str(), &st) != 0) {
+    // Path does not exist or is otherwise invalid.
+    return ERR(FileDescriptor,
+               Errors::invalid_fd); // TODO: specify error kind and message.
+  }
+  if (S_ISLNK(st.st_mode)) {
+    // Reject symbolic links.
+    return ERR(FileDescriptor,
+               Errors::invalid_fd); // TODO: specify error kind and message.
+  }
+  if (!S_ISREG(st.st_mode)) {
+    // Ensure the target is a regular file.
     return ERR(FileDescriptor,
                Errors::invalid_fd); // TODO: specify error kind and message.
   }
 
-  int _fd = open(resolvedPath, O_RDONLY | O_NOFOLLOW);
-  free(resolvedPath);
+  // O_NOFOLLOW provides defense-in-depth against TOCTOU races with symlinks.
+  int _fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW);
   if (_fd < 0)
     return ERR(FileDescriptor,
                Errors::invalid_fd); // TODO: specify error kind and message.
-
-  struct stat st;
-  if (fstat(_fd, &st) != 0 || !S_ISREG(st.st_mode)) {
-    // Ensure the target is an existing regular file.
-    close(_fd);
-    return ERR(FileDescriptor,
-               Errors::invalid_fd); // TODO: specify error kind and message.
-  }
 
   FileDescriptor fd;
   fd._fd = _fd;
