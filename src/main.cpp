@@ -1,7 +1,7 @@
 #include "webserv.h"
 #include "ServerSocket.hpp"
 
-volatile sig_atomic_t sig = 0;
+volatile sig_atomic_t g_receivedSignal = 0;
 
 int main(const int argc, char *argv[]) {
   (void)argc;
@@ -39,4 +39,4 @@ int main(const int argc, char *argv[]) {
   return 0;
 }
 
-void wrap_up(const int signum) throw() { sig = signum; }
+void wrap_up(const int signum) throw() { g_receivedSignal = signum; }

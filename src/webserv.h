@@ -39,6 +39,6 @@
 #include <unistd.h>
 
 void wrap_up(int) throw();
-extern volatile sig_atomic_t sig;
+extern volatile sig_atomic_t g_receivedSignal;
 
 #endif
