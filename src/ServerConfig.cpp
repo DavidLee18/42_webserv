@@ -307,8 +307,8 @@ static bool is_pattern(std::string line) {
   size_t count = 0;
   size_t start = 0;
   while (1) {
-    size_t pos = inside.find('|', start);
-    std::string ext = inside.substr(start, pos - start);
+    size_t pipePos = inside.find('|', start);
+    std::string ext = inside.substr(start, pipePos - start);
     if (ext.empty())
       return false;
     for (size_t i = 0; i < ext.size(); ++i) {
@@ -316,9 +316,9 @@ static bool is_pattern(std::string line) {
         return false;
     }
     count++;
-    if (pos == std::string::npos)
+    if (pipePos == std::string::npos)
       break;
-    start = pos + 1;
+    start = pipePos + 1;
   }
   return count >= 2;
 }
