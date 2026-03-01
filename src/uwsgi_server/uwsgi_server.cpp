@@ -2,8 +2,11 @@
 
 #include <arpa/inet.h>
 #include <cerrno>
+#include <csignal>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
+#include <fcntl.h>
 #include <iostream>
 #include <netinet/in.h>
 #include <sstream>
@@ -11,6 +14,52 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+// Maximum allowed request body size (10 MB)
+static const long MAX_BODY_SIZE = 10 * 1024 * 1024;
+
+// Timeout in seconds for child WSGI process
+static const int CHILD_TIMEOUT_SEC = 30;
+
+// Allowlisted WSGI/CGI environment variable names (exact match).
+// Any key starting with "HTTP_" is also allowed.
+// See https://peps.python.org/pep-3333/ and RFC 3875 for the full list.
+static const char *const ALLOWED_VARS[] = {
+    "REQUEST_METHOD",
+    "SCRIPT_NAME",
+    "PATH_INFO",
+    "QUERY_STRING",
+    "CONTENT_TYPE",
+    "CONTENT_LENGTH",
+    "SERVER_NAME",
+    "SERVER_PORT",
+    "SERVER_PROTOCOL",
+    "SERVER_SOFTWARE",
+    "GATEWAY_INTERFACE",
+    "REMOTE_ADDR",
+    "REMOTE_HOST",
+    "REMOTE_IDENT",
+    "REMOTE_USER",
+    NULL
+};
+
+// Returns true only when key is a legitimate WSGI/CGI variable name.
+// Rejects keys containing NUL or '=' to prevent environment injection
+// (e.g. LD_PRELOAD, PYTHONPATH, PATH).
+static bool is_allowed_wsgi_var(const std::string &key) {
+    if (key.find('\0') != std::string::npos)
+        return false;
+    if (key.find('=') != std::string::npos)
+        return false;
+    // Allow HTTP_* request-header variables
+    if (key.size() > 5 && key.compare(0, 5, "HTTP_") == 0)
+        return true;
+    for (int i = 0; ALLOWED_VARS[i] != NULL; ++i) {
+        if (key == ALLOWED_VARS[i])
+            return true;
+    }
+    return false;
+}
 
 UwsgiServer::UwsgiServer(const std::string &script_path, int port)
     : _script_path(script_path), _port(port), _server_fd(-1) {}
@@ -29,9 +78,24 @@ bool UwsgiServer::setup_socket() {
         return false;
     }
 
+    // Prevent the listening socket from being inherited by child processes
+    if (fcntl(_server_fd, F_SETFD, FD_CLOEXEC) < 0) {
+        std::cerr << "fcntl(FD_CLOEXEC) failed: " << std::strerror(errno)
+                  << std::endl;
+        close(_server_fd);
+        _server_fd = -1;
+        return false;
+    }
+
     int optval = 1;
-    setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR, &optval,
-               static_cast<socklen_t>(sizeof(optval)));
+    if (setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR, &optval,
+                   static_cast<socklen_t>(sizeof(optval))) < 0) {
+        std::cerr << "setsockopt() failed: " << std::strerror(errno)
+                  << std::endl;
+        close(_server_fd);
+        _server_fd = -1;
+        return false;
+    }
 
     struct sockaddr_in addr;
     std::memset(&addr, 0, sizeof(addr));
@@ -79,6 +143,14 @@ void UwsgiServer::run() {
             continue;
         }
 
+        // Prevent the client socket from leaking into child processes
+        if (fcntl(client_fd, F_SETFD, FD_CLOEXEC) < 0) {
+            std::cerr << "fcntl(FD_CLOEXEC) failed: " << std::strerror(errno)
+                      << std::endl;
+            close(client_fd);
+            continue;
+        }
+
         handle_connection(client_fd);
         close(client_fd);
     }
@@ -89,9 +161,16 @@ bool UwsgiServer::read_all(int fd, void *buf, size_t len) {
     char  *p     = reinterpret_cast<char *>(buf);
     while (total < len) {
         ssize_t n = read(fd, p + total, len - total);
-        if (n <= 0)
-            return false;
-        total += static_cast<size_t>(n);
+        if (n > 0) {
+            total += static_cast<size_t>(n);
+            continue;
+        }
+        if (n == 0)
+            return false; // EOF before reading all bytes
+        // n < 0: retry on signal interrupt or temporary unavailability
+        if (errno == EINTR || errno == EAGAIN)
+            continue;
+        return false;
     }
     return true;
 }
@@ -159,7 +238,12 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
     }
 
     if (pid == 0) {
-        // Child process
+        // Child process: explicitly close the listening socket so it is not
+        // held open by the Python process. FD_CLOEXEC set in setup_socket()
+        // provides defense-in-depth on execve; the explicit close is direct
+        // and handles any fd created before F_SETFD was applied.
+        if (_server_fd >= 0)
+            close(_server_fd);
         close(stdin_pipe[1]);
         close(stdout_pipe[0]);
 
@@ -171,11 +255,17 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
         close(stdin_pipe[0]);
         close(stdout_pipe[1]);
 
-        // Build environment from uwsgi vars
+        // Build environment from allowlisted WSGI/CGI vars only.
+        // Keys or values containing NUL bytes are silently dropped to
+        // prevent environment injection (e.g. LD_PRELOAD, PYTHONPATH).
         std::vector<std::string> env_strings;
         for (std::map<std::string, std::string>::const_iterator it =
                  vars.begin();
              it != vars.end(); ++it) {
+            if (!is_allowed_wsgi_var(it->first))
+                continue;
+            if (it->second.find('\0') != std::string::npos)
+                continue;
             env_strings.push_back(it->first + "=" + it->second);
         }
 
@@ -220,8 +310,31 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
     }
     close(stdout_pipe[0]);
 
-    int wstatus;
-    waitpid(pid, &wstatus, 0);
+    // Wait for the child with a timeout to prevent blocking indefinitely
+    // when a WSGI script hangs after producing its output.
+    // Sleep in 100 ms increments up to the remaining deadline to keep
+    // CPU usage low while still reaping promptly.
+    int    wstatus  = 0;
+    time_t deadline = time(NULL) + CHILD_TIMEOUT_SEC;
+    while (true) {
+        pid_t waited = waitpid(pid, &wstatus, WNOHANG);
+        if (waited > 0 || (waited < 0 && errno != EINTR))
+            break;
+        time_t now = time(NULL);
+        if (now >= deadline) {
+            kill(pid, SIGKILL);
+            while (waitpid(pid, &wstatus, 0) < 0 && errno == EINTR)
+                ;
+            break;
+        }
+        // Sleep up to 100 ms, but no more than the remaining timeout
+        long remaining_ms = static_cast<long>((deadline - now) * 1000L);
+        long sleep_ms     = (remaining_ms < 100L) ? remaining_ms : 100L;
+        struct timespec ts;
+        ts.tv_sec  = 0;
+        ts.tv_nsec = sleep_ms * 1000000L;
+        nanosleep(&ts, NULL);
+    }
 
     return response;
 }
@@ -280,12 +393,26 @@ void UwsgiServer::handle_connection(int client_fd) {
         return;
     }
 
-    // Read request body if CONTENT_LENGTH is provided
+    // Read request body if CONTENT_LENGTH is provided.
+    // Validate that the value contains only digits and cap it at MAX_BODY_SIZE
+    // to prevent allocation-based DoS attacks.
     std::string body;
     std::map<std::string, std::string>::const_iterator cl_it =
         vars.find("CONTENT_LENGTH");
     if (cl_it != vars.end() && !cl_it->second.empty()) {
-        long content_length = std::atol(cl_it->second.c_str());
+        const std::string &cl_str = cl_it->second;
+        char *endptr = NULL;
+        errno = 0;
+        long content_length = std::strtol(cl_str.c_str(), &endptr, 10);
+        if (errno != 0 || endptr == cl_str.c_str() || *endptr != '\0' ||
+            content_length < 0) {
+            send_error_response(client_fd, 400, "Invalid Content-Length");
+            return;
+        }
+        if (content_length > MAX_BODY_SIZE) {
+            send_error_response(client_fd, 413, "Request Entity Too Large");
+            return;
+        }
         if (content_length > 0) {
             std::vector<char> body_buf(static_cast<size_t>(content_length));
             if (!read_all(client_fd, &body_buf[0],
