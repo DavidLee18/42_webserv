@@ -53,9 +53,11 @@ int main() {
   // --- get current UTC time ---
   char time_buf[64];
   std::time_t now = std::time(NULL);
+  std::tm utc_tm;
   std::tm *utc = std::gmtime(&now);
   if (utc) {
-    std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%dT%H:%M:%SZ", utc);
+    utc_tm = *utc;  // copy from potentially shared static storage into local variable
+    std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%dT%H:%M:%SZ", &utc_tm);
   } else {
     time_buf[0] = '\0';
   }
