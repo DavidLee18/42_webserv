@@ -17,7 +17,7 @@ UWSGI_DEPS     := $(addprefix $(UWSGI_BUILD_DIR)/, $(UWSGI_SRC_FILES:.cpp=.d))
 
 SRC_FILES := errors.cpp epoll_kqueue.cpp file_descriptor.cpp	\
 	ParsingUtils.cpp ServerConfig.cpp WebserverConfig.cpp		\
-	json.cpp cgi_1_1.cpp wsgi.cpp http_1_1.cpp					\
+	json.cpp cgi_1_1.cpp wsgi.cpp uwsgi_client.cpp http_1_1.cpp	\
 	ServerSocket.cpp 											\
 	main.cpp 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))

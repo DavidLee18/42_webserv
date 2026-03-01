@@ -1,4 +1,5 @@
 #include "webserv.h"
+#include "uwsgi_client.h"
 
 // WsgiMetaVar implementation
 
@@ -153,6 +154,42 @@ char **WsgiInput::to_envp() const {
   return envp;
 }
 
+// Returns the CGI/HTTP vars as a map suitable for uwsgi binary encoding.
+// WSGI-specific vars (wsgi.version, wsgi.url_scheme, etc.) are excluded because
+// they are not part of the CGI/HTTP namespace and the uwsgi_server rejects them.
+std::map<std::string, std::string> WsgiInput::to_map() const {
+  std::map<std::string, std::string> result;
+  for (size_t i = 0; i < mvars.size(); ++i) {
+    const WsgiMetaVar &mvar = mvars[i];
+    std::string key;
+    switch (mvar.get_name()) {
+    case WsgiMetaVar::REQUEST_METHOD:  key = "REQUEST_METHOD";  break;
+    case WsgiMetaVar::SCRIPT_NAME:     key = "SCRIPT_NAME";     break;
+    case WsgiMetaVar::PATH_INFO:       key = "PATH_INFO";       break;
+    case WsgiMetaVar::QUERY_STRING:    key = "QUERY_STRING";    break;
+    case WsgiMetaVar::CONTENT_TYPE:    key = "CONTENT_TYPE";    break;
+    case WsgiMetaVar::CONTENT_LENGTH:  key = "CONTENT_LENGTH";  break;
+    case WsgiMetaVar::SERVER_NAME:     key = "SERVER_NAME";     break;
+    case WsgiMetaVar::SERVER_PORT:     key = "SERVER_PORT";     break;
+    case WsgiMetaVar::SERVER_PROTOCOL: key = "SERVER_PROTOCOL"; break;
+    case WsgiMetaVar::REMOTE_ADDR:     key = "REMOTE_ADDR";     break;
+    case WsgiMetaVar::HTTP_: {
+      // value already contains "HTTP_HEADER_NAME=value"
+      const std::string &combined = mvar.get_value();
+      size_t eq = combined.find('=');
+      if (eq != std::string::npos)
+        result[combined.substr(0, eq)] = combined.substr(eq + 1);
+      continue;
+    }
+    default:
+      // Skip WSGI-specific vars (wsgi.version, wsgi.url_scheme, etc.)
+      continue;
+    }
+    result[key] = mvar.get_value();
+  }
+  return result;
+}
+
 Result<WsgiInput> WsgiInput::Parser::parse(Http::Request const &req) {
   WsgiInput input(req);
 
@@ -247,8 +284,9 @@ Result<WsgiInput> WsgiInput::Parser::parse(Http::Request const &req) {
 
 // WsgiDelegate implementation
 
-WsgiDelegate::WsgiDelegate(const Http::Request &req, const std::string &script)
-    : env(req), script_path(script), request(req) {
+WsgiDelegate::WsgiDelegate(const Http::Request &req,
+                            const std::string &uwsgi_host, int uwsgi_port)
+    : env(req), _uwsgi_host(uwsgi_host), _uwsgi_port(uwsgi_port), request(req) {
   Result<WsgiInput> env_result = WsgiInput::Parser::parse(req);
   if (env_result.error().empty()) {
     env = env_result.value();
@@ -256,117 +294,20 @@ WsgiDelegate::WsgiDelegate(const Http::Request &req, const std::string &script)
 }
 
 Result<Http::Response> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
+  (void)timeout_ms;
+  (void)epoll;
 
-  if (epoll == NULL) {
-    return ERR(Http::Response, "EPoll instance required");
-  }
+  // Collect CGI/HTTP vars from the parsed WSGI environment
+  std::map<std::string, std::string> vars = env.to_map();
 
-  // Create pipes for communication
-  int stdin_pipe[2];
-  int stdout_pipe[2];
-
-  if (pipe(stdin_pipe) == -1) {
-    return ERR(Http::Response, "Failed to create stdin pipe");
-  }
-  if (pipe(stdout_pipe) == -1) {
-    close(stdin_pipe[0]);
-    close(stdin_pipe[1]);
-    return ERR(Http::Response, "Failed to create stdout pipe");
-  }
-
-  // Fork the process
-  pid_t pid = fork();
-  if (pid == -1) {
-    close(stdin_pipe[0]);
-    close(stdin_pipe[1]);
-    close(stdout_pipe[0]);
-    close(stdout_pipe[1]);
-    return ERR(Http::Response, "Failed to fork process");
-  }
-
-  if (pid == 0) {
-    // Child process
-
-    // Close unused pipe ends
-    close(stdin_pipe[1]);  // Close write end of stdin pipe
-    close(stdout_pipe[0]); // Close read end of stdout pipe
-
-    // Redirect stdin and stdout
-    if (dup2(stdin_pipe[0], STDIN_FILENO) == -1) {
-      std::cerr << "Failed to redirect stdin" << std::endl;
-      exit(1);
-    }
-    if (dup2(stdout_pipe[1], STDOUT_FILENO) == -1) {
-      std::cerr << "Failed to redirect stdout" << std::endl;
-      exit(1);
-    }
-
-    // Close the pipe file descriptors after duplication
-    close(stdin_pipe[0]);
-    close(stdout_pipe[1]);
-
-    // Prepare environment variables
-    char **envp = env.to_envp();
-
-    // Prepare arguments to execute Python with the WSGI script
-    char *argv[3];
-    argv[0] = const_cast<char *>("python3");
-    argv[1] = const_cast<char *>(script_path.c_str());
-    argv[2] = NULL;
-
-    // Execute Python with the WSGI script
-    execve("/usr/bin/python3", argv, envp);
-
-    // If execve returns, it failed
-    // Clean up allocated memory before exit
-    for (size_t i = 0; envp[i] != NULL; i++) {
-      delete[] envp[i];
-    }
-    delete[] envp;
-
-    std::cerr << "Failed to execute WSGI script: " << script_path << std::endl;
-    exit(1);
-  }
-
-  // Parent process
-
-  // Close unused pipe ends
-  close(stdin_pipe[0]);  // Close read end of stdin pipe
-  close(stdout_pipe[1]); // Close write end of stdout pipe
-
-  // Create FileDescriptor objects for the pipes
-  Result<FileDescriptor> stdin_fd_res = FileDescriptor::from_raw(stdin_pipe[1]);
-  if (!stdin_fd_res.error().empty()) {
-    close(stdin_pipe[1]);
-    close(stdout_pipe[0]);
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
-    return ERR(Http::Response, "Failed to create stdin FileDescriptor");
-  }
-  FileDescriptor stdin_fd = stdin_fd_res.value();
-
-  Result<FileDescriptor> stdout_fd_res =
-      FileDescriptor::from_raw(stdout_pipe[0]);
-  if (!stdout_fd_res.error().empty()) {
-    // stdin_pipe[1] is owned by stdin_fd, will be closed automatically
-    close(stdout_pipe[0]);
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
-    return ERR(Http::Response, "Failed to create stdout FileDescriptor");
-  }
-  FileDescriptor stdout_fd = stdout_fd_res.value();
-
-  // Prepare request body for writing
-  const Http::Body &body = request.body();
+  // Serialise request body
   std::string body_str;
-
+  const Http::Body &body = request.body();
   switch (body.type()) {
   case Http::Body::Html:
-    if (body.value().html_raw != NULL) {
+    if (body.value().html_raw != NULL)
       body_str = *body.value().html_raw;
-    }
     break;
-
   case Http::Body::HttpJson:
     if (body.value().json != NULL) {
       std::stringstream ss;
@@ -375,7 +316,6 @@ Result<Http::Response> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       body_str = ss.str();
     }
     break;
-
   case Http::Body::HttpFormUrlEncoded:
     if (body.value().form != NULL) {
       std::stringstream ss;
@@ -383,205 +323,27 @@ Result<Http::Response> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       bool first = true;
       for (std::map<std::string, std::string>::const_iterator it = form.begin();
            it != form.end(); ++it) {
-        if (!first) {
+        if (!first)
           ss << "&";
-        }
         ss << it->first << "=" << it->second;
         first = false;
       }
       body_str = ss.str();
     }
     break;
-
   case Http::Body::Empty:
-    // No body to write
     break;
   }
 
-  // Write request body to WSGI stdin if present, using EPoll to check
-  // writability
-  if (!body_str.empty()) {
-    // Add stdin_fd to epoll for writing
-    const FileDescriptor *stdin_fd_ptr =
-        const_cast<const FileDescriptor *>(&stdin_fd);
-    Event write_event(stdin_fd_ptr, false, true, false, false, false, false);
-    Option write_option(false, false, false, false);
-    Result<FileDescriptor *> add_result =
-        epoll->add_fd(stdin_fd, write_event, write_option);
+  // Send request to uwsgi_server and receive its raw HTTP output
+  UwsgiClient client(_uwsgi_host, _uwsgi_port);
+  Result<std::string> resp_result = client.send(vars, body_str);
+  if (!resp_result.error().empty())
+    return ERR(Http::Response, resp_result.error());
 
-    if (!add_result.has_value()) {
-      // FileDescriptor destructors will close the pipes
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
-      return ERR(Http::Response, "Failed to add stdin to epoll");
-    }
-    FileDescriptor *stdin_epoll = add_result.value();
-
-    size_t total_written = 0;
-    while (total_written < body_str.length()) {
-      // Wait for the fd to be writable
-      Result<Events> wait_result = epoll->wait(timeout_ms);
-      if (!wait_result.error().empty()) {
-        epoll->del_fd(*stdin_epoll);
-        // FileDescriptor destructors will close the pipes
-        kill(pid, SIGKILL);
-        waitpid(pid, NULL, 0);
-        return ERR(Http::Response, "EPoll wait failed for stdin");
-      }
-
-      Events events = wait_result.value();
-
-      // Check if timeout occurred (no events returned)
-      if (events.is_end()) {
-        epoll->del_fd(*stdin_epoll);
-        // FileDescriptor destructors will close the pipes
-        kill(pid, SIGKILL);
-        waitpid(pid, NULL, 0);
-        return ERR(Http::Response, "Timeout waiting for stdin writability");
-      }
-
-      bool fd_ready = false;
-
-      for (; !events.is_end(); ++events) {
-        Result<const Event *> event_result = *events;
-        if (!event_result.error().empty()) {
-          continue;
-        }
-        const Event *ev = event_result.value();
-        if (*ev->fd == stdin_pipe[1] && ev->out) {
-          fd_ready = true;
-          break;
-        }
-      }
-
-      if (!fd_ready) {
-        // Got events but not for our fd, continue waiting
-        continue;
-      }
-
-      // FD is ready, perform write
-      ssize_t written = write(stdin_pipe[1], body_str.c_str() + total_written,
-                              body_str.length() - total_written);
-      if (written < 0) {
-        epoll->del_fd(*stdin_epoll);
-        // FileDescriptor destructors will close the pipes
-        kill(pid, SIGKILL);
-        waitpid(pid, NULL, 0);
-        return ERR(Http::Response, "Failed to write to WSGI stdin");
-      } else if (written == 0) {
-        // Pipe closed by reader (child process)
-        epoll->del_fd(*stdin_epoll);
-        // FileDescriptor destructors will close the pipes
-        kill(pid, SIGKILL);
-        waitpid(pid, NULL, 0);
-        return ERR(Http::Response, "WSGI process closed stdin prematurely");
-      }
-      total_written += static_cast<size_t>(written);
-    }
-
-    // Remove stdin from epoll and close it
-    epoll->del_fd(*stdin_epoll);
-  }
-  // Close stdin by letting stdin_fd go out of scope
-  // (Manual close would be a double-close bug)
-  {
-    // Create a scope to destroy stdin_fd and close stdin_pipe[1]
-    FileDescriptor temp_fd = stdin_fd;
-    // temp_fd destructor will close stdin_pipe[1]
-  }
-
-  // Add stdout_fd to epoll for reading
-  const FileDescriptor *stdout_fd_ptr =
-      const_cast<const FileDescriptor *>(&stdout_fd);
-  Event read_event(stdout_fd_ptr, true, false, false, false, false, false);
-  Option read_option(false, false, false, false);
-  Result<FileDescriptor *> add_stdout_result =
-      epoll->add_fd(stdout_fd, read_event, read_option);
-
-  if (!add_stdout_result.has_value()) {
-    // stdout_fd destructor will close stdout_pipe[0]
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
-    return ERR(Http::Response, "Failed to add stdout to epoll");
-  }
-  FileDescriptor *stdout_epoll = add_stdout_result.value();
-
-  // Read output using EPoll to check readability
-  std::string output;
-  char buffer[4096];
-
-  while (true) {
-    // Wait for data to be available
-    Result<Events> wait_result = epoll->wait(timeout_ms);
-    if (!wait_result.error().empty()) {
-      epoll->del_fd(*stdout_epoll);
-      // stdout_fd destructor will close stdout_pipe[0]
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
-      return ERR(Http::Response, "EPoll wait failed for stdout");
-    }
-
-    Events events = wait_result.value();
-
-    // Check if timeout occurred (no events returned)
-    if (events.is_end()) {
-      epoll->del_fd(*stdout_epoll);
-      // stdout_fd destructor will close stdout_pipe[0]
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
-      return ERR(Http::Response, "WSGI execution timeout");
-    }
-
-    bool fd_ready = false;
-
-    for (; !events.is_end(); ++events) {
-      Result<const Event *> event_result = *events;
-      if (!event_result.error().empty()) {
-        continue;
-      }
-      const Event *ev = event_result.value();
-      if (*ev->fd == stdout_pipe[0] && ev->in) {
-        fd_ready = true;
-        break;
-      }
-    }
-
-    if (!fd_ready) {
-      // Got events but not for our fd, continue waiting
-      continue;
-    }
-
-    // FD is ready, perform read
-    ssize_t bytes_read = read(stdout_pipe[0], buffer, sizeof(buffer));
-
-    if (bytes_read > 0) {
-      output.append(buffer, static_cast<size_t>(bytes_read));
-    } else if (bytes_read == 0) {
-      // EOF reached
-      break;
-    } else {
-      // Read error
-      epoll->del_fd(*stdout_epoll);
-      // stdout_fd destructor will close stdout_pipe[0]
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
-      return ERR(Http::Response, "Failed to read from WSGI stdout");
-    }
-  }
-
-  // Remove stdout from epoll and close it
-  epoll->del_fd(*stdout_epoll);
-  // stdout_fd destructor will close stdout_pipe[0] when it goes out of scope
-
-  // Wait for child process
-  int status;
-  if (waitpid(pid, &status, 0) == -1) {
-    return ERR(Http::Response, "Failed to wait for child process");
-  }
-
-  if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-    return ERR(Http::Response, "WSGI script failed");
-  }
+  const std::string &output = resp_result.value();
+  if (output.empty())
+    return ERR(Http::Response, "Empty response from uwsgi server");
 
   // Parse WSGI output to extract headers and body
   // WSGI scripts output headers followed by blank line, then body
@@ -654,3 +416,4 @@ Result<Http::Response> WsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
 WsgiDelegate::~WsgiDelegate() {
   // env is now a value member, will be automatically destroyed
 }
+

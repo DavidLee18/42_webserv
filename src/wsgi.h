@@ -92,15 +92,18 @@ public:
   }
   void add_mvar(std::string const &, std::string const &);
   char **to_envp() const;
+  std::map<std::string, std::string> to_map() const;
 };
 
 class WsgiDelegate {
   WsgiInput env;
-  std::string script_path;
+  std::string _uwsgi_host;
+  int _uwsgi_port;
   Http::Request request;
 
 public:
-  WsgiDelegate(const Http::Request &req, const std::string &script);
+  WsgiDelegate(const Http::Request &req, const std::string &uwsgi_host,
+               int uwsgi_port);
   Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
   ~WsgiDelegate();
 };
