@@ -74,6 +74,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 			}
 		}
 
+		// Handling events
 		Events events = events_result.value();
 		while (!events.is_end()) {
 			Result<const Event *> ev_result = *events;
@@ -84,12 +85,12 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 			const Event *event = ev_result.value();
 			const FileDescriptor *fd = event->fd;
 
-			// 1. 서버 소켓에 이벤트가 발생한 경우 (새로운 클라이언트 접속)
+			// New event in server socket (New client)
 			if (server_fds.find(fd) != server_fds.end()) {
-				while (true) { // Edge-Triggered이므로 가능한 모든 연결을 accept 해야 함
-					Result<FileDescriptor> client_res = fd->socket_accept(NULL, NULL);
-					if (!client_res.has_value()) {
-						const std::string &err = client_res.error();
+				while (true) { // Have to search for every clients due to Edge-Triggered
+					Result<FileDescriptor> client_result = fd->socket_accept(NULL, NULL);
+					if (!client_result.has_value()) {
+						const std::string &err = client_result.error();
 						if (err == Errors::try_again)
 						{
 							// EWOULDBLOCK: 더 이상 대기 중인 연결이 없음
@@ -107,7 +108,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 							break;
 						}
 					}
-					FileDescriptor client_fd = client_res.value();
+					FileDescriptor client_fd = client_result.value();
 					Result<Void> nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
 					if (!nb_res.has_value()) {
 						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
