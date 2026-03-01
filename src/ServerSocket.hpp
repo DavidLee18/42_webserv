@@ -17,6 +17,13 @@
 #include <string>
 #include <utility>
 
+struct ClientSession
+{
+	std::string in_buff;
+	std::string out_buff;
+};
+
+
 Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds);
 void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds);
 

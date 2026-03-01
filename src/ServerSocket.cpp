@@ -60,7 +60,7 @@ Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDes
 }
 
 void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds) {
-	std::map<const FileDescriptor *, std::pair<std::string, std::string> > clients;
+	std::map<const FileDescriptor *, ClientSession> clients;
 
 	while (true) {
 		// Waiting for events
@@ -122,8 +122,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					Result<FileDescriptor *> add_result = epoll.add_fd(client_fd, client_ev, client_op);
 					if (add_result.has_value()) {
 						FileDescriptor *client_ptr = add_result.value();
-						clients.insert(std::make_pair(client_ptr,
-												std::make_pair(std::string(), std::string())));
+						clients[client_ptr] = ClientSession();
 						std::cout << "New client connected!" << std::endl;
 					} else {
 						std::cerr << "ERROR: failed to add client fd to epoll: " << add_result.error() << std::endl;
@@ -158,12 +157,12 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 							break;
 						}
 						// Store read data in buffer
-						clients.at(fd).first.append(buf, static_cast<std::size_t>(bytes));
+						clients.at(fd).in_buff.append(buf, static_cast<std::size_t>(bytes));
 					}
 
 					// TODO: 여기서 HTTP 파싱 로직 호출
 					// 임시로, 데이터가 들어오면 무조건 고정된 응답을 보내도록 설정
-					if (clients.find(fd) != clients.end() && !clients.at(fd).first.empty()) {
+					if (clients.find(fd) != clients.end() && !clients.at(fd).in_buff.empty()) {
 						std::string body = "<html><body><h1>Hello from webserv!</h1></body></html>";
 						std::ostringstream response;
 						response << "HTTP/1.1 200 OK\r\n";
@@ -172,14 +171,14 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						response << "Connection: keep-alive\r\n\r\n";
 						response << body;
 
-						clients.at(fd).second = response.str();
-						clients.at(fd).first.clear(); // Clear read buffer
+						clients.at(fd).out_buff = response.str();
+						clients.at(fd).in_buff.clear(); // Clear read buffer
 					}
 				}
 
 				// 쓰기 이벤트 (클라이언트에게 데이터를 보낼 수 있음)
 				if (event->out && clients.find(fd) != clients.end()) {
-					std::string &write_buffer = clients.at(fd).second;
+					std::string &write_buffer = clients.at(fd).out_buff;
 					if (!write_buffer.empty()) {
 						while (true) { // Edge-Triggered이므로 보낼 수 있는 만큼 다 보내야 함
 							Result<ssize_t> send_res = fd->sock_send(write_buffer.c_str(), write_buffer.length());
