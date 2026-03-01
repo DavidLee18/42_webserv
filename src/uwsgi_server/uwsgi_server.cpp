@@ -1,7 +1,6 @@
 #include "uwsgi_server.h"
 
 #include <arpa/inet.h>
-#include <cerrno>
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
@@ -74,14 +73,13 @@ UwsgiServer::~UwsgiServer() {
 bool UwsgiServer::setup_socket() {
     _server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (_server_fd < 0) {
-        std::cerr << "socket() failed: " << std::strerror(errno) << std::endl;
+        std::cerr << "socket() failed" << std::endl;
         return false;
     }
 
     // Prevent the listening socket from being inherited by child processes
     if (fcntl(_server_fd, F_SETFD, FD_CLOEXEC) < 0) {
-        std::cerr << "fcntl(FD_CLOEXEC) failed: " << std::strerror(errno)
-                  << std::endl;
+        std::cerr << "fcntl(FD_CLOEXEC) failed" << std::endl;
         close(_server_fd);
         _server_fd = -1;
         return false;
@@ -90,8 +88,7 @@ bool UwsgiServer::setup_socket() {
     int optval = 1;
     if (setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR, &optval,
                    static_cast<socklen_t>(sizeof(optval))) < 0) {
-        std::cerr << "setsockopt() failed: " << std::strerror(errno)
-                  << std::endl;
+        std::cerr << "setsockopt() failed" << std::endl;
         close(_server_fd);
         _server_fd = -1;
         return false;
@@ -105,12 +102,12 @@ bool UwsgiServer::setup_socket() {
 
     if (bind(_server_fd, reinterpret_cast<struct sockaddr *>(&addr),
              sizeof(addr)) < 0) {
-        std::cerr << "bind() failed: " << std::strerror(errno) << std::endl;
+        std::cerr << "bind() failed" << std::endl;
         return false;
     }
 
     if (listen(_server_fd, 128) < 0) {
-        std::cerr << "listen() failed: " << std::strerror(errno) << std::endl;
+        std::cerr << "listen() failed" << std::endl;
         return false;
     }
 
@@ -136,17 +133,13 @@ void UwsgiServer::run() {
                                reinterpret_cast<struct sockaddr *>(&client_addr),
                                &client_len);
         if (client_fd < 0) {
-            if (errno == EINTR)
-                continue;
-            std::cerr << "accept() failed: " << std::strerror(errno)
-                      << std::endl;
+            std::cerr << "accept() failed" << std::endl;
             continue;
         }
 
         // Prevent the client socket from leaking into child processes
         if (fcntl(client_fd, F_SETFD, FD_CLOEXEC) < 0) {
-            std::cerr << "fcntl(FD_CLOEXEC) failed: " << std::strerror(errno)
-                      << std::endl;
+            std::cerr << "fcntl(FD_CLOEXEC) failed" << std::endl;
             close(client_fd);
             continue;
         }
@@ -165,11 +158,7 @@ bool UwsgiServer::read_all(int fd, void *buf, size_t len) {
             total += static_cast<size_t>(n);
             continue;
         }
-        if (n == 0)
-            return false; // EOF before reading all bytes
-        // n < 0: retry on signal interrupt or temporary unavailability
-        if (errno == EINTR || errno == EAGAIN)
-            continue;
+        // n == 0: EOF before reading all bytes; n < 0: error
         return false;
     }
     return true;
@@ -217,11 +206,11 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
     int stdout_pipe[2];
 
     if (pipe(stdin_pipe) < 0) {
-        std::cerr << "pipe() failed: " << std::strerror(errno) << std::endl;
+        std::cerr << "pipe() failed" << std::endl;
         return "";
     }
     if (pipe(stdout_pipe) < 0) {
-        std::cerr << "pipe() failed: " << std::strerror(errno) << std::endl;
+        std::cerr << "pipe() failed" << std::endl;
         close(stdin_pipe[0]);
         close(stdin_pipe[1]);
         return "";
@@ -229,7 +218,7 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
 
     pid_t pid = fork();
     if (pid < 0) {
-        std::cerr << "fork() failed: " << std::strerror(errno) << std::endl;
+        std::cerr << "fork() failed" << std::endl;
         close(stdin_pipe[0]);
         close(stdin_pipe[1]);
         close(stdout_pipe[0]);
@@ -318,13 +307,13 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
     time_t deadline = time(NULL) + CHILD_TIMEOUT_SEC;
     while (true) {
         pid_t waited = waitpid(pid, &wstatus, WNOHANG);
-        if (waited > 0 || (waited < 0 && errno != EINTR))
+        if (waited != 0)
             break;
         time_t now = time(NULL);
         if (now >= deadline) {
             kill(pid, SIGKILL);
-            while (waitpid(pid, &wstatus, 0) < 0 && errno == EINTR)
-                ;
+            // Loop until the killed child is fully reaped (may be interrupted)
+            while (waitpid(pid, &wstatus, 0) < 0) {}
             break;
         }
         // Sleep up to 100 ms, but no more than the remaining timeout
@@ -402,9 +391,8 @@ void UwsgiServer::handle_connection(int client_fd) {
     if (cl_it != vars.end() && !cl_it->second.empty()) {
         const std::string &cl_str = cl_it->second;
         char *endptr = NULL;
-        errno = 0;
         long content_length = std::strtol(cl_str.c_str(), &endptr, 10);
-        if (errno != 0 || endptr == cl_str.c_str() || *endptr != '\0' ||
+        if (endptr == cl_str.c_str() || *endptr != '\0' ||
             content_length < 0) {
             send_error_response(client_fd, 400, "Invalid Content-Length");
             return;

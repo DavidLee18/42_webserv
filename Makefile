@@ -24,7 +24,7 @@ SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 OBJS := $(addprefix $(BUILD_DIR)/, $(SRC_FILES:.cpp=.o))
 DEPS := $(addprefix $(BUILD_DIR)/, $(SRC_FILES:.cpp=.d))
 
-all: $(NAME)
+all: $(NAME) uwsgi
 
 $(NAME): $(OBJS)
 	$(CXX) $(OBJS) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(NAME)
