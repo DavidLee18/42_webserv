@@ -54,9 +54,7 @@ int main() {
   char time_buf[64];
   std::time_t now = std::time(NULL);
   std::tm utc_tm;
-  std::tm *utc = std::gmtime(&now);
-  if (utc) {
-    utc_tm = *utc;  // copy from potentially shared static storage into local variable
+  if (gmtime_r(&now, &utc_tm)) {
     std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%dT%H:%M:%SZ", &utc_tm);
   } else {
     time_buf[0] = '\0';
