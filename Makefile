@@ -24,7 +24,15 @@ SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 OBJS := $(addprefix $(BUILD_DIR)/, $(SRC_FILES:.cpp=.o))
 DEPS := $(addprefix $(BUILD_DIR)/, $(SRC_FILES:.cpp=.d))
 
-all: $(NAME) uwsgi
+CGI_NAME      := cgi/cgi_html_gen
+CGI_SRC       := cgi/cgi_html_gen.cpp
+
+all: $(NAME) uwsgi cgi
+
+cgi: $(CGI_NAME)
+
+$(CGI_NAME): $(CGI_SRC)
+	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(CGI_NAME) $(CGI_SRC)
 
 $(NAME): $(OBJS)
 	$(CXX) $(OBJS) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(NAME)
@@ -39,6 +47,7 @@ clean:
 fclean:	clean
 	rm -f $(NAME)
 	rm -f $(UWSGI_NAME)
+	rm -f $(CGI_NAME)
 
 re:	fclean all
 
@@ -54,4 +63,4 @@ $(UWSGI_BUILD_DIR)/%.o: $(UWSGI_SRC_DIR)/%.cpp
 -include $(DEPS)
 -include $(UWSGI_DEPS)
 
-.PHONY: all clean fclean re bonus rebo uwsgi
+.PHONY: all clean fclean re bonus rebo uwsgi cgi
