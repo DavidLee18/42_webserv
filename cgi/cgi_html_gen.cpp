@@ -1,9 +1,9 @@
 // CGI/1.1-conforming program that generates a dynamic HTML page.
 // It reads CGI meta-variables from the environment, obtains the current
-// server time, and writes a complete HTTP response (headers + body) to
-// stdout so the web server can forward it to the client.
+// server time, and writes a CGI response (headers + body) to stdout;
+// the web server then constructs the HTTP response that is sent to the client.
 //
-// Compile:  c++ -Wall -Wextra -Werror -std=c++98 -o cgi_html_gen cgi_html_gen.cpp
+// Compile:  use the project's Makefile (target `cgi`) to build this program.
 // Usage:    executed by the webserver as a CGI script
 
 #include <cstdlib>
