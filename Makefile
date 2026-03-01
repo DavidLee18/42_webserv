@@ -34,7 +34,7 @@ DEPS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.d))
 
 vpath %.cpp $(addprefix $(SRC_DIR)/,$(SRC_DIRS)) $(SRC_DIR)
 
-CGI_NAME      := src/cgi/cgi_html_gen
+CGI_NAME      := gen_html.cgi
 CGI_SRC       := src/cgi/cgi_html_gen.cpp
 
 all: $(NAME) uwsgi cgi
