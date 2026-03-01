@@ -1,5 +1,5 @@
-#ifndef WSGI_H
-#define WSGI_H
+#ifndef UWSGI_H
+#define UWSGI_H
 
 #include "http_1_1.h"
 #include "result.h"
@@ -9,10 +9,10 @@
 #include <vector>
 
 // Forward declarations
-class WsgiInput;
+class UwsgiInput;
 class EPoll;
 
-class WsgiMetaVar {
+class UwsgiMetaVar {
 public:
   enum Name {
     REQUEST_METHOD,
@@ -39,16 +39,16 @@ public:
     virtual void phantom() = 0;
 
   public:
-    static Result<std::pair<WsgiMetaVar, size_t> > parse(std::string const &,
-                                                        std::string const &);
+    static Result<std::pair<UwsgiMetaVar, size_t> > parse(std::string const &,
+                                                          std::string const &);
   };
 
-  friend class WsgiInput;
+  friend class UwsgiInput;
 
 public:
-  WsgiMetaVar(const WsgiMetaVar &other);
-  WsgiMetaVar &operator=(const WsgiMetaVar &other);
-  ~WsgiMetaVar();
+  UwsgiMetaVar(const UwsgiMetaVar &other);
+  UwsgiMetaVar &operator=(const UwsgiMetaVar &other);
+  ~UwsgiMetaVar();
 
   Name const &get_name() const { return name; }
   std::string const &get_value() const { return value; }
@@ -57,33 +57,33 @@ private:
   Name name;
   std::string value;
 
-  WsgiMetaVar(Name n, std::string v) : name(n), value(v) {}
-  static WsgiMetaVar create(Name n, std::string v);
+  UwsgiMetaVar(Name n, std::string v) : name(n), value(v) {}
+  static UwsgiMetaVar create(Name n, std::string v);
 };
 
-class WsgiInput {
-  std::vector<WsgiMetaVar> mvars;
+class UwsgiInput {
+  std::vector<UwsgiMetaVar> mvars;
   Http::Body req_body;
 
 private:
-  WsgiInput();
-  WsgiInput(std::vector<WsgiMetaVar>, Http::Body);
-  WsgiInput(Http::Request const &);
+  UwsgiInput();
+  UwsgiInput(std::vector<UwsgiMetaVar>, Http::Body);
+  UwsgiInput(Http::Request const &);
 
 public:
   class Parser {
     virtual void phantom() = 0;
 
   public:
-    static Result<WsgiInput> parse(Http::Request const &);
+    static Result<UwsgiInput> parse(Http::Request const &);
   };
 
   friend class Parser;
-  friend class WsgiDelegate;
+  friend class UwsgiDelegate;
 
-  WsgiInput(const WsgiInput &other)
+  UwsgiInput(const UwsgiInput &other)
       : mvars(other.mvars), req_body(other.req_body) {}
-  WsgiInput &operator=(const WsgiInput &other) {
+  UwsgiInput &operator=(const UwsgiInput &other) {
     if (this != &other) {
       mvars = other.mvars;
       req_body = other.req_body;
@@ -92,17 +92,20 @@ public:
   }
   void add_mvar(std::string const &, std::string const &);
   char **to_envp() const;
+  std::map<std::string, std::string> to_map() const;
 };
 
-class WsgiDelegate {
-  WsgiInput env;
-  std::string script_path;
+class UwsgiDelegate {
+  UwsgiInput env;
+  std::string _uwsgi_host;
+  int _uwsgi_port;
   Http::Request request;
 
 public:
-  WsgiDelegate(const Http::Request &req, const std::string &script);
+  UwsgiDelegate(const Http::Request &req, const std::string &uwsgi_host,
+                int uwsgi_port);
   Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
-  ~WsgiDelegate();
+  ~UwsgiDelegate();
 };
 
 #endif
