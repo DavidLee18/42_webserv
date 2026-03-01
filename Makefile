@@ -24,7 +24,7 @@ SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 OBJS := $(addprefix $(BUILD_DIR)/, $(SRC_FILES:.cpp=.o))
 DEPS := $(addprefix $(BUILD_DIR)/, $(SRC_FILES:.cpp=.d))
 
-CGI_NAME      := src/cgi/cgi_html_gen
+CGI_NAME      := gen_html.cgi
 CGI_SRC       := src/cgi/cgi_html_gen.cpp
 
 all: $(NAME) uwsgi cgi
