@@ -38,7 +38,7 @@
 *.app
 webserv
 /uwsgi_server
-/cgi/cgi_html_gen
+/gen_html.cgi
 
 # debug information files
 *.dwo
