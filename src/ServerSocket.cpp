@@ -83,8 +83,8 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 				continue;
 			}
 			const Event *event = ev_result.value();
-			const FileDescriptor *fd = event->fd;
 
+			const FileDescriptor *fd = event->fd;
 			// New event in server socket (New client)
 			if (server_fds.find(fd) != server_fds.end()) {
 				while (true) { // Have to search for every clients due to Edge-Triggered
@@ -109,7 +109,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						}
 					}
 					FileDescriptor client_fd = client_result.value();
-					Result<Void> nb_res = client_fd.set_nonblocking(); // 클라이언트 소켓도 논블로킹 필수!
+					Result<Void> nb_res = client_fd.set_nonblocking();
 					if (!nb_res.has_value()) {
 						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
 						// Skip this client; do not register with epoll
@@ -117,10 +117,10 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					}
 
 					// Register client socket with EPoll (read/write detection, Edge-Triggered)
-					Event client_ev(&client_fd, true, true, false, false, false, false); // in=true, out=true
-					Option client_op(true, false, false, false);                         // et=true (edge-triggered)
+					Event client_event(&client_fd, true, true, false, false, false, false); // in=true, out=true
+					Option client_option(true, false, false, false);                         // et=true (edge-triggered)
 
-					Result<FileDescriptor *> add_result = epoll.add_fd(client_fd, client_ev, client_op);
+					Result<FileDescriptor *> add_result = epoll.add_fd(client_fd, client_event, client_option);
 					if (add_result.has_value()) {
 						FileDescriptor *client_ptr = add_result.value();
 						clients[client_ptr] = ClientSession();
@@ -131,7 +131,7 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					}
 				}
 			}
-			// 2. 클라이언트 소켓에 이벤트가 발생한 경우 (데이터 송수신)
+			// Event occured by client (data I/O)
 			else {
 				// 에러나 연결 종료 감지
 				if (event->err || event->hup || event->rdhup) {
@@ -164,16 +164,67 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 					// TODO: 여기서 HTTP 파싱 로직 호출
 					// 임시로, 데이터가 들어오면 무조건 고정된 응답을 보내도록 설정
 					if (clients.find(fd) != clients.end() && !clients.at(fd).in_buff.empty()) {
-						std::string body = "<html><body><h1>Hello from webserv!</h1></body></html>";
-						std::ostringstream response;
-						response << "HTTP/1.1 200 OK\r\n";
-						response << "Content-Type: text/html\r\n";
-						response << "Content-Length: " << body.length() << "\r\n";
-						response << "Connection: keep-alive\r\n\r\n";
-						response << body;
+						std::string &in_buffer = clients.at(fd).in_buff;
 
-						clients.at(fd).out_buff = response.str();
-						clients.at(fd).in_buff.clear(); // Clear read buffer
+						// 1. HTTP 헤더가 모두 도착했는지 확인 (\r\n\r\n)
+						// (Non-blocking이라 데이터가 반쪽만 왔을 수도 있으므로 반드시 확인해야 합니다)
+						size_t header_end = in_buffer.find("\r\n\r\n");
+
+						if (header_end != std::string::npos) { // 요청의 헤더 끝부분을 찾았다면 파싱 시작
+							
+							// 2. 가장 첫 줄(요청 라인)만 잘라내기
+							// 예: "GET /index.html HTTP/1.1"
+							size_t first_line_end = in_buffer.find("\r\n");
+							std::string request_line = in_buffer.substr(0, first_line_end);
+
+							// 3. 공백을 기준으로 Method와 Path 파싱하기 stringstream 이용
+							std::istringstream iss(request_line);
+							std::string method, path, version;
+							iss >> method >> path >> version;
+
+							// 터미널에 어떤 요청이 왔는지 출력
+							std::cout << "[Request] " << method << " " << path << std::endl;
+
+							std::string body;
+							std::string status_code;
+
+							// 4. Path(경로)에 따라 응답을 다르게 분기 처리 (라우팅)
+							if (path == "/") {
+								std::ifstream file("./spool/www/index.html");
+								if (file.is_open())
+								{
+									std::ostringstream ss;
+									ss << file.rdbuf();
+									body = ss.str();
+									status_code = "200 OK";
+									file.close();
+								}
+							} 
+							else if (path == "/hello") {
+								status_code = "200 OK";
+								body = "<html><body><h1>Hello! Nice to meet you.</h1></body></html>";
+							} 
+							else {
+								// 정의되지 않은 경로면 404 에러 반환
+								status_code = "404 Not Found";
+								body = "<html><body><h1>404 Error: File Not Found</h1></body></html>";
+							}
+
+							// 5. 클라이언트에게 보낼 HTTP 응답 메시지 조립
+							std::ostringstream response;
+							response << "HTTP/1.1 " << status_code << "\r\n"; //todo: status code
+							response << "Content-Type: text/html\r\n"; //todo: mimetype 심기
+							response << "Content-Length: " << body.length() << "\r\n";
+							response << "Connection: keep-alive\r\n\r\n";
+							response << body;
+
+							// 6. 만들어진 응답을 송신 버퍼(out_buff)에 넣기
+							clients.at(fd).out_buff += response.str();
+
+							// 7. 파싱이 끝난 헤더 부분은 수신 버퍼에서 삭제 
+							// (+4는 "\r\n\r\n" 문자열의 길이입니다)
+							in_buffer.erase(0, header_end + 4); 
+						}
 					}
 				}
 
