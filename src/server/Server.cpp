@@ -1,5 +1,5 @@
 #include "webserv.h"
-#include "ServerSocket.hpp"
+#include "Server.hpp"
 
 Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds) {
 	// EPoll init
@@ -109,8 +109,8 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 						}
 					}
 					FileDescriptor client_fd = client_result.value();
-					Result<Void> nb_res = client_fd.set_nonblocking();
-					if (!nb_res.has_value()) {
+					Result<Void> nb_result = client_fd.set_nonblocking();
+					if (!nb_result.has_value()) {
 						std::cerr << "ERROR: failed to set client socket to non-blocking mode" << std::endl;
 						// Skip this client; do not register with epoll
 						continue;
@@ -185,41 +185,21 @@ void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds
 							// 터미널에 어떤 요청이 왔는지 출력
 							std::cout << "[Request] " << method << " " << path << std::endl;
 
-							std::string body;
-							std::string status_code;
-
-							// 4. Path(경로)에 따라 응답을 다르게 분기 처리 (라우팅)
-							if (path == "/") {
-								std::ifstream file("./spool/www/index.html");
-								if (file.is_open())
-								{
-									std::ostringstream ss;
-									ss << file.rdbuf();
-									body = ss.str();
-									status_code = "200 OK";
-									file.close();
-								}
-							} 
-							else if (path == "/hello") {
-								status_code = "200 OK";
-								body = "<html><body><h1>Hello! Nice to meet you.</h1></body></html>";
-							} 
-							else {
-								// 정의되지 않은 경로면 404 에러 반환
-								status_code = "404 Not Found";
-								body = "<html><body><h1>404 Error: File Not Found</h1></body></html>";
-							}
+							if (path == "/")
+								path = "/index.html";
+							HttpResponse http;
+							http = PathRoute::get_file_content(path);
 
 							// 5. 클라이언트에게 보낼 HTTP 응답 메시지 조립
-							std::ostringstream response;
-							response << "HTTP/1.1 " << status_code << "\r\n"; //todo: status code
-							response << "Content-Type: text/html\r\n"; //todo: mimetype 심기
-							response << "Content-Length: " << body.length() << "\r\n";
-							response << "Connection: keep-alive\r\n\r\n";
-							response << body;
+							std::ostringstream server_response;
+							server_response << "HTTP/1.1 " << http.status_code << "\r\n"; //todo: status code
+							server_response << "Content-Type: text/html\r\n"; //todo: mimetype 심기
+							server_response << "Content-Length: " << http.body.length() << "\r\n";
+							server_response << "Connection: keep-alive\r\n\r\n";
+							server_response << http.body;
 
 							// 6. 만들어진 응답을 송신 버퍼(out_buff)에 넣기
-							clients.at(fd).out_buff += response.str();
+							clients.at(fd).out_buff += server_response.str();
 
 							// 7. 파싱이 끝난 헤더 부분은 수신 버퍼에서 삭제 
 							// (+4는 "\r\n\r\n" 문자열의 길이입니다)
