@@ -10,14 +10,9 @@ types =
 
 
 
-
-
-
 :8080 =
 	[] +<= X-Content-Type-Options: "nosniff"
-	[] +<= Content-Security-Policy: default-src 'self';
-        object-src 'none'; script-src 'sha256-${$HASH($SCRIPT)}';
-        base-uri 'none'; frame-ancestors 'none'
+    $add_csp_sha256.cgi                                              # 주석: CGI, 모든 요청에 공통 적용. 요청이 오면 CGI 요청으로 추가 헤더를 받고, 라우팅에 따라 응답 생성
 
     ...30
 
@@ -39,9 +34,6 @@ types =
 
 :8040 =
 	[] +<= X-Content-Type-Options: "nosniff"
-	[] +<= Content-Security-Policy: default-src 'self';
-        object-src 'none'; script-src 'sha256-${$HASH($SCRIPT)}';
-        base-uri 'none'; frame-ancestors 'none'
 
     ...30
 
@@ -53,8 +45,6 @@ types =
 
     GET *.(jpg|jpeg|gif) <- /spool/www/*.(jpg|jpeg|gif)
 
-    GET|POST|DELETE * <- /spool/www/*
-        ? index2.html
-        @ auth_info
-        ->{} 10MB
-        ! 404:/404.html
+    POST /upload_file $upload_file.cgi(UPLOAD_DEST=/uploaded/)          # 주석: 추가 메타변수 설정
+		...5                                                            # 주석: 타임아웃
+		BUFFER_SIZE=2048                                                # 주석: 추가 메타변수(환경변수)
