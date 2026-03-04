@@ -21,8 +21,7 @@ int main(const int argc, char *argv[]) {
     return 1;
   } else {
     const WebserverConfig &config = result_config.value();
-    std::cout << "main(): " << std::endl;
-    
+    std::cout << config << std::endl;
     // Initiate and generate server.
     std::set<const FileDescriptor *> server_fds;
     Result<EPoll> epoll_result = init_servers(config, server_fds);

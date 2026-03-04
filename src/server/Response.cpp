@@ -1,4 +1,5 @@
 #include "Response.hpp"
+#include "../cgi_1_1.h"
 
 static int check_path_type(const std::string &path)
 {
@@ -18,7 +19,7 @@ static int check_path_type(const std::string &path)
 HttpResponse PathRoute::get_file_content(const std::string path)
 {
 	HttpResponse response;
-
+	chmod("spool/www/forbidden.html", 0000);
 	std::string route = "./spool/www" + path;
 	int path_type = check_path_type(route);
 
@@ -45,5 +46,6 @@ HttpResponse PathRoute::get_file_content(const std::string path)
 		response.status_code = "200 OK";
 		file.close();
 	}
+	chmod("spool/www/forbidden.html", 0644);
 	return response;
 }

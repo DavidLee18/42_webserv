@@ -12,6 +12,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+struct StatusInfo
+{
+    std::string message;
+    std::string file_path;
+};
+
 struct HttpResponse
 {
 	std::string status_code;
