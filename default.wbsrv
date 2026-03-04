@@ -11,8 +11,8 @@ types =
 
 
 :8080 =
-	[] +<= X-Content-Type-Options: "nosniff"
-    $add_csp_sha256.cgi                                              # 주석: CGI, 모든 요청에 공통 적용. 요청이 오면 CGI 요청으로 추가 헤더를 받고, 라우팅에 따라 응답 생성
+	[] +<= X-Content-Type-Options: "nosniff"             # 주석
+    $add_csp_sha256.cgi                                  # $<CGI 프로그램 경로> : 모든 요청에 공통 적용. 요청이 오면 CGI 요청으로 추가 헤더를 받고, 라우팅에 따라 응답 생성
 
     ...30
 
@@ -45,6 +45,9 @@ types =
 
     GET *.(jpg|jpeg|gif) <- /spool/www/*.(jpg|jpeg|gif)
 
-    POST /upload_file $upload_file.cgi(UPLOAD_DEST=/uploaded/)          # 주석: 추가 메타변수 설정
-		...5                                                            # 주석: 타임아웃
-		BUFFER_SIZE=2048                                                # 주석: 추가 메타변수(환경변수)
+    POST /upload_file $upload_file.cgi(UPLOAD_DEST=/uploaded/)          # $<CGI 프로그램 경로>(<추가 메타변수>=<값>) : 해당 라우트에만 적용
+		...5                                                            # 타임아웃
+		BUFFER_SIZE=2048                                                # 추가 메타변수(환경변수)
+
+    POST /login $9000(AUTH_INFO=/auth_info)                             # $<uWSGI 서버 포트>(<추가 메타변수>=<값>)
+		...7                                                            # 타임아웃
