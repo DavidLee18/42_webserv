@@ -1,7 +1,26 @@
 #include "Response.hpp"
 #include "../cgi_1_1.h"
 
-static int check_path_type(const std::string &path)
+std::string get_pwd() {
+    char buffer[1024];
+    if (getcwd(buffer, sizeof(buffer)) != NULL) {
+        return std::string(buffer);
+    }
+    return "";
+}
+
+std::string error_file_path(int error_code)
+{
+	if (error_code == 400)
+		return get_pwd() + "/spool/www/error/400.html";
+	else if (error_code == 403)
+		return get_pwd() + "/spool/www/error/403.html";
+	else if (error_code == 404)
+		return get_pwd() + "/spool/www/error/404.html";
+	return get_pwd() + "/spool/www/error/500.html";
+}
+
+int ResponseGenerator::check_path_type(const std::string &path)
 {
 	struct stat info;
 
@@ -13,31 +32,34 @@ static int check_path_type(const std::string &path)
 		return IS_DIRECTORY;
 	else if (info.st_mode & S_IFREG)
 		return IS_FILE;
-	return 0;
+	return -1;
 }
 
-HttpResponse PathRoute::get_file_content(const std::string path)
+HttpResponse ResponseGenerator::generate(const Http::Request* request, const ServerConfig *config)
 {
 	HttpResponse response;
-	chmod("spool/www/forbidden.html", 0000);
-	std::string route = "./spool/www" + path;
-	int path_type = check_path_type(route);
+	std::string full_path = resolve_full_path(request, config);
+	int path_type = check_path_type(full_path);
 
 	if (path_type == IS_DIRECTORY)
-		route += "/index.html";
+	{
+		std::string index_path = full_path + "/index.html";
+		if (check_path_type(index_path) == IS_FILE)
+		{
+			full_path = index_path;
+			path_type = IS_FILE;
+		}
+		else
+			full_path = error_file_path(403);
+	}
+
+	if (path_type == FORBIDDEN)
+		full_path = error_file_path(403);
 	else if (path_type == NOT_FOUND)
-	{
-		response.status_code = "404 Not Found";
-		response.body = "<html><body><h1>404 Error: File Not Found</h1></body></html>";
-		return response;
-	}
-	else if (path_type == FORBIDDEN)
-	{
-		response.status_code = "403 Forbidden";
-		response.body = "<html><body><h1>404 Error: Permission Denied</h1></body></html>";
-		return response;
-	}
-	std::ifstream file(route.c_str());
+		full_path = error_file_path(404);
+	else if (path_type == -1)
+		full_path = error_file_path(500);
+	std::ifstream file(full_path.c_str());
 	if (file.is_open())
 	{
 		std::ostringstream ss;
@@ -46,6 +68,35 @@ HttpResponse PathRoute::get_file_content(const std::string path)
 		response.status_code = "200 OK";
 		file.close();
 	}
-	chmod("spool/www/forbidden.html", 0644);
 	return response;
+
+}
+
+std::string ResponseGenerator::resolve_full_path(const Http::Request* request, const ServerConfig *config)
+{
+	const RouteRule *rule = config->findRoute(request->method(), request->path());
+
+	std::string root = get_pwd() + rule->root.toString();
+	size_t npos = 0;
+	if (root.find('*', npos))
+		root.erase(root.length() - 2, 2);
+	if (request->path() == "/")
+		return root;
+	return root + request->path();
+}
+
+HttpResponse ResponseGenerator::make_error_response(int error_code, const ServerConfig *config)
+{
+	(void)config;
+
+	HttpResponse res;
+	if (error_code == 404)
+		res.status_code = "404 Not Found";
+	else if (error_code == 403)
+		res.status_code = "403 Forbidden";
+	else
+		res.status_code = "500 Internal Server Error";
+
+	res.body = "<html><body><h1>" + res.status_code + "</h1></body></html>";
+	return res;
 }

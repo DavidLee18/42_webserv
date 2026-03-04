@@ -11,6 +11,7 @@
 #include <sstream>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "../ServerConfig.hpp"
 
 struct StatusInfo
 {
@@ -24,11 +25,14 @@ struct HttpResponse
 	std::string body;
 };
 
-class PathRoute
+class ResponseGenerator
 {
 public:
-	static HttpResponse get_file_content(const std::string path);
+        static HttpResponse generate(const Http::Request* request, const ServerConfig *config);
+private:
+        static int check_path_type(const std::string &path);
+        static std::string resolve_full_path(const Http::Request* request, const ServerConfig *config);
+        static HttpResponse make_error_response(int error_code, const ServerConfig *config);
 };
-
 
 #endif

@@ -3,6 +3,7 @@
 
 #include "../epoll_kqueue.h"
 #include "../WebserverConfig.hpp"
+#include "../http_1_1.h"
 #include "../errors.h"
 
 #include "Session.hpp"
@@ -22,7 +23,28 @@
 #include <string>
 #include <utility>
 
-Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds);
-void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds);
+// class Server
+// {
+// private:
+// 	ServerConfig
+// 	WebserverConfig
+// public:
+// 	Server(/* args */);
+// 	~Server();
+// };
+
+// Server::Server(/* args */)
+// {
+// }
+
+// Server::~Server()
+// {
+// }
+
+
+typedef std::map<const FileDescriptor *, const ServerConfig *> ListenerMap;
+
+Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds, ListenerMap &listener_map);
+void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds, const ListenerMap &listener_map);
 
 #endif

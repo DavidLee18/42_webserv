@@ -13,18 +13,19 @@ int main(const int argc, char *argv[]) {
     std::cerr << "file open failed: " << fd.error() << std::endl;
     return 1;
   }
-  Result<WebserverConfig> result_config =
-      WebserverConfig::parse(fd.value_mut());
+  Result<WebserverConfig> result_config = WebserverConfig::parse(fd.value_mut());
   if (!result_config.error().empty()) {
     std::cerr << "config parsing failed: " << result_config.error()
               << std::endl;
     return 1;
   } else {
     const WebserverConfig &config = result_config.value();
-    std::cout << config << std::endl;
-    // Initiate and generate server.
+
+    // Initiate server.
     std::set<const FileDescriptor *> server_fds;
-    Result<EPoll> epoll_result = init_servers(config, server_fds);
+    ListenerMap listener_map;
+
+    Result<EPoll> epoll_result = init_servers(config, server_fds, listener_map);
     if (!epoll_result.has_value()) {
       std::cerr << "Server initialization failed: " << epoll_result.error() << std::endl;
       return 1;
@@ -32,7 +33,7 @@ int main(const int argc, char *argv[]) {
 
     std::cout << "Starting server loop..." << std::endl;
     EPoll epoll = epoll_result.value();
-    run_server(epoll, server_fds);
+    run_server(epoll, server_fds, listener_map);
   }
   return 0;
 }
