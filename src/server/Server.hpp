@@ -23,28 +23,30 @@
 #include <string>
 #include <utility>
 
-// class Server
-// {
-// private:
-// 	ServerConfig
-// 	WebserverConfig
-// public:
-// 	Server(/* args */);
-// 	~Server();
-// };
+class Server
+{
+private:
+	EPoll epoll;
+	WebserverConfig config;
+	std::set<const FileDescriptor *> server_fds;
+	// Listening socket
+	// key: server socket fds, value: ports ServerConfig
+	std::map<const FileDescriptor *, const ServerConfig *> listeners;
+	// Manage client sessions
+	// key: client fds, value: session info
+	std::map<const FileDescriptor *, ClientSession> clients;
 
-// Server::Server(/* args */)
-// {
-// }
+	void handle_new_connection(const FileDescriptor *server_fd);
+	void disconnect(const FileDescriptor *client_fd);
+	void handle_client_read(const FileDescriptor *client_fd);
+	void handle_client_write(const FileDescriptor *client_fd);
 
-// Server::~Server()
-// {
-// }
+public:
+	Server(const WebserverConfig &config) : config(config) {};
+	~Server() {};
 
-
-typedef std::map<const FileDescriptor *, const ServerConfig *> ListenerMap;
-
-Result<EPoll> init_servers(const WebserverConfig &config, std::set<const FileDescriptor *> &server_fds, ListenerMap &listener_map);
-void run_server(EPoll &epoll, const std::set<const FileDescriptor *> &server_fds, const ListenerMap &listener_map);
+	Result<Void> init();
+	Result<Void> start();
+};
 
 #endif

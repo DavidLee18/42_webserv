@@ -1,7 +1,7 @@
 #include "Response.hpp"
 #include "../cgi_1_1.h"
 
-std::string get_pwd() {
+std::string Response::get_pwd() {
     char buffer[1024];
     if (getcwd(buffer, sizeof(buffer)) != NULL) {
         return std::string(buffer);
@@ -9,7 +9,7 @@ std::string get_pwd() {
     return "";
 }
 
-std::string error_file_path(int error_code)
+std::string Response::error_file_path(int error_code)
 {
 	if (error_code == 400)
 		return get_pwd() + "/spool/www/error/400.html";
@@ -20,7 +20,7 @@ std::string error_file_path(int error_code)
 	return get_pwd() + "/spool/www/error/500.html";
 }
 
-int ResponseGenerator::check_path_type(const std::string &path)
+int Response::check_path_type(const std::string &path)
 {
 	struct stat info;
 
@@ -35,7 +35,7 @@ int ResponseGenerator::check_path_type(const std::string &path)
 	return -1;
 }
 
-HttpResponse ResponseGenerator::generate(const Http::Request* request, const ServerConfig *config)
+HttpResponse Response::generate(const Http::Request* request, const ServerConfig *config)
 {
 	HttpResponse response;
 	std::string full_path = resolve_full_path(request, config);
@@ -72,7 +72,7 @@ HttpResponse ResponseGenerator::generate(const Http::Request* request, const Ser
 
 }
 
-std::string ResponseGenerator::resolve_full_path(const Http::Request* request, const ServerConfig *config)
+std::string Response::resolve_full_path(const Http::Request* request, const ServerConfig *config)
 {
 	const RouteRule *rule = config->findRoute(request->method(), request->path());
 
@@ -83,20 +83,4 @@ std::string ResponseGenerator::resolve_full_path(const Http::Request* request, c
 	if (request->path() == "/")
 		return root;
 	return root + request->path();
-}
-
-HttpResponse ResponseGenerator::make_error_response(int error_code, const ServerConfig *config)
-{
-	(void)config;
-
-	HttpResponse res;
-	if (error_code == 404)
-		res.status_code = "404 Not Found";
-	else if (error_code == 403)
-		res.status_code = "403 Forbidden";
-	else
-		res.status_code = "500 Internal Server Error";
-
-	res.body = "<html><body><h1>" + res.status_code + "</h1></body></html>";
-	return res;
 }
