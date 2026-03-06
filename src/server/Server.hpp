@@ -36,10 +36,10 @@ private:
 	// key: client fds, value: session info
 	std::map<const FileDescriptor *, ClientSession> clients;
 
-	void handle_new_connection(const FileDescriptor *server_fd);
+	void new_connection(const FileDescriptor *server_fd);
 	void disconnect(const FileDescriptor *client_fd);
-	void handle_client_read(const FileDescriptor *client_fd);
-	void handle_client_write(const FileDescriptor *client_fd);
+	void client_read(const FileDescriptor *client_fd);
+	void client_write(const FileDescriptor *client_fd);
 
 public:
 	Server(const WebserverConfig &config) : config(config) {};
