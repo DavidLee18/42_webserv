@@ -26,20 +26,32 @@ static std::string html_escape(const std::string &s) {
   out.reserve(s.size());
   for (std::size_t i = 0; i < s.size(); ++i) {
     switch (s[i]) {
-    case '&':  out += "&amp;";  break;
-    case '<':  out += "&lt;";   break;
-    case '>':  out += "&gt;";   break;
-    case '"':  out += "&quot;"; break;
-    case '\'': out += "&#39;";  break;
-    default:   out += s[i];     break;
+    case '&':
+      out += "&amp;";
+      break;
+    case '<':
+      out += "&lt;";
+      break;
+    case '>':
+      out += "&gt;";
+      break;
+    case '"':
+      out += "&quot;";
+      break;
+    case '\'':
+      out += "&#39;";
+      break;
+    default:
+      out += s[i];
+      break;
     }
   }
   return out;
 }
 
 static std::string tr(const std::string &name, const std::string &value) {
-  return "    <tr><td>" + html_escape(name) + "</td><td>" +
-         html_escape(value) + "</td></tr>\n";
+  return "    <tr><td>" + html_escape(name) + "</td><td>" + html_escape(value) +
+         "</td></tr>\n";
 }
 
 int main() {
@@ -63,13 +75,15 @@ int main() {
   body += "  <style>\n";
   body += "    body { font-family: monospace; margin: 2em; }\n";
   body += "    table { border-collapse: collapse; }\n";
-  body += "    th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }\n";
+  body += "    th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: "
+          "left; }\n";
   body += "    th { background: #eee; }\n";
   body += "  </style>\n";
   body += "</head>\n";
   body += "<body>\n";
   body += "  <h1>CGI/1.1 Dynamic Response</h1>\n";
-  body += "  <p>Generated at: <strong>" + std::string(time_buf) + "</strong></p>\n";
+  body +=
+      "  <p>Generated at: <strong>" + std::string(time_buf) + "</strong></p>\n";
 
   // --- section 1: all 17 standard CGI/1.1 meta-variables (RFC 3875 §4.1) ---
   body += "  <h2>Standard CGI/1.1 Meta-Variables</h2>\n";
@@ -78,25 +92,12 @@ int main() {
 
   // The fixed set defined by RFC 3875 §4.1
   static const char *const STANDARD_VARS[] = {
-    "AUTH_TYPE",
-    "CONTENT_LENGTH",
-    "CONTENT_TYPE",
-    "GATEWAY_INTERFACE",
-    "PATH_INFO",
-    "PATH_TRANSLATED",
-    "QUERY_STRING",
-    "REMOTE_ADDR",
-    "REMOTE_HOST",
-    "REMOTE_IDENT",
-    "REMOTE_USER",
-    "REQUEST_METHOD",
-    "SCRIPT_NAME",
-    "SERVER_NAME",
-    "SERVER_PORT",
-    "SERVER_PROTOCOL",
-    "SERVER_SOFTWARE",
-    NULL
-  };
+      "AUTH_TYPE",         "CONTENT_LENGTH",  "CONTENT_TYPE",
+      "GATEWAY_INTERFACE", "PATH_INFO",       "PATH_TRANSLATED",
+      "QUERY_STRING",      "REMOTE_ADDR",     "REMOTE_HOST",
+      "REMOTE_IDENT",      "REMOTE_USER",     "REQUEST_METHOD",
+      "SCRIPT_NAME",       "SERVER_NAME",     "SERVER_PORT",
+      "SERVER_PROTOCOL",   "SERVER_SOFTWARE", NULL};
 
   for (int i = 0; STANDARD_VARS[i] != NULL; ++i) {
     body += tr(STANDARD_VARS[i], env_or_empty(STANDARD_VARS[i]));
@@ -126,7 +127,8 @@ int main() {
     body += "    <tr><td colspan=\"2\">(none)</td></tr>\n";
   } else {
     for (std::map<std::string, std::string>::const_iterator it =
-             http_vars.begin(); it != http_vars.end(); ++it) {
+             http_vars.begin();
+         it != http_vars.end(); ++it) {
       body += tr(it->first, it->second);
     }
   }

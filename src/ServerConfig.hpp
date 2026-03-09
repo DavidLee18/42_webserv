@@ -27,7 +27,8 @@ enum RuleOperator {
 class PathPattern {
 private:
   std::vector<std::string> path;
-  static bool segmentMatches(const std::string &pattern, const std::string &segment);
+  static bool segmentMatches(const std::string &pattern,
+                             const std::string &segment);
 
 public:
   PathPattern() : path() {}
@@ -89,10 +90,9 @@ public:
       : header(), serverResponseTime(-1), routes(), err_line(), end_flag(0) {}
   const Header &Get_Header(void) const { return header; }
   int Get_ServerResponseTime(void) const { return (serverResponseTime); }
-  const std::vector<RouteRule> &Get_Routes(void) const {
-    return routes;
-  }
-  RouteRule const *findRoute(Http::Method method, const std::string &path) const;
+  const std::vector<RouteRule> &Get_Routes(void) const { return routes; }
+  RouteRule const *findRoute(Http::Method method,
+                             const std::string &path) const;
   const std::string &Geterr_line(void) const { return err_line; }
   // Result<ServerConfig> read_from_file(FileDescriptor &);
 };
