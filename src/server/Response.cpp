@@ -69,6 +69,9 @@ std::string Response::resolve_full_path(const Http::Request *request,
                                         const ServerConfig *config) {
   const RouteRule *rule = config->findRoute(request->method(), request->path());
 
+  if (rule == NULL)
+    return error_file_path(404);
+
   std::string root = get_pwd() + rule->root.toString();
   size_t npos = 0;
   if (root.find('*', npos))
