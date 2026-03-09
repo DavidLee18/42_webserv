@@ -1,52 +1,51 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-#include "../epoll_kqueue.h"
 #include "../WebserverConfig.hpp"
-#include "../http_1_1.h"
+#include "../epoll_kqueue.h"
 #include "../errors.h"
+#include "../http_1_1.h"
 
-#include "Session.hpp"
 #include "Response.hpp"
+#include "Session.hpp"
 
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <csignal>
-#include <iostream>
-#include <sstream>
+#include <fcntl.h>
 #include <fstream>
-#include <set>
+#include <iostream>
 #include <map>
+#include <netinet/in.h>
+#include <set>
+#include <sstream>
 #include <string>
+#include <sys/socket.h>
+#include <unistd.h>
 #include <utility>
 
-class Server
-{
+class Server {
 private:
-	EPoll epoll;
-	WebserverConfig config;
-	std::set<const FileDescriptor *> server_fds;
-	// Listening socket
-	// key: server socket fds, value: ports ServerConfig
-	std::map<const FileDescriptor *, const ServerConfig *> listeners;
-	// Manage client sessions
-	// key: client fds, value: session info
-	std::map<const FileDescriptor *, ClientSession> clients;
+  EPoll epoll;
+  WebserverConfig config;
+  std::set<const FileDescriptor *> server_fds;
+  // Listening socket
+  // key: server socket fds, value: ports ServerConfig
+  std::map<const FileDescriptor *, const ServerConfig *> listeners;
+  // Manage client sessions
+  // key: client fds, value: session info
+  std::map<const FileDescriptor *, ClientSession> clients;
 
-	void new_connection(const FileDescriptor *server_fd);
-	void disconnect(const FileDescriptor *client_fd);
-	void client_read(const FileDescriptor *client_fd);
-	void client_write(const FileDescriptor *client_fd);
+  void new_connection(const FileDescriptor *server_fd);
+  void disconnect(const FileDescriptor *client_fd);
+  void client_read(const FileDescriptor *client_fd);
+  void client_write(const FileDescriptor *client_fd);
 
 public:
-	Server(const WebserverConfig &config) : config(config) {};
-	~Server() {};
+  Server(const WebserverConfig &config) : config(config){};
+  ~Server(){};
 
-	Result<Void> init();
-	Result<Void> start();
+  Result<Void> init();
+  Result<Void> start();
 };
 
 #endif

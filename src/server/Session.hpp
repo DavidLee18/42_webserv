@@ -1,17 +1,16 @@
 #ifndef SESSION_HPP
 #define SESSION_HPP
 
-#include <string>
 #include "../ServerConfig.hpp"
+#include <string>
 
-struct ClientSession
-{
-	std::string in_buff;
-	std::string out_buff;
+struct ClientSession {
+  std::string in_buff;
+  std::string out_buff;
 
-	const ServerConfig* config;
+  const ServerConfig *config;
 
-	ClientSession() : config(NULL) {}
+  ClientSession() : config(NULL) {}
 };
 
 #endif

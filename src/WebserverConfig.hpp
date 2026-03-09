@@ -29,7 +29,7 @@ private:
 public:
   WebserverConfig(const WebserverConfig &other)
       : default_mime(other.default_mime), type_map(other.type_map),
-        ServerConfig_map(other.ServerConfig_map) {};
+        ServerConfig_map(other.ServerConfig_map){};
 
   WebserverConfig &operator=(const WebserverConfig &other) {
     if (this != &other) {

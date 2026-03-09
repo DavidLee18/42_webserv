@@ -15,8 +15,8 @@
 #include "errors.h"
 #include "http_1_1.h"
 #include "json.h"
-#include "wsgi.h"
 #include "server/Server.hpp"
+#include "wsgi.h"
 
 #include <algorithm>
 #include <arpa/inet.h>

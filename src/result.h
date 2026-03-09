@@ -141,9 +141,9 @@ struct Void {};
   }
 
 #define OK_PAIR(t1, t2, v1, v2)                                                \
-  Result<std::pair<t1, t2> >(std::make_pair(v1, v2), "")
+  Result<std::pair<t1, t2>>(std::make_pair(v1, v2), "")
 
-#define ERR_PAIR(t1, t2, e) Result<std::pair<t1, t2> >(e)
+#define ERR_PAIR(t1, t2, e) Result<std::pair<t1, t2>>(e)
 
 #define TRY_PAIR(t1, t2, v, r)                                                 \
   if ((r).error().empty()) {                                                   \

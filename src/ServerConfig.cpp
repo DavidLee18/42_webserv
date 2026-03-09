@@ -2,46 +2,48 @@
 
 // Helper function to check if a segment matches a pattern
 // Pattern can contain * as wildcard
-bool PathPattern::segmentMatches(const std::string &pattern, const std::string &segment) {
+bool PathPattern::segmentMatches(const std::string &pattern,
+                                 const std::string &segment) {
   // If pattern is exactly "*", it matches anything
   if (pattern == "*") {
     return true;
   }
-  
+
   // If no wildcard in pattern, must match exactly
   if (pattern.find('*') == std::string::npos) {
     return pattern == segment;
   }
-  
+
   // Split pattern by * to get parts that must match
   std::vector<std::string> parts = string_split(pattern, "*");
-  
+
   size_t pos = 0;
   for (size_t i = 0; i < parts.size(); ++i) {
     if (parts[i].empty()) {
-      continue;  // Skip empty parts from consecutive *
+      continue; // Skip empty parts from consecutive *
     }
-    
+
     // Find this part in the segment
     size_t found = segment.find(parts[i], pos);
     if (found == std::string::npos) {
-      return false;  // Required part not found
+      return false; // Required part not found
     }
-    
-    // For the first part, it should be at the beginning (unless pattern starts with *)
+
+    // For the first part, it should be at the beginning (unless pattern starts
+    // with *)
     if (i == 0 && pattern[0] != '*' && found != 0) {
       return false;
     }
-    
+
     pos = found + parts[i].length();
   }
-  
+
   // If pattern ends with a non-wildcard part, check that we matched to the end
-  if (!parts.empty() && !parts[parts.size() - 1].empty() && 
+  if (!parts.empty() && !parts[parts.size() - 1].empty() &&
       pattern[pattern.length() - 1] != '*') {
     return pos == segment.length();
   }
-  
+
   return true;
 }
 
@@ -51,16 +53,16 @@ bool PathPattern::matches(const PathPattern &other) const {
   if (isWildcard()) {
     return true;
   }
-  
+
   // If other is "*", we need to check if our pattern would match it
   // In this case, only "*" matches "*"
   if (other.isWildcard()) {
     return isWildcard();
   }
-  
+
   // If the path lengths are different and neither has wildcards, no match
   // But if we have wildcards, we need more complex matching
-  
+
   // Check if any of our segments contain wildcards
   bool hasWildcard = false;
   for (size_t i = 0; i < path.size(); ++i) {
@@ -69,11 +71,11 @@ bool PathPattern::matches(const PathPattern &other) const {
       break;
     }
   }
-  
+
   if (!hasWildcard && path.size() != other.path.size()) {
     return false;
   }
-  
+
   // If we have wildcards, do more flexible matching
   if (hasWildcard) {
     // For patterns like "*.jpg", we want to match any path ending with .jpg
@@ -88,12 +90,12 @@ bool PathPattern::matches(const PathPattern &other) const {
       }
       return false;
     }
-    
+
     // For multi-segment patterns, match segment by segment
     if (path.size() != other.path.size()) {
       return false;
     }
-    
+
     for (size_t i = 0; i < path.size(); ++i) {
       if (!segmentMatches(path[i], other.path[i])) {
         return false;
@@ -101,14 +103,14 @@ bool PathPattern::matches(const PathPattern &other) const {
     }
     return true;
   }
-  
+
   // No wildcards - exact match required
   for (size_t i = 0; i < path.size(); ++i) {
     if (path[i] != other.path[i]) {
       return false;
     }
   }
-  
+
   return true;
 }
 
@@ -339,10 +341,10 @@ static std::vector<std::string> get_pattern(std::string line) {
   return (temp);
 }
 
-static std::vector<std::vector<std::string> >
-make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
+static std::vector<std::vector<std::string>>
+make_paths_from_url_pattern(std::vector<std::vector<std::string>> paths,
                             std::vector<std::string> pattern, size_t index) {
-  std::vector<std::vector<std::string> > new_paths;
+  std::vector<std::vector<std::string>> new_paths;
   std::string seg = paths[0][index];
   std::string prefix = "";
   std::string suffix = "";
@@ -364,10 +366,10 @@ make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
   return (new_paths);
 }
 
-static std::vector<std::vector<std::string> >
+static std::vector<std::vector<std::string>>
 expand_url_pattern(std::string line) {
   std::vector<std::string> path(string_split(line, "/"));
-  std::vector<std::vector<std::string> > paths;
+  std::vector<std::vector<std::string>> paths;
 
   paths.push_back(path);
   for (size_t i = 0; i < path.size(); ++i) {
@@ -482,14 +484,18 @@ bool ServerConfig::parse_Rule(std::vector<Http::Method> mets,
 
   if (size < 2)
     return (false);
-  
+
   // Find or create routes for each method with this path pattern
   for (size_t i = 0; i < mets.size(); ++i) {
-    size_t targetRouteIndex = routes.size();  // Will be set to existing route index or stay as size (indicating new route)
-    
-    // Find existing route with matching method and path (exact match for updating properties)
+    size_t targetRouteIndex =
+        routes.size(); // Will be set to existing route index or stay as size
+                       // (indicating new route)
+
+    // Find existing route with matching method and path (exact match for
+    // updating properties)
     for (size_t j = 0; j < routes.size(); ++j) {
-      // For updating route properties, we need exact path match, not wildcard match
+      // For updating route properties, we need exact path match, not wildcard
+      // match
       if (routes[j].method == mets[i]) {
         // Compare path segments for exact match
         const std::vector<std::string> &routePath = routes[j].path.Get_path();
@@ -509,7 +515,7 @@ bool ServerConfig::parse_Rule(std::vector<Http::Method> mets,
         }
       }
     }
-    
+
     // If not found, create a new route
     if (targetRouteIndex == routes.size()) {
       RouteRule newRoute;
@@ -519,10 +525,12 @@ bool ServerConfig::parse_Rule(std::vector<Http::Method> mets,
       newRoute.op = UNDEFINED;
       newRoute.maxBodyKB = 1;
       routes.push_back(newRoute);
-      // targetRouteIndex is already set to the correct value (old size, which is the new index)
+      // targetRouteIndex is already set to the correct value (old size, which
+      // is the new index)
     }
-    
-    // Update the route based on rule type (using index to avoid pointer invalidation)
+
+    // Update the route based on rule type (using index to avoid pointer
+    // invalidation)
     if (rule[0] == "?") {
       std::string index = index_parse(rule[1]);
       if (size != 2 || index == "")
@@ -538,7 +546,7 @@ bool ServerConfig::parse_Rule(std::vector<Http::Method> mets,
         return (false);
       routes[targetRouteIndex].maxBodyKB = max;
     } else if (rule[0] == "!") {
-      std::string errPageLine = rule[1];  // Make a copy to avoid modification
+      std::string errPageLine = rule[1]; // Make a copy to avoid modification
       int err_key = errPage_parse(errPageLine);
       if (err_key == 0 || size != 2)
         return (false);
@@ -546,7 +554,7 @@ bool ServerConfig::parse_Rule(std::vector<Http::Method> mets,
     } else
       return (false);
   }
-  
+
   return (true);
 }
 
@@ -621,8 +629,8 @@ bool ServerConfig::is_matching(PathPattern path, PathPattern root) {
 bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
                                     std::vector<Http::Method> mets) {
   RouteRule route;
-  std::vector<std::vector<std::string> > path_url;
-  std::vector<std::vector<std::string> > root_url;
+  std::vector<std::vector<std::string>> path_url;
+  std::vector<std::vector<std::string>> root_url;
 
   if (data.size() != 4)
     return (false);
@@ -640,7 +648,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
     if (path_url.size() < 1 || root_url.size() < 1 ||
         path_url.size() != root_url.size())
       return (false);
-    
+
     for (size_t j = 0; j < path_url.size(); ++j) {
       route.path = path_url[j];
       route.root = root_url[j];
@@ -700,16 +708,17 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
 }
 
 // Find a route that matches the given method and path
-RouteRule const *ServerConfig::findRoute(Http::Method method, const std::string &path) const {
+RouteRule const *ServerConfig::findRoute(Http::Method method,
+                                         const std::string &path) const {
   PathPattern pathPattern(path);
-  
+
   // Iterate through all routes to find a match
   for (size_t i = 0; i < routes.size(); ++i) {
     if (routes[i].method == method && routes[i].path.matches(pathPattern)) {
       return &routes[i];
     }
   }
-  
+
   return NULL;
 }
 
@@ -785,7 +794,8 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
     os << "\tAuth Info: " << route.authInfo << std::endl;
     os << "\tMax Body(KB): " << route.maxBodyKB;
     if (route.errorPages.empty())
-      os << "\n\tError Page: " << "empty map";
+      os << "\n\tError Page: "
+         << "empty map";
     else {
       std::map<int, std::string>::const_iterator err_it;
       for (err_it = route.errorPages.begin(); err_it != route.errorPages.end();

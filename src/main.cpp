@@ -13,7 +13,8 @@ int main(const int argc, char *argv[]) {
     std::cerr << "file open failed: " << fd.error() << std::endl;
     return 1;
   }
-  Result<WebserverConfig> result_config = WebserverConfig::parse(fd.value_mut());
+  Result<WebserverConfig> result_config =
+      WebserverConfig::parse(fd.value_mut());
   if (!result_config.error().empty()) {
     std::cerr << "config parsing failed: " << result_config.error()
               << std::endl;

@@ -80,7 +80,7 @@ Result<EPoll> EPoll::create(unsigned short sz) {
 }
 
 Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
-                          const Option &op) {
+                                       const Option &op) {
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -106,7 +106,8 @@ Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   if (epoll_ctl(_fd._fd, EPOLL_CTL_ADD, fd._fd, &event) == -1) {
     switch (errno) {
     case EEXIST:
-      return ERR(FileDescriptor *, "this fd is already registered to this epoll");
+      return ERR(FileDescriptor *,
+                 "this fd is already registered to this epoll");
     case EINVAL:
       return ERR(FileDescriptor *, Errors::invalid_fd);
     case ELOOP:
@@ -118,7 +119,8 @@ Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
     case EPERM:
       return ERR(FileDescriptor *, Errors::not_supported);
     default:
-      return ERR(FileDescriptor *, "an unknown error occured during EPOLL_CTL_ADD");
+      return ERR(FileDescriptor *,
+                 "an unknown error occured during EPOLL_CTL_ADD");
     }
   }
   _events.push_back(fd);
