@@ -103,6 +103,9 @@ jobs:
   finalize:
     needs: codeql
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: LouisBrunner/checks-action@6b626ffbad7cc56fd58627f774b9067e6118af23
         with:
