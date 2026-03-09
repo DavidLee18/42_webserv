@@ -146,14 +146,14 @@ public:
                                                                 size_t);
       static Result<std::pair<std::string, size_t> >
       parse_http_version(const char *, size_t);
-      static Result<std::pair<std::map<std::string, std::string>, size_t>>
+      static Result<std::pair<std::map<std::string, std::string>, size_t> >
       parse_headers(const char *, size_t);
-      static Result<std::pair<Body, size_t>>
+      static Result<std::pair<Body, size_t> >
       parse_body(const char *, size_t,
                  std::map<std::string, std::string> const &);
 
     public:
-      static Result<std::pair<Request, size_t>> parse(const char *, size_t);
+      static Result<std::pair<Request, size_t> > parse(const char *, size_t);
     };
 
     friend class Parser;
@@ -178,7 +178,7 @@ public:
     }
     const std::string &path() const { return _path; }
     const Body &body() const { return _body; }
-    static Result<std::pair<Request *, size_t>> parse(const char *, char);
+    static Result<std::pair<Request *, size_t> > parse(const char *, char);
     std::string serialize() const;
   };
 

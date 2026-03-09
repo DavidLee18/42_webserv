@@ -90,11 +90,11 @@ class ServerName {
 public:
   class Parser {
     virtual void phantom() = 0;
-    static Result<std::pair<ServerName, size_t>> parse_host(std::string);
-    static Result<std::pair<ServerName, size_t>> parse_ipv4(std::string);
+    static Result<std::pair<ServerName, size_t> > parse_host(std::string);
+    static Result<std::pair<ServerName, size_t> > parse_ipv4(std::string);
 
   public:
-    static Result<std::pair<ServerName, size_t>> parse(std::string);
+    static Result<std::pair<ServerName, size_t> > parse(std::string);
   };
 
   enum Type {
@@ -234,17 +234,17 @@ public:
 
   class Parser {
     virtual void phantom() = 0;
-    static Result<std::pair<CgiMetaVar, size_t>> parse_auth_type(std::string);
-    static Result<std::pair<CgiMetaVar, size_t>>
+    static Result<std::pair<CgiMetaVar, size_t> > parse_auth_type(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> >
         parse_content_length(std::string);
-    static Result<std::pair<CgiMetaVar, size_t>>
+    static Result<std::pair<CgiMetaVar, size_t> >
         parse_content_type(std::string);
-    static Result<std::pair<CgiMetaVar, size_t>>
+    static Result<std::pair<CgiMetaVar, size_t> >
         parse_gateway_interface(std::string);
-    static Result<std::pair<CgiMetaVar, size_t>> parse_path_info(std::string);
-    static Result<std::pair<CgiMetaVar, size_t>>
+    static Result<std::pair<CgiMetaVar, size_t> > parse_path_info(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> >
         parse_path_translated(std::string);
-    static Result<std::pair<CgiMetaVar, size_t>>
+    static Result<std::pair<CgiMetaVar, size_t> >
         parse_query_string(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_remote_addr(std::string);
@@ -268,7 +268,7 @@ public:
         parse_server_port(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_server_protocol(std::string);
-    static Result<std::pair<CgiMetaVar, size_t>>
+    static Result<std::pair<CgiMetaVar, size_t> >
         parse_server_software(std::string);
     static Result<std::pair<CgiMetaVar, size_t> > parse_custom_var(std::string,
                                                                    std::string);

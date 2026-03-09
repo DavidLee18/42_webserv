@@ -22,7 +22,7 @@ ServerName ServerName::ipv4(unsigned char b1, unsigned char b2,
   return ServerName(Ipv4, (ServerName::Val){.ipv4 = {b1, b2, b3, b4}});
 }
 
-Result<std::pair<ServerName, size_t>>
+Result<std::pair<ServerName, size_t> >
 ServerName::Parser::parse_host(std::string raw) {
   std::stringstream ss(raw);
   std::list<std::string> parts;
@@ -68,7 +68,7 @@ ServerName::Parser::parse_host(std::string raw) {
   return OK_PAIR(ServerName, size_t, ServerName::host(parts), j + part.size());
 }
 
-Result<std::pair<ServerName, size_t>>
+Result<std::pair<ServerName, size_t> >
 ServerName::Parser::parse_ipv4(std::string raw) {
   std::stringstream ss(raw);
   std::vector<unsigned char> addrs;
@@ -102,9 +102,9 @@ ServerName::Parser::parse_ipv4(std::string raw) {
                  i + part.size());
 }
 
-Result<std::pair<ServerName, size_t>>
+Result<std::pair<ServerName, size_t> >
 ServerName::Parser::parse(std::string raw) {
-  Result<std::pair<ServerName, size_t>> res = parse_host(raw);
+  Result<std::pair<ServerName, size_t> > res = parse_host(raw);
   if (res.error().empty())
     return res;
   return parse_ipv4(raw);
@@ -207,7 +207,7 @@ CgiMetaVar CgiMetaVar::custom_var(EtcMetaVar::Type ty, std::string name,
       X_, (CgiMetaVar::Val){.etc_val = new EtcMetaVar(ty, name, value)});
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_auth_type(std::string raw) {
   std::stringstream ss(raw);
   std::string ty;
@@ -227,7 +227,7 @@ CgiMetaVar::Parser::parse_auth_type(std::string raw) {
       ty.size());
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_content_length(std::string raw) {
   char *ptr = NULL;
   const char *str = raw.c_str();
@@ -239,7 +239,7 @@ CgiMetaVar::Parser::parse_content_length(std::string raw) {
                  ptr - str);
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_content_type(std::string raw) {
   size_t consumed = 0;
   size_t slash_pos = raw.find('/');
@@ -358,7 +358,7 @@ CgiMetaVar::Parser::parse_content_type(std::string raw) {
   return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::content_type(ct), consumed);
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_gateway_interface(std::string raw) {
   std::string norm = raw;
   std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
@@ -368,7 +368,7 @@ CgiMetaVar::Parser::parse_gateway_interface(std::string raw) {
   return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_path_info(std::string raw) {
   if (raw.empty() || raw[0] != '/')
     return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
@@ -385,7 +385,7 @@ CgiMetaVar::Parser::parse_path_info(std::string raw) {
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_path_translated(std::string raw) {
   if (raw.empty())
     return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
@@ -393,7 +393,7 @@ CgiMetaVar::Parser::parse_path_translated(std::string raw) {
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_query_string(std::string raw) {
   std::map<std::string, std::string> query_map;
 
@@ -419,7 +419,7 @@ CgiMetaVar::Parser::parse_query_string(std::string raw) {
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_remote_addr(std::string raw) {
   std::stringstream ss(raw);
   std::vector<unsigned char> octets;
@@ -450,9 +450,9 @@ CgiMetaVar::Parser::parse_remote_addr(std::string raw) {
       raw.length());
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_remote_host(std::string raw) {
-  Result<std::pair<ServerName, size_t>> server_res =
+  Result<std::pair<ServerName, size_t> > server_res =
       ServerName::Parser::parse(raw);
   if (!server_res.error().empty())
     return ERR_PAIR(CgiMetaVar, size_t, server_res.error());
@@ -471,7 +471,7 @@ CgiMetaVar::Parser::parse_remote_host(std::string raw) {
                  server_res.value().second);
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_remote_ident(std::string raw) {
   if (raw.empty())
     return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
@@ -479,7 +479,7 @@ CgiMetaVar::Parser::parse_remote_ident(std::string raw) {
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_remote_user(std::string raw) {
   if (raw.empty())
     return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
@@ -487,7 +487,7 @@ CgiMetaVar::Parser::parse_remote_user(std::string raw) {
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_request_method(std::string raw) {
   std::string method = raw;
   std::transform(method.begin(), method.end(), method.begin(), to_upper);
@@ -518,7 +518,7 @@ CgiMetaVar::Parser::parse_request_method(std::string raw) {
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_script_name(std::string raw) {
   if (raw.empty() || raw[0] != '/')
     return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
@@ -535,9 +535,9 @@ CgiMetaVar::Parser::parse_script_name(std::string raw) {
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_server_name(std::string raw) {
-  Result<std::pair<ServerName, size_t>> res = ServerName::Parser::parse(raw);
+  Result<std::pair<ServerName, size_t> > res = ServerName::Parser::parse(raw);
   if (!res.error().empty())
     return ERR_PAIR(CgiMetaVar, size_t, res.error());
 
@@ -545,7 +545,7 @@ CgiMetaVar::Parser::parse_server_name(std::string raw) {
                  res.value().second);
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_server_port(std::string raw) {
   char *ptr = NULL;
   const char *str = raw.c_str();
@@ -557,7 +557,7 @@ CgiMetaVar::Parser::parse_server_port(std::string raw) {
                  raw.length());
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_server_protocol(std::string raw) {
   std::string norm = raw;
   std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
@@ -567,7 +567,7 @@ CgiMetaVar::Parser::parse_server_protocol(std::string raw) {
   return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_server_software(std::string raw) {
   std::string norm = raw;
   std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower);
@@ -577,7 +577,7 @@ CgiMetaVar::Parser::parse_server_software(std::string raw) {
   return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_custom_var(std::string name, std::string value) {
   EtcMetaVar::Type type = EtcMetaVar::Custom;
   if (name.length() >= 5 && name.substr(0, 5) == "HTTP_") {
@@ -587,7 +587,7 @@ CgiMetaVar::Parser::parse_custom_var(std::string name, std::string value) {
                  name.length() + value.length());
 }
 
-Result<std::pair<CgiMetaVar, size_t>>
+Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse(std::string const &name, std::string const &value) {
   if (name == "AUTH_TYPE")
     return parse_auth_type(value);
@@ -718,13 +718,13 @@ Result<CgiInput> CgiInput::Parser::parse(Http::Request const &req) {
 
     // Special handling for standard CGI variables
     if (header_name == "CONTENT_TYPE") {
-      Result<std::pair<CgiMetaVar, size_t>> res =
+      Result<std::pair<CgiMetaVar, size_t> > res =
           CgiMetaVar::Parser::parse("CONTENT_TYPE", value);
       if (res.error().empty()) {
         input.mvars.push_back(res.value().first);
       }
     } else if (header_name == "CONTENT_LENGTH") {
-      Result<std::pair<CgiMetaVar, size_t>> res =
+      Result<std::pair<CgiMetaVar, size_t> > res =
           CgiMetaVar::Parser::parse("CONTENT_LENGTH", value);
       if (res.error().empty()) {
         input.mvars.push_back(res.value().first);

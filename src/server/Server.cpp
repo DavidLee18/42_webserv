@@ -74,7 +74,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
     size_t header_end = in_buffer.find("\r\n\r\n");
 
     if (header_end != std::string::npos) {
-      Result<std::pair<Http::Request *, size_t>> request_result =
+      Result<std::pair<Http::Request *, size_t> > request_result =
           Http::Request::parse(in_buffer.c_str(), '\0');
       if (!request_result.has_value()) {
         std::cerr << request_result.error() << std::endl;

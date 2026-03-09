@@ -341,10 +341,10 @@ static std::vector<std::string> get_pattern(std::string line) {
   return (temp);
 }
 
-static std::vector<std::vector<std::string>>
-make_paths_from_url_pattern(std::vector<std::vector<std::string>> paths,
+static std::vector<std::vector<std::string> >
+make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
                             std::vector<std::string> pattern, size_t index) {
-  std::vector<std::vector<std::string>> new_paths;
+  std::vector<std::vector<std::string> > new_paths;
   std::string seg = paths[0][index];
   std::string prefix = "";
   std::string suffix = "";
@@ -366,10 +366,10 @@ make_paths_from_url_pattern(std::vector<std::vector<std::string>> paths,
   return (new_paths);
 }
 
-static std::vector<std::vector<std::string>>
+static std::vector<std::vector<std::string> >
 expand_url_pattern(std::string line) {
   std::vector<std::string> path(string_split(line, "/"));
-  std::vector<std::vector<std::string>> paths;
+  std::vector<std::vector<std::string> > paths;
 
   paths.push_back(path);
   for (size_t i = 0; i < path.size(); ++i) {
@@ -629,8 +629,8 @@ bool ServerConfig::is_matching(PathPattern path, PathPattern root) {
 bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
                                     std::vector<Http::Method> mets) {
   RouteRule route;
-  std::vector<std::vector<std::string>> path_url;
-  std::vector<std::vector<std::string>> root_url;
+  std::vector<std::vector<std::string> > path_url;
+  std::vector<std::vector<std::string> > root_url;
 
   if (data.size() != 4)
     return (false);

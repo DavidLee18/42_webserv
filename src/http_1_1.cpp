@@ -41,7 +41,7 @@ static size_t skip_whitespace(const char *input, size_t offset,
 
 // Parse HTTP method (GET, POST, etc.)
 // RFC 2616 §5.1.1: Method is case-sensitive
-Result<std::pair<Http::Method, size_t>>
+Result<std::pair<Http::Method, size_t> >
 Http::Request::Parser::parse_method(const char *input, size_t offset) {
   std::string method_str;
   size_t start = offset;
@@ -84,7 +84,7 @@ Http::Request::Parser::parse_method(const char *input, size_t offset) {
 }
 
 // Parse request path
-Result<std::pair<std::string, size_t>>
+Result<std::pair<std::string, size_t> >
 Http::Request::Parser::parse_path(const char *input, size_t offset) {
   std::string path;
   size_t start = offset;
@@ -105,7 +105,7 @@ Http::Request::Parser::parse_path(const char *input, size_t offset) {
 
 // Parse HTTP version (HTTP/1.1)
 // RFC 2616 §3.1: HTTP-Version = "HTTP" "/" 1*DIGIT "." 1*DIGIT
-Result<std::pair<std::string, size_t>>
+Result<std::pair<std::string, size_t> >
 Http::Request::Parser::parse_http_version(const char *input, size_t offset) {
   std::string version;
   size_t start = offset;
@@ -155,12 +155,12 @@ Http::Request::Parser::parse_http_version(const char *input, size_t offset) {
 }
 
 // Parse request line (e.g., "GET /path HTTP/1.1\r\n")
-Result<std::pair<Http::Request, size_t>>
+Result<std::pair<Http::Request, size_t> >
 Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   size_t start_offset = offset;
 
   // Parse method
-  Result<std::pair<Http::Method, size_t>> method_res =
+  Result<std::pair<Http::Method, size_t> > method_res =
       parse_method(input, offset);
   if (!method_res.error().empty()) {
     return ERR_PAIR(Http::Request, size_t, method_res.error());
@@ -174,7 +174,7 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   offset = skip_whitespace(input, offset, space_limit);
 
   // Parse path
-  Result<std::pair<std::string, size_t>> path_res = parse_path(input, offset);
+  Result<std::pair<std::string, size_t> > path_res = parse_path(input, offset);
   if (!path_res.error().empty()) {
     return ERR_PAIR(Http::Request, size_t, path_res.error());
   }
@@ -187,7 +187,7 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
   offset = skip_whitespace(input, offset, space_limit);
 
   // Parse HTTP version
-  Result<std::pair<std::string, size_t>> version_res =
+  Result<std::pair<std::string, size_t> > version_res =
       parse_http_version(input, offset);
   if (!version_res.error().empty()) {
     return ERR_PAIR(Http::Request, size_t, version_res.error());
@@ -214,7 +214,7 @@ Http::Request::Parser::parse_request_line(const char *input, size_t offset) {
 
 // Parse headers (e.g., "Host: example.com\r\n")
 // RFC 2616 §4.2: Field names are case-insensitive, LWS may be present
-Result<std::pair<std::map<std::string, std::string>, size_t>>
+Result<std::pair<std::map<std::string, std::string>, size_t> >
 Http::Request::Parser::parse_headers(const char *input, size_t offset) {
   typedef std::map<std::string, std::string> HeaderMap;
   HeaderMap headers;
@@ -331,7 +331,7 @@ static std::string url_encode(const std::string &decoded) {
 }
 
 // Parse application/x-www-form-urlencoded body
-static Result<std::pair<std::map<std::string, std::string>, size_t>>
+static Result<std::pair<std::map<std::string, std::string>, size_t> >
 parse_form_urlencoded(const char *input, size_t offset, size_t body_length) {
   std::map<std::string, std::string> form;
   std::string body_str(input + offset, body_length);
@@ -366,7 +366,7 @@ parse_form_urlencoded(const char *input, size_t offset, size_t body_length) {
 
 // Parse body
 // RFC 2616 §4.3: Message body determined by Content-Type and Content-Length
-Result<std::pair<Http::Body, size_t>> Http::Request::Parser::parse_body(
+Result<std::pair<Http::Body, size_t> > Http::Request::Parser::parse_body(
     const char *input, size_t offset,
     std::map<std::string, std::string> const &headers) {
   // Check for Content-Length header
@@ -424,7 +424,7 @@ Result<std::pair<Http::Body, size_t>> Http::Request::Parser::parse_body(
     // Parse as JSON
     // Create a temporary null-terminated string for JSON parser
     std::string json_body(input + offset, body_length);
-    Result<std::pair<Json, size_t>> json_res =
+    Result<std::pair<Json, size_t> > json_res =
         Json::Parser::parse(json_body.c_str(), '\0');
 
     if (!json_res.error().empty()) {
@@ -438,7 +438,7 @@ Result<std::pair<Http::Body, size_t>> Http::Request::Parser::parse_body(
   } else if (content_type.find("application/x-www-form-urlencoded") !=
              std::string::npos) {
     // Parse as form-urlencoded
-    Result<std::pair<std::map<std::string, std::string>, size_t>> form_res =
+    Result<std::pair<std::map<std::string, std::string>, size_t> > form_res =
         parse_form_urlencoded(input, offset, static_cast<size_t>(body_length));
 
     if (!form_res.error().empty()) {
@@ -461,7 +461,7 @@ Result<std::pair<Http::Body, size_t>> Http::Request::Parser::parse_body(
 }
 
 // Main parse function
-Result<std::pair<Http::Request, size_t>>
+Result<std::pair<Http::Request, size_t> >
 Http::Request::Parser::parse(const char *input, size_t) {
   if (input == NULL) {
     return ERR_PAIR(Http::Request, size_t, Errors::invalid_format);
@@ -470,7 +470,7 @@ Http::Request::Parser::parse(const char *input, size_t) {
   size_t offset = 0;
 
   // Parse request line
-  Result<std::pair<Http::Request, size_t>> req_line_res =
+  Result<std::pair<Http::Request, size_t> > req_line_res =
       parse_request_line(input, offset);
   if (!req_line_res.error().empty()) {
     return req_line_res;
@@ -480,7 +480,7 @@ Http::Request::Parser::parse(const char *input, size_t) {
   offset += req_line_res.value().second;
 
   // Parse headers
-  Result<std::pair<std::map<std::string, std::string>, size_t>> headers_res =
+  Result<std::pair<std::map<std::string, std::string>, size_t> > headers_res =
       parse_headers(input, offset);
   if (!headers_res.error().empty()) {
     return ERR_PAIR(Http::Request, size_t, headers_res.error());
@@ -491,7 +491,7 @@ Http::Request::Parser::parse(const char *input, size_t) {
   offset += headers_res.value().second;
 
   // Parse body
-  Result<std::pair<Http::Body, size_t>> body_res =
+  Result<std::pair<Http::Body, size_t> > body_res =
       parse_body(input, offset, request._headers);
   if (!body_res.error().empty()) {
     return ERR_PAIR(Http::Request, size_t, body_res.error());
@@ -505,7 +505,7 @@ Http::Request::Parser::parse(const char *input, size_t) {
 }
 
 // Original parse function (delegating to Parser::parse)
-Result<std::pair<Http::Request *, size_t>>
+Result<std::pair<Http::Request *, size_t> >
 Http::Request::parse(const char *input, char delimiter) {
   // Find the length of the input until delimiter
   size_t len = 0;
@@ -513,7 +513,7 @@ Http::Request::parse(const char *input, char delimiter) {
     len++;
   }
 
-  Result<std::pair<Http::Request, size_t>> result =
+  Result<std::pair<Http::Request, size_t> > result =
       Http::Request::Parser::parse(input, len);
 
   if (!result.error().empty()) {

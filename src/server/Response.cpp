@@ -74,7 +74,8 @@ std::string Response::resolve_full_path(const Http::Request *request,
 
   std::string root = get_pwd() + rule->root.toString();
   size_t pos = root.find('*');
-  if (pos != std::string::npos && pos + 1 == root.length() && pos > 0 && root[pos - 1] == '/')
+  if (pos != std::string::npos && pos + 1 == root.length() && pos > 0 &&
+      root[pos - 1] == '/')
     root.erase(pos - 1, 2);
   if (request->path() == "/")
     return root;
