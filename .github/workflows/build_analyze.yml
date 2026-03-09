@@ -12,11 +12,21 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
-      - name: Install Clang-Format
-        run: pip install clang-format=12.0.1.2
-      - name: Format Check
-        run: clang-format -Werror --dry-run -i src/*
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: clang-format Check
+        uses: jidicula/clang-format-action@6cd220de46c89139a0365edae93eee8eb30ca8fe
+        with:
+          # The major version of clang-format that you want to use.
+          clang-format-version: 12
+          # The path to the directory you want to check for correct C/C++/Protobuf formatting. Default is the full repository.
+          check-path: src
+          # A regex to exclude files or directories that should not be checked. Default is empty.
+          # exclude-regex: # optional, default is 
+          # The fallback style for clang-format if no .clang-format file exists in your repository.
+          fallback-style: llvm # optional, default is llvm
+          # A regex to override the C/C++/Protobuf/CUDA filetype regex. that should be checked. Default results in the regex defined in `check.sh`.
+          # include-regex: # optional, default is 
+          
   make:
     needs: format
     name: Make
@@ -24,7 +34,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       - name: Make
         run: make
   codeql:
@@ -56,8 +66,7 @@ jobs:
         # If you are analyzing a compiled language, you can modify the 'build-mode' for that language to customize how
         # your codebase is analyzed, see https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/codeql-code-scanning-for-compiled-languages
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       # Add any setup steps before running the `github/codeql-action/init` action.
       # This includes steps like installing compilers or runtimes (`actions/setup-node`
       # or others). This is typically only required for manual builds.
@@ -66,7 +75,7 @@ jobs:
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@0c0c5dc2f136b98cb0537075ccfa21f94cd9a63e
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -88,6 +97,6 @@ jobs:
           make
       - name: Perform CodeQL Analysis
         id: analyze
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@0c0c5dc2f136b98cb0537075ccfa21f94cd9a63e
         with:
           category: "/language:${{matrix.language}}"
