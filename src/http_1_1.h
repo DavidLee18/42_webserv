@@ -138,13 +138,13 @@ public:
     class Parser {
       virtual void phantom() = 0;
 
-      static Result<std::pair<Request, size_t>> parse_request_line(const char *,
-                                                                   size_t);
-      static Result<std::pair<Method, size_t>> parse_method(const char *,
-                                                            size_t);
-      static Result<std::pair<std::string, size_t>> parse_path(const char *,
-                                                               size_t);
-      static Result<std::pair<std::string, size_t>>
+      static Result<std::pair<Request, size_t> >
+      parse_request_line(const char *, size_t);
+      static Result<std::pair<Method, size_t> > parse_method(const char *,
+                                                             size_t);
+      static Result<std::pair<std::string, size_t> > parse_path(const char *,
+                                                                size_t);
+      static Result<std::pair<std::string, size_t> >
       parse_http_version(const char *, size_t);
       static Result<std::pair<std::map<std::string, std::string>, size_t>>
       parse_headers(const char *, size_t);

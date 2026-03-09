@@ -82,9 +82,9 @@ Json Json::arr(std::vector<Json> js) {
   return Json(Arr, (Value){.arr = new std::vector<Json>(js)});
 }
 
-Json Json::obj(std::vector<std::pair<std::string, Json>> m) {
-  return Json(Obj,
-              (Value){.obj = new std::vector<std::pair<std::string, Json>>(m)});
+Json Json::obj(std::vector<std::pair<std::string, Json> > m) {
+  return Json(
+      Obj, (Value){.obj = new std::vector<std::pair<std::string, Json> >(m)});
 }
 
 Result<std::pair<Json, size_t>> Json::Parser::null_or_undef(const char *raw) {
@@ -228,9 +228,9 @@ Result<std::pair<Json, size_t>> Json::Parser::_obj(const char *raw) {
   return ERR_PAIR(Json, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<Json, size_t>> Json::Parser::parse(const char *raw,
-                                                    char num_end) {
-  Result<std::pair<Json, size_t>> res = null_or_undef(raw);
+Result<std::pair<Json, size_t> > Json::Parser::parse(const char *raw,
+                                                     char num_end) {
+  Result<std::pair<Json, size_t> > res = null_or_undef(raw);
   if (res.error().empty() && !raw[res.value().second])
     return OK_PAIR(Json, size_t, res.value().first, res.value().second);
   Result<std::pair<Json, size_t>> res1 = _boolean(raw);

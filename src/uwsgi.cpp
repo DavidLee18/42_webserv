@@ -1,5 +1,5 @@
-#include "webserv.h"
 #include "uwsgi_client.h"
+#include "webserv.h"
 
 // UwsgiMetaVar implementation
 
@@ -156,23 +156,44 @@ char **UwsgiInput::to_envp() const {
 
 // Returns the CGI/HTTP vars as a map suitable for uwsgi binary encoding.
 // WSGI-specific vars (wsgi.version, wsgi.url_scheme, etc.) are excluded because
-// they are not part of the CGI/HTTP namespace and the uwsgi_server rejects them.
+// they are not part of the CGI/HTTP namespace and the uwsgi_server rejects
+// them.
 std::map<std::string, std::string> UwsgiInput::to_map() const {
   std::map<std::string, std::string> result;
   for (size_t i = 0; i < mvars.size(); ++i) {
     const UwsgiMetaVar &mvar = mvars[i];
     std::string key;
     switch (mvar.get_name()) {
-    case UwsgiMetaVar::REQUEST_METHOD:  key = "REQUEST_METHOD";  break;
-    case UwsgiMetaVar::SCRIPT_NAME:     key = "SCRIPT_NAME";     break;
-    case UwsgiMetaVar::PATH_INFO:       key = "PATH_INFO";       break;
-    case UwsgiMetaVar::QUERY_STRING:    key = "QUERY_STRING";    break;
-    case UwsgiMetaVar::CONTENT_TYPE:    key = "CONTENT_TYPE";    break;
-    case UwsgiMetaVar::CONTENT_LENGTH:  key = "CONTENT_LENGTH";  break;
-    case UwsgiMetaVar::SERVER_NAME:     key = "SERVER_NAME";     break;
-    case UwsgiMetaVar::SERVER_PORT:     key = "SERVER_PORT";     break;
-    case UwsgiMetaVar::SERVER_PROTOCOL: key = "SERVER_PROTOCOL"; break;
-    case UwsgiMetaVar::REMOTE_ADDR:     key = "REMOTE_ADDR";     break;
+    case UwsgiMetaVar::REQUEST_METHOD:
+      key = "REQUEST_METHOD";
+      break;
+    case UwsgiMetaVar::SCRIPT_NAME:
+      key = "SCRIPT_NAME";
+      break;
+    case UwsgiMetaVar::PATH_INFO:
+      key = "PATH_INFO";
+      break;
+    case UwsgiMetaVar::QUERY_STRING:
+      key = "QUERY_STRING";
+      break;
+    case UwsgiMetaVar::CONTENT_TYPE:
+      key = "CONTENT_TYPE";
+      break;
+    case UwsgiMetaVar::CONTENT_LENGTH:
+      key = "CONTENT_LENGTH";
+      break;
+    case UwsgiMetaVar::SERVER_NAME:
+      key = "SERVER_NAME";
+      break;
+    case UwsgiMetaVar::SERVER_PORT:
+      key = "SERVER_PORT";
+      break;
+    case UwsgiMetaVar::SERVER_PROTOCOL:
+      key = "SERVER_PROTOCOL";
+      break;
+    case UwsgiMetaVar::REMOTE_ADDR:
+      key = "REMOTE_ADDR";
+      break;
     case UwsgiMetaVar::HTTP_: {
       // value already contains "HTTP_HEADER_NAME=value"
       const std::string &combined = mvar.get_value();
@@ -285,7 +306,7 @@ Result<UwsgiInput> UwsgiInput::Parser::parse(Http::Request const &req) {
 // UwsgiDelegate implementation
 
 UwsgiDelegate::UwsgiDelegate(const Http::Request &req,
-                              const std::string &uwsgi_host, int uwsgi_port)
+                             const std::string &uwsgi_host, int uwsgi_port)
     : env(req), _uwsgi_host(uwsgi_host), _uwsgi_port(uwsgi_port), request(req) {
   Result<UwsgiInput> env_result = UwsgiInput::Parser::parse(req);
   if (env_result.error().empty()) {
