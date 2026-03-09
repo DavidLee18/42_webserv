@@ -222,12 +222,14 @@ Result<Void> Server::start() {
       }
       // 2. 이미 연결된 클라이언트 소켓인 경우
       else {
-        if (event->err || event->hup || event->rdhup)
+        if (event->err || event->hup || event->rdhup) {
           disconnect(fd);
-        else if (event->in)
-          client_read(fd);
-        else if (event->out)
-          client_write(fd);
+        } else {
+          if (event->in)
+            client_read(fd);
+          if (event->out)
+            client_write(fd);
+        }
       }
       ++events;
     }
