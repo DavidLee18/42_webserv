@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webserv Test Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        a { display: inline-block; margin: 15px; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; }
+        a:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>Hello</h1>
+
+    <!-- 1. /hello 경로로 이동 (200 OK 테스트) -->
+    <a href="/">back to main menu</a>
+    <br>
+    
+    <!-- 2. 없는 경로로 이동 (404 Not Found 테스트) -->
+    <a href="/where-am-i">없는 페이지 가보기 (404 오류)</a>
+
+</body>
+</html>
