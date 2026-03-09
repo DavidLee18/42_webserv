@@ -246,26 +246,32 @@ public:
         parse_path_translated(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_query_string(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> > parse_remote_addr(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> > parse_remote_host(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> >
+        parse_remote_addr(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> >
+        parse_remote_host(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_remote_ident(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> > parse_remote_user(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> >
+        parse_remote_user(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_request_method(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> > parse_script_name(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> > parse_server_name(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> > parse_server_port(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> >
+        parse_script_name(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> >
+        parse_server_name(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> >
+        parse_server_port(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_server_protocol(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_server_software(std::string);
     static Result<std::pair<CgiMetaVar, size_t> > parse_custom_var(std::string,
-                                                                  std::string);
+                                                                   std::string);
 
   public:
     static Result<std::pair<CgiMetaVar, size_t> > parse(std::string const &,
-                                                       std::string const &);
+                                                        std::string const &);
   };
 
   friend class CgiInput;
@@ -334,11 +340,12 @@ public:
     }
   }
 
-  // Assigns from another CgiMetaVar, performing a deep copy of the active value.
-  // The operator first releases any currently owned dynamic resources associated
-  // with this->name, then copies the discriminator and value from 'other' in a
-  // way that mirrors the copy constructor. Self-assignment is explicitly guarded
-  // against so we never delete resources before reading from them.
+  // Assigns from another CgiMetaVar, performing a deep copy of the active
+  // value. The operator first releases any currently owned dynamic resources
+  // associated with this->name, then copies the discriminator and value from
+  // 'other' in a way that mirrors the copy constructor. Self-assignment is
+  // explicitly guarded against so we never delete resources before reading from
+  // them.
   CgiMetaVar &operator=(const CgiMetaVar &other) {
     // Protect against self-assignment; required because we delete current
     // resources before copying from 'other'.

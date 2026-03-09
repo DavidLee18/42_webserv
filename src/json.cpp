@@ -83,8 +83,8 @@ Json Json::arr(std::vector<Json> js) {
 }
 
 Json Json::obj(std::vector<std::pair<std::string, Json> > m) {
-  return Json(Obj,
-              (Value){.obj = new std::vector<std::pair<std::string, Json> >(m)});
+  return Json(
+      Obj, (Value){.obj = new std::vector<std::pair<std::string, Json> >(m)});
 }
 
 Result<std::pair<Json, size_t> > Json::Parser::null_or_undef(const char *raw) {
@@ -229,7 +229,7 @@ Result<std::pair<Json, size_t> > Json::Parser::_obj(const char *raw) {
 }
 
 Result<std::pair<Json, size_t> > Json::Parser::parse(const char *raw,
-                                                    char num_end) {
+                                                     char num_end) {
   Result<std::pair<Json, size_t> > res = null_or_undef(raw);
   if (res.error().empty() && !raw[res.value().second])
     return OK_PAIR(Json, size_t, res.value().first, res.value().second);

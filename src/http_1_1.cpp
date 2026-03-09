@@ -304,18 +304,18 @@ static std::string url_decode(const std::string &encoded) {
 static std::string url_encode(const std::string &decoded) {
   std::string encoded;
   size_t len = decoded.length();
-  
+
   for (size_t i = 0; i < len; ++i) {
     char c = static_cast<char>(decoded[i]);
-    
+
     // Encode spaces as '+'
     if (c == ' ') {
       encoded += '+';
     }
     // Keep alphanumeric and certain safe characters unencoded
     else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-             (c >= '0' && c <= '9') || c == '-' || c == '_' || 
-             c == '.' || c == '~') {
+             (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' ||
+             c == '~') {
       encoded += c;
     }
     // Encode everything else as %XX
@@ -326,7 +326,7 @@ static std::string url_encode(const std::string &decoded) {
       encoded += hex[c & 0x0F];
     }
   }
-  
+
   return encoded;
 }
 
@@ -525,54 +525,75 @@ Http::Request::parse(const char *input, char delimiter) {
                  result.value().second);
 }
 
-static std::string http_method_to_string(Http::Method m)
-{
+static std::string http_method_to_string(Http::Method m) {
   switch (m) {
-    case Http::GET:     return "GET";
-    case Http::HEAD:    return "HEAD";
-    case Http::OPTIONS: return "OPTIONS";
-    case Http::POST:    return "POST";
-    case Http::DELETE:  return "DELETE";
-    case Http::PUT:     return "PUT";
-    case Http::CONNECT: return "CONNECT";
-    case Http::TRACE:   return "TRACE";
-    case Http::PATCH:   return "PATCH";
-    default:      return "";
+  case Http::GET:
+    return "GET";
+  case Http::HEAD:
+    return "HEAD";
+  case Http::OPTIONS:
+    return "OPTIONS";
+  case Http::POST:
+    return "POST";
+  case Http::DELETE:
+    return "DELETE";
+  case Http::PUT:
+    return "PUT";
+  case Http::CONNECT:
+    return "CONNECT";
+  case Http::TRACE:
+    return "TRACE";
+  case Http::PATCH:
+    return "PATCH";
+  default:
+    return "";
   }
 }
 
 //<METHOD> <REQUEST-TARGET> HTTP/1.1\r\n
-static std::string serialize_request_line(Http::Method m, const std::string &path)
-{
+static std::string serialize_request_line(Http::Method m,
+                                          const std::string &path) {
   return http_method_to_string(m) + " " + path + " HTTP/1.1\r\n";
 }
 
 // <HTTP-VERSION> <STATUS-CODE> <REASON-PHRASE>\r\n
-static std::string serialize_response_line(int status)
-{
+static std::string serialize_response_line(int status) {
   std::ostringstream oss;
   std::string reason_phrase = " ";
 
   oss << status;
-  if (status == 200) reason_phrase = " OK";
-  else if (status == 201) reason_phrase = " Created";
-  else if (status == 204) reason_phrase = " No Content";
-  else if (status == 301) reason_phrase = " Moved Permanently";
-  else if (status == 302) reason_phrase = " Found";
-  else if (status == 400) reason_phrase = " Bad Request";
-  else if (status == 403) reason_phrase = " Forbidden";
-  else if (status == 404) reason_phrase = " Not Found";
-  else if (status == 405) reason_phrase = " Method Not Allowed";
-  else if (status == 413) reason_phrase = " Payload Too Large";
-  else if (status == 500) reason_phrase = " Internal Server Error";
-  else if (status == 502) reason_phrase = " Bad Gateway";
-  else if (status == 503) reason_phrase = " Service Unavailable";
+  if (status == 200)
+    reason_phrase = " OK";
+  else if (status == 201)
+    reason_phrase = " Created";
+  else if (status == 204)
+    reason_phrase = " No Content";
+  else if (status == 301)
+    reason_phrase = " Moved Permanently";
+  else if (status == 302)
+    reason_phrase = " Found";
+  else if (status == 400)
+    reason_phrase = " Bad Request";
+  else if (status == 403)
+    reason_phrase = " Forbidden";
+  else if (status == 404)
+    reason_phrase = " Not Found";
+  else if (status == 405)
+    reason_phrase = " Method Not Allowed";
+  else if (status == 413)
+    reason_phrase = " Payload Too Large";
+  else if (status == 500)
+    reason_phrase = " Internal Server Error";
+  else if (status == 502)
+    reason_phrase = " Bad Gateway";
+  else if (status == 503)
+    reason_phrase = " Service Unavailable";
   return "HTTP/1.1 " + oss.str() + reason_phrase + "\r\n";
 }
 
 //<Header-Name>: <Header-Value>\r\n
-static std::string serialize_headers(const std::map<std::string, std::string>& header)
-{
+static std::string
+serialize_headers(const std::map<std::string, std::string> &header) {
   std::ostringstream oss;
   std::map<std::string, std::string>::const_iterator it = header.begin();
 
@@ -587,23 +608,20 @@ static std::string serialize_headers(const std::map<std::string, std::string>& h
 // Body 타입이 Json → JSON 문자열
 // Body 타입이 Form → key1=value1&key2=value2&key3=value3
 // Body 타입이 Html → raw 문자열
-static std::string serialize_body(const Http::Body& b)
-{
-  const Http::Body::Type& body_type = b.type();
-  
+static std::string serialize_body(const Http::Body &b) {
+  const Http::Body::Type &body_type = b.type();
+
   if (body_type == Http::Body::HttpJson) {
     std::ostringstream oss;
-
 
     if (!b.value().json)
       return "";
     oss << *b.value().json;
     return oss.str();
-  }
-  else if (body_type == Http::Body::HttpFormUrlEncoded) {
+  } else if (body_type == Http::Body::HttpFormUrlEncoded) {
     if (!b.value().form)
       return "";
-    const std::map<std::string, std::string>& map = *b.value().form;
+    const std::map<std::string, std::string> &map = *b.value().form;
     std::map<std::string, std::string>::const_iterator it = map.begin();
     std::string s;
 
@@ -613,8 +631,7 @@ static std::string serialize_body(const Http::Body& b)
       s += url_encode(it->first) + "=" + url_encode(it->second);
     }
     return s;
-  }
-  else if (body_type == Http::Body::Html) {
+  } else if (body_type == Http::Body::Html) {
     if (!b.value().html_raw)
       return "";
     return *b.value().html_raw;
@@ -622,18 +639,19 @@ static std::string serialize_body(const Http::Body& b)
   return "";
 }
 
-static std::string request_serialize_body(Http::Method m, const Http::Body& b)
-{
-  const Http::Body::Type& body_type = b.type();
+static std::string request_serialize_body(Http::Method m, const Http::Body &b) {
+  const Http::Body::Type &body_type = b.type();
 
-  if (m == Http::GET || m == Http::HEAD || body_type == Http::Body::Empty) return "";
+  if (m == Http::GET || m == Http::HEAD || body_type == Http::Body::Empty)
+    return "";
   return serialize_body(b);
 }
 
-static bool sync_headers_with_body(std::map<std::string, std::string> &headers, size_t body_size)
-{
+static bool sync_headers_with_body(std::map<std::string, std::string> &headers,
+                                   size_t body_size) {
   // Look for an existing Content-Length header in a case-insensitive way.
-  // If found, update its value; otherwise, insert a normalized "content-length".
+  // If found, update its value; otherwise, insert a normalized
+  // "content-length".
   const std::string normalized_key = "content-length";
   std::map<std::string, std::string>::iterator it = headers.end();
 
@@ -667,8 +685,7 @@ static bool sync_headers_with_body(std::map<std::string, std::string> &headers, 
   return true;
 }
 
-std::string Http::Request::serialize() const
-{
+std::string Http::Request::serialize() const {
   std::map<std::string, std::string> headers = _headers;
 
   std::string start_line = serialize_request_line(_method, _path);
@@ -679,13 +696,13 @@ std::string Http::Request::serialize() const
   return start_line + header + "\r\n" + body;
 }
 
-std::string Http::Response::serialize() const
-{
+std::string Http::Response::serialize() const {
   std::map<std::string, std::string> headers = _headers;
 
   std::string start_line = serialize_response_line(_status_code);
   std::string body = "";
-  if (!(_status_code > 99 && _status_code < 200) && _status_code != 204 && _status_code != 304)
+  if (!(_status_code > 99 && _status_code < 200) && _status_code != 204 &&
+      _status_code != 304)
     body = serialize_body(_body);
   sync_headers_with_body(headers, body.size());
   std::string header = serialize_headers(headers);

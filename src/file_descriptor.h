@@ -33,7 +33,8 @@ public:
 
   Result<Void> socket_listen(unsigned short backlog);
 
-  Result<FileDescriptor> socket_accept(struct sockaddr *addr, socklen_t *len) const;
+  Result<FileDescriptor> socket_accept(struct sockaddr *addr,
+                                       socklen_t *len) const;
 
   Result<ssize_t> sock_recv(void *buf, size_t size) const;
 
