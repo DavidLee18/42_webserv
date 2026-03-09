@@ -18,12 +18,7 @@ UWSGI_DEPS     := $(addprefix $(UWSGI_BUILD_DIR)/, $(UWSGI_SRC_FILES:.cpp=.d))
 
 SRC_FILES	:= errors.cpp epoll_kqueue.cpp file_descriptor.cpp	\
 	ParsingUtils.cpp ServerConfig.cpp WebserverConfig.cpp		\
-<<<<<<< HEAD
-	json.cpp cgi_1_1.cpp wsgi.cpp http_1_1.cpp					\
-=======
-	json.cpp cgi_1_1.cpp wsgi.cpp uwsgi_client.cpp http_1_1.cpp	\
-	ServerSocket.cpp 											\
->>>>>>> cedb4a9 (Add UwsgiClient; replace WsgiDelegate fork/exec with uwsgi binary protocol)
+	json.cpp cgi_1_1.cpp uwsgi.cpp uwsgi_client.cpp http_1_1.cpp \
 	main.cpp 
 SERVER		:=	Server.cpp	Session.cpp	Response.cpp
 

@@ -249,10 +249,6 @@ public:
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_remote_addr(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_query_string(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_addr(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> >
         parse_remote_host(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_remote_ident(std::string);
