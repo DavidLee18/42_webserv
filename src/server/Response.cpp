@@ -26,9 +26,9 @@ int Response::check_path_type(const std::string &path) {
     return NOT_FOUND;
   else if (access(path.c_str(), R_OK) != 0)
     return FORBIDDEN;
-  else if (info.st_mode & S_IFDIR)
+  else if (S_ISDIR(info.st_mode))
     return IS_DIRECTORY;
-  else if (info.st_mode & S_IFREG)
+  else if (S_ISREG(info.st_mode))
     return IS_FILE;
   return -1;
 }
