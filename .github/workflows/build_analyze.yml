@@ -100,3 +100,16 @@ jobs:
         uses: github/codeql-action/analyze@0c0c5dc2f136b98cb0537075ccfa21f94cd9a63e
         with:
           category: "/language:${{matrix.language}}"
+  finalize:
+    needs: codeql
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: LouisBrunner/checks-action@6b626ffbad7cc56fd58627f774b9067e6118af23
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: Build & Analyze
+          status: completed
+          conclusion: success

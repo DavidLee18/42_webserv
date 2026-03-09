@@ -249,6 +249,10 @@ public:
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_remote_addr(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
+        parse_query_string(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> >
+        parse_remote_addr(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> >
         parse_remote_host(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_remote_ident(std::string);
@@ -340,12 +344,6 @@ public:
     }
   }
 
-  // Assigns from another CgiMetaVar, performing a deep copy of the active
-  // value. The operator first releases any currently owned dynamic resources
-  // associated with this->name, then copies the discriminator and value from
-  // 'other' in a way that mirrors the copy constructor. Self-assignment is
-  // explicitly guarded against so we never delete resources before reading from
-  // them.
   // Assigns from another CgiMetaVar, performing a deep copy of the active
   // value. The operator first releases any currently owned dynamic resources
   // associated with this->name, then copies the discriminator and value from

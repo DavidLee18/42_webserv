@@ -15,6 +15,7 @@ UWSGI_SRCS     := $(addprefix $(UWSGI_SRC_DIR)/, $(UWSGI_SRC_FILES))
 UWSGI_OBJS     := $(addprefix $(UWSGI_BUILD_DIR)/, $(UWSGI_SRC_FILES:.cpp=.o))
 UWSGI_DEPS     := $(addprefix $(UWSGI_BUILD_DIR)/, $(UWSGI_SRC_FILES:.cpp=.d))
 
+
 SRC_FILES	:= errors.cpp epoll_kqueue.cpp file_descriptor.cpp	\
 	ParsingUtils.cpp ServerConfig.cpp WebserverConfig.cpp		\
 <<<<<<< HEAD
