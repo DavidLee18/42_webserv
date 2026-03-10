@@ -327,31 +327,8 @@ static int uwsgi_remaining_ms(long long start_ms, int timeout_ms) {
   return (rem > 0) ? (int)rem : 0;
 }
 
-UwsgiDelegate::UwsgiDelegate(const Http::Request &req, int uwsgi_port)
-    : env(req), _uwsgi_port(uwsgi_port), request(req) {
-  Result<UwsgiInput> env_result = UwsgiInput::Parser::parse(req);
-  if (env_result.error().empty()) {
-    env = env_result.value();
-  }
-}
-
-Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
-  if (epoll == NULL) {
-    return ERR(Http::Response, "EPoll instance required");
-  }
-
-  // Capture start time for end-to-end deadline tracking
-  struct timeval tv_start;
-  gettimeofday(&tv_start, NULL);
-  long long start_ms =
-      (long long)tv_start.tv_sec * 1000 + tv_start.tv_usec / 1000;
-
-  // Collect CGI/HTTP vars from the parsed WSGI environment
-  std::map<std::string, std::string> vars = env.to_map();
-
-  // Serialise request body
+static std::string serialize_body(const Http::Body &body) {
   std::string body_str;
-  const Http::Body &body = request.body();
   switch (body.type()) {
   case Http::Body::Html:
     if (body.value().html_raw != NULL)
@@ -383,8 +360,11 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   case Http::Body::Empty:
     break;
   }
+  return body_str;
+}
 
-  // Build uwsgi vars block: repeated [key_len:2B LE][key][val_len:2B LE][val]
+static Result<std::vector<unsigned char>> build_uwsgi_vars_block(
+    const std::map<std::string, std::string> &vars) {
   std::vector<unsigned char> vars_block;
   for (std::map<std::string, std::string>::const_iterator it = vars.begin();
        it != vars.end(); ++it) {
@@ -400,91 +380,41 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     vars_block.insert(vars_block.end(), val.begin(), val.end());
   }
   if (vars_block.size() > static_cast<size_t>(USHRT_MAX))
-    return ERR(Http::Response, "uwsgi vars block exceeds 64 KiB limit");
+    return ERR(std::vector<unsigned char>,
+               "uwsgi vars block exceeds 64 KiB limit");
+  return OK(std::vector<unsigned char>, vars_block);
+}
 
-  // 4-byte uwsgi header: [modifier1=0][datasize:2B LE][modifier2=0]
-  unsigned short datasize = static_cast<unsigned short>(vars_block.size());
-  unsigned char uwsgi_header[4];
-  uwsgi_header[0] = 0;
-  uwsgi_header[1] = static_cast<unsigned char>(datasize & 0xFF);
-  uwsgi_header[2] = static_cast<unsigned char>((datasize >> 8) & 0xFF);
-  uwsgi_header[3] = 0;
-
-  // Build the full send buffer: header + vars_block + body
-  std::vector<unsigned char> send_buf;
-  send_buf.insert(send_buf.end(), uwsgi_header, uwsgi_header + 4);
-  send_buf.insert(send_buf.end(), vars_block.begin(), vars_block.end());
-  send_buf.insert(send_buf.end(), body_str.begin(), body_str.end());
-
-  // Create a non-blocking TCP socket and connect to 127.0.0.1:_uwsgi_port
-  struct addrinfo hints, *res = NULL;
-  std::memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
-  std::ostringstream port_ss;
-  port_ss << _uwsgi_port;
-  if (getaddrinfo("127.0.0.1", port_ss.str().c_str(), &hints, &res) != 0)
-    return ERR(Http::Response, "uwsgi: failed to resolve server address");
-
-  int raw_sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-  if (raw_sock < 0) {
-    freeaddrinfo(res);
-    return ERR(Http::Response, "uwsgi: failed to create socket");
-  }
-
-  // Wrap in FileDescriptor so it is automatically closed when it goes out of
-  // scope (FileDescriptor destructor closes the fd)
-  Result<FileDescriptor> sock_fd_res = FileDescriptor::from_raw(raw_sock);
-  if (!sock_fd_res.error().empty()) {
-    freeaddrinfo(res);
-    close(raw_sock);
-    return ERR(Http::Response, "uwsgi: failed to wrap socket fd");
-  }
-  FileDescriptor sock_fd = sock_fd_res.value();
-
-  // Set non-blocking so we can use epoll
-  Result<Void> nb_res = sock_fd.set_nonblocking();
-  if (!nb_res.error().empty()) {
-    freeaddrinfo(res);
-    return ERR(Http::Response, "uwsgi: failed to set socket non-blocking");
-  }
-
-  // Start non-blocking connect; EINPROGRESS is expected
-  int conn_ret = connect(raw_sock, res->ai_addr, res->ai_addrlen);
-  freeaddrinfo(res);
-  if (conn_ret < 0 && errno != EINPROGRESS) {
-    return ERR(Http::Response, "uwsgi: connect failed");
-  }
-
-  // Add socket to epoll, monitoring for writability (connect completion) and
-  // errors
+static Result<FileDescriptor *> uwsgi_epoll_connect(
+    EPoll *epoll, FileDescriptor &sock_fd, int raw_sock, long long start_ms,
+    int timeout_ms) {
   const FileDescriptor *sock_fd_ptr = &sock_fd;
   Event connect_event(sock_fd_ptr, false, true, false, false, true, false);
   Option connect_option(false, false, false, false);
   Result<FileDescriptor *> add_res =
       epoll->add_fd(sock_fd, connect_event, connect_option);
   if (!add_res.has_value()) {
-    return ERR(Http::Response, "uwsgi: failed to add socket to epoll");
+    return ERR(FileDescriptor *, "uwsgi: failed to add socket to epoll");
   }
   FileDescriptor *sock_epoll = add_res.value();
 
-  // Wait for connect to complete
   bool connected = false;
   while (!connected) {
     int rem = uwsgi_remaining_ms(start_ms, timeout_ms);
     if (rem == 0) {
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: timeout waiting for connect");
+      return ERR(FileDescriptor *, "uwsgi: timeout waiting for connect");
     }
     Result<Events> wait_res = epoll->wait(rem);
     if (!wait_res.error().empty()) {
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: epoll wait failed during connect");
+      return ERR(FileDescriptor *,
+                 "uwsgi: epoll wait failed during connect");
     }
     Events events = wait_res.value();
     if (events.is_end()) {
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: timeout waiting for connect");
+      return ERR(FileDescriptor *, "uwsgi: timeout waiting for connect");
     }
     for (; !events.is_end(); ++events) {
       Result<const Event *> ev_res = *events;
@@ -494,10 +424,9 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       if (*ev->fd == raw_sock) {
         if (ev->err || ev->hup) {
           epoll->del_fd(*sock_epoll);
-          return ERR(Http::Response, "uwsgi: connect error");
+          return ERR(FileDescriptor *, "uwsgi: connect error");
         }
         if (ev->out) {
-          // Verify connect succeeded via getsockopt
           int sock_err = 0;
           socklen_t sock_err_len = sizeof(sock_err);
           if (getsockopt(raw_sock, SOL_SOCKET, SO_ERROR, &sock_err,
@@ -506,37 +435,43 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
             connected = true;
           } else {
             epoll->del_fd(*sock_epoll);
-            return ERR(Http::Response, "uwsgi: connect failed (SO_ERROR)");
+            return ERR(FileDescriptor *, "uwsgi: connect failed (SO_ERROR)");
           }
         }
       }
     }
   }
 
-  // Switch epoll interest to WRITE for sending the request
+  return OK(FileDescriptor *, sock_epoll);
+}
+
+static Result<Void> uwsgi_epoll_send(EPoll *epoll, FileDescriptor *sock_epoll,
+                                     int raw_sock,
+                                     const std::vector<unsigned char> &send_buf,
+                                     long long start_ms, int timeout_ms) {
+  const FileDescriptor *sock_fd_ptr = sock_epoll;
   {
     Event write_event(sock_fd_ptr, false, true, false, false, false, false);
     Option write_option(false, false, false, false);
     epoll->modify_fd(*sock_epoll, write_event, write_option);
   }
 
-  // Send the entire send_buf using epoll-backed non-blocking writes
   size_t total_sent = 0;
   while (total_sent < send_buf.size()) {
     int rem = uwsgi_remaining_ms(start_ms, timeout_ms);
     if (rem == 0) {
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: timeout during send");
+      return ERR(Void, "uwsgi: timeout during send");
     }
     Result<Events> wait_res = epoll->wait(rem);
     if (!wait_res.error().empty()) {
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: epoll wait failed during send");
+      return ERR(Void, "uwsgi: epoll wait failed during send");
     }
     Events events = wait_res.value();
     if (events.is_end()) {
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: timeout during send");
+      return ERR(Void, "uwsgi: timeout during send");
     }
     bool fd_ready = false;
     for (; !events.is_end(); ++events) {
@@ -559,42 +494,46 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       if (errno == EAGAIN || errno == EWOULDBLOCK)
         continue;
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: write failed");
+      return ERR(Void, "uwsgi: write failed");
     } else if (written == 0) {
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: connection closed during send");
+      return ERR(Void, "uwsgi: connection closed during send");
     }
     total_sent += static_cast<size_t>(written);
   }
 
-  // Half-close the write side so the uwsgi server sees EOF on the request
-  shutdown(raw_sock, SHUT_WR);
+  return OK(Void, Void());
+}
 
-  // Switch epoll interest to READ for receiving the response
+static Result<std::string> uwsgi_epoll_recv(EPoll *epoll,
+                                            FileDescriptor *sock_epoll,
+                                            int raw_sock, long long start_ms,
+                                            int timeout_ms) {
+  const FileDescriptor *sock_fd_ptr = sock_epoll;
   {
     Event read_event(sock_fd_ptr, true, false, false, false, false, false);
     Option read_option(false, false, false, false);
     epoll->modify_fd(*sock_epoll, read_event, read_option);
   }
 
-  // Read the full response using epoll-backed non-blocking reads
   std::string output;
   char read_buf[4096];
   while (true) {
     int rem = uwsgi_remaining_ms(start_ms, timeout_ms);
     if (rem == 0) {
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: timeout during receive");
+      return ERR(std::string, "uwsgi: timeout during receive");
     }
     Result<Events> wait_res = epoll->wait(rem);
     if (!wait_res.error().empty()) {
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: epoll wait failed during receive");
+      return ERR(std::string,
+                 "uwsgi: epoll wait failed during receive");
     }
     Events events = wait_res.value();
     if (events.is_end()) {
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: timeout during receive");
+      return ERR(std::string, "uwsgi: timeout during receive");
     }
     bool fd_ready = false;
     for (; !events.is_end(); ++events) {
@@ -614,21 +553,24 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     if (n > 0) {
       output.append(read_buf, static_cast<size_t>(n));
     } else if (n == 0) {
-      break; // EOF: server closed connection
+      break;
     } else {
       if (errno == EAGAIN || errno == EWOULDBLOCK)
         continue;
       epoll->del_fd(*sock_epoll);
-      return ERR(Http::Response, "uwsgi: read error receiving response");
+      return ERR(std::string,
+                 "uwsgi: read error receiving response");
     }
   }
 
-  epoll->del_fd(*sock_epoll);
+  return OK(std::string, output);
+}
 
+static Result<Http::Response>
+parse_uwsgi_response_output(const std::string &output) {
   if (output.empty())
     return ERR(Http::Response, "Empty response from uwsgi server");
 
-  // Parse WSGI output to extract headers and body
   std::string headers_section;
   std::string body_section;
   size_t blank_line_pos = output.find("\r\n\r\n");
@@ -646,7 +588,6 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     body_section = output.substr(blank_line_pos + 4);
   }
 
-  // Parse response headers
   std::map<std::string, std::string> response_headers;
   int status_code = 200;
 
@@ -679,6 +620,115 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   Http::Body result_body(Http::Body::Html, body_val);
   Http::Response response(status_code, response_headers, result_body);
   return OK(Http::Response, response);
+}
+
+UwsgiDelegate::UwsgiDelegate(const Http::Request &req, int uwsgi_port)
+    : env(req), _uwsgi_port(uwsgi_port), request(req) {
+  Result<UwsgiInput> env_result = UwsgiInput::Parser::parse(req);
+  if (env_result.error().empty()) {
+    env = env_result.value();
+  }
+}
+
+Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
+  if (epoll == NULL) {
+    return ERR(Http::Response, "EPoll instance required");
+  }
+
+  struct timeval tv_start;
+  gettimeofday(&tv_start, NULL);
+  long long start_ms =
+      (long long)tv_start.tv_sec * 1000 + tv_start.tv_usec / 1000;
+
+  std::map<std::string, std::string> vars = env.to_map();
+
+  const Http::Body &body = request.body();
+  std::string body_str = serialize_body(body);
+
+  Result<std::vector<unsigned char>> vars_block_res =
+      build_uwsgi_vars_block(vars);
+  if (!vars_block_res.error().empty()) {
+    return ERR(Http::Response, vars_block_res.error());
+  }
+  std::vector<unsigned char> vars_block = vars_block_res.value();
+
+  unsigned short datasize = static_cast<unsigned short>(vars_block.size());
+  unsigned char uwsgi_header[4];
+  uwsgi_header[0] = 0;
+  uwsgi_header[1] = static_cast<unsigned char>(datasize & 0xFF);
+  uwsgi_header[2] = static_cast<unsigned char>((datasize >> 8) & 0xFF);
+  uwsgi_header[3] = 0;
+
+  std::vector<unsigned char> send_buf;
+  send_buf.insert(send_buf.end(), uwsgi_header, uwsgi_header + 4);
+  send_buf.insert(send_buf.end(), vars_block.begin(), vars_block.end());
+  send_buf.insert(send_buf.end(), body_str.begin(), body_str.end());
+
+  struct addrinfo hints, *res = NULL;
+  std::memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  std::ostringstream port_ss;
+  port_ss << _uwsgi_port;
+  if (getaddrinfo("127.0.0.1", port_ss.str().c_str(), &hints, &res) != 0)
+    return ERR(Http::Response, "uwsgi: failed to resolve server address");
+
+  int raw_sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  if (raw_sock < 0) {
+    freeaddrinfo(res);
+    return ERR(Http::Response, "uwsgi: failed to create socket");
+  }
+
+  Result<FileDescriptor> sock_fd_res = FileDescriptor::from_raw(raw_sock);
+  if (!sock_fd_res.error().empty()) {
+    freeaddrinfo(res);
+    close(raw_sock);
+    return ERR(Http::Response, "uwsgi: failed to wrap socket fd");
+  }
+  FileDescriptor sock_fd = sock_fd_res.value();
+
+  Result<Void> nb_res = sock_fd.set_nonblocking();
+  if (!nb_res.error().empty()) {
+    freeaddrinfo(res);
+    return ERR(Http::Response, "uwsgi: failed to set socket non-blocking");
+  }
+
+  int conn_ret = connect(raw_sock, res->ai_addr, res->ai_addrlen);
+  freeaddrinfo(res);
+  if (conn_ret < 0 && errno != EINPROGRESS) {
+    return ERR(Http::Response, "uwsgi: connect failed");
+  }
+
+  Result<FileDescriptor *> connect_res =
+      uwsgi_epoll_connect(epoll, sock_fd, raw_sock, start_ms, timeout_ms);
+  if (!connect_res.error().empty()) {
+    return ERR(Http::Response, connect_res.error());
+  }
+  FileDescriptor *sock_epoll = connect_res.value();
+
+  Result<Void> send_res =
+      uwsgi_epoll_send(epoll, sock_epoll, raw_sock, send_buf, start_ms,
+                       timeout_ms);
+  if (!send_res.error().empty()) {
+    return ERR(Http::Response, send_res.error());
+  }
+
+  shutdown(raw_sock, SHUT_WR);
+
+  Result<std::string> recv_res =
+      uwsgi_epoll_recv(epoll, sock_epoll, raw_sock, start_ms, timeout_ms);
+  if (!recv_res.error().empty()) {
+    return ERR(Http::Response, recv_res.error());
+  }
+  std::string output = recv_res.value();
+
+  epoll->del_fd(*sock_epoll);
+
+  Result<Http::Response> parse_res = parse_uwsgi_response_output(output);
+  if (!parse_res.error().empty()) {
+    return ERR(Http::Response, parse_res.error());
+  }
+  return OK(Http::Response, parse_res.value());
 }
 
 UwsgiDelegate::~UwsgiDelegate() {
