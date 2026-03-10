@@ -366,16 +366,22 @@ static std::string serialize_body(const Http::Body &body) {
 static Result<std::vector<unsigned char>> build_uwsgi_vars_block(
     const std::map<std::string, std::string> &vars) {
   std::vector<unsigned char> vars_block;
+  size_t running_size = 0;
   for (std::map<std::string, std::string>::const_iterator it = vars.begin();
        it != vars.end(); ++it) {
     const std::string &key = it->first;
     const std::string &val = it->second;
     if (key.size() > static_cast<size_t>(USHRT_MAX))
       return ERR(std::vector<unsigned char>,
-                 "uwsgi vars key exceeds 65535 bytes");
+                 "uwsgi var key exceeds 64 KiB limit");
     if (val.size() > static_cast<size_t>(USHRT_MAX))
       return ERR(std::vector<unsigned char>,
-                 "uwsgi vars value exceeds 65535 bytes");
+                 "uwsgi var value exceeds 64 KiB limit");
+    size_t entry_size = 4 + key.size() + val.size();
+    if (running_size + entry_size > static_cast<size_t>(USHRT_MAX))
+      return ERR(std::vector<unsigned char>,
+                 "uwsgi vars block exceeds 64 KiB limit");
+    running_size += entry_size;
     unsigned short key_len = static_cast<unsigned short>(key.size());
     vars_block.push_back(static_cast<unsigned char>(key_len & 0xFF));
     vars_block.push_back(static_cast<unsigned char>((key_len >> 8) & 0xFF));
@@ -385,9 +391,6 @@ static Result<std::vector<unsigned char>> build_uwsgi_vars_block(
     vars_block.push_back(static_cast<unsigned char>((val_len >> 8) & 0xFF));
     vars_block.insert(vars_block.end(), val.begin(), val.end());
   }
-  if (vars_block.size() > static_cast<size_t>(USHRT_MAX))
-    return ERR(std::vector<unsigned char>,
-               "uwsgi vars block exceeds 64 KiB limit");
   return OK(std::vector<unsigned char>, vars_block);
 }
 
