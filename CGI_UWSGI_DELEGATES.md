@@ -208,8 +208,8 @@ Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
 
 | Parameter    | Description |
 |--------------|-------------|
-| `timeout_ms` | Reserved. Currently unused — the underlying `UwsgiClient` uses blocking TCP I/O. |
-| `epoll`      | Reserved. Currently unused. May be `NULL`. |
+| `timeout_ms` | End-to-end request deadline in milliseconds. The same `remaining_ms` accounting used by `CgiDelegate` applies: the wall-clock elapsed time since `execute()` was called must not exceed `timeout_ms`. Before each `EPoll::wait()` call the remaining time is recomputed and passed; if the deadline has already expired the operation returns a timeout error immediately. Pass `<= 0` for no deadline. |
+| `epoll`      | Non-NULL pointer to the server's `EPoll` instance. All TCP socket I/O (connect, send, receive) is performed non-blocking via `add_fd` / `wait`. |
 
 **Execution steps**:
 
@@ -218,21 +218,30 @@ Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
    `wsgi.url_scheme`, etc.) are excluded because the uWSGI server rejects them.
 2. Serialises the request body to a string (supports `Html`, `HttpJson`, and
    `HttpFormUrlEncoded` body types).
-3. Creates a `UwsgiClient` with `uwsgi_host` and `uwsgi_port` and calls
-   `UwsgiClient::send(vars, body)`.
-4. Parses the raw HTTP output returned by the server: headers separated from the
-   body by a blank line (`\r\n\r\n` or `\n\n`). The `Status` header controls the
-   response status code (defaults to 200).
+3. Encodes the uwsgi binary protocol request (4-byte header + vars block + body)
+   into a single send buffer.
+4. Creates a non-blocking TCP socket, sets it non-blocking, and calls
+   `connect()` (expecting `EINPROGRESS`). Adds the socket to `epoll` and waits
+   for writability (connect completion), verifying success via `getsockopt(SO_ERROR)`.
+5. Sends the full request buffer using epoll-backed non-blocking `write()` calls,
+   then performs a `shutdown(SHUT_WR)` so the server sees EOF on the request stream.
+6. Switches the socket to read-interest in epoll and reads the raw HTTP response
+   until EOF, using non-blocking `read()` calls.
+7. Parses the raw HTTP output: headers separated from the body by a blank line
+   (`\r\n\r\n` or `\n\n`). The `Status` header controls the response status
+   code (defaults to 200).
 
 **Return value**: `Result<Http::Response>` — on success holds the parsed
 response; on failure holds a non-empty error string. Failure causes include:
 
-- `UwsgiClient::send()` fails (DNS resolution, connection, or write/read error).
+- DNS resolution, socket creation, or non-blocking connect error.
+- `epoll` add/wait failure, write error, or read error.
+- Timeout (end-to-end deadline exceeded at any stage).
 - The server returns an empty response.
 
 ### Wire protocol
 
-`UwsgiClient` encodes the request as follows (all integers are little-endian):
+`execute()` encodes the request as follows (all integers are little-endian):
 
 ```
 [ modifier1  : 1 byte  ]  always 0 (Python/WSGI sub-type)
@@ -308,6 +317,6 @@ if (!result.error().empty()) {
 | Transport                     | stdin/stdout over anonymous pipes        | TCP socket (uWSGI binary protocol)         |
 | Script language                | Any executable (C, Python, shell, …)     | Python WSGI application via uWSGI server   |
 | Process model                 | Forks a new process per request          | Connects to a long-running server process  |
-| EPoll integration              | Required (non-blocking pipe I/O)         | Not used (blocking TCP I/O)                |
-| Timeout (`timeout_ms`)         | Per-`EPoll::wait()` call (not end-to-end) | Reserved — parameter accepted but unused  |
+| EPoll integration              | Required (non-blocking pipe I/O)         | Required (non-blocking TCP socket I/O)     |
+| Timeout (`timeout_ms`)         | End-to-end deadline                      | End-to-end deadline                        |
 | Config syntax (planned)        | `$<script_path>` (not yet in parser)     | `$<port>` (not yet in parser)              |

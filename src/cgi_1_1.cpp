@@ -124,9 +124,8 @@ std::string ServerName::to_string() const {
     return result;
   } else {
     std::stringstream ss;
-    ss << static_cast<int>(val.ipv4[0]) << "."
-       << static_cast<int>(val.ipv4[1]) << "."
-       << static_cast<int>(val.ipv4[2]) << "."
+    ss << static_cast<int>(val.ipv4[0]) << "." << static_cast<int>(val.ipv4[1])
+       << "." << static_cast<int>(val.ipv4[2]) << "."
        << static_cast<int>(val.ipv4[3]);
     return ss.str();
   }
@@ -792,13 +791,13 @@ Result<CgiInput> CgiInput::Parser::parse(Http::Request const &req) {
   // Add AUTH_TYPE and REMOTE_USER (from Authorization header, if present)
   if (!auth_header_val.empty()) {
     size_t sp = auth_header_val.find(' ');
-    std::string scheme =
-        (sp != std::string::npos) ? auth_header_val.substr(0, sp)
-                                  : auth_header_val;
+    std::string scheme = (sp != std::string::npos)
+                             ? auth_header_val.substr(0, sp)
+                             : auth_header_val;
     std::string scheme_upper = scheme;
     for (size_t i = 0; i < scheme_upper.size(); i++)
-      scheme_upper[i] =
-          static_cast<char>(to_upper(static_cast<unsigned char>(scheme_upper[i])));
+      scheme_upper[i] = static_cast<char>(
+          to_upper(static_cast<unsigned char>(scheme_upper[i])));
     if (scheme_upper == "BASIC")
       input.mvars.push_back(
           CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::Basic)));
@@ -1125,8 +1124,7 @@ static int remaining_ms(long long start_ms, int timeout_ms) {
     return -1;
   struct timeval tv_now;
   gettimeofday(&tv_now, NULL);
-  long long now_ms =
-      (long long)tv_now.tv_sec * 1000 + tv_now.tv_usec / 1000;
+  long long now_ms = (long long)tv_now.tv_sec * 1000 + tv_now.tv_usec / 1000;
   // Guard against clock going backwards (e.g. NTP adjustment)
   if (now_ms < start_ms)
     return timeout_ms;
@@ -1286,8 +1284,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   // writability
   if (!body_str.empty()) {
     // Add stdin_fd to epoll for writing
-    const FileDescriptor *stdin_fd_ptr =
-        const_cast<const FileDescriptor *>(&stdin_fd);
+    const FileDescriptor *stdin_fd_ptr = &stdin_fd;
     Event write_event(stdin_fd_ptr, false, true, false, false, false, false);
     Option write_option(false, false, false, false);
     Result<FileDescriptor *> add_result =
@@ -1382,8 +1379,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   }
 
   // Add stdout_fd to epoll for reading
-  const FileDescriptor *stdout_fd_ptr =
-      const_cast<const FileDescriptor *>(&stdout_fd);
+  const FileDescriptor *stdout_fd_ptr = &stdout_fd;
   Event read_event(stdout_fd_ptr, true, false, false, false, false, false);
   Option read_option(false, false, false, false);
   Result<FileDescriptor *> add_stdout_result =
