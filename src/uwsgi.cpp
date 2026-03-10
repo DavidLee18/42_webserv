@@ -370,6 +370,12 @@ static Result<std::vector<unsigned char>> build_uwsgi_vars_block(
        it != vars.end(); ++it) {
     const std::string &key = it->first;
     const std::string &val = it->second;
+    if (key.size() > static_cast<size_t>(USHRT_MAX))
+      return ERR(std::vector<unsigned char>,
+                 "uwsgi vars key exceeds 65535 bytes");
+    if (val.size() > static_cast<size_t>(USHRT_MAX))
+      return ERR(std::vector<unsigned char>,
+                 "uwsgi vars value exceeds 65535 bytes");
     unsigned short key_len = static_cast<unsigned short>(key.size());
     vars_block.push_back(static_cast<unsigned char>(key_len & 0xFF));
     vars_block.push_back(static_cast<unsigned char>((key_len >> 8) & 0xFF));
