@@ -38,12 +38,12 @@ CgiDelegate(const Http::Request &req, const std::string &script);
 | Parameter | Description |
 |-----------|-------------|
 | `req`     | The incoming HTTP/1.1 request to dispatch to the CGI script. |
-| `script`  | Absolute path to the CGI executable on the filesystem. |
+| `script`  | Path to the CGI executable. Relative paths are resolved against the server process's working directory; absolute paths are used as-is. |
 
 The constructor calls `CgiInput::Parser::parse(req)` to build the CGI
-meta-variable environment from the request. If parsing succeeds, the resulting
-`CgiInput` is stored; otherwise the delegate retains a default-constructed
-(empty) `CgiInput`.
+meta-variable environment from the request. The current implementation always
+succeeds and returns a fully populated `CgiInput`; the error-path guard in the
+constructor is defensive code for future parser extensions.
 
 ### execute()
 
@@ -53,7 +53,7 @@ Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
 
 | Parameter    | Description |
 |--------------|-------------|
-| `timeout_ms` | Maximum time in milliseconds to wait for the CGI script to produce output. Passed directly to `EPoll::wait()`. |
+| `timeout_ms` | Timeout in milliseconds for each individual `EPoll::wait()` call. Since `EPoll::wait()` may be called multiple times (during the stdin-write loop and the stdout-read loop), the **total** execution time is not bounded by this value. |
 | `epoll`      | Non-NULL pointer to the server's `EPoll` instance. Used for non-blocking pipe I/O via `add_fd` / `wait`. |
 
 **Execution steps**:
@@ -102,57 +102,33 @@ status code returned to the client. If absent, the status defaults to 200.
 
 ### Environment variables passed to the script
 
-All 17 standard CGI/1.1 meta-variables defined by RFC 3875 §4.1 are set:
+`CgiInput::Parser::parse` populates the following variables from the request.
+Variables from the full RFC 3875 §4.1 set that are not listed here are **not
+currently set** by the parser and will be absent from the script's environment.
 
-| Variable             | Example value               |
-|----------------------|-----------------------------|
-| `AUTH_TYPE`          | `Basic`                     |
-| `CONTENT_LENGTH`     | `42`                        |
-| `CONTENT_TYPE`       | `application/json`          |
-| `GATEWAY_INTERFACE`  | `CGI/1.1`                   |
-| `PATH_INFO`          | `/foo/bar`                  |
-| `PATH_TRANSLATED`    | `/var/www/foo/bar`           |
-| `QUERY_STRING`       | `key=value&other=x`         |
-| `REMOTE_ADDR`        | `127.0.0.1`                 |
-| `REMOTE_HOST`        | *(hostname of the client)*  |
-| `REMOTE_IDENT`       | *(RFC 1413 identity)*       |
-| `REMOTE_USER`        | *(authenticated user)*      |
-| `REQUEST_METHOD`     | `GET`                       |
-| `SCRIPT_NAME`        | `/cgi-bin/hello`            |
-| `SERVER_NAME`        | `localhost`                 |
-| `SERVER_PORT`        | `8080`                      |
-| `SERVER_PROTOCOL`    | `HTTP/1.1`                  |
-| `SERVER_SOFTWARE`    | `webserv`                   |
+| Variable            | Source                                           | Always set? |
+|---------------------|--------------------------------------------------|-------------|
+| `REQUEST_METHOD`    | HTTP method (`GET`, `POST`, etc.)                | ✅ Yes |
+| `SERVER_PROTOCOL`   | Hard-coded `HTTP/1.1`                            | ✅ Yes |
+| `GATEWAY_INTERFACE` | Hard-coded `CGI/1.1`                             | ✅ Yes |
+| `SCRIPT_NAME`       | Request path up to `?`, split on `/` into a path-segment list | Only when path is non-empty |
+| `QUERY_STRING`      | Query part of the request path (after `?`)       | Only when query string is present |
+| `CONTENT_TYPE`      | `Content-Type` request header                    | Only when header is present |
+| `CONTENT_LENGTH`    | `Content-Length` request header                  | Only when header is present |
+| `HTTP_*`            | All other request headers, uppercased            | One per header present |
 
-HTTP request headers are forwarded as `HTTP_*` variables (e.g.,
-`HTTP_ACCEPT_ENCODING`). Extra meta-variables can be added through the server
-configuration (see [Configuration](#configuration) below).
+Variables defined by RFC 3875 §4.1 that are **not yet implemented**:
+`AUTH_TYPE`, `PATH_INFO`, `PATH_TRANSLATED`, `REMOTE_ADDR`, `REMOTE_HOST`,
+`REMOTE_IDENT`, `REMOTE_USER`, `SERVER_NAME`, `SERVER_PORT`, `SERVER_SOFTWARE`.
 
 ### Configuration syntax
 
-In the `.wbsrv` configuration file a CGI script is referenced with a `$` prefix
-followed by the script path. Additional meta-variables can be appended in
-parentheses.
-
-**Global handler** — applied to every request on the server block:
-
-```
-:8080 =
-    $add_csp_sha256.cgi
-```
-
-**Route-specific handler** — applied only when the route matches:
-
-```
-POST /upload_file $upload_file.cgi(UPLOAD_DEST=/uploaded/)
-    ...5           # route-level timeout: 5 seconds
-    BUFFER_SIZE=2048
-```
-
-Here `UPLOAD_DEST` and `BUFFER_SIZE` become additional CGI meta-variables
-available in the script's environment. The `...<N>` directive sets the
-per-route server-response timeout in seconds (overriding the server-block
-default set by a standalone `...N` line).
+> **Note**: The `$<script>` delegate syntax shown in `default.wbsrv` comments
+> is **not yet implemented** by the server configuration parser
+> (`ServerConfig`). Route rules currently require exactly four space-separated
+> tokens in the form `METHOD PATH OPERATOR TARGET` (e.g.
+> `GET /path <- /root/*`). `CgiDelegate` is invoked programmatically — see the
+> usage example below.
 
 ### Usage example
 
@@ -214,8 +190,11 @@ UwsgiDelegate(const Http::Request &req,
 | `uwsgi_port`  | TCP port the uWSGI application server listens on. |
 
 The constructor calls `UwsgiInput::Parser::parse(req)` to build the WSGI/CGI
-environment from the request. If parsing succeeds the resulting `UwsgiInput` is
-stored; otherwise a default-constructed (empty) `UwsgiInput` is retained.
+environment from the request. The current implementation always succeeds:
+it hard-codes `SERVER_NAME=localhost`, `SERVER_PORT=8080`,
+`REMOTE_ADDR=127.0.0.1`, and several WSGI defaults, then supplements them
+with values derived from the request. The error-path guard in the constructor
+is defensive code for future parser extensions.
 
 ### execute()
 
@@ -294,20 +273,11 @@ WSGI-only keys (`wsgi.version`, `wsgi.url_scheme`, `wsgi.input`,
 
 ### Configuration syntax
 
-In the `.wbsrv` configuration file, a uWSGI server is referenced by its TCP
-port number (without a path). Additional meta-variables can be appended in
-parentheses.
-
-**Route-specific handler**:
-
-```
-POST /login $9000(AUTH_INFO=/auth_info)
-    ...7           # route-level timeout: 7 seconds
-```
-
-Here `9000` is the TCP port of the uWSGI server, `AUTH_INFO` becomes an
-extra CGI meta-variable forwarded in the packet, and `...7` sets a 7-second
-per-route server-response timeout (see the `...<N>` timeout directive).
+> **Note**: The `$<port>` delegate syntax shown in `default.wbsrv` comments
+> is **not yet implemented** by the server configuration parser
+> (`ServerConfig`). Route rules currently require exactly four space-separated
+> tokens in the form `METHOD PATH OPERATOR TARGET`. `UwsgiDelegate` is invoked
+> programmatically — see the usage example below.
 
 ### Usage example
 
@@ -335,6 +305,5 @@ if (!result.error().empty()) {
 | Script language                | Any executable (C, Python, shell, …)     | Python WSGI application via uWSGI server   |
 | Process model                 | Forks a new process per request          | Connects to a long-running server process  |
 | EPoll integration              | Required (non-blocking pipe I/O)         | Not used (blocking TCP I/O)                |
-| Timeout support                | Yes, via `timeout_ms` and `EPoll::wait`  | Planned (parameter reserved, not yet used) |
-| Config identifier              | `$<script_path>` (file path)             | `$<port>` (TCP port number)                |
-| Extra meta-variables           | `$<script>(KEY=value)`                   | `$<port>(KEY=value)`                       |
+| Timeout (`timeout_ms`)         | Per-`EPoll::wait()` call (not end-to-end) | Reserved — parameter accepted but unused  |
+| Config syntax (planned)        | `$<script_path>` (not yet in parser)     | `$<port>` (not yet in parser)              |
