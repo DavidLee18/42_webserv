@@ -53,7 +53,7 @@ Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
 
 | Parameter    | Description |
 |--------------|-------------|
-| `timeout_ms` | Timeout in milliseconds for each individual `EPoll::wait()` call. Since `EPoll::wait()` may be called multiple times (during the stdin-write loop and the stdout-read loop), the **total** execution time is not bounded by this value. |
+| `timeout_ms` | End-to-end request deadline in milliseconds. The wall-clock elapsed time since `execute()` was called must not exceed `timeout_ms`. Before each `EPoll::wait()` call the remaining time is recomputed and passed; if the deadline has already expired the operation returns a timeout error immediately. Pass `<= 0` for no deadline (each `EPoll::wait()` call blocks indefinitely). |
 | `epoll`      | Non-NULL pointer to the server's `EPoll` instance. Used for non-blocking pipe I/O via `add_fd` / `wait`. |
 
 **Execution steps**:
@@ -102,24 +102,33 @@ status code returned to the client. If absent, the status defaults to 200.
 
 ### Environment variables passed to the script
 
-`CgiInput::Parser::parse` populates the following variables from the request.
-Variables from the full RFC 3875 §4.1 set that are not listed here are **not
-currently set** by the parser and will be absent from the script's environment.
+`CgiInput::Parser::parse` populates all 17 standard CGI/1.1 meta-variables
+defined by RFC 3875 §4.1:
 
-| Variable            | Source                                           | Always set? |
-|---------------------|--------------------------------------------------|-------------|
-| `REQUEST_METHOD`    | HTTP method (`GET`, `POST`, etc.)                | ✅ Yes |
-| `SERVER_PROTOCOL`   | Hard-coded `HTTP/1.1`                            | ✅ Yes |
-| `GATEWAY_INTERFACE` | Hard-coded `CGI/1.1`                             | ✅ Yes |
-| `SCRIPT_NAME`       | Request path up to `?`, split on `/` into a path-segment list | Only when path is non-empty |
-| `QUERY_STRING`      | Query part of the request path (after `?`)       | Only when query string is present |
-| `CONTENT_TYPE`      | `Content-Type` request header                    | Only when header is present |
-| `CONTENT_LENGTH`    | `Content-Length` request header                  | Only when header is present |
-| `HTTP_*`            | All other request headers, uppercased            | One per header present |
+| Variable            | Source / Value                                              | Always set? |
+|---------------------|-------------------------------------------------------------|-------------|
+| `AUTH_TYPE`         | Scheme from `Authorization` header (`Basic`, `Digest`, …)  | Only when `Authorization` header is present |
+| `CONTENT_LENGTH`    | `Content-Length` request header                            | Only when header is present |
+| `CONTENT_TYPE`      | `Content-Type` request header                              | Only when header is present |
+| `GATEWAY_INTERFACE` | Hard-coded `CGI/1.1`                                       | ✅ Yes |
+| `PATH_INFO`         | Full request path (up to `?`), same as `SCRIPT_NAME`. RFC 3875 §4.1.5 defines PATH_INFO as the extra path after the script name, but since this server does not split the URI into script-name vs extra-path, both variables receive the full path. | ✅ Yes |
+| `PATH_TRANSLATED`   | Empty string — document root is not available here         | ✅ Yes (empty) |
+| `QUERY_STRING`      | Query part of the request path (after `?`)                 | Only when query string is present |
+| `REMOTE_ADDR`       | Hard-coded `127.0.0.1` — actual client IP not available    | ✅ Yes |
+| `REMOTE_HOST`       | Hard-coded `localhost` (same as `REMOTE_ADDR`)             | ✅ Yes |
+| `REMOTE_IDENT`      | Empty string — RFC 1413 identification not implemented     | ✅ Yes (empty) |
+| `REMOTE_USER`       | Empty string — credential parsing not implemented          | Only when `Authorization` header is present |
+| `REQUEST_METHOD`    | HTTP method (`GET`, `POST`, etc.)                          | ✅ Yes |
+| `SCRIPT_NAME`       | Full request path (up to `?`), split on `/` into path segments | ✅ Yes |
+| `SERVER_NAME`       | Hostname from `Host` header; defaults to `localhost`       | ✅ Yes |
+| `SERVER_PORT`       | Port from `Host` header; defaults to `80`                  | ✅ Yes |
+| `SERVER_PROTOCOL`   | Hard-coded `HTTP/1.1`                                      | ✅ Yes |
+| `SERVER_SOFTWARE`   | Hard-coded `webserv`                                       | ✅ Yes |
 
-Variables defined by RFC 3875 §4.1 that are **not yet implemented**:
-`AUTH_TYPE`, `PATH_INFO`, `PATH_TRANSLATED`, `REMOTE_ADDR`, `REMOTE_HOST`,
-`REMOTE_IDENT`, `REMOTE_USER`, `SERVER_NAME`, `SERVER_PORT`, `SERVER_SOFTWARE`.
+HTTP request headers (other than `Content-Type`, `Content-Length`, and
+`Authorization`) are forwarded as `HTTP_*` variables (e.g.,
+`HTTP_ACCEPT_ENCODING`). Extra meta-variables can be added programmatically via
+`CgiInput::add_mvar()`.
 
 ### Configuration syntax
 
@@ -167,9 +176,7 @@ HTTP response, and parses it into an `Http::Response`.
 ```cpp
 class UwsgiDelegate {
 public:
-  UwsgiDelegate(const Http::Request &req,
-                const std::string &uwsgi_host,
-                int uwsgi_port);
+  UwsgiDelegate(const Http::Request &req, int uwsgi_port);
   Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
   ~UwsgiDelegate();
 };
@@ -178,23 +185,20 @@ public:
 ### Constructor
 
 ```cpp
-UwsgiDelegate(const Http::Request &req,
-              const std::string &uwsgi_host,
-              int uwsgi_port);
+UwsgiDelegate(const Http::Request &req, int uwsgi_port);
 ```
 
 | Parameter     | Description |
 |---------------|-------------|
 | `req`         | The incoming HTTP/1.1 request to forward to the uWSGI server. |
-| `uwsgi_host`  | Hostname or IP address of the uWSGI application server. |
-| `uwsgi_port`  | TCP port the uWSGI application server listens on. |
+| `uwsgi_port`  | TCP port the uWSGI application server listens on. The host is always `127.0.0.1` (loopback). |
 
 The constructor calls `UwsgiInput::Parser::parse(req)` to build the WSGI/CGI
 environment from the request. The current implementation always succeeds:
 it hard-codes `SERVER_NAME=localhost`, `SERVER_PORT=8080`,
 `REMOTE_ADDR=127.0.0.1`, and several WSGI defaults, then supplements them
-with values derived from the request. The error-path guard in the constructor
-is defensive code for future parser extensions.
+with values derived from the request. The uWSGI server is always contacted
+at `127.0.0.1:<uwsgi_port>`.
 
 ### execute()
 
@@ -285,7 +289,7 @@ WSGI-only keys (`wsgi.version`, `wsgi.url_scheme`, `wsgi.input`,
 #include "uwsgi.h"
 
 // Inside a request handler:
-UwsgiDelegate delegate(request, "127.0.0.1", 9000);
+UwsgiDelegate delegate(request, 9000);
 Result<Http::Response> result = delegate.execute(0, NULL);
 if (!result.error().empty()) {
     // Handle error

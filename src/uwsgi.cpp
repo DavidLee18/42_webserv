@@ -305,9 +305,8 @@ Result<UwsgiInput> UwsgiInput::Parser::parse(Http::Request const &req) {
 
 // UwsgiDelegate implementation
 
-UwsgiDelegate::UwsgiDelegate(const Http::Request &req,
-                             const std::string &uwsgi_host, int uwsgi_port)
-    : env(req), _uwsgi_host(uwsgi_host), _uwsgi_port(uwsgi_port), request(req) {
+UwsgiDelegate::UwsgiDelegate(const Http::Request &req, int uwsgi_port)
+    : env(req), _uwsgi_port(uwsgi_port), request(req) {
   Result<UwsgiInput> env_result = UwsgiInput::Parser::parse(req);
   if (env_result.error().empty()) {
     env = env_result.value();
@@ -357,7 +356,7 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   }
 
   // Send request to uwsgi_server and receive its raw HTTP output
-  UwsgiClient client(_uwsgi_host, _uwsgi_port);
+  UwsgiClient client("127.0.0.1", _uwsgi_port);
   Result<std::string> resp_result = client.send(vars, body_str);
   if (!resp_result.error().empty())
     return ERR(Http::Response, resp_result.error());
