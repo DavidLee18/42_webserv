@@ -366,10 +366,22 @@ static std::string serialize_body(const Http::Body &body) {
 static Result<std::vector<unsigned char> >
 build_uwsgi_vars_block(const std::map<std::string, std::string> &vars) {
   std::vector<unsigned char> vars_block;
+  size_t running_size = 0;
   for (std::map<std::string, std::string>::const_iterator it = vars.begin();
        it != vars.end(); ++it) {
     const std::string &key = it->first;
     const std::string &val = it->second;
+    if (key.size() > static_cast<size_t>(USHRT_MAX))
+      return ERR(std::vector<unsigned char>,
+                 "uwsgi var key exceeds 64 KiB limit");
+    if (val.size() > static_cast<size_t>(USHRT_MAX))
+      return ERR(std::vector<unsigned char>,
+                 "uwsgi var value exceeds 64 KiB limit");
+    size_t entry_size = 4 + key.size() + val.size();
+    if (running_size + entry_size > static_cast<size_t>(USHRT_MAX))
+      return ERR(std::vector<unsigned char>,
+                 "uwsgi vars block exceeds 64 KiB limit");
+    running_size += entry_size;
     unsigned short key_len = static_cast<unsigned short>(key.size());
     vars_block.push_back(static_cast<unsigned char>(key_len & 0xFF));
     vars_block.push_back(static_cast<unsigned char>((key_len >> 8) & 0xFF));
@@ -379,9 +391,6 @@ build_uwsgi_vars_block(const std::map<std::string, std::string> &vars) {
     vars_block.push_back(static_cast<unsigned char>((val_len >> 8) & 0xFF));
     vars_block.insert(vars_block.end(), val.begin(), val.end());
   }
-  if (vars_block.size() > static_cast<size_t>(USHRT_MAX))
-    return ERR(std::vector<unsigned char>,
-               "uwsgi vars block exceeds 64 KiB limit");
   return OK(std::vector<unsigned char>, vars_block);
 }
 
@@ -452,7 +461,11 @@ static Result<Void> uwsgi_epoll_send(EPoll *epoll, FileDescriptor *sock_epoll,
   {
     Event write_event(sock_fd_ptr, false, true, false, false, false, false);
     Option write_option(false, false, false, false);
-    epoll->modify_fd(*sock_epoll, write_event, write_option);
+    Result<Void> modify_res = epoll->modify_fd(*sock_epoll, write_event, write_option);
+    if (!modify_res.error().empty()) {
+      epoll->del_fd(*sock_epoll);
+      return ERR(Void, "uwsgi: epoll modify failed during send");
+    }
   }
 
   size_t total_sent = 0;
@@ -512,7 +525,11 @@ static Result<std::string> uwsgi_epoll_recv(EPoll *epoll,
   {
     Event read_event(sock_fd_ptr, true, false, false, false, false, false);
     Option read_option(false, false, false, false);
-    epoll->modify_fd(*sock_epoll, read_event, read_option);
+    Result<Void> modify_res = epoll->modify_fd(*sock_epoll, read_event, read_option);
+    if (!modify_res.error().empty()) {
+      epoll->del_fd(*sock_epoll);
+      return ERR(std::string, "uwsgi: epoll modify failed during receive");
+    }
   }
 
   std::string output;
