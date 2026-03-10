@@ -146,6 +146,8 @@ public:
     }
   }
 
+  std::string to_string() const;
+
 private:
   Type type;
   Val val;
