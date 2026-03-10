@@ -363,8 +363,8 @@ static std::string serialize_body(const Http::Body &body) {
   return body_str;
 }
 
-static Result<std::vector<unsigned char>> build_uwsgi_vars_block(
-    const std::map<std::string, std::string> &vars) {
+static Result<std::vector<unsigned char> >
+build_uwsgi_vars_block(const std::map<std::string, std::string> &vars) {
   std::vector<unsigned char> vars_block;
   for (std::map<std::string, std::string>::const_iterator it = vars.begin();
        it != vars.end(); ++it) {
@@ -385,9 +385,9 @@ static Result<std::vector<unsigned char>> build_uwsgi_vars_block(
   return OK(std::vector<unsigned char>, vars_block);
 }
 
-static Result<FileDescriptor *> uwsgi_epoll_connect(
-    EPoll *epoll, FileDescriptor &sock_fd, int raw_sock, long long start_ms,
-    int timeout_ms) {
+static Result<FileDescriptor *>
+uwsgi_epoll_connect(EPoll *epoll, FileDescriptor &sock_fd, int raw_sock,
+                    long long start_ms, int timeout_ms) {
   const FileDescriptor *sock_fd_ptr = &sock_fd;
   Event connect_event(sock_fd_ptr, false, true, false, false, true, false);
   Option connect_option(false, false, false, false);
@@ -408,8 +408,7 @@ static Result<FileDescriptor *> uwsgi_epoll_connect(
     Result<Events> wait_res = epoll->wait(rem);
     if (!wait_res.error().empty()) {
       epoll->del_fd(*sock_epoll);
-      return ERR(FileDescriptor *,
-                 "uwsgi: epoll wait failed during connect");
+      return ERR(FileDescriptor *, "uwsgi: epoll wait failed during connect");
     }
     Events events = wait_res.value();
     if (events.is_end()) {
@@ -527,8 +526,7 @@ static Result<std::string> uwsgi_epoll_recv(EPoll *epoll,
     Result<Events> wait_res = epoll->wait(rem);
     if (!wait_res.error().empty()) {
       epoll->del_fd(*sock_epoll);
-      return ERR(std::string,
-                 "uwsgi: epoll wait failed during receive");
+      return ERR(std::string, "uwsgi: epoll wait failed during receive");
     }
     Events events = wait_res.value();
     if (events.is_end()) {
@@ -558,8 +556,7 @@ static Result<std::string> uwsgi_epoll_recv(EPoll *epoll,
       if (errno == EAGAIN || errno == EWOULDBLOCK)
         continue;
       epoll->del_fd(*sock_epoll);
-      return ERR(std::string,
-                 "uwsgi: read error receiving response");
+      return ERR(std::string, "uwsgi: read error receiving response");
     }
   }
 
@@ -645,7 +642,7 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   const Http::Body &body = request.body();
   std::string body_str = serialize_body(body);
 
-  Result<std::vector<unsigned char>> vars_block_res =
+  Result<std::vector<unsigned char> > vars_block_res =
       build_uwsgi_vars_block(vars);
   if (!vars_block_res.error().empty()) {
     return ERR(Http::Response, vars_block_res.error());
@@ -706,9 +703,8 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   }
   FileDescriptor *sock_epoll = connect_res.value();
 
-  Result<Void> send_res =
-      uwsgi_epoll_send(epoll, sock_epoll, raw_sock, send_buf, start_ms,
-                       timeout_ms);
+  Result<Void> send_res = uwsgi_epoll_send(epoll, sock_epoll, raw_sock,
+                                           send_buf, start_ms, timeout_ms);
   if (!send_res.error().empty()) {
     return ERR(Http::Response, send_res.error());
   }
