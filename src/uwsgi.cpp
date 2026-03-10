@@ -462,7 +462,11 @@ static Result<Void> uwsgi_epoll_send(EPoll *epoll, FileDescriptor *sock_epoll,
   {
     Event write_event(sock_fd_ptr, false, true, false, false, false, false);
     Option write_option(false, false, false, false);
-    epoll->modify_fd(*sock_epoll, write_event, write_option);
+    Result<Void> modify_res = epoll->modify_fd(*sock_epoll, write_event, write_option);
+    if (!modify_res.error().empty()) {
+      epoll->del_fd(*sock_epoll);
+      return ERR(Void, "uwsgi: epoll modify failed during send");
+    }
   }
 
   size_t total_sent = 0;
@@ -522,7 +526,11 @@ static Result<std::string> uwsgi_epoll_recv(EPoll *epoll,
   {
     Event read_event(sock_fd_ptr, true, false, false, false, false, false);
     Option read_option(false, false, false, false);
-    epoll->modify_fd(*sock_epoll, read_event, read_option);
+    Result<Void> modify_res = epoll->modify_fd(*sock_epoll, read_event, read_option);
+    if (!modify_res.error().empty()) {
+      epoll->del_fd(*sock_epoll);
+      return ERR(std::string, "uwsgi: epoll modify failed during receive");
+    }
   }
 
   std::string output;
