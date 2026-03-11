@@ -1,5 +1,22 @@
 #include "Response.hpp"
 #include "../cgi_1_1.h"
+#include "ParsingUtils.hpp"
+
+const std::map<int, std::string> Response::status_code =
+    Response::init_status_code();
+
+std::map<int, std::string> Response::init_status_code() {
+  std::map<int, std::string> status;
+  status[200] = "200 OK";
+  status[301] = "301 Moved Permanently";
+  status[400] = "400 Bad Request";
+  status[403] = "403 Forbidden";
+  status[404] = "404 Not Found";
+  status[405] = "405 Method Not Allowed";
+  status[413] = "413 Payload Too Large";
+  status[500] = "500 Internal Server Error";
+  return status;
+}
 
 std::string Response::get_pwd() {
   char buffer[1024];
@@ -23,61 +40,74 @@ int Response::check_path_type(const std::string &path) {
   struct stat info;
 
   if (stat(path.c_str(), &info) != 0)
-    return NOT_FOUND;
+    return PATH_ERROR;
   else if (access(path.c_str(), R_OK) != 0)
-    return FORBIDDEN;
+    return PATH_ERROR;
   else if (S_ISDIR(info.st_mode))
-    return IS_DIRECTORY;
+    return IS_DIR;
   else if (S_ISREG(info.st_mode))
     return IS_FILE;
-  return -1;
+  return PATH_ERROR;
+}
+
+std::string find_file_type(std::string path)
+{
+  std::vector<std::string> file_type = string_split(path, ".");
+  std::cout << "file type: " << file_type << std::endl;
+
+  if (file_type.size() <= 1)
+    return "default";
+  return file_type.back();
 }
 
 HttpResponse Response::generate(const Http::Request *request,
                                 const ServerConfig *config) {
   HttpResponse response;
-  std::string full_path = resolve_full_path(request, config);
-  int path_type = check_path_type(full_path);
+  Path path = resolve_path(request, config);
 
-  if (path_type == IS_DIRECTORY) {
-    std::string index_path = full_path + "/index.html";
-    if (check_path_type(index_path) == IS_FILE) {
-      full_path = index_path;
-      path_type = IS_FILE;
-    } else
-      full_path = error_file_path(403);
-  }
-
-  if (path_type == FORBIDDEN)
-    full_path = error_file_path(403);
-  else if (path_type == NOT_FOUND)
-    full_path = error_file_path(404);
-  else if (path_type == -1)
-    full_path = error_file_path(500);
-  std::ifstream file(full_path.c_str());
+  if (path.type == IS_FILE)
+    response.file_type = find_file_type(path.route);
+  else
+    response.file_type = "default";
+  if (path.type == IS_FILE || path.type == IS_DIR)
+    path.type = OK;
+  std::ifstream file(path.route.c_str());
   if (file.is_open()) {
     std::ostringstream ss;
     ss << file.rdbuf();
     response.body = ss.str();
-    response.status_code = "200 OK";
+    response.status_code = status_code.at(path.type);
     file.close();
   }
   return response;
 }
 
-std::string Response::resolve_full_path(const Http::Request *request,
-                                        const ServerConfig *config) {
+Path Response::resolve_path(const Http::Request *request,
+                            const ServerConfig *config) {
   const RouteRule *rule = config->findRoute(request->method(), request->path());
+  Path path;
 
-  if (rule == NULL)
-    return error_file_path(404);
+  if (rule == NULL) {
+    path.type = NOT_FOUND_ERR;
+    path.route = error_file_path(NOT_FOUND_ERR);
+    return path;
+  }
 
   std::string root = get_pwd() + rule->root.toString();
   size_t pos = root.find('*');
-  if (pos != std::string::npos && pos + 1 == root.length() && pos > 0 &&
-      root[pos - 1] == '/')
-    root.erase(pos - 1, 2);
+  if (pos != std::string::npos && pos + 1 == root.length() && pos > 0)
+  {
+    root.erase(pos, 1);
+    --pos;
+    if (root[pos] == '/')
+     root.erase(pos, 1);
+  }
+
   if (request->path() == "/")
-    return root;
-  return root + request->path();
+    path.route = root;
+  else
+    path.route = root + request->path();
+  path.type = check_path_type(path.route);
+
+  return path;
 }

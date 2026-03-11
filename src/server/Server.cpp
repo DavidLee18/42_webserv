@@ -2,7 +2,8 @@
 #include "../webserv.h"
 
 void Server::new_connection(const FileDescriptor *server_fd) {
-  while (true) { // Edge-Triggered이므로 모든 연결을 다 받아야 함
+  while (true) { // accept all clients until nothing to connect
+    // init client socket
     Result<FileDescriptor> client_result = server_fd->socket_accept(NULL, NULL);
     if (!client_result.has_value()) {
       const std::string &err = client_result.error();
@@ -32,7 +33,6 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     if (add_result.has_value()) {
       FileDescriptor *client_ptr = add_result.value();
       ClientSession session;
-      // ★ 내 문지기(server_fd)의 Config 설정을 그대로 복사해서 세션에 넣음!
       if (listeners.find(server_fd) != listeners.end()) {
         session.config = listeners.at(server_fd);
       }
@@ -52,22 +52,21 @@ void Server::disconnect(const FileDescriptor *client_fd) {
 }
 
 void Server::client_read(const FileDescriptor *client_fd) {
-  while (true) { // ET 모드이므로 버퍼가 빌 때까지 다 읽음
+  while (true) { // repeat until nothing to read
     char buf[NETWORK_BUFFER_SIZE];
     Result<ssize_t> recv_res = client_fd->sock_recv(buf, sizeof(buf));
     if (!recv_res.has_value())
       break; // EWOULDBLOCK
 
     ssize_t bytes = recv_res.value();
-    if (bytes == 0) {
-      // 클라이언트가 정상적으로 연결 종료 (EOF)
+    if (bytes == 0) { // (EOF)
       disconnect(client_fd);
       return;
     }
     clients.at(client_fd).in_buff.append(buf, static_cast<std::size_t>(bytes));
   }
 
-  // HTTP 파싱 및 응답 생성 로직
+  // HTTP parsing and response generate
   if (clients.find(client_fd) != clients.end() &&
       !clients.at(client_fd).in_buff.empty()) {
     std::string &in_buffer = clients.at(client_fd).in_buff;
@@ -82,20 +81,28 @@ void Server::client_read(const FileDescriptor *client_fd) {
       }
 
       Http::Request *request = request_result.value().first;
+      // todo: method to string
       std::cout << "[Request] " << request->method() << " " << request->path()
                 << std::endl;
 
       HttpResponse http =
           Response::generate(request, clients.at(client_fd).config);
       delete request;
+      std::cout << "file type: " << http.file_type << std::endl;
 
       // HTTP 응답 메시지 조립
       // todo: 하드코딩된 response 말고 동적으로
       std::ostringstream server_response;
       server_response << "HTTP/1.1 " << http.status_code << "\r\n";
-      server_response << "Content-Type: text/html\r\n";
+      if (http.file_type == "default")
+        server_response << "Content-Type:" << config.Get_default_mime() << "\r\n";
+      else
+        server_response << "Content-Type:" << config.Get_Type_map().at(http.file_type) << "\r\n";
       server_response << "Content-Length: " << http.body.length() << "\r\n";
-      server_response << "Connection: keep-alive\r\n\r\n";
+      if (http.keep_alive)
+        server_response << "Connection: keep-alive\r\n\r\n";
+      else
+        server_response << "Connection: close\r\n\r\n";
       server_response << http.body;
 
       clients.at(client_fd).out_buff += server_response.str();

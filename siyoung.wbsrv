@@ -1,0 +1,37 @@
+types =
+    html|htm -> text/html
+    css      -> text/css
+    js       -> application/javascript
+    json     -> application/json
+    jpg|jpeg -> image/jpeg
+    png      -> image/png
+    _        -> application/octet-stream
+
+
+
+
+:8080 =
+	[] +<= X-Content-Type-Options: "nosniff"
+
+    ...30
+
+    GET /old_stuff/* =301> /new_stuff/*
+
+    GET /download/*/mp3/* =301> /*/mp3/*.mp3
+
+    GET /download/ <i- /spool/www
+
+    GET *.(jpg|jpeg|gif) <- /spool/www/*.(jpg|jpeg|gif)
+
+    GET|POST|DELETE * <- /spool/www/*
+        ? index2.html
+        @ auth_info
+        ->{} 10MB
+        ! 400:/spool/www/error/400.html
+        ! 401:/spool/www/error/401.html
+        ! 403:/spool/www/error/403.html
+        ! 404:/spool/www/error/404.html
+        ! 405:/spool/www/error/405.html
+        ! 409:/spool/www/error/409.html
+        ! 413:/spool/www/error/413.html
+        ! 500:/spool/www/error/500.html
