@@ -825,22 +825,36 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
         wilds.push_back(split_from[j]);
     }
   }
+
+  // Build the rewritten path in a separate vector to avoid mutating new_to
+  // while iterating over it, and consume wildcards sequentially.
+  std::vector<std::string> result_to;
+  result_to.reserve(new_to.size() + wilds.size());
+
   std::size_t j = 0;
   for (std::size_t i = 0; i < new_to.size(); ++i) {
-    if (j < wilds.size() && std::string::npos != new_to[i].find("*"))
-      new_to[i] = wilds[j++];
-    if (i + 1 == new_to.size()) {
-      if (std::string::npos != new_to[i].find("*"))
-        j++;
-      for (; j < wilds.size(); ++j)
-        new_to.push_back(wilds[j]);
-      break;
+    std::string segment = new_to[i];
+    if (j < wilds.size() && std::string::npos != segment.find("*")) {
+      segment = wilds[j++];
     }
+    result_to.push_back(segment);
   }
-  std::string result = new_to[0];
-  for (std::size_t i = 1; i < new_to.size(); ++i) {
+  if (new_to.empty()) {
+    return "";
+  }
+
+  // Append any remaining wildcard segments at the end.
+  while (j < wilds.size()) {
+    result_to.push_back(wilds[j++]);
+  }
+
+  if (result_to.empty())
+    return std::string();
+
+  std::string result = result_to[0];
+  for (std::size_t i = 1; i < result_to.size(); ++i) {
     result += '/';
-    result += new_to[i];
+    result += result_to[i];
   }
   return (result);
 }

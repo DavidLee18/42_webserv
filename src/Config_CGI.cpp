@@ -1,5 +1,10 @@
 #include "Config_CGI.hpp"
 
+// Forward declarations of internal helper functions used in parse_CGI
+static bool is_CGI(const std::string &line);
+static bool is_timeout(const std::string &line);
+static int  parse_timeout(const std::string &line);
+
 Config_CGI::Config_CGI(FileDescriptor &fd, std::string line) {
   err = "";
   timeout = 3;
@@ -7,7 +12,7 @@ Config_CGI::Config_CGI(FileDescriptor &fd, std::string line) {
 }
 
 std::string Config_CGI::parse_CGI(FileDescriptor &fd, std::string line) {
-  std::string err_meg = "";
+  std::string err_msg = "";
 
   if (!is_CGI(line))
     return "CGI Error: \"" + line + "\" CGI executable not found";
@@ -17,9 +22,9 @@ std::string Config_CGI::parse_CGI(FileDescriptor &fd, std::string line) {
     std::size_t end = file_line.find(')');
     executable = file_line.substr(0, start);
     std::string env = file_line.substr(start + 1, end - start - 1);
-    err_meg = parse_env(env);
-    if (err_meg != "")
-      return err_meg;
+    err_msg = parse_env(env);
+    if (err_msg != "")
+      return err_msg;
   } else
     executable = file_line;
   while (true) {
@@ -37,9 +42,9 @@ std::string Config_CGI::parse_CGI(FileDescriptor &fd, std::string line) {
     if (is_timeout(file_line))
       timeout = parse_timeout(file_line);
     else if (std::string::npos != file_line.find("=")) {
-      err_meg = parse_env(file_line);
-      if (err_meg != "")
-        return err_meg;
+      err_msg = parse_env(file_line);
+      if (err_msg != "")
+        return err_msg;
     }
   }
 }
@@ -59,7 +64,10 @@ static bool isExecutableFile(const std::string &path) {
 static bool is_CGI(const std::string &line) {
   std::size_t i = 1;
 
-  if (line[0] != '$' || is_have_space(line))
+  if (line.empty())
+    return false;
+
+  if (line.empty() || line[0] != '$' || is_have_space(line))
     return false;
 
   std::size_t pos = line.find(".cgi");
@@ -115,7 +123,12 @@ static double parse_timeout(std::string line) {
 }
 
 static bool is_key(const std::string &key) {
+  if (key.empty())
+    return false;
   std::size_t i = 0;
+
+  if (key.empty())
+    return false;
 
   while (i < key.length()) {
     if (std::isupper(key[i]) || key[i] == '_' ||
