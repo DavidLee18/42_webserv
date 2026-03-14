@@ -71,7 +71,11 @@ void Server::client_read(const FileDescriptor *client_fd) {
       !clients.at(client_fd).in_buff.empty()) {
     std::string &in_buffer = clients.at(client_fd).in_buff;
     size_t header_end = in_buffer.find("\r\n\r\n");
+    std::cout << "client request: \n" << in_buffer << "\nend of request" << std::endl;
 
+
+    // todo: 해당 client의 포트 번호에 따른 config 적용
+    // 맞는 로케이션 블럭 
     if (header_end != std::string::npos) {
       Result<std::pair<Http::Request *, size_t> > request_result =
           Http::Request::parse(in_buffer.c_str(), '\0');
