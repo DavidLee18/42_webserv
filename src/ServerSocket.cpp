@@ -67,7 +67,8 @@ Result<EPoll> init_servers(const WebserverConfig &config,
 
 void run_server(EPoll &epoll,
                 const std::set<const FileDescriptor *> &server_fds) {
-  std::map<const FileDescriptor *, std::pair<std::string, std::string>> clients;
+  std::map<const FileDescriptor *, std::pair<std::string, std::string> >
+      clients;
 
   while (true) {
     // Waiting for events

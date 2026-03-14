@@ -18,7 +18,7 @@ Json::Json(const Json &other) : _type(other._type) {
     _value = (Value){.arr = new std::vector<Json>(*other._value.arr)};
     break;
   case Obj:
-    _value = (Value){.obj = new std::vector<std::pair<std::string, Json>>(
+    _value = (Value){.obj = new std::vector<std::pair<std::string, Json> >(
                          *other._value.obj)};
     break;
   }
@@ -60,7 +60,7 @@ Json &Json::operator=(const Json &other) {
       _value = (Value){.arr = new std::vector<Json>(*other._value.arr)};
       break;
     case Obj:
-      _value = (Value){.obj = new std::vector<std::pair<std::string, Json>>(
+      _value = (Value){.obj = new std::vector<std::pair<std::string, Json> >(
                            *other._value.obj)};
       break;
     }
@@ -82,12 +82,12 @@ Json Json::arr(std::vector<Json> js) {
   return Json(Arr, (Value){.arr = new std::vector<Json>(js)});
 }
 
-Json Json::obj(std::vector<std::pair<std::string, Json>> m) {
-  return Json(Obj,
-              (Value){.obj = new std::vector<std::pair<std::string, Json>>(m)});
+Json Json::obj(std::vector<std::pair<std::string, Json> > m) {
+  return Json(
+      Obj, (Value){.obj = new std::vector<std::pair<std::string, Json> >(m)});
 }
 
-Result<std::pair<Json, size_t>> Json::Parser::null_or_undef(const char *raw) {
+Result<std::pair<Json, size_t> > Json::Parser::null_or_undef(const char *raw) {
   const char *pos = std::strstr(raw, "null");
   const char *pos2 = std::strstr(raw, "undefined");
 
@@ -98,7 +98,7 @@ Result<std::pair<Json, size_t>> Json::Parser::null_or_undef(const char *raw) {
   return ERR_PAIR(Json, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<Json, size_t>> Json::Parser::_boolean(const char *raw) {
+Result<std::pair<Json, size_t> > Json::Parser::_boolean(const char *raw) {
   const char *pos = std::strstr(raw, "true");
   const char *pos2 = std::strstr(raw, "false");
 
@@ -109,7 +109,7 @@ Result<std::pair<Json, size_t>> Json::Parser::_boolean(const char *raw) {
   return ERR_PAIR(Json, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<Json, size_t>> Json::Parser::_num(const char *raw, char end) {
+Result<std::pair<Json, size_t> > Json::Parser::_num(const char *raw, char end) {
   char *endptr;
   errno = 0;
   long l = std::strtol(raw, &endptr, 10);
@@ -124,7 +124,7 @@ Result<std::pair<Json, size_t>> Json::Parser::_num(const char *raw, char end) {
   return OK_PAIR(Json, size_t, Json::num(ld), endptr - raw);
 }
 
-Result<std::pair<Json, size_t>> Json::Parser::_str(const char *raw) {
+Result<std::pair<Json, size_t> > Json::Parser::_str(const char *raw) {
   if (raw[0] != '\"')
     return ERR_PAIR(Json, size_t, Errors::invalid_format);
   const char *pos = std::strchr(raw + 1, '\"');
@@ -138,7 +138,7 @@ Result<std::pair<Json, size_t>> Json::Parser::_str(const char *raw) {
   return OK_PAIR(Json, size_t, Json::str(str), pos - raw + 1);
 }
 
-Result<std::pair<Json, size_t>> Json::Parser::_arr(const char *raw) {
+Result<std::pair<Json, size_t> > Json::Parser::_arr(const char *raw) {
   if (raw[0] != '[')
     return ERR_PAIR(Json, size_t, Errors::invalid_format);
   std::vector<Json> recs;
@@ -176,10 +176,10 @@ Result<std::pair<Json, size_t>> Json::Parser::_arr(const char *raw) {
   return ERR_PAIR(Json, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<Json, size_t>> Json::Parser::_obj(const char *raw) {
+Result<std::pair<Json, size_t> > Json::Parser::_obj(const char *raw) {
   if (raw[0] != '{')
     return ERR_PAIR(Json, size_t, Errors::invalid_format);
-  std::vector<std::pair<std::string, Json>> recs;
+  std::vector<std::pair<std::string, Json> > recs;
   for (size_t i = 1; i < std::strlen(raw);) {
     while (std::isspace(static_cast<unsigned char>(raw[i])))
       i++;
@@ -200,7 +200,7 @@ Result<std::pair<Json, size_t>> Json::Parser::_obj(const char *raw) {
     }
     while (std::isspace(static_cast<unsigned char>(raw[i])))
       i++;
-    Result<std::pair<Json, size_t>> rec = _str(raw + i);
+    Result<std::pair<Json, size_t> > rec = _str(raw + i);
     std::pair<Json, size_t> k;
     TRY_PAIR(Json, size_t, k, rec);
     if (k.first.type() != Json::Str)
@@ -228,24 +228,24 @@ Result<std::pair<Json, size_t>> Json::Parser::_obj(const char *raw) {
   return ERR_PAIR(Json, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<Json, size_t>> Json::Parser::parse(const char *raw,
-                                                    char num_end) {
-  Result<std::pair<Json, size_t>> res = null_or_undef(raw);
+Result<std::pair<Json, size_t> > Json::Parser::parse(const char *raw,
+                                                     char num_end) {
+  Result<std::pair<Json, size_t> > res = null_or_undef(raw);
   if (res.error().empty() && !raw[res.value().second])
     return OK_PAIR(Json, size_t, res.value().first, res.value().second);
-  Result<std::pair<Json, size_t>> res1 = _boolean(raw);
+  Result<std::pair<Json, size_t> > res1 = _boolean(raw);
   if (res1.error().empty() && !raw[res1.value().second])
     return OK_PAIR(Json, size_t, res1.value().first, res1.value().second);
-  Result<std::pair<Json, size_t>> res2 = _num(raw, num_end);
+  Result<std::pair<Json, size_t> > res2 = _num(raw, num_end);
   if (res2.error().empty() && !raw[res2.value().second])
     return OK_PAIR(Json, size_t, res2.value().first, res2.value().second);
-  Result<std::pair<Json, size_t>> res3 = _str(raw);
+  Result<std::pair<Json, size_t> > res3 = _str(raw);
   if (res3.error().empty() && !raw[res3.value().second])
     return OK_PAIR(Json, size_t, res3.value().first, res3.value().second);
-  Result<std::pair<Json, size_t>> res4 = _arr(raw);
+  Result<std::pair<Json, size_t> > res4 = _arr(raw);
   if (res4.error().empty() && !raw[res4.value().second])
     return OK_PAIR(Json, size_t, res4.value().first, res4.value().second);
-  Result<std::pair<Json, size_t>> res5 = _obj(raw);
+  Result<std::pair<Json, size_t> > res5 = _obj(raw);
   if (res5.error().empty() && !raw[res5.value().second])
     return OK_PAIR(Json, size_t, res5.value().first, res5.value().second);
   return ERR_PAIR(Json, size_t, Errors::invalid_json);

@@ -342,10 +342,10 @@ static std::vector<std::string> get_pattern(std::string line) {
   return (temp);
 }
 
-static std::vector<std::vector<std::string>>
-make_paths_from_url_pattern(std::vector<std::vector<std::string>> paths,
+static std::vector<std::vector<std::string> >
+make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
                             std::vector<std::string> pattern, size_t index) {
-  std::vector<std::vector<std::string>> new_paths;
+  std::vector<std::vector<std::string> > new_paths;
   std::string seg = paths[0][index];
   std::string prefix = "";
   std::string suffix = "";
@@ -367,10 +367,10 @@ make_paths_from_url_pattern(std::vector<std::vector<std::string>> paths,
   return (new_paths);
 }
 
-static std::vector<std::vector<std::string>>
+static std::vector<std::vector<std::string> >
 expand_url_pattern(std::string line) {
   std::vector<std::string> path(string_split(line, "/"));
-  std::vector<std::vector<std::string>> paths;
+  std::vector<std::vector<std::string> > paths;
 
   paths.push_back(path);
   for (size_t i = 0; i < path.size(); ++i) {
@@ -630,8 +630,8 @@ bool ServerConfig::is_matching(PathPattern path, PathPattern root) {
 bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
                                     std::vector<Http::Method> mets) {
   RouteRule route;
-  std::vector<std::vector<std::string>> path_url;
-  std::vector<std::vector<std::string>> root_url;
+  std::vector<std::vector<std::string> > path_url;
+  std::vector<std::vector<std::string> > root_url;
 
   if (data.size() != 4)
     return (false);
@@ -833,26 +833,18 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
 
   std::size_t j = 0;
   for (std::size_t i = 0; i < new_to.size(); ++i) {
-    std::string segment = new_to[i];
-    if (j < wilds.size() && std::string::npos != segment.find("*")) {
-      segment = wilds[j++];
+    if (j < wilds.size() && std::string::npos != new_to[i].find("*"))
+      new_to[i] = wilds[j++];
+    if (i + 1 == new_to.size()) {
+      for (; j < wilds.size(); ++j)
+        new_to.push_back(wilds[j]);
+      break;
     }
-    result_to.push_back(segment);
   }
-  if (new_to.empty()) {
+  if (new_to.empty())
     return "";
-  }
-
-  // Append any remaining wildcard segments at the end.
-  while (j < wilds.size()) {
-    result_to.push_back(wilds[j++]);
-  }
-
-  if (result_to.empty())
-    return std::string();
-
-  std::string result = result_to[0];
-  for (std::size_t i = 1; i < result_to.size(); ++i) {
+  std::string result = new_to[0];
+  for (std::size_t i = 1; i < new_to.size(); ++i) {
     result += '/';
     result += result_to[i];
   }
