@@ -1,5 +1,5 @@
-#include "webserv.h"
 #include "ServerSocket.hpp"
+#include "webserv.h"
 
 volatile sig_atomic_t g_receivedSignal = 0;
 
@@ -23,12 +23,13 @@ int main(const int argc, char *argv[]) {
   } else {
     const WebserverConfig &config = result_config.value();
     std::cout << "main(): " << std::endl;
-    
+
     // Initiate and generate server.
     std::set<const FileDescriptor *> server_fds;
     Result<EPoll> epoll_result = init_servers(config, server_fds);
     if (!epoll_result.has_value()) {
-      std::cerr << "Server initialization failed: " << epoll_result.error() << std::endl;
+      std::cerr << "Server initialization failed: " << epoll_result.error()
+                << std::endl;
       return 1;
     }
 

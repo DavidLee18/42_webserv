@@ -39,8 +39,8 @@ public:
     virtual void phantom() = 0;
 
   public:
-    static Result<std::pair<UwsgiMetaVar, size_t> > parse(std::string const &,
-                                                          std::string const &);
+    static Result<std::pair<UwsgiMetaVar, size_t>> parse(std::string const &,
+                                                         std::string const &);
   };
 
   friend class UwsgiInput;

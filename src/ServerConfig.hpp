@@ -7,7 +7,7 @@
 #include <iosfwd>
 #include <unistd.h>
 
-typedef std::map<std::string, std::map<std::string, std::string> > Header;
+typedef std::map<std::string, std::map<std::string, std::string>> Header;
 // enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
 
 enum RuleOperator {
@@ -27,7 +27,8 @@ enum RuleOperator {
 class PathPattern {
 private:
   std::vector<std::string> path;
-  static bool segmentMatches(const std::string &pattern, const std::string &segment);
+  static bool segmentMatches(const std::string &pattern,
+                             const std::string &segment);
 
 public:
   PathPattern() : path() {}
@@ -82,6 +83,8 @@ private:
   bool parse_Rule(std::vector<Http::Method> met, std::string key,
                   std::string line);
   RuleOperator parse_RuleOperator(std::string indicator);
+  std::string rewrite_to(std::string from, PathPattern path,
+                         PathPattern to) const;
 
 public:
   ServerConfig(FileDescriptor &);
@@ -89,10 +92,10 @@ public:
       : header(), serverResponseTime(-1), routes(), err_line(), end_flag(0) {}
   const Header &Get_Header(void) const { return header; }
   int Get_ServerResponseTime(void) const { return (serverResponseTime); }
-  const std::vector<RouteRule> &Get_Routes(void) const {
-    return routes;
-  }
-  RouteRule const *findRoute(Http::Method method, const std::string &path) const;
+  const std::vector<RouteRule> &Get_Routes(void) const { return routes; }
+  RouteRule const *findRoute(Http::Method method,
+                             const std::string &path) const;
+  std::string Get_to(Http::Method method, const std::string &path) const;
   const std::string &Geterr_line(void) const { return err_line; }
   // Result<ServerConfig> read_from_file(FileDescriptor &);
 };
