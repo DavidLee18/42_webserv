@@ -816,7 +816,7 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
   std::vector<std::string> split_from = string_split(from, "/");
 
   for (std::size_t i = 0; i < new_path.size(); ++i) {
-    if (std::string::npos != new_path[i].find("*"))
+    if (i < split_from.size() && std::string::npos != new_path[i].find("*"))
       wilds.push_back(split_from[i]);
     if (i + 1 == new_path.size()) {
       if (std::string::npos != new_path[i].find("*"))
@@ -827,13 +827,14 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
   }
   std::size_t j = 0;
   for (std::size_t i = 0; i < new_to.size(); ++i) {
-    if (std::string::npos != new_to[i].find("*"))
+    if (j < wilds.size() && std::string::npos != new_to[i].find("*"))
       new_to[i] = wilds[j++];
     if (i + 1 == new_to.size()) {
       if (std::string::npos != new_to[i].find("*"))
         j++;
       for (; j < wilds.size(); ++j)
         new_to.push_back(wilds[j]);
+      break;
     }
   }
   std::string result = new_to[0];
