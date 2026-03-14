@@ -44,14 +44,13 @@ Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
       filename.compare(filename.length() - ext.length(), ext.length(), ext) !=
           0) {
     return ERR(FileDescriptor,
-               Errors::invalid_fd); // TODO: specify error kind and message.
+               "server config file extension must be \"wbsrv\"");
   }
 
   // Build the safe path: current working directory + "/" + basename.
   char cwd_buf[PATH_MAX];
   if (getcwd(cwd_buf, sizeof(cwd_buf)) == NULL) {
-    return ERR(FileDescriptor,
-               Errors::invalid_fd); // TODO: specify error kind and message.
+    return ERR(FileDescriptor, "cannot retrieve current working directory");
   }
   std::string safe_path = std::string(cwd_buf) + "/" + filename;
 
@@ -60,24 +59,21 @@ Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
   if (lstat(safe_path.c_str(), &st) != 0) {
     // Path does not exist or is otherwise invalid.
     return ERR(FileDescriptor,
-               Errors::invalid_fd); // TODO: specify error kind and message.
+               "config file does not exist or the file path is invalid");
   }
   if (S_ISLNK(st.st_mode)) {
     // Reject symbolic links.
-    return ERR(FileDescriptor,
-               Errors::invalid_fd); // TODO: specify error kind and message.
+    return ERR(FileDescriptor, "a symbolic link is not allowed");
   }
   if (!S_ISREG(st.st_mode)) {
     // Ensure the target is a regular file.
-    return ERR(FileDescriptor,
-               Errors::invalid_fd); // TODO: specify error kind and message.
+    return ERR(FileDescriptor, "the config file is not a regular file");
   }
 
   // O_NOFOLLOW provides defense-in-depth against TOCTOU races with symlinks.
   int _fd = open(safe_path.c_str(), O_RDONLY | O_NOFOLLOW);
   if (_fd < 0)
-    return ERR(FileDescriptor,
-               Errors::invalid_fd); // TODO: specify error kind and message.
+    return ERR(FileDescriptor, "failed to open the config file");
 
   FileDescriptor fd;
   fd._fd = _fd;
