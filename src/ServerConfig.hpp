@@ -83,6 +83,8 @@ private:
   bool parse_Rule(std::vector<Http::Method> met, std::string key,
                   std::string line);
   RuleOperator parse_RuleOperator(std::string indicator);
+  std::string rewrite_to(std::string from, PathPattern path,
+                         PathPattern to) const;
 
 public:
   ServerConfig(FileDescriptor &);
@@ -93,6 +95,7 @@ public:
   const std::vector<RouteRule> &Get_Routes(void) const { return routes; }
   RouteRule const *findRoute(Http::Method method,
                              const std::string &path) const;
+  std::string Get_to(Http::Method method, const std::string &path) const;
   const std::string &Geterr_line(void) const { return err_line; }
   // Result<ServerConfig> read_from_file(FileDescriptor &);
 };

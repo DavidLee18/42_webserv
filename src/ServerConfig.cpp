@@ -173,6 +173,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           err_line = "RouteRule syntax Error: " + err_line;
           return (false);
         }
+        // else if (is_Config_CGI())
       } else {
         err_line = "Invalid line Error: " + trim_space(line);
         return (false);
@@ -805,4 +806,55 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   }
   os << "\n========================================================";
   return (os);
+}
+
+std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
+                                     PathPattern to) const {
+  std::vector<std::string> new_path = path.Get_path();
+  std::vector<std::string> wilds;
+  std::vector<std::string> new_to = to.Get_path();
+  std::vector<std::string> split_from = string_split(from, "/");
+
+  for (std::size_t i = 0; i < new_path.size(); ++i) {
+    if (i < split_from.size() && std::string::npos != new_path[i].find("*"))
+      wilds.push_back(split_from[i]);
+    if (i + 1 == new_path.size()) {
+      if (std::string::npos != new_path[i].find("*"))
+        i++;
+      for (std::size_t j = i; j < split_from.size(); ++j)
+        wilds.push_back(split_from[j]);
+    }
+  }
+
+  // Build the rewritten path in a separate vector to avoid mutating new_to
+  // while iterating over it, and consume wildcards sequentially.
+  std::vector<std::string> result_to;
+  result_to.reserve(new_to.size() + wilds.size());
+
+  std::size_t j = 0;
+  for (std::size_t i = 0; i < new_to.size(); ++i) {
+    if (j < wilds.size() && std::string::npos != new_to[i].find("*"))
+      new_to[i] = wilds[j++];
+    if (i + 1 == new_to.size()) {
+      for (; j < wilds.size(); ++j)
+        new_to.push_back(wilds[j]);
+      break;
+    }
+  }
+  if (new_to.empty())
+    return "";
+  std::string result = new_to[0];
+  for (std::size_t i = 1; i < new_to.size(); ++i) {
+    result += '/';
+    result += result_to[i];
+  }
+  return (result);
+}
+
+std::string ServerConfig::Get_to(Http::Method method,
+                                 const std::string &path) const {
+  const RouteRule *temp = findRoute(method, path);
+  if (!temp)
+    return "";
+  return rewrite_to(path, temp->path, temp->root);
 }
