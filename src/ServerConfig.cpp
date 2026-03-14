@@ -826,11 +826,6 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
     }
   }
 
-  // Build the rewritten path in a separate vector to avoid mutating new_to
-  // while iterating over it, and consume wildcards sequentially.
-  std::vector<std::string> result_to;
-  result_to.reserve(new_to.size() + wilds.size());
-
   std::size_t j = 0;
   for (std::size_t i = 0; i < new_to.size(); ++i) {
     if (j < wilds.size() && std::string::npos != new_to[i].find("*"))
@@ -841,12 +836,17 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
       break;
     }
   }
+  
   if (new_to.empty())
     return "";
-  std::string result = new_to[0];
+
+  std::string result = "/";
+  result += new_to[0];
   for (std::size_t i = 1; i < new_to.size(); ++i) {
+    if (new_to[i].find("*") != std::string::npos)
+      continue;
     result += '/';
-    result += result_to[i];
+    result += new_to[i]; // 수정됨: result_to -> new_to
   }
   return (result);
 }

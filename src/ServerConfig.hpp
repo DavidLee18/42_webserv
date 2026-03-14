@@ -62,6 +62,7 @@ private:
   Header header;
   int serverResponseTime;
   std::vector<RouteRule> routes;
+
   std::string err_line;
   int end_flag;
 
