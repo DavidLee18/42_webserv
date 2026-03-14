@@ -91,8 +91,9 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
       HttpResponse http =
           Response::generate(request, clients.at(client_fd).config);
-      delete request;
-      std::cout << "file type: " << http.file_type << std::endl;
+        std::cout << "file type: " << http.file_type << std::endl;
+        std::cout << "Route: " << clients.at(client_fd).config->Get_to(request->method(), request->path()) << std::endl;
+        delete request;
 
       // HTTP 응답 메시지 조립
       // todo: 하드코딩된 response 말고 동적으로
