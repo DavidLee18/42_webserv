@@ -2,6 +2,7 @@
 #define RESPONSE_HPP
 
 #include "../ServerConfig.hpp"
+#include "Client.hpp"
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -26,9 +27,11 @@ struct HttpResponse {
   bool keep_alive;
 };
 
+class Request;
+class ServerConfig;
 class Response {
 public:
-  static HttpResponse generate(const Http::Request *request,
+  static HttpResponse generate(const Request *request,
                                const ServerConfig *config);
 
 private:
@@ -49,8 +52,8 @@ private:
   static std::map<int, std::string> init_status_code();
 
   static int check_path_type(const std::string &path);
-  static Path resolve_path(const Http::Request *request,
-                                  const ServerConfig *config);
+  static Path resolve_path(const Request *request,
+                           const ServerConfig *config);
   static std::string get_pwd();
   static std::string error_file_path(int error_code);
 };

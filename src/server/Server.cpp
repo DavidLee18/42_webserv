@@ -77,23 +77,16 @@ void Server::client_read(const FileDescriptor *client_fd) {
     // todo: 해당 client의 포트 번호에 따른 config 적용
     // 맞는 로케이션 블럭 
     if (header_end != std::string::npos) {
-      Result<std::pair<Http::Request *, size_t> > request_result =
-          Http::Request::parse(in_buffer.c_str(), '\0');
-      if (!request_result.has_value()) {
-        std::cerr << request_result.error() << std::endl;
-        return;
-      }
 
-      Http::Request *request = request_result.value().first;
+      Request request(in_buffer);
       // todo: method to string
-      std::cout << "[Request] " << request->method() << " " << request->path()
+      std::cout << "[Request] " << request.get_method_string() << " " << request.path()
                 << std::endl;
 
       HttpResponse http =
-          Response::generate(request, clients.at(client_fd).config);
+          Response::generate(&request, clients.at(client_fd).config);
         std::cout << "file type: " << http.file_type << std::endl;
-        std::cout << "Route: " << clients.at(client_fd).config->Get_to(request->method(), request->path()) << std::endl;
-        delete request;
+        std::cout << "Route: " << clients.at(client_fd).config->Get_to(request.method(), request.path()) << std::endl;
 
       // HTTP 응답 메시지 조립
       // todo: 하드코딩된 response 말고 동적으로

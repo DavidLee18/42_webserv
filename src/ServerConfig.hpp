@@ -3,7 +3,7 @@
 
 #include "ParsingUtils.hpp"
 #include "file_descriptor.h"
-#include "http_1_1.h"
+#include "server/Client.hpp"
 #include <iosfwd>
 #include <unistd.h>
 
@@ -43,7 +43,7 @@ public:
 };
 
 struct RouteRule {
-  Http::Method method;
+  Request::Method method;
   PathPattern path;
   int status_code;
 
@@ -80,8 +80,8 @@ private:
   bool is_matching(PathPattern path, PathPattern root);
   bool parse_RouteRule(std::string line, FileDescriptor &fd);
   bool parse_Httpmethod(std::vector<std::string> data,
-                        std::vector<Http::Method> mets);
-  bool parse_Rule(std::vector<Http::Method> met, std::string key,
+                        std::vector<Request::Method> mets);
+  bool parse_Rule(std::vector<Request::Method> met, std::string key,
                   std::string line);
   RuleOperator parse_RuleOperator(std::string indicator);
   std::string rewrite_to(std::string from, PathPattern path,
@@ -94,9 +94,9 @@ public:
   const Header &Get_Header(void) const { return header; }
   int Get_ServerResponseTime(void) const { return (serverResponseTime); }
   const std::vector<RouteRule> &Get_Routes(void) const { return routes; }
-  RouteRule const *findRoute(Http::Method method,
+  RouteRule const *findRoute(Request::Method method,
                              const std::string &path) const;
-  std::string Get_to(Http::Method method, const std::string &path) const;
+  std::string Get_to(Request::Method method, const std::string &path) const;
   const std::string &Geterr_line(void) const { return err_line; }
   // Result<ServerConfig> read_from_file(FileDescriptor &);
 };

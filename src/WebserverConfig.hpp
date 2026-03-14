@@ -4,6 +4,7 @@
 #include "ServerConfig.hpp"
 #include <iosfwd>
 
+class ServerConfig;
 class WebserverConfig {
 private:
   std::string err_meg;

@@ -472,7 +472,7 @@ static int errPage_parse(std::string &line) {
   return (key);
 }
 
-bool ServerConfig::parse_Rule(std::vector<Http::Method> mets,
+bool ServerConfig::parse_Rule(std::vector<Request::Method> mets,
                               std::string key_data, std::string line) {
   if (line.empty())
     return (false);
@@ -628,7 +628,7 @@ bool ServerConfig::is_matching(PathPattern path, PathPattern root) {
 }
 
 bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
-                                    std::vector<Http::Method> mets) {
+                                    std::vector<Request::Method> mets) {
   RouteRule route;
   std::vector<std::vector<std::string> > path_url;
   std::vector<std::vector<std::string> > root_url;
@@ -666,18 +666,18 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
 bool ServerConfig::parse_RouteRule(std::string method_line,
                                    FileDescriptor &fd) {
   std::string line;
-  std::vector<Http::Method> mets;
+  std::vector<Request::Method> mets;
   std::vector<std::string> method_line_data = string_split(method_line, " ");
   std::vector<std::string> method = string_split(method_line_data[0], "|");
 
   err_line = method_line;
   for (size_t i = 0; i < method.size(); ++i) {
     if (method[i] == "GET")
-      mets.push_back(Http::GET);
+      mets.push_back(Request::GET);
     else if (method[i] == "POST")
-      mets.push_back(Http::POST);
+      mets.push_back(Request::POST);
     else if (method[i] == "DELETE")
-      mets.push_back(Http::DELETE);
+      mets.push_back(Request::DELETE);
     else
       return (false);
   }
@@ -709,7 +709,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
 }
 
 // Find a route that matches the given method and path
-RouteRule const *ServerConfig::findRoute(Http::Method method,
+RouteRule const *ServerConfig::findRoute(Request::Method method,
                                          const std::string &path) const {
   PathPattern pathPattern(path);
 
@@ -778,11 +778,11 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   for (size_t i = 0; i < routes.size(); ++i) {
     const RouteRule &route = routes[i];
     os << "\n\nRoute: ";
-    if (route.method == Http::GET)
+    if (route.method == Request::GET)
       os << "GET";
-    else if (route.method == Http::POST)
+    else if (route.method == Request::POST)
       os << "POST";
-    else if (route.method == Http::DELETE)
+    else if (route.method == Request::DELETE)
       os << "DELETE";
     os << " " << route.path << std::endl;
     os << "\tStatus code: " << route.status_code << std::endl;
@@ -851,7 +851,7 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
   return (result);
 }
 
-std::string ServerConfig::Get_to(Http::Method method,
+std::string ServerConfig::Get_to(Request::Method method,
                                  const std::string &path) const {
   const RouteRule *temp = findRoute(method, path);
   if (!temp)

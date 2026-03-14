@@ -60,7 +60,7 @@ std::string find_file_type(std::string path)
   return file_type.back();
 }
 
-HttpResponse Response::generate(const Http::Request *request,
+HttpResponse Response::generate(const Request *request,
                                 const ServerConfig *config) {
   HttpResponse response;
   Path path = resolve_path(request, config);
@@ -82,9 +82,9 @@ HttpResponse Response::generate(const Http::Request *request,
   return response;
 }
 
-Path Response::resolve_path(const Http::Request *request,
+Path Response::resolve_path(const Request *request,
                             const ServerConfig *config) {
-  const RouteRule *rule = config->findRoute(request->method(), request->path());
+  const RouteRule *rule = config->findRoute(request->get_method(), request->path());
   Path path;
 
   if (rule == NULL) {

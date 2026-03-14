@@ -4,10 +4,8 @@
 #include "../WebserverConfig.hpp"
 #include "../epoll_kqueue.h"
 #include "../errors.h"
-#include "../http_1_1.h"
 
 #include "Response.hpp"
-#include "Session.hpp"
 
 #include <arpa/inet.h>
 #include <csignal>
@@ -23,6 +21,7 @@
 #include <unistd.h>
 #include <utility>
 
+class ServerConfig;
 class Server {
 private:
   EPoll epoll;
