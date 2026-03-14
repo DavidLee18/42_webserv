@@ -138,7 +138,7 @@ Result<Void> Server::init() {
   // EPoll init
   Result<EPoll> epoll_result = EPoll::create(1024);
   if (!epoll_result.has_value())
-    return ERR(Void, epoll_result.error());
+    return ERR(Void, "Epoll create fail: " + epoll_result.error());
   epoll = epoll_result.value();
 
   // Init server socket for every port listed on configuration file
@@ -152,13 +152,13 @@ Result<Void> Server::init() {
     // Init socket
     Result<FileDescriptor> sock_result = FileDescriptor::socket_new();
     if (!sock_result.has_value())
-      return ERR(Void, sock_result.error());
+      return ERR(Void, "Socket fail: " + sock_result.error());
     FileDescriptor server_fd = sock_result.value();
 
     // Non-blocking socket for ET (edge-triggered)
     Result<Void> nb_result = server_fd.set_nonblocking();
     if (!nb_result.has_value())
-      return ERR(Void, nb_result.error());
+      return ERR(Void, "set nonblocking fail: " + nb_result.error());
 
     // Port reusing option
     int opt = 1;
@@ -173,12 +173,12 @@ Result<Void> Server::init() {
     addr.s_addr = htonl(INADDR_ANY); // All IPs
     Result<Void> bind_result = server_fd.socket_bind(addr, port);
     if (!bind_result.has_value())
-      return ERR(Void, bind_result.error());
+      return ERR(Void, "Bind fail: " + bind_result.error());
 
     // Listen (max queue length)
     Result<Void> listen_result = server_fd.socket_listen(SOMAXCONN);
     if (!listen_result.has_value())
-      return ERR(Void, listen_result.error());
+      return ERR(Void, "Listen fail: " + listen_result.error());
 
     // EPoll event and option setting
     Event event(&server_fd, true, false, false, false, false, false); // in=true
@@ -187,7 +187,7 @@ Result<Void> Server::init() {
     // Add server socket to EPoll
     Result<FileDescriptor *> add_result = epoll.add_fd(server_fd, event, op);
     if (!add_result.has_value())
-      return ERR(Void, add_result.error());
+      return ERR(Void, "Server register fail: " + add_result.error());
 
     // Save pointer to distinguish server sockets from client sockets
     FileDescriptor *fd_ptr = add_result.value();
