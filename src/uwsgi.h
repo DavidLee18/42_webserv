@@ -97,13 +97,11 @@ public:
 
 class UwsgiDelegate {
   UwsgiInput env;
-  std::string _uwsgi_host;
   int _uwsgi_port;
   Http::Request request;
 
 public:
-  UwsgiDelegate(const Http::Request &req, const std::string &uwsgi_host,
-                int uwsgi_port);
+  UwsgiDelegate(const Http::Request &req, int uwsgi_port);
   Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
   ~UwsgiDelegate();
 };

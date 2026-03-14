@@ -15,7 +15,9 @@
 #include "errors.h"
 #include "http_1_1.h"
 #include "json.h"
+#include "server/Server.hpp"
 #include "uwsgi.h"
+
 #include <algorithm>
 #include <arpa/inet.h>
 #include <cctype>
@@ -34,6 +36,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>

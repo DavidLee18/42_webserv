@@ -110,6 +110,27 @@ ServerName::Parser::parse(std::string raw) {
   return parse_ipv4(raw);
 }
 
+std::string ServerName::to_string() const {
+  if (type == Host) {
+    std::string result;
+    bool first = true;
+    for (std::list<std::string>::const_iterator it = val.host_name->begin();
+         it != val.host_name->end(); ++it) {
+      if (!first)
+        result += ".";
+      result += *it;
+      first = false;
+    }
+    return result;
+  } else {
+    std::stringstream ss;
+    ss << static_cast<int>(val.ipv4[0]) << "." << static_cast<int>(val.ipv4[1])
+       << "." << static_cast<int>(val.ipv4[2]) << "."
+       << static_cast<int>(val.ipv4[3]);
+    return ss.str();
+  }
+}
+
 CgiMetaVar CgiMetaVar::auth_type(CgiAuthType ty) {
   return CgiMetaVar(AUTH_TYPE,
                     (CgiMetaVar::Val){.auth_type = new CgiAuthType(ty)});
@@ -652,7 +673,10 @@ Result<CgiInput> CgiInput::Parser::parse(Http::Request const &req) {
   CgiMetaVar gateway_var = CgiMetaVar::gateway_interface(Cgi_1_1);
   input.mvars.push_back(gateway_var);
 
-  // Parse path for SCRIPT_NAME and QUERY_STRING
+  // Add SERVER_SOFTWARE
+  input.mvars.push_back(CgiMetaVar::server_software(Webserv));
+
+  // Parse path for SCRIPT_NAME, PATH_INFO, and QUERY_STRING
   std::string path = req.path();
   size_t query_pos = path.find('?');
   std::string script_path;
@@ -666,19 +690,31 @@ Result<CgiInput> CgiInput::Parser::parse(Http::Request const &req) {
     query_string = "";
   }
 
-  // Add SCRIPT_NAME
+  // Build path segments list (shared by SCRIPT_NAME and PATH_INFO)
+  std::list<std::string> path_parts;
   if (!script_path.empty()) {
-    std::list<std::string> script_parts;
-    if (script_path[0] == '/') {
-      std::stringstream ss(script_path.substr(1));
-      std::string part;
-      while (std::getline(ss, part, '/')) {
-        script_parts.push_back(part);
-      }
+    std::string p =
+        (script_path[0] == '/') ? script_path.substr(1) : script_path;
+    std::stringstream ss(p);
+    std::string part;
+    while (std::getline(ss, part, '/')) {
+      path_parts.push_back(part);
     }
-    CgiMetaVar script_var = CgiMetaVar::script_name(script_parts);
-    input.mvars.push_back(script_var);
   }
+
+  // Add SCRIPT_NAME
+  input.mvars.push_back(CgiMetaVar::script_name(path_parts));
+
+  // Add PATH_INFO. RFC 3875 §4.1.5 defines PATH_INFO as the extra path
+  // information after the script name in the URI. Because this server does not
+  // split the request URI into a script-name portion and an extra-path portion,
+  // PATH_INFO is set to the same segments as SCRIPT_NAME (i.e., the full
+  // request path). Scripts that rely on PATH_INFO being distinct from
+  // SCRIPT_NAME will need the caller to pre-populate it via add_mvar().
+  input.mvars.push_back(CgiMetaVar::path_info(path_parts));
+
+  // Add PATH_TRANSLATED (empty — document root is not available here)
+  input.mvars.push_back(CgiMetaVar::path_translated(""));
 
   // Add QUERY_STRING
   if (!query_string.empty()) {
@@ -693,12 +729,90 @@ Result<CgiInput> CgiInput::Parser::parse(Http::Request const &req) {
         query_map[pair] = "";
       }
     }
-    CgiMetaVar query_var = CgiMetaVar::query_string(query_map);
-    input.mvars.push_back(query_var);
+    input.mvars.push_back(CgiMetaVar::query_string(query_map));
+  }
+
+  // Add REMOTE_ADDR (127.0.0.1 — actual client IP is not available from
+  // Http::Request)
+  input.mvars.push_back(CgiMetaVar::remote_addr(127, 0, 0, 1));
+
+  // Add REMOTE_HOST (same as REMOTE_ADDR for loopback connections)
+  {
+    std::list<std::string> remote_host_parts;
+    remote_host_parts.push_back("localhost");
+    input.mvars.push_back(CgiMetaVar::remote_host(remote_host_parts));
+  }
+
+  // Add REMOTE_IDENT (empty — RFC 1413 identification not implemented)
+  input.mvars.push_back(CgiMetaVar::remote_ident(""));
+
+  // Pre-scan headers for Host and Authorization, used to populate SERVER_NAME,
+  // SERVER_PORT, AUTH_TYPE, and REMOTE_USER before processing all headers.
+  std::map<std::string, std::string> const &headers = req.headers();
+  std::string host_header_val;
+  std::string auth_header_val;
+  for (std::map<std::string, std::string>::const_iterator it = headers.begin();
+       it != headers.end(); ++it) {
+    std::string hname = it->first;
+    for (size_t i = 0; i < hname.size(); i++)
+      hname[i] =
+          static_cast<char>(to_upper(static_cast<unsigned char>(hname[i])));
+    if (hname == "HOST")
+      host_header_val = it->second;
+    else if (hname == "AUTHORIZATION")
+      auth_header_val = it->second;
+  }
+
+  // Add SERVER_NAME and SERVER_PORT (from Host header; default localhost:80)
+  {
+    std::string server_name_str = "localhost";
+    unsigned short server_port_val = 80;
+    if (!host_header_val.empty()) {
+      size_t colon_pos = host_header_val.find(':');
+      if (colon_pos != std::string::npos) {
+        server_name_str = host_header_val.substr(0, colon_pos);
+        std::string port_str = host_header_val.substr(colon_pos + 1);
+        char *endptr = NULL;
+        unsigned long port = std::strtoul(port_str.c_str(), &endptr, 10);
+        if (endptr != NULL && endptr != port_str.c_str() && *endptr == '\0' &&
+            port > 0 && port <= 65535)
+          server_port_val = static_cast<unsigned short>(port);
+      } else {
+        server_name_str = host_header_val;
+      }
+    }
+    Result<std::pair<ServerName, size_t> > sn_res =
+        ServerName::Parser::parse(server_name_str);
+    if (sn_res.error().empty())
+      input.mvars.push_back(CgiMetaVar::server_name(sn_res.value().first));
+    input.mvars.push_back(CgiMetaVar::server_port(server_port_val));
+  }
+
+  // Add AUTH_TYPE and REMOTE_USER (from Authorization header, if present)
+  if (!auth_header_val.empty()) {
+    size_t sp = auth_header_val.find(' ');
+    std::string scheme = (sp != std::string::npos)
+                             ? auth_header_val.substr(0, sp)
+                             : auth_header_val;
+    std::string scheme_upper = scheme;
+    for (size_t i = 0; i < scheme_upper.size(); i++)
+      scheme_upper[i] = static_cast<char>(
+          to_upper(static_cast<unsigned char>(scheme_upper[i])));
+    if (scheme_upper == "BASIC")
+      input.mvars.push_back(
+          CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::Basic)));
+    else if (scheme_upper == "DIGEST")
+      input.mvars.push_back(
+          CgiMetaVar::auth_type(CgiAuthType(CgiAuthType::Digest)));
+    else
+      input.mvars.push_back(CgiMetaVar::auth_type(
+          CgiAuthType(CgiAuthType::CgiAuthOther, scheme)));
+    // REMOTE_USER: username is not decoded here (would require Base64 decode
+    // for Basic); set to empty string
+    input.mvars.push_back(CgiMetaVar::remote_user(""));
   }
 
   // Add HTTP headers as CGI variables
-  std::map<std::string, std::string> const &headers = req.headers();
   for (std::map<std::string, std::string>::const_iterator it = headers.begin();
        it != headers.end(); ++it) {
     std::string header_name = it->first;
@@ -948,10 +1062,7 @@ char **CgiInput::to_envp() const {
     case CgiMetaVar::SERVER_NAME:
       env_str = "SERVER_NAME=";
       if (var.get_val().server_name != NULL) {
-        // ServerName formatting - could be host or IPv4
-        // For simplicity, we'll format it as a string
-        // This is a simplified implementation
-        env_str += "localhost"; // TODO: proper ServerName formatting
+        env_str += var.get_val().server_name->to_string();
       }
       break;
 
@@ -995,12 +1106,6 @@ unsigned char to_upper(unsigned char c) {
 
 // CgiDelegate implementation
 
-// CGI read timeout constants
-// Initial timeout for first read
-#define CGI_INITIAL_TIMEOUT_SEC 30
-// Timeout for subsequent reads
-#define CGI_SUBSEQUENT_TIMEOUT_SEC 5
-
 CgiDelegate::CgiDelegate(const Http::Request &req, const std::string &script)
     : env(), script_path(script), request(req) {
   // Parse the HTTP request to CgiInput
@@ -1010,11 +1115,34 @@ CgiDelegate::CgiDelegate(const Http::Request &req, const std::string &script)
   }
 }
 
+// Returns the number of milliseconds remaining until the deadline.
+// If timeout_ms <= 0 the caller requested no deadline and -1 is returned
+// (epoll_wait interprets -1 as "wait indefinitely").
+// Returns 0 when the deadline has already passed.
+static int remaining_ms(long long start_ms, int timeout_ms) {
+  if (timeout_ms <= 0)
+    return -1;
+  struct timeval tv_now;
+  gettimeofday(&tv_now, NULL);
+  long long now_ms = (long long)tv_now.tv_sec * 1000 + tv_now.tv_usec / 1000;
+  // Guard against clock going backwards (e.g. NTP adjustment)
+  if (now_ms < start_ms)
+    return timeout_ms;
+  long long rem = (long long)timeout_ms - (now_ms - start_ms);
+  return (rem > 0) ? (int)rem : 0;
+}
+
 Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
 
   if (epoll == NULL) {
     return ERR(Http::Response, "EPoll instance required");
   }
+
+  // Capture start time for end-to-end deadline tracking
+  struct timeval tv_start;
+  gettimeofday(&tv_start, NULL);
+  long long start_ms =
+      (long long)tv_start.tv_sec * 1000 + tv_start.tv_usec / 1000;
 
   // Create pipes for communication
   int stdin_pipe[2];
@@ -1156,8 +1284,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   // writability
   if (!body_str.empty()) {
     // Add stdin_fd to epoll for writing
-    const FileDescriptor *stdin_fd_ptr =
-        const_cast<const FileDescriptor *>(&stdin_fd);
+    const FileDescriptor *stdin_fd_ptr = &stdin_fd;
     Event write_event(stdin_fd_ptr, false, true, false, false, false, false);
     Option write_option(false, false, false, false);
     Result<FileDescriptor *> add_result =
@@ -1173,8 +1300,15 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
 
     size_t total_written = 0;
     while (total_written < body_str.length()) {
-      // Wait for the fd to be writable
-      Result<Events> wait_result = epoll->wait(timeout_ms);
+      // Wait for the fd to be writable (respects the end-to-end deadline)
+      int rem = remaining_ms(start_ms, timeout_ms);
+      if (rem == 0) {
+        epoll->del_fd(*stdin_epoll);
+        kill(pid, SIGKILL);
+        waitpid(pid, NULL, 0);
+        return ERR(Http::Response, "Timeout waiting for stdin writability");
+      }
+      Result<Events> wait_result = epoll->wait(rem);
       if (!wait_result.error().empty()) {
         epoll->del_fd(*stdin_epoll);
         // FileDescriptor destructors will close the pipes
@@ -1245,8 +1379,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   }
 
   // Add stdout_fd to epoll for reading
-  const FileDescriptor *stdout_fd_ptr =
-      const_cast<const FileDescriptor *>(&stdout_fd);
+  const FileDescriptor *stdout_fd_ptr = &stdout_fd;
   Event read_event(stdout_fd_ptr, true, false, false, false, false, false);
   Option read_option(false, false, false, false);
   Result<FileDescriptor *> add_stdout_result =
@@ -1265,8 +1398,15 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   char buffer[4096];
 
   while (true) {
-    // Wait for data to be available
-    Result<Events> wait_result = epoll->wait(timeout_ms);
+    // Wait for data to be available (respects the end-to-end deadline)
+    int rem = remaining_ms(start_ms, timeout_ms);
+    if (rem == 0) {
+      epoll->del_fd(*stdout_epoll);
+      kill(pid, SIGKILL);
+      waitpid(pid, NULL, 0);
+      return ERR(Http::Response, "CGI execution timeout");
+    }
+    Result<Events> wait_result = epoll->wait(rem);
     if (!wait_result.error().empty()) {
       epoll->del_fd(*stdout_epoll);
       // stdout_fd destructor will close stdout_pipe[0]

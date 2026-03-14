@@ -51,4 +51,7 @@ build/
 .cache/
 .idea/
 _codeql_detected_source_root
+
+.postman/
+postman/
 .vscode/
