@@ -9,12 +9,12 @@ types =
 
 uwsgi =
     /uwsgi/login.py:9000
-	/uwsgi/function2.py:9090
+    /uwsgi/function2.py:9090
 
 
 
 :8080 =
-	[] +<= X-Content-Type-Options: "nosniff"
+    [] +<= X-Content-Type-Options: "nosniff"
     $add_csp_sha256.cgi
 
     ...30
@@ -36,7 +36,7 @@ uwsgi =
 
 
 :8040 =
-	[] +<= X-Content-Type-Options: "nosniff"
+    [] +<= X-Content-Type-Options: "nosniff"
 
     ...30
 
@@ -49,8 +49,8 @@ uwsgi =
     GET *.(jpg|jpeg|gif) <- /spool/www/*.(jpg|jpeg|gif)
 
     POST /upload_file $upload_file.cgi(UPLOAD_DEST=/uploaded/)
-		...5
-		BUFFER_SIZE=2048
+        ...5
+        BUFFER_SIZE=2048
 
     POST /login $9000(AUTH_INFO=/auth_info)
-		...7
+        ...7
