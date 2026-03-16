@@ -84,7 +84,7 @@ HttpResponse Response::generate(const Request *request,
 
 Path Response::resolve_path(const Request *request,
                             const ServerConfig *config) {
-  const RouteRule *rule = config->findRoute(request->get_method(), request->path());
+  const RouteRule *rule = config->findRoute(request->get_method(), request->get_path());
   Path path;
 
   if (rule == NULL) {
@@ -103,10 +103,10 @@ Path Response::resolve_path(const Request *request,
      root.erase(pos, 1);
   }
 
-  if (request->path() == "/")
+  if (request->get_path() == "/")
     path.route = root;
   else
-    path.route = root + request->path();
+    path.route = root + request->get_path();
   path.type = check_path_type(path.route);
 
   return path;

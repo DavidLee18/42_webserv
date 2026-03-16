@@ -1,7 +1,7 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
-#include "Server.hpp"
+#include <map>
 #include <sstream>
 #include <string>
 
@@ -25,7 +25,7 @@ private:
   std::string body;
 
 public:
-  enum Method { GET, HEAD, OPTIONS, POST, DELETE, PUT, CONNECT, TRACE, PATCH };
+  enum Method { GET, HEAD, OPTIONS, POST, DELETE, PUT, CONNECT, TRACE, PATCH, ERROR };
   Request(std::string request);
   const std::string get_connection_string() const;
   Request::Method get_method() const;

@@ -5,6 +5,7 @@
 #include "../epoll_kqueue.h"
 #include "../errors.h"
 
+#include "Client.hpp"
 #include "Response.hpp"
 
 #include <arpa/inet.h>

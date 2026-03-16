@@ -20,6 +20,7 @@ Request::Method Request::get_method() const
     return Request::TRACE;
   else if (method == "PATCH")
     return Request::PATCH;
+  return Request::ERROR;
 }
 
 const std::string Request::get_connection_string() const
