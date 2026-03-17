@@ -18,7 +18,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (temp.error() == "")
         err_meg =
             "Invalid line Error: " + trim_space(trim_char(temp.value(), '\n'));
-      return (false);
+      return false;
     } else if (temp.value() == "")
       break;
     else if (temp.value() == "\n")
@@ -26,13 +26,17 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     line = trim_char(temp.value(), '\n');
     if (line == "types =" || line == "types=") {
       if (!set_type_map(file))
-        return (false);
+        return false;
     } else if (is_ServerConfig(line)) {
       if (!set_ServerConfig_map(file, line))
-        return (false);
+        return false;
+    } else if (line == "uwsgi =" || line == "uwsgi=") {
+      err_meg = parse_Config_uwsgi(file, this->uwsgi);
+      if (err_meg != "")
+        return false;
     } else {
       err_meg = "Invalid line Error: " + line;
-      return (false);
+      return false;
     }
   }
   if (this->type_map.empty() || this->default_mime.length() == 0)
@@ -199,20 +203,32 @@ unsigned int WebserverConfig::parse_ServerConfig_key(std::string &key) {
 
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.Get_Type_map();
+  const std::map<std::string, std::string> &uw = data.Get_Uwsgi();
   std::map<std::string, std::string>::const_iterator ty_it;
+  std::map<std::string, std::string>::const_iterator uw_it;
 
   os << "========================================================" << std::endl;
-  os << "Type_map\n" << std::endl;
+  os << "<<Type_map>>\n" << std::endl;
   for (ty_it = ty.begin(); ty_it != ty.end(); ++ty_it) {
     os << "Type key: " << ty_it->first << ", Type value: " << ty_it->second
        << std::endl;
   }
   os << "default_mime: " << data.Get_default_mime() << std::endl;
   os << "========================================================" << std::endl;
+  os << "\n\n\n========================================================"
+     << std::endl;
+  os << "<<Uwsgi>>\n" << std::endl;
+  for (uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
+    os << "Uwsgi key: " << uw_it->first << ", Uwsgi value: " << uw_it->second
+       << std::endl;
+  }
+  os << "========================================================" << std::endl;
+  os << "\n\n\n========================================================"
+     << std::endl;
   const std::map<unsigned int, ServerConfig> &Server_map =
       data.Get_ServerConfig_map();
   std::map<unsigned int, ServerConfig>::const_iterator Server_map_it;
-  os << "Server_map" << std::endl;
+  os << "<<Server_map>>" << std::endl;
   for (Server_map_it = Server_map.begin(); Server_map_it != Server_map.end();
        ++Server_map_it) {
     os << "\nServer key: " << Server_map_it->first << std::endl;

@@ -2,13 +2,14 @@
 #define SERVERCONFIG_HPP
 
 #include "ParsingUtils.hpp"
+#include "RouteRule_CGI.hpp"
 #include "file_descriptor.h"
 #include "http_1_1.h"
 #include <iosfwd>
 #include <unistd.h>
 
 typedef std::map<std::string, std::map<std::string, std::string> > Header;
-// enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
+typedef std::map<std::string, std::map<std::string, std::string> > Server_CGI;
 
 enum RuleOperator {
   MULTIPLECHOICES,   // 300
@@ -62,6 +63,9 @@ private:
   Header header;
   int serverResponseTime;
   std::vector<RouteRule> routes;
+  std::vector<RouteRule_CGI> R_CGI;
+  Server_CGI S_CGI;
+
   std::string err_line;
   int end_flag;
 
@@ -97,6 +101,8 @@ public:
                              const std::string &path) const;
   std::string Get_to(Http::Method method, const std::string &path) const;
   const std::string &Geterr_line(void) const { return err_line; }
+  std::vector<RouteRule_CGI> Get_RouteRule_CGI() const { return R_CGI; }
+  Server_CGI Get_Serve_CGI() const { return S_CGI; }
   // Result<ServerConfig> read_from_file(FileDescriptor &);
 };
 

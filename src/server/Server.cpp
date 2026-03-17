@@ -2,7 +2,8 @@
 #include "../webserv.h"
 
 void Server::new_connection(const FileDescriptor *server_fd) {
-  while (true) { // Edge-Triggered이므로 모든 연결을 다 받아야 함
+  while (true) { // accept all clients until nothing to connect
+    // init client socket
     Result<FileDescriptor> client_result = server_fd->socket_accept(NULL, NULL);
     if (!client_result.has_value()) {
       const std::string &err = client_result.error();
@@ -32,7 +33,6 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     if (add_result.has_value()) {
       FileDescriptor *client_ptr = add_result.value();
       ClientSession session;
-      // ★ 내 문지기(server_fd)의 Config 설정을 그대로 복사해서 세션에 넣음!
       if (listeners.find(server_fd) != listeners.end()) {
         session.config = listeners.at(server_fd);
       }
@@ -52,27 +52,30 @@ void Server::disconnect(const FileDescriptor *client_fd) {
 }
 
 void Server::client_read(const FileDescriptor *client_fd) {
-  while (true) { // ET 모드이므로 버퍼가 빌 때까지 다 읽음
+  while (true) { // repeat until nothing to read
     char buf[NETWORK_BUFFER_SIZE];
     Result<ssize_t> recv_res = client_fd->sock_recv(buf, sizeof(buf));
     if (!recv_res.has_value())
       break; // EWOULDBLOCK
 
     ssize_t bytes = recv_res.value();
-    if (bytes == 0) {
-      // 클라이언트가 정상적으로 연결 종료 (EOF)
+    if (bytes == 0) { // (EOF)
       disconnect(client_fd);
       return;
     }
     clients.at(client_fd).in_buff.append(buf, static_cast<std::size_t>(bytes));
   }
 
-  // HTTP 파싱 및 응답 생성 로직
+  // HTTP parsing and response generate
   if (clients.find(client_fd) != clients.end() &&
       !clients.at(client_fd).in_buff.empty()) {
     std::string &in_buffer = clients.at(client_fd).in_buff;
     size_t header_end = in_buffer.find("\r\n\r\n");
+    std::cout << "client request: \n"
+              << in_buffer << "\nend of request" << std::endl;
 
+    // todo: 해당 client의 포트 번호에 따른 config 적용
+    // 맞는 로케이션 블럭
     if (header_end != std::string::npos) {
       Result<std::pair<Http::Request *, size_t> > request_result =
           Http::Request::parse(in_buffer.c_str(), '\0');
@@ -82,20 +85,34 @@ void Server::client_read(const FileDescriptor *client_fd) {
       }
 
       Http::Request *request = request_result.value().first;
+      // todo: method to string
       std::cout << "[Request] " << request->method() << " " << request->path()
                 << std::endl;
 
       HttpResponse http =
           Response::generate(request, clients.at(client_fd).config);
+      std::cout << "file type: " << http.file_type << std::endl;
+      std::cout << "Route: "
+                << clients.at(client_fd).config->Get_to(request->method(),
+                                                        request->path())
+                << std::endl;
       delete request;
 
       // HTTP 응답 메시지 조립
       // todo: 하드코딩된 response 말고 동적으로
       std::ostringstream server_response;
       server_response << "HTTP/1.1 " << http.status_code << "\r\n";
-      server_response << "Content-Type: text/html\r\n";
+      if (http.file_type == "default")
+        server_response << "Content-Type:" << config.Get_default_mime()
+                        << "\r\n";
+      else
+        server_response << "Content-Type:"
+                        << config.Get_Type_map().at(http.file_type) << "\r\n";
       server_response << "Content-Length: " << http.body.length() << "\r\n";
-      server_response << "Connection: keep-alive\r\n\r\n";
+      if (http.keep_alive)
+        server_response << "Connection: keep-alive\r\n\r\n";
+      else
+        server_response << "Connection: close\r\n\r\n";
       server_response << http.body;
 
       clients.at(client_fd).out_buff += server_response.str();
@@ -131,7 +148,7 @@ Result<Void> Server::init() {
   // EPoll init
   Result<EPoll> epoll_result = EPoll::create(1024);
   if (!epoll_result.has_value())
-    return ERR(Void, epoll_result.error());
+    return ERR(Void, "Epoll create fail: " + epoll_result.error());
   epoll = epoll_result.value();
 
   // Init server socket for every port listed on configuration file
@@ -145,13 +162,13 @@ Result<Void> Server::init() {
     // Init socket
     Result<FileDescriptor> sock_result = FileDescriptor::socket_new();
     if (!sock_result.has_value())
-      return ERR(Void, sock_result.error());
+      return ERR(Void, "Socket fail: " + sock_result.error());
     FileDescriptor server_fd = sock_result.value();
 
     // Non-blocking socket for ET (edge-triggered)
     Result<Void> nb_result = server_fd.set_nonblocking();
     if (!nb_result.has_value())
-      return ERR(Void, nb_result.error());
+      return ERR(Void, "set nonblocking fail: " + nb_result.error());
 
     // Port reusing option
     int opt = 1;
@@ -166,12 +183,12 @@ Result<Void> Server::init() {
     addr.s_addr = htonl(INADDR_ANY); // All IPs
     Result<Void> bind_result = server_fd.socket_bind(addr, port);
     if (!bind_result.has_value())
-      return ERR(Void, bind_result.error());
+      return ERR(Void, "Bind fail: " + bind_result.error());
 
     // Listen (max queue length)
     Result<Void> listen_result = server_fd.socket_listen(SOMAXCONN);
     if (!listen_result.has_value())
-      return ERR(Void, listen_result.error());
+      return ERR(Void, "Listen fail: " + listen_result.error());
 
     // EPoll event and option setting
     Event event(&server_fd, true, false, false, false, false, false); // in=true
@@ -180,7 +197,7 @@ Result<Void> Server::init() {
     // Add server socket to EPoll
     Result<FileDescriptor *> add_result = epoll.add_fd(server_fd, event, op);
     if (!add_result.has_value())
-      return ERR(Void, add_result.error());
+      return ERR(Void, "Server register fail: " + add_result.error());
 
     // Save pointer to distinguish server sockets from client sockets
     FileDescriptor *fd_ptr = add_result.value();
