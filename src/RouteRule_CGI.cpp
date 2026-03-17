@@ -183,6 +183,8 @@ std::string parse_Config_uwsgi(FileDescriptor &fd,
     value_and_key = string_split(line, ":");
     if (!is_uwsgi(value_and_key))
       return "Error: \"" + line + "\" uwsgi syntax error";
+    if (value_and_key[0].find(".py") == std::string::npos)
+      return "Error: \"" + line + "\" It is not a .py file";
     if (uwsgi.find(value_and_key[1]) != uwsgi.end())
       return "Error: \"" + line + "\" uwsgi syntax error";
     else{
