@@ -167,7 +167,16 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           return false;
         }
       } else if(is_CGI(line)) {
-        ;
+        std::string key;
+        std::map<std::string, std::string> temp;
+        err_line = parse_Executable(line, key, temp);
+        if (err_line != "")
+          return false;
+        if (S_CGI.find(key) != S_CGI.end()) {
+          err_line = "Error: \"" + line + "\" duplicate key error";
+          return false;
+        }
+        S_CGI[key] = temp;
       } else if (is_serverResponseTime(line))
         parse_serverResponseTime(line);
       else if (is_RouteRule(line)) {
@@ -181,7 +190,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           err_line = temp.Get_err();
           return false;
         }
-        CGI.push_back(temp);
+        R_CGI.push_back(temp);
       } else {
         err_line = "Invalid line Error: " + trim_space(line);
         return false;
@@ -797,7 +806,7 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   }
   os << "\n========================================================";
 
-  std::vector<RouteRule_CGI> cgi = data.Get_CGI();
+  std::vector<RouteRule_CGI> cgi = data.Get_RouteRule_CGI();
   os << "\nCGI\n";
   for (std::size_t i = 0; i < cgi.size(); ++i) {
     os << cgi[i];

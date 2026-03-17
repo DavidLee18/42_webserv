@@ -140,6 +140,8 @@ std::string parse_env(const std::string &line, std::map<std::string, std::string
   if (!is_key(key_and_value[0]))
     return "Error: \"" + key_and_value[0] +
            "\" Invalid environment variable value";
+  if (env.find(key_and_value[0]) != env.end())
+    return "Error: \"" + line + "\" duplicate key error";
   env[key_and_value[0]] = key_and_value[1];
   return "";
 }
