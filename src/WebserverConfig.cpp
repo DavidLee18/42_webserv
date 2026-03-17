@@ -215,14 +215,16 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   }
   os << "default_mime: " << data.Get_default_mime() << std::endl;
   os << "========================================================" << std::endl;
-  os << "\n\n\n========================================================" << std::endl;
+  os << "\n\n\n========================================================"
+     << std::endl;
   os << "<<Uwsgi>>\n" << std::endl;
   for (uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
     os << "Uwsgi key: " << uw_it->first << ", Uwsgi value: " << uw_it->second
        << std::endl;
   }
   os << "========================================================" << std::endl;
-  os << "\n\n\n========================================================" << std::endl;
+  os << "\n\n\n========================================================"
+     << std::endl;
   const std::map<unsigned int, ServerConfig> &Server_map =
       data.Get_ServerConfig_map();
   std::map<unsigned int, ServerConfig>::const_iterator Server_map_it;

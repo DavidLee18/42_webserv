@@ -166,7 +166,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           err_line = "Header syntax Error: " + err_line;
           return false;
         }
-      } else if(is_CGI(line)) {
+      } else if (is_CGI(line)) {
         std::string key;
         std::map<std::string, std::string> temp;
         err_line = parse_Executable(line, key, temp);
@@ -183,7 +183,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
         if (!parse_RouteRule(line, fd)) {
           err_line = "RouteRule syntax Error: " + err_line;
           return false;
-        } 
+        }
       } else if (is_Config_CGI(line)) {
         RouteRule_CGI temp(fd, line);
         if (temp.Get_err() != "") {
@@ -784,8 +784,7 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
       os << "\tvalue: nosniff" << std::endl;
     else {
       std::map<std::string, std::string>::const_iterator temp;
-      for (temp = s_it->second.begin(); temp != s_it->second.end();
-           ++temp)
+      for (temp = s_it->second.begin(); temp != s_it->second.end(); ++temp)
         os << "\tvalue: " << temp->first << " " << temp->second << std::endl;
     }
   }

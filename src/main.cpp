@@ -19,8 +19,7 @@ int main(const int argc, char *argv[]) {
     std::cerr << "config parsing failed: " << result_config.error()
               << std::endl;
     return 1;
-  } 
-  else {
+  } else {
     std::cout << result_config.value() << std::endl;
   }
   return 0;

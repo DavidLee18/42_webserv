@@ -4,7 +4,8 @@
 bool is_CGI(const std::string &line);
 static bool is_timeout(const std::string &line);
 static double parse_timeout(std::string &line);
-std::string parse_Executable(const std::string& line, std::string &executable, std::map<std::string, std::string> &map);
+std::string parse_Executable(const std::string &line, std::string &executable,
+                             std::map<std::string, std::string> &map);
 
 RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, std::string line) {
   err = "";
@@ -23,7 +24,7 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, std::string line) {
 std::string RouteRule_CGI::parse_CGI(FileDescriptor &fd, std::string line) {
   std::string err_msg = "";
   std::string file_line = trim_char(line, '$');
-  
+
   err_msg = parse_Executable(file_line, this->executable, this->env);
   if (err_msg != "")
     return err_msg;
@@ -138,7 +139,8 @@ static bool is_key(const std::string &key) {
   return true;
 }
 
-std::string parse_env(const std::string &line, std::map<std::string, std::string> &env) {
+std::string parse_env(const std::string &line,
+                      std::map<std::string, std::string> &env) {
   std::vector<std::string> key_and_value = string_split(line, "=");
   if (key_and_value.size() != 2)
     return "Error: \"" + line + "\" Invalid environment variable syntax";
@@ -151,7 +153,7 @@ std::string parse_env(const std::string &line, std::map<std::string, std::string
   return "";
 }
 
-static bool is_uwsgi(std::vector<std::string> data) { 
+static bool is_uwsgi(std::vector<std::string> data) {
   if (data.size() != 2)
     return false;
   if (!isExecutableFile(data[0]))
@@ -164,7 +166,7 @@ static bool is_uwsgi(std::vector<std::string> data) {
 }
 
 std::string parse_Config_uwsgi(FileDescriptor &fd,
-                        std::map<std::string, std::string> &uwsgi) {
+                               std::map<std::string, std::string> &uwsgi) {
   std::vector<std::string> value_and_key;
   std::string line = "";
 
@@ -187,42 +189,42 @@ std::string parse_Config_uwsgi(FileDescriptor &fd,
       return "Error: \"" + line + "\" It is not a .py file";
     if (uwsgi.find(value_and_key[1]) != uwsgi.end())
       return "Error: \"" + line + "\" uwsgi syntax error";
-    else{
+    else {
       uwsgi[value_and_key[1]] = value_and_key[0];
     }
   }
   return "";
 }
 
-bool is_Config_CGI(std::string line)
-{
+bool is_Config_CGI(std::string line) {
   std::vector<std::string> split_line = string_split(line, " ");
   if (split_line.size() != 3)
     return false;
-  if (split_line[0] != "POST" && split_line[0] != "GET" && split_line[0] != "DELETE")
+  if (split_line[0] != "POST" && split_line[0] != "GET" &&
+      split_line[0] != "DELETE")
     return false;
   if (is_have_space(split_line[1]))
     return false;
   return true;
 }
 
-std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data)
-{
+std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
   std::map<std::string, std::string> env = data.Get_env();
   std::map<std::string, std::string>::const_iterator env_it;
 
   os << "\nExecutable: " << data.Get_executable() << "\n";
   os << "\n\tEnv\n";
   for (env_it = env.begin(); env_it != env.end(); ++env_it) {
-    os << "\tEnv key: " << env_it->first << ", Env value: " << env_it->second << "\n";
+    os << "\tEnv key: " << env_it->first << ", Env value: " << env_it->second
+       << "\n";
   }
   os << "\n\tTimeout: " << data.Get_timeout() << "\n";
-  
+
   return (os);
 }
 
-std::string parse_Executable(const std::string& line, std::string &executable, std::map<std::string, std::string> &map)
-{
+std::string parse_Executable(const std::string &line, std::string &executable,
+                             std::map<std::string, std::string> &map) {
   std::string err_msg = "";
 
   std::string file_line = trim_char(line, '$');
