@@ -31,7 +31,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (!set_ServerConfig_map(file, line))
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
-      err_meg = parse_uwsgi(file, this->uwsgi);
+      err_meg = parse_Config_uwsgi(file, this->uwsgi);
       if (err_meg != "")
         return false;
     } else {
@@ -203,7 +203,9 @@ unsigned int WebserverConfig::parse_ServerConfig_key(std::string &key) {
 
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.Get_Type_map();
+  const std::map<std::string, std::string> &uw = data.Get_Uwsgi();
   std::map<std::string, std::string>::const_iterator ty_it;
+  std::map<std::string, std::string>::const_iterator uw_it;
 
   os << "========================================================" << std::endl;
   os << "Type_map\n" << std::endl;
@@ -212,6 +214,12 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
        << std::endl;
   }
   os << "default_mime: " << data.Get_default_mime() << std::endl;
+  os << "========================================================" << std::endl;
+  os << "Uwsgi\n" << std::endl;
+  for (uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
+    os << "Uwsgi key: " << uw_it->first << ", Uwsgi value: " << uw_it->second
+       << std::endl;
+  }
   os << "========================================================" << std::endl;
   const std::map<unsigned int, ServerConfig> &Server_map =
       data.Get_ServerConfig_map();

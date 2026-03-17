@@ -149,7 +149,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
     Result<std::string> temp = fd.read_file_line();
     if (temp.error() != "") {
       err_line = "FileDescriptor Error: " + temp.error();
-      return (false);
+      return false;
     } else if (temp.value() == "\n") {
       end_flag += 1;
       if (end_flag == 2)
@@ -164,24 +164,32 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
       if (is_header(line)) {
         if (!parse_header_line(fd, line)) {
           err_line = "Header syntax Error: " + err_line;
-          return (false);
+          return false;
         }
+      } else if(is_CGI(line)) {
+        ;
       } else if (is_serverResponseTime(line))
         parse_serverResponseTime(line);
       else if (is_RouteRule(line)) {
         if (!parse_RouteRule(line, fd)) {
           err_line = "RouteRule syntax Error: " + err_line;
-          return (false);
+          return false;
+        } 
+      } else if (is_Config_CGI(line)) {
+        Config_CGI temp(fd, line);
+        if (temp.Get_err() != "") {
+          err_line = temp.Get_err();
+          return false;
         }
-        // else if (is_Config_CGI())
+        CGI.push_back(temp);
       } else {
         err_line = "Invalid line Error: " + trim_space(line);
-        return (false);
+        return false;
       }
     } else
-      return (false);
+      return false;
   }
-  return (true);
+  return true;
 }
 
 // header method
@@ -584,23 +592,6 @@ RuleOperator ServerConfig::parse_RuleOperator(std::string indicator) {
     return (UNDEFINED);
 }
 
-// static bool match(const std::string& wildcard, const std::string& path) {
-//   std::vector<std::string> parts = string_split(wildcard, "*");
-//   size_t pos = 0;
-
-//   if (2 < parts.size())
-//     return (false);
-//   for (size_t i = 0; i < parts.size(); ++i) {
-//       pos = path.find(parts[i], pos);
-//       if (pos == std::string::npos)
-//           return false;
-//       pos += parts[i].length();
-//   }
-//   if (pos != path.size())
-//     return false;
-//   return true;
-// }
-
 bool ServerConfig::is_matching(PathPattern path, PathPattern root) {
   std::vector<std::string> path_pattern = path.Get_path();
   std::vector<std::string> root_pattern = root.Get_path();
@@ -804,6 +795,15 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
         os << "\n\tError Page: " << err_it->first << " " << err_it->second;
     }
   }
+  os << "\n========================================================";
+
+  std::vector<Config_CGI> cgi = data.Get_CGI();
+  os << "\nCGI\n";
+  for (std::size_t i = 0; i < cgi.size(); ++i) {
+    os << cgi[i];
+  }
+  if (cgi.size() == 0)
+    os << "\nEmpty";
   os << "\n========================================================";
   return (os);
 }

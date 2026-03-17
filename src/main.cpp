@@ -19,19 +19,9 @@ int main(const int argc, char *argv[]) {
     std::cerr << "config parsing failed: " << result_config.error()
               << std::endl;
     return 1;
-  } else {
+  } 
+  else {
     std::cout << result_config.value() << std::endl;
-    // const WebserverConfig &config = result_config.value();
-    // Initiate server.
-    // Server server(config);
-    // Result<Void> init_result = server.init();
-    // if (!init_result.has_value()) {
-    //   std::cerr << "Server init failed: " << init_result.error() <<
-    //   std::endl; return 1;
-    // }
-
-    //   std::cout << "Starting server loop..." << std::endl;
-    //   server.start();
   }
   return 0;
 }

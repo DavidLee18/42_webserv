@@ -63,6 +63,7 @@ private:
   Header header;
   int serverResponseTime;
   std::vector<RouteRule> routes;
+  std::vector<Config_CGI> CGI;
 
   std::string err_line;
   int end_flag;
@@ -99,6 +100,7 @@ public:
                              const std::string &path) const;
   std::string Get_to(Http::Method method, const std::string &path) const;
   const std::string &Geterr_line(void) const { return err_line; }
+  std::vector<Config_CGI> Get_CGI() const { return CGI; }
   // Result<ServerConfig> read_from_file(FileDescriptor &);
 };
 
