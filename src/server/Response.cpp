@@ -50,8 +50,7 @@ int Response::check_path_type(const std::string &path) {
   return PATH_ERROR;
 }
 
-std::string find_file_type(std::string path)
-{
+std::string find_file_type(std::string path) {
   std::vector<std::string> file_type = string_split(path, ".");
   std::cout << "file type: " << file_type << std::endl;
 
@@ -95,12 +94,11 @@ Path Response::resolve_path(const Http::Request *request,
 
   std::string root = get_pwd() + rule->root.toString();
   size_t pos = root.find('*');
-  if (pos != std::string::npos && pos + 1 == root.length() && pos > 0)
-  {
+  if (pos != std::string::npos && pos + 1 == root.length() && pos > 0) {
     root.erase(pos, 1);
     --pos;
     if (root[pos] == '/')
-     root.erase(pos, 1);
+      root.erase(pos, 1);
   }
 
   if (request->path() == "/")

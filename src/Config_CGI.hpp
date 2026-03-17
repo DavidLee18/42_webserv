@@ -23,6 +23,7 @@ public:
   Config_CGI(FileDescriptor &fd, std::string);
 };
 
-std::string parse_uwsgi(FileDescriptor &fd, std::map<std::string, std::string> uwsgi);
+std::string parse_uwsgi(FileDescriptor &fd,
+                        std::map<std::string, std::string> &uwsgi);
 
 #endif

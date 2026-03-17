@@ -18,7 +18,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (temp.error() == "")
         err_meg =
             "Invalid line Error: " + trim_space(trim_char(temp.value(), '\n'));
-      return (false);
+      return false;
     } else if (temp.value() == "")
       break;
     else if (temp.value() == "\n")
@@ -26,13 +26,17 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     line = trim_char(temp.value(), '\n');
     if (line == "types =" || line == "types=") {
       if (!set_type_map(file))
-        return (false);
+        return false;
     } else if (is_ServerConfig(line)) {
       if (!set_ServerConfig_map(file, line))
-        return (false);
+        return false;
+    } else if (line == "uwsgi =" || line == "uwsgi=") {
+      err_meg = parse_uwsgi(file, this->uwsgi);
+      if (err_meg != "")
+        return false;
     } else {
       err_meg = "Invalid line Error: " + line;
-      return (false);
+      return false;
     }
   }
   if (this->type_map.empty() || this->default_mime.length() == 0)

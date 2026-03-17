@@ -112,7 +112,7 @@ static bool is_timeout(const std::string &line) {
   return true;
 }
 
-static double parse_timeout(std::string& line) {
+static double parse_timeout(std::string &line) {
   double time = 3;
   std::stringstream oss;
   oss << line.erase(0, 3);
@@ -147,14 +147,11 @@ std::string Config_CGI::parse_env(const std::string &line) {
   return "";
 }
 
-static bool is_uwsgi(std::string line)
-{
-  return true;
-}
+static bool is_uwsgi(std::string line) { return true; }
 
-std::string parse_uwsgi(FileDescriptor &fd, std::map<std::string, std::string> uwsgi)
-{
-  std::vector<std::string> key_and_value;
+std::string parse_uwsgi(FileDescriptor &fd,
+                        std::map<std::string, std::string> &uwsgi) {
+  std::vector<std::string> value_and_key;
   std::string line = "";
 
   while (true) {
@@ -165,16 +162,16 @@ std::string parse_uwsgi(FileDescriptor &fd, std::map<std::string, std::string> u
       return "";
     line = trim_char(temp.value(), '\n');
     if (is_tab_or_space(line, 1) == false ||
-    (line.empty() || line[line.length() - 1] == ' ' ||
-      line[line.length() - 1] == '\t'))
-    line = trim_space(line);
+        (line.empty() || line[line.length() - 1] == ' ' ||
+         line[line.length() - 1] == '\t'))
+      line = trim_space(line);
     if (!is_uwsgi(line))
       return "Error: \"" + line + "\" uwsgi syntax error";
-    key_and_value = string_split(line, ":");
-    if (uwsgi.find(key_and_value[0]) !=  uwsgi.end())
+    value_and_key = string_split(line, ":");
+    if (uwsgi.find(value_and_key[1]) != uwsgi.end())
       return "Error: \"" + line + "\" uwsgi syntax error";
     else
-      uwsgi[key_and_value[0]] = key_and_value[1];
+      uwsgi[value_and_key[1]] = value_and_key[0];
   }
   return "";
 }

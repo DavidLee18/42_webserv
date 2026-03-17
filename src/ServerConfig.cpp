@@ -836,7 +836,7 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
       break;
     }
   }
-  
+
   if (new_to.empty())
     return "";
 

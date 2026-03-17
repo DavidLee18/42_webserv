@@ -50,7 +50,7 @@ private:
 
   static int check_path_type(const std::string &path);
   static Path resolve_path(const Http::Request *request,
-                                  const ServerConfig *config);
+                           const ServerConfig *config);
   static std::string get_pwd();
   static std::string error_file_path(int error_code);
 };
