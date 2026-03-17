@@ -4,12 +4,15 @@
 #include "ServerConfig.hpp"
 #include <iosfwd>
 
+class ServerConfig;
 class WebserverConfig {
 private:
   std::string err_meg;
+
   std::string default_mime;
   std::map<std::string, std::string> uwsgi;
   std::map<std::string, std::string> type_map;
+
   std::map<unsigned int, ServerConfig> ServerConfig_map;
 
   bool file_parsing(FileDescriptor &file);
