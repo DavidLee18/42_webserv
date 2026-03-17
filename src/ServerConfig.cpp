@@ -760,7 +760,7 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
 
   const Header &header = data.Get_Header();
   Header::const_iterator header_it;
-  os << "\nHeader";
+  os << "\n\n\n<<Header>>";
   for (header_it = header.begin(); header_it != header.end(); ++header_it) {
     os << "\n\tkey: " << header_it->first << std::endl;
     if (header_it->second.empty())
@@ -773,8 +773,25 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
     }
   }
 
+  os << "\n\n\n<<Server CGI>>";
+  const Server_CGI &s = data.Get_Serve_CGI();
+  Server_CGI::const_iterator s_it;
+  if (s.empty())
+    os << "\n\tEmpty" << std::endl;
+  for (s_it = s.begin(); s_it != s.end(); ++s_it) {
+    os << "\n\tkey: " << s_it->first << std::endl;
+    if (s_it->second.empty())
+      os << "\tvalue: nosniff" << std::endl;
+    else {
+      std::map<std::string, std::string>::const_iterator temp;
+      for (temp = s_it->second.begin(); temp != s_it->second.end();
+           ++temp)
+        os << "\tvalue: " << temp->first << " " << temp->second << std::endl;
+    }
+  }
+
   const std::vector<RouteRule> &routes = data.Get_Routes();
-  os << "\nRoutes";
+  os << "\n\n\n<<Routes>>";
   for (size_t i = 0; i < routes.size(); ++i) {
     const RouteRule &route = routes[i];
     os << "\n\nRoute: ";
@@ -804,15 +821,14 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
         os << "\n\tError Page: " << err_it->first << " " << err_it->second;
     }
   }
-  os << "\n========================================================";
 
   std::vector<RouteRule_CGI> cgi = data.Get_RouteRule_CGI();
-  os << "\nCGI\n";
+  os << "\n\n\n\n<<Route CGI>>\n";
   for (std::size_t i = 0; i < cgi.size(); ++i) {
     os << cgi[i];
   }
   if (cgi.size() == 0)
-    os << "\nEmpty";
+    os << "\n\tEmpty";
   os << "\n========================================================";
   return (os);
 }

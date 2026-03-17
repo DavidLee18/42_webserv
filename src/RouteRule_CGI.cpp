@@ -10,15 +10,20 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, std::string line) {
   err = "";
   timeout = 3;
   std::vector<std::string> temp = string_split(line, " ");
+  if (temp[0] == "GET")
+    met = Http::GET;
+  if (temp[0] == "POST")
+    met = Http::POST;
+  if (temp[0] == "DELETE")
+    met = Http::DELETE;
+  path = temp[1];
   err = parse_CGI(fd, temp[2]);
 }
 
 std::string RouteRule_CGI::parse_CGI(FileDescriptor &fd, std::string line) {
   std::string err_msg = "";
-
-  if (!is_CGI(line))
-    return "Error: \"" + line + "\" CGI executable not found";
   std::string file_line = trim_char(line, '$');
+  
   err_msg = parse_Executable(file_line, this->executable, this->env);
   if (err_msg != "")
     return err_msg;
@@ -146,8 +151,15 @@ std::string parse_env(const std::string &line, std::map<std::string, std::string
   return "";
 }
 
-static bool is_uwsgi(std::string line) { 
-  (void)line;
+static bool is_uwsgi(std::vector<std::string> data) { 
+  if (data.size() != 2)
+    return false;
+  if (!isExecutableFile(data[0]))
+    return false;
+  for (std::size_t i = 0; i < data[1].size(); ++i) {
+    if (!std::isdigit(static_cast<unsigned char>(data[1][i])))
+      return false;
+  }
   return true;
 }
 
@@ -168,9 +180,9 @@ std::string parse_Config_uwsgi(FileDescriptor &fd,
          line[line.length() - 1] == '\t'))
       return "Error: \"" + line + "\" Indentation or space error";
     line = trim_space(line);
-    if (!is_uwsgi(line))
-      return "Error: \"" + line + "\" uwsgi syntax error";
     value_and_key = string_split(line, ":");
+    if (!is_uwsgi(value_and_key))
+      return "Error: \"" + line + "\" uwsgi syntax error";
     if (uwsgi.find(value_and_key[1]) != uwsgi.end())
       return "Error: \"" + line + "\" uwsgi syntax error";
     else{
@@ -182,7 +194,13 @@ std::string parse_Config_uwsgi(FileDescriptor &fd,
 
 bool is_Config_CGI(std::string line)
 {
-  (void)line;
+  std::vector<std::string> split_line = string_split(line, " ");
+  if (split_line.size() != 3)
+    return false;
+  if (split_line[0] != "POST" && split_line[0] != "GET" && split_line[0] != "DELETE")
+    return false;
+  if (is_have_space(split_line[1]))
+    return false;
   return true;
 }
 

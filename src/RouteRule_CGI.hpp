@@ -17,6 +17,8 @@
 
 class RouteRule_CGI {
 private:
+  Http::Method met;
+  std::string path;
   std::string executable;
   std::map<std::string, std::string> env;
   double timeout;
