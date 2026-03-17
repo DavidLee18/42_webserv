@@ -3,7 +3,7 @@
 // Forward declarations of internal helper functions used in parse_CGI
 static bool is_CGI(const std::string &line);
 static bool is_timeout(const std::string &line);
-static int  parse_timeout(const std::string &line);
+static double parse_timeout(const std::string &line);
 
 Config_CGI::Config_CGI(FileDescriptor &fd, std::string line) {
   err = "";
@@ -15,7 +15,7 @@ std::string Config_CGI::parse_CGI(FileDescriptor &fd, std::string line) {
   std::string err_msg = "";
 
   if (!is_CGI(line))
-    return "CGI Error: \"" + line + "\" CGI executable not found";
+    return "Error: \"" + line + "\" CGI executable not found";
   std::string file_line = trim_char(line, '$');
   std::size_t start = file_line.find('(');
   if (std::string::npos != start) {
@@ -41,11 +41,12 @@ std::string Config_CGI::parse_CGI(FileDescriptor &fd, std::string line) {
     file_line = trim_space(file_line);
     if (is_timeout(file_line))
       timeout = parse_timeout(file_line);
-    else if (std::string::npos != file_line.find("=")) {
+    else if (std::string::npos != file_line.find("="))
       err_msg = parse_env(file_line);
-      if (err_msg != "")
-        return err_msg;
-    }
+    else
+      err_msg = "Error: \"" + file_line + "\" Syntax error";
+    if (err_msg != "")
+      return err_msg;
   }
 }
 
@@ -63,9 +64,6 @@ static bool isExecutableFile(const std::string &path) {
 
 static bool is_CGI(const std::string &line) {
   std::size_t i = 1;
-
-  if (line.empty())
-    return false;
 
   if (line.empty() || line[0] != '$' || is_have_space(line))
     return false;
@@ -114,7 +112,7 @@ static bool is_timeout(const std::string &line) {
   return true;
 }
 
-static double parse_timeout(std::string line) {
+static double parse_timeout(std::string& line) {
   double time = 3;
   std::stringstream oss;
   oss << line.erase(0, 3);
@@ -123,8 +121,6 @@ static double parse_timeout(std::string line) {
 }
 
 static bool is_key(const std::string &key) {
-  if (key.empty())
-    return false;
   std::size_t i = 0;
 
   if (key.empty())
@@ -140,13 +136,45 @@ static bool is_key(const std::string &key) {
   return true;
 }
 
-std::string Config_CGI::parse_env(const std::string &env) {
-  std::vector<std::string> key_and_value = string_split(env, "=");
+std::string Config_CGI::parse_env(const std::string &line) {
+  std::vector<std::string> key_and_value = string_split(line, "=");
   if (key_and_value.size() != 2)
-    return "Error: \"" + env + "\" Invalid environment variable syntax";
+    return "Error: \"" + line + "\" Invalid environment variable syntax";
   if (!is_key(key_and_value[0]))
     return "Error: \"" + key_and_value[0] +
            "\" Invalid environment variable value";
   this->env[key_and_value[0]] = key_and_value[1];
+  return "";
+}
+
+static bool is_uwsgi(std::string line)
+{
+  return true;
+}
+
+std::string parse_uwsgi(FileDescriptor &fd, std::map<std::string, std::string> uwsgi)
+{
+  std::vector<std::string> key_and_value;
+  std::string line = "";
+
+  while (true) {
+    Result<std::string> temp = fd.read_file_line();
+    if (temp.error() != "")
+      return "FileDescriptor Error: " + temp.error();
+    else if (temp.value() == "\n" || temp.value() == "")
+      return "";
+    line = trim_char(temp.value(), '\n');
+    if (is_tab_or_space(line, 1) == false ||
+    (line.empty() || line[line.length() - 1] == ' ' ||
+      line[line.length() - 1] == '\t'))
+    line = trim_space(line);
+    if (!is_uwsgi(line))
+      return "Error: \"" + line + "\" uwsgi syntax error";
+    key_and_value = string_split(line, ":");
+    if (uwsgi.find(key_and_value[0]) !=  uwsgi.end())
+      return "Error: \"" + line + "\" uwsgi syntax error";
+    else
+      uwsgi[key_and_value[0]] = key_and_value[1];
+  }
   return "";
 }
