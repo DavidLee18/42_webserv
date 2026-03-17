@@ -176,7 +176,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           return false;
         } 
       } else if (is_Config_CGI(line)) {
-        Config_CGI temp(fd, line);
+        RouteRule_CGI temp(fd, line);
         if (temp.Get_err() != "") {
           err_line = temp.Get_err();
           return false;
@@ -797,7 +797,7 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   }
   os << "\n========================================================";
 
-  std::vector<Config_CGI> cgi = data.Get_CGI();
+  std::vector<RouteRule_CGI> cgi = data.Get_CGI();
   os << "\nCGI\n";
   for (std::size_t i = 0; i < cgi.size(); ++i) {
     os << cgi[i];

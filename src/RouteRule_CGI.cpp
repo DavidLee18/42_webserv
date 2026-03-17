@@ -1,4 +1,4 @@
-#include "Config_CGI.hpp"
+#include "RouteRule_CGI.hpp"
 
 // Forward declarations of internal helper functions used in parse_CGI
 bool is_CGI(const std::string &line);
@@ -6,14 +6,14 @@ static bool is_timeout(const std::string &line);
 static double parse_timeout(std::string &line);
 std::string parse_Executable(const std::string& line, std::string &executable, std::map<std::string, std::string> &map);
 
-Config_CGI::Config_CGI(FileDescriptor &fd, std::string line) {
+RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, std::string line) {
   err = "";
   timeout = 3;
   std::vector<std::string> temp = string_split(line, " ");
   err = parse_CGI(fd, temp[2]);
 }
 
-std::string Config_CGI::parse_CGI(FileDescriptor &fd, std::string line) {
+std::string RouteRule_CGI::parse_CGI(FileDescriptor &fd, std::string line) {
   std::string err_msg = "";
 
   if (!is_CGI(line))
@@ -184,7 +184,7 @@ bool is_Config_CGI(std::string line)
   return true;
 }
 
-std::ostream &operator<<(std::ostream &os, const Config_CGI &data)
+std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data)
 {
   std::map<std::string, std::string> env = data.Get_env();
   std::map<std::string, std::string>::const_iterator env_it;

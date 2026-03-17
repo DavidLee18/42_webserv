@@ -1,7 +1,7 @@
 #ifndef SERVERCONFIG_HPP
 #define SERVERCONFIG_HPP
 
-#include "Config_CGI.hpp"
+#include "RouteRule_CGI.hpp"
 #include "ParsingUtils.hpp"
 #include "file_descriptor.h"
 #include "http_1_1.h"
@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 typedef std::map<std::string, std::map<std::string, std::string> > Header;
+typedef std::map<std::string, std::map<std::string, std::string> > Server_CGI;
 // enum RouteType { ROUTE_REDIRECT, ROUTE_STATIC, ROUTE_OTHER };
 
 enum RuleOperator {
@@ -63,7 +64,7 @@ private:
   Header header;
   int serverResponseTime;
   std::vector<RouteRule> routes;
-  std::vector<Config_CGI> CGI;
+  std::vector<RouteRule_CGI> CGI;
 
   std::string err_line;
   int end_flag;
@@ -100,7 +101,7 @@ public:
                              const std::string &path) const;
   std::string Get_to(Http::Method method, const std::string &path) const;
   const std::string &Geterr_line(void) const { return err_line; }
-  std::vector<Config_CGI> Get_CGI() const { return CGI; }
+  std::vector<RouteRule_CGI> Get_CGI() const { return CGI; }
   // Result<ServerConfig> read_from_file(FileDescriptor &);
 };
 
