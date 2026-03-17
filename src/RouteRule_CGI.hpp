@@ -8,12 +8,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-// struct RouteRule_CGI
-// {
-// std::string executable;
-// std::map<std::string, std::string> env;
-// };
-
 class RouteRule_CGI {
 private:
   Http::Method met;
