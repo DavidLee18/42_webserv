@@ -28,9 +28,12 @@ int main(const int argc, char *argv[]) {
       std::cerr << "Server init failed: " << init_result.error() << std::endl;
       return 1;
     }
-
-    std::cout << "Starting server loop..." << std::endl;
-    server.start();
+    Result<Void> server_result = server.start();
+    if (!server_result.has_value()) {
+      std::cerr << "Server Error: " << server_result.error() << std::endl;
+      return 1;
+    }
+    
   }
   return 0;
 }

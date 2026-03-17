@@ -2,20 +2,43 @@
 #include "../cgi_1_1.h"
 #include "ParsingUtils.hpp"
 
-const std::map<int, std::string> Response::status_code =
-    Response::init_status_code();
+std::string get_string_from_map(const std::map<int, std::string> map, int key) {
+  std::map<int, std::string>::const_iterator it = map.find(key);
 
-std::map<int, std::string> Response::init_status_code() {
-  std::map<int, std::string> status;
-  status[200] = "200 OK";
-  status[301] = "301 Moved Permanently";
-  status[400] = "400 Bad Request";
-  status[403] = "403 Forbidden";
-  status[404] = "404 Not Found";
-  status[405] = "405 Method Not Allowed";
-  status[413] = "413 Payload Too Large";
-  status[500] = "500 Internal Server Error";
-  return status;
+  if (it != map.end())
+    return it->second;
+  else
+    return "";
+}
+
+std::string get_string_from_map(const std::map<std::string, std::string> map,
+                                std::string key) {
+  std::map<std::string, std::string>::const_iterator it = map.find(key);
+
+  if (it != map.end())
+    return it->second;
+  else
+    return "";
+}
+
+std::string Response::status_code_to_string(int status_code) {
+  if (status_code == 200)
+    return "200 OK";
+  else if (status_code == 301)
+    return "301 Moved Permanently";
+  else if (status_code == 400)
+    return "400 Bad Request";
+  else if (status_code == 403)
+    return "403 Forbidden";
+  else if (status_code == 404)
+    return "404 Not Found";
+  else if (status_code == 405)
+    return "405 Method Not Allowed";
+  else if (status_code == 413)
+    return "413 Payload Too Large";
+  else if (status_code == 500)
+    return "500 Internal Server Error";
+  return "500 Internal Server Error";
 }
 
 std::string Response::get_pwd() {
@@ -40,9 +63,9 @@ int Response::check_path_type(const std::string &path) {
   struct stat info;
 
   if (stat(path.c_str(), &info) != 0)
-    return PATH_ERROR;
+    return NOT_FOUND_ERR;
   else if (access(path.c_str(), R_OK) != 0)
-    return PATH_ERROR;
+    return FORBIDDEN_ERR;
   else if (S_ISDIR(info.st_mode))
     return IS_DIR;
   else if (S_ISREG(info.st_mode))
@@ -50,64 +73,115 @@ int Response::check_path_type(const std::string &path) {
   return PATH_ERROR;
 }
 
-std::string find_file_type(std::string path)
-{
+std::string find_file_type(std::string path) {
   std::vector<std::string> file_type = string_split(path, ".");
-  std::cout << "file type: " << file_type << std::endl;
+  std::cout << "file type: " << file_type.back() << std::endl;
 
   if (file_type.size() <= 1)
     return "default";
   return file_type.back();
 }
 
-HttpResponse Response::generate(const Request *request,
-                                const ServerConfig *config) {
+HttpResponse
+Response::generate(const Request *request, const ServerConfig *config,
+                   const std::map<std::string, std::string> mime_type) {
+  const RouteRule *rule =
+      config->findRoute(request->get_method(), request->get_path());
   HttpResponse response;
-  Path path = resolve_path(request, config);
+  Target target = resolve_target(
+      rule, config->Get_to(request->get_method(), request->get_path()));
+  std::cout << "CONFIG FIND ROUTE GET PATH: " << std::endl;
 
-  if (path.type == IS_FILE)
-    response.file_type = find_file_type(path.route);
-  else
-    response.file_type = "default";
-  if (path.type == IS_FILE || path.type == IS_DIR)
-    path.type = OK;
-  std::ifstream file(path.route.c_str());
-  if (file.is_open()) {
-    std::ostringstream ss;
-    ss << file.rdbuf();
-    response.body = ss.str();
-    response.status_code = status_code.at(path.type);
-    file.close();
+  response.mime_type =
+      get_string_from_map(mime_type, find_file_type(target.path));
+  if (target.type == IS_DIR && rule->op == AUTOINDEX) {
+    target.type = OK;
+    response.mime_type = "html";
+    response.body = make_autoindex_page(target.path, request->get_path());
+    response.status_code = status_code_to_string(target.type);
+  } else {
+    std::ifstream file(target.path.c_str());
+    std::cout << "Target path: " << target.path << std::endl;
+    if (file.is_open()) {
+      std::ostringstream ss;
+      ss << file.rdbuf();
+      target.type = OK;
+      response.body = ss.str();
+      response.status_code = status_code_to_string(target.type);
+      file.close();
+    }
   }
   return response;
 }
 
-Path Response::resolve_path(const Request *request,
-                            const ServerConfig *config) {
-  const RouteRule *rule = config->findRoute(request->get_method(), request->get_path());
-  Path path;
-
+Target Response::resolve_target(const RouteRule *rule, std::string root) {
+  Target target;
   if (rule == NULL) {
-    path.type = NOT_FOUND_ERR;
-    path.route = error_file_path(NOT_FOUND_ERR);
-    return path;
+    target.type = NOT_FOUND_ERR;
+    target.path = get_string_from_map(rule->errorPages, NOT_FOUND_ERR);
+    return target;
   }
 
-  std::string root = get_pwd() + rule->root.toString();
-  size_t pos = root.find('*');
-  if (pos != std::string::npos && pos + 1 == root.length() && pos > 0)
-  {
-    root.erase(pos, 1);
-    --pos;
-    if (root[pos] == '/')
-     root.erase(pos, 1);
-  }
-
-  if (request->get_path() == "/")
-    path.route = root;
+  target.path = get_pwd();
+  std::cout << "Root: " << target.path + root << std::endl;
+  int type = check_path_type(target.path + root);
+  if (type == IS_DIR && rule->op != AUTOINDEX) {
+    if (rule->index.empty())
+      target.path += root + "/index.html";
+    else
+      target.path += root + "/" + rule->index;
+  } else if (type == NOT_FOUND_ERR)
+    target.path += get_string_from_map(rule->errorPages, NOT_FOUND_ERR);
+  else if (type == FORBIDDEN_ERR)
+    target.path += get_string_from_map(rule->errorPages, FORBIDDEN_ERR);
   else
-    path.route = root + request->get_path();
-  path.type = check_path_type(path.route);
+    target.path += root;
+  target.type = type;
 
-  return path;
+  return target;
+}
+
+std::string Response::make_autoindex_page(const std::string &real_path,
+                                          const std::string &req_uri) {
+  DIR *dir = opendir(real_path.c_str());
+  if (dir == NULL) {
+    return ""; // 폴더를 열 권한이 없거나 없으면 빈 문자열 반환 (나중에 403
+               // 처리)
+  }
+
+  // 1. HTML 기본 뼈대 작성
+  std::string html =
+      "<html><head><title>Index of " + req_uri + "</title></head><body>\r\n";
+  html += "<h1>Index of " + req_uri + "</h1><hr><pre>\r\n";
+
+  struct dirent *entity;
+
+  // 2. 디렉토리 안의 파일들을 하나씩 읽기
+  while ((entity = readdir(dir)) != NULL) {
+    std::string name = entity->d_name;
+
+    // 현재 폴더(.)는 굳이 보여줄 필요가 없으니 스킵
+    if (name == ".")
+      continue;
+
+    // 링크용 href 만들기
+    std::string href = name;
+
+    // 폴더인 경우 이름 끝에 '/'를 붙여주는 것이 관례입니다.
+    if (entity->d_type == DT_DIR) {
+      href += "/";
+      name += "/";
+    }
+
+    // 3. <a> 태그를 사용해 클릭 가능한 링크 추가
+    html += "<a href=\"" + href + "\">" + name + "</a>\r\n<br>\r\n";
+  }
+
+  // 4. HTML 마무리
+  html += "</pre><hr></body></html>";
+  closedir(dir);
+
+  std::cout << html << std::endl;
+
+  return html;
 }

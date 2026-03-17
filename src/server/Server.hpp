@@ -27,6 +27,7 @@ class Server {
 private:
   EPoll epoll;
   WebserverConfig config;
+  std::map<std::string, std::string> mime_type;
   std::set<const FileDescriptor *> server_fds;
   // Listening socket
   // key: server socket fds, value: ports ServerConfig
@@ -41,7 +42,8 @@ private:
   void client_write(const FileDescriptor *client_fd);
 
 public:
-  Server(const WebserverConfig &config) : config(config){};
+  Server(const WebserverConfig &config) : config(config), mime_type(config.Get_Type_map())
+  { mime_type["default"] = config.Get_default_mime(); };
   ~Server(){};
 
   Result<Void> init();

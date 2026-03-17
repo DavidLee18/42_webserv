@@ -71,7 +71,6 @@ void Server::client_read(const FileDescriptor *client_fd) {
       !clients.at(client_fd).in_buff.empty()) {
     std::string &in_buffer = clients.at(client_fd).in_buff;
     size_t header_end = in_buffer.find("\r\n\r\n");
-    std::cout << "client request: \n" << in_buffer << "\nend of request" << std::endl;
 
 
     // todo: 해당 client의 포트 번호에 따른 config 적용
@@ -84,23 +83,18 @@ void Server::client_read(const FileDescriptor *client_fd) {
                 << std::endl;
 
       HttpResponse http =
-          Response::generate(&request, clients.at(client_fd).config);
-        std::cout << "file type: " << http.file_type << std::endl;
-        std::cout << "Route: " << clients.at(client_fd).config->Get_to(request.get_method(), request.get_path()) << std::endl;
+          Response::generate(&request, clients.at(client_fd).config, mime_type);
+        std::cout << "Http file type: " << http.mime_type << std::endl;
+        std::cout << "Route: " << clients.at(client_fd).config->Get_to(request.get_method(), request.get_path()) << std::endl << std::endl;
 
       // HTTP 응답 메시지 조립
       // todo: 하드코딩된 response 말고 동적으로
       std::ostringstream server_response;
       server_response << "HTTP/1.1 " << http.status_code << "\r\n";
-      if (http.file_type == "default")
-        server_response << "Content-Type:" << config.Get_default_mime() << "\r\n";
-      else
-        server_response << "Content-Type:" << config.Get_Type_map().at(http.file_type) << "\r\n";
+
+      server_response << "Content-Type:" << http.mime_type << "\r\n";
       server_response << "Content-Length: " << http.body.length() << "\r\n";
-      if (http.keep_alive)
-        server_response << "Connection: keep-alive\r\n\r\n";
-      else
-        server_response << "Connection: close\r\n\r\n";
+      server_response << "Connection: " << http.connection << "\r\n\r\n";
       server_response << http.body;
 
       clients.at(client_fd).out_buff += server_response.str();
@@ -191,13 +185,13 @@ Result<Void> Server::init() {
     FileDescriptor *fd_ptr = add_result.value();
     listeners[fd_ptr] = &it->second;
 
-    std::cout << "Server listening on port " << port << std::endl;
+    std::cout << "Server listening " << inet_ntoa(addr) << " : "  << port << std::endl;
   }
-
   return OK(Void, Void());
 }
 
 Result<Void> Server::start() {
+  std::cout << "Starting server loop..." << std::endl;
   while (true) {
     // Waiting for events using epoll
     Result<Events> events_result = epoll.wait(-1);

@@ -8,9 +8,10 @@
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <dirent.h>
 
-struct Path {
-  std::string route;
+struct Target {
+  std::string path;
   int type;
 };
 
@@ -22,8 +23,10 @@ struct StatusInfo {
 struct HttpResponse {
   std::string version;
   std::string status_code;
+  std::string content_type;
+  std::string connection;
   std::string body;
-  std::string file_type;
+  std::string mime_type;
   bool keep_alive;
 };
 
@@ -32,7 +35,8 @@ class ServerConfig;
 class Response {
 public:
   static HttpResponse generate(const Request *request,
-                               const ServerConfig *config);
+                               const ServerConfig *config,
+                               const std::map<std::string, std::string>mime_type);
 
 private:
   enum Type { IS_DIR, IS_FILE, PATH_ERROR };
@@ -48,14 +52,14 @@ private:
     INTERNAL_SERVER_ERR = 500
   };
 
-  static const std::map<int, std::string> status_code;
-  static std::map<int, std::string> init_status_code();
+  static std::string status_code_to_string(int status_code);
 
   static int check_path_type(const std::string &path);
-  static Path resolve_path(const Request *request,
-                           const ServerConfig *config);
+  static Target resolve_target(const RouteRule *rule, std::string root);
   static std::string get_pwd();
   static std::string error_file_path(int error_code);
+  static std::string make_autoindex_page(const std::string& real_path,
+                                         const std::string& req_uri);
 };
 
 #endif
