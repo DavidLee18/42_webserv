@@ -1,29 +1,411 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Webserv Test Page</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-        a { display: inline-block; margin: 15px; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; }
-        a:hover { background-color: #0056b3; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(255,255,255,0.06), transparent 22%),
+                radial-gradient(circle at bottom right, rgba(255,255,255,0.04), transparent 24%),
+                linear-gradient(135deg, #060606 0%, #0d0d0d 45%, #030303 100%);
+            color: #f5f5f5;
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 배경 캔버스 */
+        #glass-bg {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* 배경 깊이감 */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(255,255,255,0.04), transparent 18%),
+                radial-gradient(circle at 80% 30%, rgba(255,255,255,0.03), transparent 20%),
+                radial-gradient(circle at 50% 80%, rgba(255,255,255,0.025), transparent 24%);
+            mix-blend-mode: screen;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 760px;
+            text-align: center;
+            padding: 48px 32px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow:
+                0 20px 60px rgba(0, 0, 0, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            position: relative;
+            z-index: 2;
+        }
+
+        .badge {
+            display: inline-block;
+            margin-bottom: 18px;
+            padding: 8px 14px;
+            border: 1px solid #333;
+            border-radius: 999px;
+            font-size: 13px;
+            color: #cfcfcf;
+            background: rgba(255,255,255,0.03);
+            letter-spacing: 0.5px;
+        }
+
+        h1 {
+            font-size: 42px;
+            line-height: 1.2;
+            margin-bottom: 14px;
+            letter-spacing: -1px;
+        }
+
+        p {
+            color: #b3b3b3;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 36px;
+        }
+
+        .links {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        a {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            text-decoration: none;
+            background: #ffffff;
+            color: #000000;
+            padding: 18px 20px;
+            border-radius: 16px;
+            font-weight: bold;
+            font-size: 16px;
+            border: 1px solid rgba(255,255,255,0.9);
+            transition: all 0.25s ease;
+            box-shadow: 0 8px 20px rgba(255, 255, 255, 0.05);
+        }
+
+        a:hover {
+            background: #111111;
+            color: #ffffff;
+            transform: translateY(-3px);
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
+        }
+
+        .btn-icon {
+            width: 34px;
+            height: 34px;
+            object-fit: contain;
+            border-radius: 8px;
+            background: #fff;
+            border: 1px solid #d9d9d9;
+            flex-shrink: 0;
+            padding: 2px;
+        }
+
+        .footer {
+            margin-top: 28px;
+            font-size: 13px;
+            color: #7a7a7a;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 36px 20px;
+                border-radius: 18px;
+            }
+
+            h1 {
+                font-size: 30px;
+            }
+
+            p {
+                font-size: 15px;
+            }
+
+            a {
+                font-size: 15px;
+                padding: 16px;
+            }
+
+            .btn-icon {
+                width: 28px;
+                height: 28px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>Welcome to Webserv Backup Page!</h1>
+    <canvas id="glass-bg"></canvas>
 
-    <!-- 1. /hello 경로로 이동 (200 OK 테스트) -->
-    <a href="/hello">인사말 보기 (/hello)</a>
-    <br>
-    
-    <a href="/forbidden.html"> 직박구리 (403)</a>
-    <br>
-    <!-- 2. 없는 경로로 이동 (404 Not Found 테스트) -->
-    <a href="/where-am-i">없는 페이지 가보기 (404 오류)</a>
-    <br>
-    <a href="/download/">download</a>
+    <div class="container">
+        <div class="badge">WEBSERV TEST</div>
+        <h1>Welcome to Webserv Main Page</h1>
+        <p>
+            Minimal, clean, and focused.
+            Choose one of the test routes below to verify your server responses.
+        </p>
 
+        <div class="links">
+            <a href="/hello">
+                <img src="/hello/hi.jpeg" alt="Hello Kitty" class="btn-icon">
+                <span>인사말 보기 (/hello)</span>
+            </a>
+
+            <a href="/forbidden.html">
+                <img src="/hello/hi.jpeg" alt="Hello Kitty" class="btn-icon">
+                <span>직박구리 (403)</span>
+            </a>
+
+            <a href="/where-am-i">
+                <img src="/hello/hi.jpeg" alt="Hello Kitty" class="btn-icon">
+                <span>없는 페이지 가보기 (404 오류)</span>
+            </a>
+        </div>
+
+        <div class="footer">
+            Modern Webserv Landing Page
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var canvas = document.getElementById("glass-bg");
+            var ctx = canvas.getContext("2d");
+
+            var dpr = Math.max(1, window.devicePixelRatio || 1);
+            var width = 0;
+            var height = 0;
+
+            var cellSize = 72;
+            var points = [];
+            var ripples = [];
+            var mouse = { x: -9999, y: -9999, moved: false };
+
+            function resize() {
+                width = window.innerWidth;
+                height = window.innerHeight;
+
+                canvas.width = Math.floor(width * dpr);
+                canvas.height = Math.floor(height * dpr);
+                canvas.style.width = width + "px";
+                canvas.style.height = height + "px";
+
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                buildGrid();
+            }
+
+            function randomRange(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            function buildGrid() {
+                points = [];
+                var cols = Math.ceil(width / cellSize) + 2;
+                var rows = Math.ceil(height / cellSize) + 2;
+
+                for (var y = -1; y < rows; y++) {
+                    for (var x = -1; x < cols; x++) {
+                        points.push({
+                            x: x * cellSize + randomRange(-10, 10),
+                            y: y * cellSize + randomRange(-10, 10),
+                            size: randomRange(20, 58),
+                            rot: randomRange(-0.8, 0.8),
+                            seed: Math.random() * Math.PI * 2
+                        });
+                    }
+                }
+            }
+
+            function addRipple(x, y, strength) {
+                ripples.push({
+                    x: x,
+                    y: y,
+                    radius: 0,
+                    life: 0,
+                    maxLife: 55,
+                    strength: strength || 1
+                });
+
+                if (ripples.length > 12) {
+                    ripples.shift();
+                }
+            }
+
+            function drawShard(px, py, size, rot, alphaFill, alphaStroke, glow) {
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.rotate(rot);
+
+                ctx.beginPath();
+                ctx.moveTo(-size * 0.45, -size * 0.10);
+                ctx.lineTo(-size * 0.10, -size * 0.48);
+                ctx.lineTo(size * 0.42, -size * 0.18);
+                ctx.lineTo(size * 0.30, size * 0.40);
+                ctx.lineTo(-size * 0.30, size * 0.32);
+                ctx.closePath();
+
+                ctx.fillStyle = "rgba(255,255,255," + alphaFill + ")";
+                ctx.fill();
+
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = "rgba(255,255,255," + alphaStroke + ")";
+                ctx.stroke();
+
+                if (glow > 0) {
+                    ctx.shadowColor = "rgba(255,255,255," + Math.min(glow, 0.45) + ")";
+                    ctx.shadowBlur = 18;
+                    ctx.strokeStyle = "rgba(255,255,255," + Math.min(alphaStroke + glow, 0.55) + ")";
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            function render() {
+                ctx.clearRect(0, 0, width, height);
+
+                for (var i = 0; i < ripples.length; i++) {
+                    ripples[i].life += 1;
+                    ripples[i].radius += 9;
+                }
+
+                ripples = ripples.filter(function (r) {
+                    return r.life < r.maxLife;
+                });
+
+                for (var p = 0; p < points.length; p++) {
+                    var point = points[p];
+
+                    var baseAlphaFill = 0.035;
+                    var baseAlphaStroke = 0.08;
+                    var glow = 0;
+                    var waveBoost = 0;
+                    var driftX = 0;
+                    var driftY = 0;
+
+                    for (var r = 0; r < ripples.length; r++) {
+                        var ripple = ripples[r];
+                        var dx = point.x - ripple.x;
+                        var dy = point.y - ripple.y;
+                        var dist = Math.sqrt(dx * dx + dy * dy);
+
+                        var ringWidth = 38;
+                        var diff = Math.abs(dist - ripple.radius);
+                        if (diff < ringWidth) {
+                            var influence = (1 - diff / ringWidth) * (1 - ripple.life / ripple.maxLife);
+                            waveBoost += influence * 0.22 * ripple.strength;
+                            glow += influence * 0.28 * ripple.strength;
+
+                            if (dist > 0.001) {
+                                var nx = dx / dist;
+                                var ny = dy / dist;
+                                driftX += nx * influence * 4.0;
+                                driftY += ny * influence * 4.0;
+                            }
+                        }
+                    }
+
+                    var mouseDx = point.x - mouse.x;
+                    var mouseDy = point.y - mouse.y;
+                    var mouseDist = Math.sqrt(mouseDx * mouseDx + mouseDy * mouseDy);
+                    var mouseInfluence = Math.max(0, 1 - mouseDist / 220);
+
+                    var pulse = (Math.sin((Date.now() * 0.002) + point.seed) + 1) * 0.5;
+                    var flicker = pulse * 0.015;
+
+                    var alphaFill = baseAlphaFill + waveBoost * 0.8 + flicker + mouseInfluence * 0.02;
+                    var alphaStroke = baseAlphaStroke + waveBoost * 1.1 + mouseInfluence * 0.04;
+                    var size = point.size + waveBoost * 18 + mouseInfluence * 3;
+                    var rot = point.rot + waveBoost * 0.22;
+                    var px = point.x + driftX;
+                    var py = point.y + driftY;
+
+                    drawShard(
+                        px,
+                        py,
+                        size,
+                        rot,
+                        Math.min(alphaFill, 0.22),
+                        Math.min(alphaStroke, 0.35),
+                        glow
+                    );
+                }
+
+                for (var j = 0; j < ripples.length; j++) {
+                    var rr = ripples[j];
+                    var opacity = (1 - rr.life / rr.maxLife) * 0.08;
+
+                    ctx.beginPath();
+                    ctx.arc(rr.x, rr.y, rr.radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = "rgba(255,255,255," + opacity + ")";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+
+                requestAnimationFrame(render);
+            }
+
+            var lastRippleTime = 0;
+            document.addEventListener("mousemove", function (e) {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+                mouse.moved = true;
+
+                var now = Date.now();
+                if (now - lastRippleTime > 70) {
+                    addRipple(e.clientX, e.clientY, 1);
+                    lastRippleTime = now;
+                }
+            });
+
+            document.addEventListener("click", function (e) {
+                addRipple(e.clientX, e.clientY, 1.6);
+            });
+
+            window.addEventListener("resize", resize);
+
+            resize();
+            render();
+        })();
+    </script>
 </body>
 </html>

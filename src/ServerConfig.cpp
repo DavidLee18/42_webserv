@@ -50,14 +50,14 @@ bool PathPattern::segmentMatches(const std::string &pattern,
 // Check if this pattern matches another PathPattern
 bool PathPattern::matches(const PathPattern &other) const {
   // If this pattern is exactly "*", it matches anything
-  if (isWildcard()) {
+  if (is_wildcard()) {
     return true;
   }
 
   // If other is "*", we need to check if our pattern would match it
   // In this case, only "*" matches "*"
-  if (other.isWildcard()) {
-    return isWildcard();
+  if (other.is_wildcard()) {
+    return is_wildcard();
   }
 
   // If the path lengths are different and neither has wildcards, no match
@@ -120,7 +120,7 @@ bool PathPattern::matches(const std::string &pathStr) const {
 }
 
 // Convert PathPattern to string for debugging/display
-std::string PathPattern::toString() const {
+std::string PathPattern::to_string() const {
   if (path.empty()) {
     return "/";
   }
@@ -134,7 +134,7 @@ std::string PathPattern::toString() const {
 
 ServerConfig::ServerConfig(FileDescriptor &file) {
   err_line = "";
-  serverResponseTime = 3;
+  server_response_time = 3;
   end_flag = 0;
   if (!set_ServerConfig(file)) {
     return;
@@ -166,10 +166,10 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           err_line = "Header syntax Error: " + err_line;
           return false;
         }
-      } else if (is_CGI(line)) {
+      } else if (is_cgi(line)) {
         std::string key;
         std::map<std::string, std::string> temp;
-        err_line = parse_Executable(line, key, temp);
+        err_line = parse_executable(line, key, temp);
         if (err_line != "")
           return false;
         if (S_CGI.find(key) != S_CGI.end()) {
@@ -177,17 +177,17 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           return false;
         }
         S_CGI[key] = temp;
-      } else if (is_serverResponseTime(line))
-        parse_serverResponseTime(line);
+      } else if (is_server_response_time(line))
+        parse_server_response_time(line);
       else if (is_RouteRule(line)) {
         if (!parse_RouteRule(line, fd)) {
           err_line = "RouteRule syntax Error: " + err_line;
           return false;
         }
-      } else if (is_Config_CGI(line)) {
+      } else if (is_config_cgi(line)) {
         RouteRule_CGI temp(fd, line);
-        if (temp.Get_err() != "") {
-          err_line = temp.Get_err();
+        if (temp.get_err() != "") {
+          err_line = temp.get_err();
           return false;
         }
         R_CGI.push_back(temp);
@@ -282,8 +282,8 @@ bool ServerConfig::parse_header_value(std::string value,
   return true;
 }
 
-// serverResponseTime method
-bool ServerConfig::is_serverResponseTime(std::string &line) {
+// server_response_time method
+bool ServerConfig::is_server_response_time(std::string &line) {
   if (line.empty() || line[line.length() - 1] == ' ' ||
       line[line.length() - 1] == '\t')
     return (false);
@@ -301,11 +301,11 @@ bool ServerConfig::is_serverResponseTime(std::string &line) {
   return (true);
 }
 
-void ServerConfig::parse_serverResponseTime(std::string line) {
+void ServerConfig::parse_server_response_time(std::string line) {
   line.erase(0, 3);
   std::stringstream oss;
   oss << line;
-  oss >> serverResponseTime;
+  oss >> server_response_time;
 }
 
 // RouteRule method
@@ -439,7 +439,7 @@ bool ServerConfig::is_RouteRule(std::string line) {
   return (true);
 }
 
-static int maxBodyKB_parse(std::string line) {
+static int max_body_KB_parse(std::string line) {
   size_t i = 0;
   int maxbody = 0;
   for (; i < line.size(); ++i) {
@@ -489,7 +489,7 @@ static int errPage_parse(std::string &line) {
   return (key);
 }
 
-bool ServerConfig::parse_Rule(std::vector<Request::Method> mets,
+bool ServerConfig::parse_rule(std::vector<Request::Method> mets,
                               std::string key_data, std::string line) {
   if (line.empty())
     return (false);
@@ -516,8 +516,8 @@ bool ServerConfig::parse_Rule(std::vector<Request::Method> mets,
       // match
       if (routes[j].method == mets[i]) {
         // Compare path segments for exact match
-        const std::vector<std::string> &routePath = routes[j].path.Get_path();
-        const std::vector<std::string> &keyPath = key.Get_path();
+        const std::vector<std::string> &routePath = routes[j].path.get_path();
+        const std::vector<std::string> &keyPath = key.get_path();
         if (routePath.size() == keyPath.size()) {
           bool exactMatch = true;
           for (size_t k = 0; k < routePath.size(); ++k) {
@@ -539,9 +539,8 @@ bool ServerConfig::parse_Rule(std::vector<Request::Method> mets,
       RouteRule newRoute;
       newRoute.method = mets[i];
       newRoute.path = key;
-      newRoute.status_code = 200;
       newRoute.op = UNDEFINED;
-      newRoute.maxBodyKB = 1;
+      newRoute.max_body_KB = 1;
       routes.push_back(newRoute);
       // targetRouteIndex is already set to the correct value (old size, which
       // is the new index)
@@ -557,18 +556,18 @@ bool ServerConfig::parse_Rule(std::vector<Request::Method> mets,
     } else if (rule[0] == "@") {
       if (size != 2)
         return (false);
-      routes[targetRouteIndex].authInfo = rule[1];
+      routes[targetRouteIndex].auth_info = rule[1];
     } else if (rule[0] == "->{}") {
-      int max = maxBodyKB_parse(rule[1]);
+      int max = max_body_KB_parse(rule[1]);
       if (max == -1 || size != 2)
         return (false);
-      routes[targetRouteIndex].maxBodyKB = max;
+      routes[targetRouteIndex].max_body_KB = max;
     } else if (rule[0] == "!") {
       std::string errPageLine = rule[1]; // Make a copy to avoid modification
       int err_key = errPage_parse(errPageLine);
       if (err_key == 0 || size != 2)
         return (false);
-      routes[targetRouteIndex].errorPages[err_key] = errPageLine;
+      routes[targetRouteIndex].error_pages[err_key] = errPageLine;
     } else
       return (false);
   }
@@ -602,8 +601,8 @@ RuleOperator ServerConfig::parse_RuleOperator(std::string indicator) {
 }
 
 bool ServerConfig::is_matching(PathPattern path, PathPattern root) {
-  std::vector<std::string> path_pattern = path.Get_path();
-  std::vector<std::string> root_pattern = root.Get_path();
+  std::vector<std::string> path_pattern = path.get_path();
+  std::vector<std::string> root_pattern = root.get_path();
 
   int path_wild = 0;
   int root_wild = 0;
@@ -636,14 +635,13 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
   if (data.size() != 4)
     return (false);
   for (size_t i = 0; i < mets.size(); ++i) {
-    route.status_code = 200;
     route.method = mets[i];
     route.op = parse_RuleOperator(data[2]);
     if (route.op == UNDEFINED)
       return (false);
     route.index = "";
-    route.authInfo = "";
-    route.maxBodyKB = 1;
+    route.auth_info = "";
+    route.max_body_KB = 1;
     path_url = expand_url_pattern(data[1]);
     root_url = expand_url_pattern(data[3]);
     if (path_url.size() < 1 || root_url.size() < 1 ||
@@ -656,7 +654,11 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
       if (!is_matching(route.path, route.root))
         return (false);
       if (route.op == REDIRECT)
-        route.redirectTarget = root_url[j];
+        route.redirect_target = root_url[j];
+      if (route.op == AUTOINDEX) {
+        route.path.add_path("*");
+        route.root.add_path("*");
+      }
       routes.push_back(route);
     }
   }
@@ -699,7 +701,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
     err_line = line;
     if (is_tab_or_space(line, 2) == false)
       return (false);
-    else if (parse_Rule(mets, method_line_data[1], line))
+    else if (parse_rule(mets, method_line_data[1], line))
       continue;
     else
       return (false);
@@ -709,7 +711,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
 }
 
 // Find a route that matches the given method and path
-RouteRule const *ServerConfig::findRoute(Request::Method method,
+RouteRule const *ServerConfig::find_route(Request::Method method,
                                          const std::string &path) const {
   PathPattern pathPattern(path);
 
@@ -724,7 +726,7 @@ RouteRule const *ServerConfig::findRoute(Request::Method method,
 }
 
 std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
-  const std::vector<std::string> &path = data.Get_path();
+  const std::vector<std::string> &path = data.get_path();
   size_t max = path.size();
   for (size_t i = 0; i < max; ++i)
     os << "/" << path[i];
@@ -755,10 +757,10 @@ static std::string what_RuleOperator(RuleOperator op) {
 }
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
-  os << "Server Response Time(s): " << data.Get_ServerResponseTime()
+  os << "Server Response Time(s): " << data.get_server_response_time()
      << std::endl;
 
-  const Header &header = data.Get_Header();
+  const Header &header = data.get_header();
   Header::const_iterator header_it;
   os << "\n\n\n<<Header>>";
   for (header_it = header.begin(); header_it != header.end(); ++header_it) {
@@ -774,7 +776,7 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   }
 
   os << "\n\n\n<<Server CGI>>";
-  const Server_CGI &s = data.Get_Serve_CGI();
+  const Server_CGI &s = data.get_serve_cgi();
   Server_CGI::const_iterator s_it;
   if (s.empty())
     os << "\n\tEmpty" << std::endl;
@@ -789,7 +791,7 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
     }
   }
 
-  const std::vector<RouteRule> &routes = data.Get_Routes();
+  const std::vector<RouteRule> &routes = data.get_routes();
   os << "\n\n\n<<Routes>>";
   for (size_t i = 0; i < routes.size(); ++i) {
     const RouteRule &route = routes[i];
@@ -801,27 +803,26 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
     else if (route.method == Request::DELETE)
       os << "DELETE";
     os << " " << route.path << std::endl;
-    os << "\tStatus code: " << route.status_code << std::endl;
 
     os << "\n\tRuleOperator: " << what_RuleOperator(route.op) << std::endl;
-    os << "\tRedirect Target: " << route.redirectTarget << std::endl;
+    os << "\tRedirect Target: " << route.redirect_target << std::endl;
 
     os << "\n\tRoot: " << route.root << std::endl;
     os << "\tIndex: " << route.index << std::endl;
-    os << "\tAuth Info: " << route.authInfo << std::endl;
-    os << "\tMax Body(KB): " << route.maxBodyKB;
-    if (route.errorPages.empty())
+    os << "\tAuth Info: " << route.auth_info << std::endl;
+    os << "\tMax Body(KB): " << route.max_body_KB;
+    if (route.error_pages.empty())
       os << "\n\tError Page: "
          << "empty map";
     else {
       std::map<int, std::string>::const_iterator err_it;
-      for (err_it = route.errorPages.begin(); err_it != route.errorPages.end();
+      for (err_it = route.error_pages.begin(); err_it != route.error_pages.end();
            ++err_it)
         os << "\n\tError Page: " << err_it->first << " " << err_it->second;
     }
   }
 
-  std::vector<RouteRule_CGI> cgi = data.Get_RouteRule_CGI();
+  std::vector<RouteRule_CGI> cgi = data.get_route_rule_cgi();
   os << "\n\n\n\n<<Route CGI>>\n";
   for (std::size_t i = 0; i < cgi.size(); ++i) {
     os << cgi[i];
@@ -834,9 +835,9 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
 
 std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
                                      PathPattern to) const {
-  std::vector<std::string> new_path = path.Get_path();
+  std::vector<std::string> new_path = path.get_path();
   std::vector<std::string> wilds;
-  std::vector<std::string> new_to = to.Get_path();
+  std::vector<std::string> new_to = to.get_path();
   std::vector<std::string> split_from = string_split(from, "/");
 
   for (std::size_t i = 0; i < new_path.size(); ++i) {
@@ -875,9 +876,9 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
   return (result);
 }
 
-std::string ServerConfig::Get_to(Request::Method method,
+std::string ServerConfig::get_to(Request::Method method,
                                  const std::string &path) const {
-  const RouteRule *temp = findRoute(method, path);
+  const RouteRule *temp = find_route(method, path);
   if (!temp)
     return "";
   return rewrite_to(path, temp->path, temp->root);

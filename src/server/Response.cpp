@@ -86,10 +86,10 @@ HttpResponse
 Response::generate(const Request *request, const ServerConfig *config,
                    const std::map<std::string, std::string> mime_type) {
   const RouteRule *rule =
-      config->findRoute(request->get_method(), request->get_path());
+      config->find_route(request->get_method(), request->get_path());
   HttpResponse response;
   Target target = resolve_target(
-      rule, config->Get_to(request->get_method(), request->get_path()));
+      rule, config->get_to(request->get_method(), request->get_path()));
   std::cout << "CONFIG FIND ROUTE GET PATH: " << std::endl;
 
   response.mime_type =
@@ -118,7 +118,7 @@ Target Response::resolve_target(const RouteRule *rule, std::string root) {
   Target target;
   if (rule == NULL) {
     target.type = NOT_FOUND_ERR;
-    target.path = get_string_from_map(rule->errorPages, NOT_FOUND_ERR);
+    target.path = get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
     return target;
   }
 
@@ -131,9 +131,9 @@ Target Response::resolve_target(const RouteRule *rule, std::string root) {
     else
       target.path += root + "/" + rule->index;
   } else if (type == NOT_FOUND_ERR)
-    target.path += get_string_from_map(rule->errorPages, NOT_FOUND_ERR);
+    target.path += get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
   else if (type == FORBIDDEN_ERR)
-    target.path += get_string_from_map(rule->errorPages, FORBIDDEN_ERR);
+    target.path += get_string_from_map(rule->error_pages, FORBIDDEN_ERR);
   else
     target.path += root;
   target.type = type;

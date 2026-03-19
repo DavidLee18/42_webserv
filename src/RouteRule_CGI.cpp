@@ -1,10 +1,10 @@
 #include "RouteRule_CGI.hpp"
 
-// Forward declarations of internal helper functions used in parse_CGI
-bool is_CGI(const std::string &line);
+// Forward declarations of internal helper functions used in parse_cgi
+bool is_cgi(const std::string &line);
 static bool is_timeout(const std::string &line);
 static double parse_timeout(std::string &line);
-std::string parse_Executable(const std::string &line, std::string &executable,
+std::string parse_executable(const std::string &line, std::string &executable,
                              std::map<std::string, std::string> &map);
 
 RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, std::string line) {
@@ -18,14 +18,14 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, std::string line) {
   if (temp[0] == "DELETE")
     met = Http::DELETE;
   path = temp[1];
-  err = parse_CGI(fd, temp[2]);
+  err = parse_cgi(fd, temp[2]);
 }
 
-std::string RouteRule_CGI::parse_CGI(FileDescriptor &fd, std::string line) {
+std::string RouteRule_CGI::parse_cgi(FileDescriptor &fd, std::string line) {
   std::string err_msg = "";
   std::string file_line = trim_char(line, '$');
 
-  err_msg = parse_Executable(file_line, this->executable, this->env);
+  err_msg = parse_executable(file_line, this->executable, this->env);
   if (err_msg != "")
     return err_msg;
   while (true) {
@@ -51,7 +51,7 @@ std::string RouteRule_CGI::parse_CGI(FileDescriptor &fd, std::string line) {
   }
 }
 
-bool isExecutableFile(const std::string &path) {
+bool is_executable_file(const std::string &path) {
   // struct stat st;
 
   // if (stat(path.c_str(), &st) != 0)
@@ -65,7 +65,7 @@ bool isExecutableFile(const std::string &path) {
   return true;
 }
 
-bool is_CGI(const std::string &line) {
+bool is_cgi(const std::string &line) {
   std::size_t i = 1;
 
   if (line.empty() || line[0] != '$' || is_have_space(line))
@@ -74,7 +74,7 @@ bool is_CGI(const std::string &line) {
   std::size_t pos = line.find(".cgi");
   if (std::string::npos != pos) {
     i = pos + 4;
-    if (!isExecutableFile(line.substr(1, pos + 3)))
+    if (!is_executable_file(line.substr(1, pos + 3)))
       return false;
   } else {
     while (i < line.length() && line[i] != '(') {
@@ -156,7 +156,7 @@ std::string parse_env(const std::string &line,
 static bool is_uwsgi(std::vector<std::string> data) {
   if (data.size() != 2)
     return false;
-  if (!isExecutableFile(data[0]))
+  if (!is_executable_file(data[0]))
     return false;
   for (std::size_t i = 0; i < data[1].size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(data[1][i])))
@@ -165,7 +165,7 @@ static bool is_uwsgi(std::vector<std::string> data) {
   return true;
 }
 
-std::string parse_Config_uwsgi(FileDescriptor &fd,
+std::string parse_config_uwsgi(FileDescriptor &fd,
                                std::map<std::string, std::string> &uwsgi) {
   std::vector<std::string> value_and_key;
   std::string line = "";
@@ -196,7 +196,7 @@ std::string parse_Config_uwsgi(FileDescriptor &fd,
   return "";
 }
 
-bool is_Config_CGI(std::string line) {
+bool is_config_cgi(std::string line) {
   std::vector<std::string> split_line = string_split(line, " ");
   if (split_line.size() != 3)
     return false;
@@ -209,21 +209,21 @@ bool is_Config_CGI(std::string line) {
 }
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
-  std::map<std::string, std::string> env = data.Get_env();
+  std::map<std::string, std::string> env = data.get_env();
   std::map<std::string, std::string>::const_iterator env_it;
 
-  os << "\nExecutable: " << data.Get_executable() << "\n";
+  os << "\nExecutable: " << data.get_executable() << "\n";
   os << "\n\tEnv\n";
   for (env_it = env.begin(); env_it != env.end(); ++env_it) {
     os << "\tEnv key: " << env_it->first << ", Env value: " << env_it->second
        << "\n";
   }
-  os << "\n\tTimeout: " << data.Get_timeout() << "\n";
+  os << "\n\tTimeout: " << data.get_timeout() << "\n";
 
   return (os);
 }
 
-std::string parse_Executable(const std::string &line, std::string &executable,
+std::string parse_executable(const std::string &line, std::string &executable,
                              std::map<std::string, std::string> &map) {
   std::string err_msg = "";
 

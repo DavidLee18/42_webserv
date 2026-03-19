@@ -27,11 +27,11 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     if (line == "types =" || line == "types=") {
       if (!set_type_map(file))
         return false;
-    } else if (is_ServerConfig(line)) {
-      if (!set_ServerConfig_map(file, line))
+    } else if (is_serverconfig(line)) {
+      if (!set_serverconfig_map(file, line))
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
-      err_meg = parse_Config_uwsgi(file, this->uwsgi);
+      err_meg = parse_config_uwsgi(file, this->uwsgi);
       if (err_meg != "")
         return false;
     } else {
@@ -45,7 +45,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
 }
 
 // type_map method
-std::vector<std::string> WebserverConfig::is_typeKey(const std::string &key) {
+std::vector<std::string> WebserverConfig::is_type_key(const std::string &key) {
   int number_of_key = 0;
   std::string temp = trim_space(key);
   std::vector<std::string> key_data;
@@ -63,7 +63,7 @@ std::vector<std::string> WebserverConfig::is_typeKey(const std::string &key) {
   return (key_data);
 }
 
-bool WebserverConfig::is_typeValue(const std::string &value) {
+bool WebserverConfig::is_type_value(const std::string &value) {
   std::vector<std::string> value_data;
 
   if (value.empty())
@@ -105,8 +105,8 @@ bool WebserverConfig::parse_type_line(const std::string &line,
   std::vector<std::string> type_data = string_split(line, "->");
   if (type_data.size() != 2)
     return (false);
-  std::vector<std::string> keys = is_typeKey(type_data[0]);
-  if (keys.empty() || !is_typeValue(type_data[1]))
+  std::vector<std::string> keys = is_type_key(type_data[0]);
+  if (keys.empty() || !is_type_value(type_data[1]))
     return (false);
   keys_out = keys;
   value_out = trim_space(type_data[1]);
@@ -150,7 +150,7 @@ bool WebserverConfig::set_type_map(FileDescriptor &file) {
 }
 
 // ServerConfig method
-bool WebserverConfig::is_ServerConfig(const std::string &line) {
+bool WebserverConfig::is_serverconfig(const std::string &line) {
   std::size_t i = 1;
 
   if (line.empty())
@@ -172,26 +172,26 @@ bool WebserverConfig::is_ServerConfig(const std::string &line) {
   return (i == line.size());
 }
 
-bool WebserverConfig::set_ServerConfig_map(FileDescriptor &file,
+bool WebserverConfig::set_serverconfig_map(FileDescriptor &file,
                                            const std::string &line) {
   unsigned int key;
   std::string temp(line);
   ServerConfig config(file);
 
-  key = parse_ServerConfig_key(temp);
-  if (config.Geterr_line() != "") {
-    err_meg = temp + " " + config.Geterr_line();
+  key = parse_serverconfig_key(temp);
+  if (config.geterr_line() != "") {
+    err_meg = temp + " " + config.geterr_line();
     return (false);
   }
-  if (ServerConfig_map.find(key) != ServerConfig_map.end()) {
+  if (serverconfig_map.find(key) != serverconfig_map.end()) {
     err_meg = "Server block declared Error: " + line;
     return (false);
   }
-  ServerConfig_map[key] = config;
+  serverconfig_map[key] = config;
   return (true);
 }
 
-unsigned int WebserverConfig::parse_ServerConfig_key(std::string &key) {
+unsigned int WebserverConfig::parse_serverconfig_key(std::string &key) {
   std::size_t i = 1;
   std::size_t start = i;
 
@@ -202,8 +202,8 @@ unsigned int WebserverConfig::parse_ServerConfig_key(std::string &key) {
 }
 
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
-  const std::map<std::string, std::string> &ty = data.Get_Type_map();
-  const std::map<std::string, std::string> &uw = data.Get_Uwsgi();
+  const std::map<std::string, std::string> &ty = data.get_type_map();
+  const std::map<std::string, std::string> &uw = data.get_uwsgi();
   std::map<std::string, std::string>::const_iterator ty_it;
   std::map<std::string, std::string>::const_iterator uw_it;
 
@@ -226,7 +226,7 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   os << "\n\n\n========================================================"
      << std::endl;
   const std::map<unsigned int, ServerConfig> &Server_map =
-      data.Get_ServerConfig_map();
+      data.get_serverconfig_map();
   std::map<unsigned int, ServerConfig>::const_iterator Server_map_it;
   os << "<<Server_map>>" << std::endl;
   for (Server_map_it = Server_map.begin(); Server_map_it != Server_map.end();
