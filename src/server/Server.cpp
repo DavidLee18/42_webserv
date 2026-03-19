@@ -74,7 +74,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
 
     // todo: 해당 client의 포트 번호에 따른 config 적용
-    // 맞는 로케이션 블럭 
+    // 맞는 로케이션 블럭
     if (header_end != std::string::npos) {
 
       Request request(in_buffer);
