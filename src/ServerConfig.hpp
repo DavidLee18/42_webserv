@@ -26,7 +26,7 @@ typedef std::map<std::string, std::map<std::string, std::string> > Server_CGI;
  * 리다이렉트 상태 코드와 경로 변환 규칙을 구분하기 위해 사용한다.
  */
 enum RuleOperator {
-  /** 
+  /**
    * @brief 300 Multiple Choices 상태 코드를 나타낸다.
    */
   MULTIPLECHOICES,
@@ -74,14 +74,17 @@ enum RuleOperator {
 
 /**
  * @class PathPattern
- * @brief 설정 파일의 경로 패턴을 분리하여 저장하고 요청 URL과의 매칭에 사용하는 클래스
+ * @brief 설정 파일의 경로 패턴을 분리하여 저장하고 요청 URL과의 매칭에 사용하는
+ * 클래스
  *
  * 경로를 '/' 단위로 분리하여 각 요소를 비교할 수 있도록 관리한다.
- * 이때 '*' 문자는 와일드카드로 해석하며, 해당 위치의 임의의 경로 문자열과 일치하는 것으로 처리한다.
- * 
+ * 이때 '*' 문자는 와일드카드로 해석하며, 해당 위치의 임의의 경로 문자열과
+ * 일치하는 것으로 처리한다.
+ *
  * 예를 들어,
- * 설정 파일에 /download/{wildcard}/mp3/{wildcard} 와 같은 패턴이 정의되어 있을 때,
- * 요청 URL이 /download/asd/mp3/asd 이면 동일한 경로 패턴으로 판단할 수 있다.
+ * 설정 파일에 /download/{wildcard}/mp3/{wildcard} 와 같은 패턴이 정의되어 있을
+ * 때, 요청 URL이 /download/asd/mp3/asd 이면 동일한 경로 패턴으로 판단할 수
+ * 있다.
  */
 class PathPattern {
 private:
@@ -95,7 +98,8 @@ private:
 
 public:
   PathPattern() : path() {}
-  PathPattern(const std::string &pathStr) : path(string_split(pathStr, "/")) {}
+  PathPattern(const std::string &pathStr)
+      : path(utils::string_split(pathStr, "/")) {}
   PathPattern(std::vector<std::string> path) : path(path) {}
 
   void add_path(std::string data) {
@@ -114,7 +118,8 @@ public:
  * @brief  설정 파일에 정의된 경로 처리 규칙과 하위 설정 정보를 저장하는 구조체
  *
  * 상위 규칙에는 요청 메서드, 경로 패턴, 처리 연산자 및 대상 경로가 포함되며,
- * 하위 설정에는 index, auth, body size, error page 등의 추가 정보가 포함될 수 있다.
+ * 하위 설정에는 index, auth, body size, error page 등의 추가 정보가 포함될 수
+ * 있다.
  */
 struct RouteRule {
   /**
@@ -139,12 +144,14 @@ struct RouteRule {
   PathPattern redirect_target;
   /**
    * @var root
-   * @brief 요청 경로를 실제 파일 시스템 경로로 매핑할 때 사용하는 기준 경로를 저장하는 멤버 변수
+   * @brief 요청 경로를 실제 파일 시스템 경로로 매핑할 때 사용하는 기준 경로를
+   * 저장하는 멤버 변수
    */
   PathPattern root;
   /**
    * @var index
-   * @brief 디렉토리 요청 시 기본으로 제공할 인덱스 파일 이름을 저장하는 멤버 변수
+   * @brief 디렉토리 요청 시 기본으로 제공할 인덱스 파일 이름을 저장하는 멤버
+   * 변수
    */
   std::string index;
   /**
@@ -154,14 +161,16 @@ struct RouteRule {
   std::string auth_info;
   /**
    * @var max_body_KB
-   * @brief 해당 규칙에서 허용하는 최대 요청 바디 크기를 KB 단위로 저장하는 멤버 변수
+   * @brief 해당 규칙에서 허용하는 최대 요청 바디 크기를 KB 단위로 저장하는 멤버
+   * 변수
    */
   int max_body_KB;
   /**
    * @var error_pages
    * @brief HTTP 상태 코드별 오류 페이지 경로를 저장하는 멤버 변수
    *
-   * 상태 코드를 키로 하고, 해당 상태 코드에 대응하는 오류 페이지 경로를 값으로 저장한다.
+   * 상태 코드를 키로 하고, 해당 상태 코드에 대응하는 오류 페이지 경로를 값으로
+   * 저장한다.
    */
   std::map<int, std::string> error_pages;
 };
@@ -240,7 +249,7 @@ public:
   int get_server_response_time(void) const { return (server_response_time); }
   const std::vector<RouteRule> &get_routes(void) const { return routes; }
   RouteRule const *find_route(Request::Method method,
-                             const std::string &path) const;
+                              const std::string &path) const;
   std::string get_to(Request::Method method, const std::string &path) const;
   const std::string &geterr_line(void) const { return err_line; }
   std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }

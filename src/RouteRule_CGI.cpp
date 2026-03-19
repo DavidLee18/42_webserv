@@ -10,7 +10,7 @@ std::string parse_executable(const std::string &line, std::string &executable,
 RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, std::string line) {
   err = "";
   timeout = 3;
-  std::vector<std::string> temp = string_split(line, " ");
+  std::vector<std::string> temp = utils::string_split(line, " ");
   if (temp[0] == "GET")
     met = Http::GET;
   if (temp[0] == "POST")
@@ -23,7 +23,7 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, std::string line) {
 
 std::string RouteRule_CGI::parse_cgi(FileDescriptor &fd, std::string line) {
   std::string err_msg = "";
-  std::string file_line = trim_char(line, '$');
+  std::string file_line = utils::remove_char(line, '$');
 
   err_msg = parse_executable(file_line, this->executable, this->env);
   if (err_msg != "")
@@ -34,12 +34,12 @@ std::string RouteRule_CGI::parse_cgi(FileDescriptor &fd, std::string line) {
       return "FileDescriptor Error: " + temp.error();
     else if (temp.value() == "\n" || temp.value() == "")
       return "";
-    file_line = trim_char(temp.value(), '\n');
-    if (is_tab_or_space(file_line, 2) == false ||
+    file_line = utils::remove_char(temp.value(), '\n');
+    if (utils::match_indent_level(file_line, 2) == false ||
         (file_line.empty() || file_line[file_line.length() - 1] == ' ' ||
          file_line[file_line.length() - 1] == '\t'))
       return "Error: \"" + file_line + "\" Indentation or space error";
-    file_line = trim_space(file_line);
+    file_line = utils::trim_whitespace(file_line);
     if (is_timeout(file_line))
       timeout = parse_timeout(file_line);
     else if (std::string::npos != file_line.find("="))
@@ -68,7 +68,7 @@ bool is_executable_file(const std::string &path) {
 bool is_cgi(const std::string &line) {
   std::size_t i = 1;
 
-  if (line.empty() || line[0] != '$' || is_have_space(line))
+  if (line.empty() || line[0] != '$' || utils::has_space(line))
     return false;
 
   std::size_t pos = line.find(".cgi");
@@ -141,7 +141,7 @@ static bool is_key(const std::string &key) {
 
 std::string parse_env(const std::string &line,
                       std::map<std::string, std::string> &env) {
-  std::vector<std::string> key_and_value = string_split(line, "=");
+  std::vector<std::string> key_and_value = utils::string_split(line, "=");
   if (key_and_value.size() != 2)
     return "Error: \"" + line + "\" Invalid environment variable syntax";
   if (!is_key(key_and_value[0]))
@@ -176,13 +176,13 @@ std::string parse_config_uwsgi(FileDescriptor &fd,
       return "FileDescriptor Error: " + temp.error();
     else if (temp.value() == "\n" || temp.value() == "")
       return "";
-    line = trim_char(temp.value(), '\n');
-    if (is_tab_or_space(line, 1) == false ||
+    line = utils::remove_char(temp.value(), '\n');
+    if (utils::match_indent_level(line, 1) == false ||
         (line.empty() || line[line.length() - 1] == ' ' ||
          line[line.length() - 1] == '\t'))
       return "Error: \"" + line + "\" Indentation or space error";
-    line = trim_space(line);
-    value_and_key = string_split(line, ":");
+    line = utils::trim_whitespace(line);
+    value_and_key = utils::string_split(line, ":");
     if (!is_uwsgi(value_and_key))
       return "Error: \"" + line + "\" uwsgi syntax error";
     if (value_and_key[0].find(".py") == std::string::npos)
@@ -197,13 +197,13 @@ std::string parse_config_uwsgi(FileDescriptor &fd,
 }
 
 bool is_config_cgi(std::string line) {
-  std::vector<std::string> split_line = string_split(line, " ");
+  std::vector<std::string> split_line = utils::string_split(line, " ");
   if (split_line.size() != 3)
     return false;
   if (split_line[0] != "POST" && split_line[0] != "GET" &&
       split_line[0] != "DELETE")
     return false;
-  if (is_have_space(split_line[1]))
+  if (utils::has_space(split_line[1]))
     return false;
   return true;
 }
@@ -227,7 +227,7 @@ std::string parse_executable(const std::string &line, std::string &executable,
                              std::map<std::string, std::string> &map) {
   std::string err_msg = "";
 
-  std::string file_line = trim_char(line, '$');
+  std::string file_line = utils::remove_char(line, '$');
   std::size_t start = file_line.find('(');
   if (std::string::npos != start) {
     std::size_t end = file_line.find(')');

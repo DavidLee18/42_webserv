@@ -3,12 +3,12 @@
 
 #include "../ServerConfig.hpp"
 #include "Client.hpp"
+#include <dirent.h>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <dirent.h>
 
 struct Target {
   std::string path;
@@ -34,9 +34,9 @@ class Request;
 class ServerConfig;
 class Response {
 public:
-  static HttpResponse generate(const Request *request,
-                               const ServerConfig *config,
-                               const std::map<std::string, std::string>mime_type);
+  static HttpResponse
+  generate(const Request *request, const ServerConfig *config,
+           const std::map<std::string, std::string> mime_type);
 
 private:
   enum Type { IS_DIR, IS_FILE, PATH_ERROR };
@@ -58,8 +58,8 @@ private:
   static Target resolve_target(const RouteRule *rule, std::string root);
   static std::string get_pwd();
   static std::string error_file_path(int error_code);
-  static std::string make_autoindex_page(const std::string& real_path,
-                                         const std::string& req_uri);
+  static std::string make_autoindex_page(const std::string &real_path,
+                                         const std::string &req_uri);
 };
 
 #endif

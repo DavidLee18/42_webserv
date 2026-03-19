@@ -13,17 +13,18 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
 
   while (true) {
     Result<std::string> temp = file.read_file_line();
-    if (temp.error() != "" || !is_tab_or_space(temp.value(), 0)) {
+    if (temp.error() != "" || !utils::match_indent_level(temp.value(), 0)) {
       err_meg = "FileDescriptor Error: " + temp.error();
       if (temp.error() == "")
         err_meg =
-            "Invalid line Error: " + trim_space(trim_char(temp.value(), '\n'));
+            "Invalid line Error: " +
+            utils::trim_whitespace(utils::remove_char(temp.value(), '\n'));
       return false;
     } else if (temp.value() == "")
       break;
     else if (temp.value() == "\n")
       continue;
-    line = trim_char(temp.value(), '\n');
+    line = utils::remove_char(temp.value(), '\n');
     if (line == "types =" || line == "types=") {
       if (!set_type_map(file))
         return false;
@@ -47,13 +48,14 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
 // type_map method
 std::vector<std::string> WebserverConfig::is_type_key(const std::string &key) {
   int number_of_key = 0;
-  std::string temp = trim_space(key);
+  std::string temp = utils::trim_whitespace(key);
   std::vector<std::string> key_data;
 
-  if (temp.empty() || is_have_space(temp) || is_have_special(temp, "_|"))
+  if (temp.empty() || utils::has_space(temp) ||
+      utils::contains_any_of(temp, "_|"))
     return (key_data);
-  key_data = string_split(temp, "|");
-  number_of_key = number_of_delim(temp, "|") + 1;
+  key_data = utils::string_split(temp, "|");
+  number_of_key = utils::count_occurrences(temp, "|") + 1;
   if (key_data.size() != static_cast<std::size_t>(number_of_key))
     return (std::vector<std::string>());
   for (std::size_t i = 0; i < key_data.size(); ++i) {
@@ -71,15 +73,16 @@ bool WebserverConfig::is_type_value(const std::string &value) {
   char last = value[value.length() - 1];
   if (!std::isalnum(static_cast<unsigned char>(last)))
     return (false);
-  std::string temp = trim_space(value);
-  if (temp.empty() || is_have_space(temp) || is_have_special(temp, "/-"))
+  std::string temp = utils::trim_whitespace(value);
+  if (temp.empty() || utils::has_space(temp) ||
+      utils::contains_any_of(temp, "/-"))
     return (false);
   for (std::size_t i = 1; i < temp.size(); ++i) {
     if (temp[i] == '-' && temp[i - 1] == '-')
       return (false);
   }
-  value_data = string_split(temp, "/");
-  if (value_data.size() != 2 || number_of_delim(temp, "/") != 1)
+  value_data = utils::string_split(temp, "/");
+  if (value_data.size() != 2 || utils::count_occurrences(temp, "/") != 1)
     return (false);
   std::string type = value_data[0];
   std::string subtype = value_data[1];
@@ -100,16 +103,16 @@ bool WebserverConfig::is_type_value(const std::string &value) {
 bool WebserverConfig::parse_type_line(const std::string &line,
                                       std::vector<std::string> &keys_out,
                                       std::string &value_out) {
-  if (number_of_delim(line, "->") != 1)
+  if (utils::count_occurrences(line, "->") != 1)
     return (false);
-  std::vector<std::string> type_data = string_split(line, "->");
+  std::vector<std::string> type_data = utils::string_split(line, "->");
   if (type_data.size() != 2)
     return (false);
   std::vector<std::string> keys = is_type_key(type_data[0]);
   if (keys.empty() || !is_type_value(type_data[1]))
     return (false);
   keys_out = keys;
-  value_out = trim_space(type_data[1]);
+  value_out = utils::trim_whitespace(type_data[1]);
   return (true);
 }
 
@@ -127,12 +130,12 @@ bool WebserverConfig::set_type_map(FileDescriptor &file) {
     }
     if (temp.value() == "\n" || temp.value() == "")
       break;
-    if (!is_tab_or_space(temp.value(), 1)) {
-      err_meg =
-          "Type syntax Error: " + trim_space(trim_char(temp.value(), '\n'));
+    if (!utils::match_indent_level(temp.value(), 1)) {
+      err_meg = "Type syntax Error: " +
+                utils::trim_whitespace(utils::remove_char(temp.value(), '\n'));
       return (false);
     }
-    line = trim_char(temp.value(), '\n');
+    line = utils::remove_char(temp.value(), '\n');
     if (!parse_type_line(line, keys, value)) {
       err_meg = "Type syntax Error: " + line;
       return (false);

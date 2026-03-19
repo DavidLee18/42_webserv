@@ -15,7 +15,7 @@ bool PathPattern::segmentMatches(const std::string &pattern,
   }
 
   // Split pattern by * to get parts that must match
-  std::vector<std::string> parts = string_split(pattern, "*");
+  std::vector<std::string> parts = utils::string_split(pattern, "*");
 
   size_t pos = 0;
   for (size_t i = 0; i < parts.size(); ++i) {
@@ -158,9 +158,9 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
     } else if (temp.value() == "")
       break;
     end_flag = 0;
-    line = trim_char(temp.value(), '\n');
-    if (is_tab_or_space(line, 1)) {
-      line = trim_space(line);
+    line = utils::remove_char(temp.value(), '\n');
+    if (utils::match_indent_level(line, 1)) {
+      line = utils::trim_whitespace(line);
       if (is_header(line)) {
         if (!parse_header_line(fd, line)) {
           err_line = "Header syntax Error: " + err_line;
@@ -192,7 +192,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
         }
         R_CGI.push_back(temp);
       } else {
-        err_line = "Invalid line Error: " + trim_space(line);
+        err_line = "Invalid line Error: " + utils::trim_whitespace(line);
         return false;
       }
     } else
@@ -203,7 +203,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
 
 // header method
 bool ServerConfig::is_header(const std::string &line) {
-  std::string temp = trim_space(line);
+  std::string temp = utils::trim_whitespace(line);
   if (temp.empty())
     return (false);
   if (temp[0] == '[' && temp[1] == ']')
@@ -213,12 +213,12 @@ bool ServerConfig::is_header(const std::string &line) {
 
 bool ServerConfig::parse_header_line(FileDescriptor &fd, std::string line) {
   std::string temp(line);
-  std::vector<std::string> key_value = string_split(temp, ":");
+  std::vector<std::string> key_value = utils::string_split(temp, ":");
 
   err_line = temp;
   if (key_value.size() != 2)
     return (false);
-  std::string key = trim_space(key_value[0]);
+  std::string key = utils::trim_whitespace(key_value[0]);
   temp = key_value[1];
   if (!is_header_key(key) || !parse_header_value(temp, key))
     return (false);
@@ -232,9 +232,9 @@ bool ServerConfig::parse_header_line(FileDescriptor &fd, std::string line) {
       end_flag += 1;
       break;
     }
-    temp = line = trim_char(fd_line.value(), '\n');
+    temp = line = utils::remove_char(fd_line.value(), '\n');
     err_line = temp;
-    if (!is_tab_or_space(temp, 2))
+    if (!utils::match_indent_level(temp, 2))
       return (false);
     if (!parse_header_value(temp, key))
       return (false);
@@ -248,7 +248,7 @@ bool ServerConfig::is_header_key(std::string &key) {
 
   if (key.empty())
     return (false);
-  temp = string_split(key, " ");
+  temp = utils::string_split(key, " ");
   if (temp.size() == 3)
     key = temp[2];
   return (true);
@@ -260,11 +260,12 @@ bool ServerConfig::parse_header_value(std::string value,
     return false;
   if (value[value.length() - 1] == ' ' || value[value.length() - 1] == '\t')
     return false;
-  std::vector<std::string> values = string_split(trim_space(value), ";");
+  std::vector<std::string> values =
+      utils::string_split(utils::trim_whitespace(value), ";");
   std::vector<std::string> temp;
   for (size_t i = 0; i < values.size(); i++) {
-    values[i] = trim_space(values[i]);
-    temp = string_split(values[i], " ");
+    values[i] = utils::trim_whitespace(values[i]);
+    temp = utils::string_split(values[i], " ");
     if (temp.size() == 1 && temp[0] == "\"nosniff\"")
       header[key];
     else if (temp.size() == 2) {
@@ -287,7 +288,7 @@ bool ServerConfig::is_server_response_time(std::string &line) {
   if (line.empty() || line[line.length() - 1] == ' ' ||
       line[line.length() - 1] == '\t')
     return (false);
-  line = trim_space(line);
+  line = utils::trim_whitespace(line);
   if (line.length() < 4 || line[0] != '.' || line[1] != '.' || line[2] != '.')
     return (false);
   int data = 0;
@@ -344,14 +345,14 @@ static bool is_pattern(std::string line) {
 }
 
 static std::vector<std::string> get_pattern(std::string line) {
-  std::vector<std::string> temp = string_split(line, "*");
+  std::vector<std::string> temp = utils::string_split(line, "*");
   std::string pattern = temp[temp.size() - 1];
   size_t l = pattern.find('(');
   size_t r = pattern.find(')', l == std::string::npos ? 0 : l + 1);
 
   if (l != std::string::npos && r != std::string::npos && r > l)
     pattern = pattern.substr(l + 1, r - l - 1);
-  temp = string_split(pattern, "|");
+  temp = utils::string_split(pattern, "|");
   // for (size_t i = 0; i < temp.size(); ++i)
   // {
   //   std::cout << temp[i] << std::endl;
@@ -386,7 +387,7 @@ make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
 
 static std::vector<std::vector<std::string> >
 expand_url_pattern(std::string line) {
-  std::vector<std::string> path(string_split(line, "/"));
+  std::vector<std::string> path(utils::string_split(line, "/"));
   std::vector<std::vector<std::string> > paths;
 
   paths.push_back(path);
@@ -420,12 +421,12 @@ bool ServerConfig::is_RouteRule(std::string line) {
     return (false);
   if (std::isspace(static_cast<unsigned char>(line[line.size() - 1])))
     return (false);
-  std::vector<std::string> split = string_split(line, " ");
+  std::vector<std::string> split = utils::string_split(line, " ");
   if (split.size() != 4 || parse_RuleOperator(split[2]) == UNDEFINED ||
       !is_url(split[1]) || !is_url(split[3])) // 크기 확인, op확인
     return (false);
 
-  std::vector<std::string> method = string_split(split[0], "|");
+  std::vector<std::string> method = utils::string_split(split[0], "|");
   for (size_t i = 0; i < method.size(); ++i) {
     if (method[i] == "GET")
       continue;
@@ -476,7 +477,7 @@ static std::string index_parse(std::string line) {
 
 static int errPage_parse(std::string &line) {
   int key = 0;
-  std::vector<std::string> key_and_value = string_split(line, ":");
+  std::vector<std::string> key_and_value = utils::string_split(line, ":");
 
   if (key_and_value.size() != 2)
     return (0);
@@ -496,7 +497,8 @@ bool ServerConfig::parse_rule(std::vector<Request::Method> mets,
   if (std::isspace(static_cast<unsigned char>(line[line.size() - 1])))
     return (false);
 
-  std::vector<std::string> rule = string_split(trim_space(line), " ");
+  std::vector<std::string> rule =
+      utils::string_split(utils::trim_whitespace(line), " ");
   size_t size = rule.size();
   PathPattern key(key_data);
 
@@ -669,8 +671,10 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
                                    FileDescriptor &fd) {
   std::string line;
   std::vector<Request::Method> mets;
-  std::vector<std::string> method_line_data = string_split(method_line, " ");
-  std::vector<std::string> method = string_split(method_line_data[0], "|");
+  std::vector<std::string> method_line_data =
+      utils::string_split(method_line, " ");
+  std::vector<std::string> method =
+      utils::string_split(method_line_data[0], "|");
 
   err_line = method_line;
   for (size_t i = 0; i < method.size(); ++i) {
@@ -697,9 +701,9 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
       end_flag += 1;
       break;
     }
-    line = trim_char(temp.value(), '\n');
+    line = utils::remove_char(temp.value(), '\n');
     err_line = line;
-    if (is_tab_or_space(line, 2) == false)
+    if (utils::match_indent_level(line, 2) == false)
       return (false);
     else if (parse_rule(mets, method_line_data[1], line))
       continue;
@@ -712,7 +716,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
 
 // Find a route that matches the given method and path
 RouteRule const *ServerConfig::find_route(Request::Method method,
-                                         const std::string &path) const {
+                                          const std::string &path) const {
   PathPattern pathPattern(path);
 
   // Iterate through all routes to find a match
@@ -816,8 +820,8 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
          << "empty map";
     else {
       std::map<int, std::string>::const_iterator err_it;
-      for (err_it = route.error_pages.begin(); err_it != route.error_pages.end();
-           ++err_it)
+      for (err_it = route.error_pages.begin();
+           err_it != route.error_pages.end(); ++err_it)
         os << "\n\tError Page: " << err_it->first << " " << err_it->second;
     }
   }
@@ -838,7 +842,7 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
   std::vector<std::string> new_path = path.get_path();
   std::vector<std::string> wilds;
   std::vector<std::string> new_to = to.get_path();
-  std::vector<std::string> split_from = string_split(from, "/");
+  std::vector<std::string> split_from = utils::string_split(from, "/");
 
   for (std::size_t i = 0; i < new_path.size(); ++i) {
     if (i < split_from.size() && std::string::npos != new_path[i].find("*"))

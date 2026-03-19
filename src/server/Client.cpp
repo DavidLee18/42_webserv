@@ -1,7 +1,6 @@
 #include "Client.hpp"
 
-Request::Method Request::get_method() const
-{
+Request::Method Request::get_method() const {
   if (method == "GET")
     return Request::GET;
   else if (method == "HEAD")
@@ -23,16 +22,14 @@ Request::Method Request::get_method() const
   return Request::ERROR;
 }
 
-const std::string Request::get_connection_string() const
-{
+const std::string Request::get_connection_string() const {
   if (keep_alive)
     return "keep-alive";
   else
     return "close";
 }
 
-Request::Request(std::string request)
-{
+Request::Request(std::string request) {
   std::stringstream ss(request);
   std::string line;
 
@@ -45,7 +42,7 @@ Request::Request(std::string request)
     std::stringstream line_ss(line);
 
     line_ss >> this->method;  // "GET"
-    line_ss >> this->path;  // "/index.html"
+    line_ss >> this->path;    // "/index.html"
     line_ss >> this->version; // "HTTP/1.1"
   }
 }

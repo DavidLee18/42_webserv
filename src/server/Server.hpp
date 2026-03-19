@@ -42,8 +42,10 @@ private:
   void client_write(const FileDescriptor *client_fd);
 
 public:
-  Server(const WebserverConfig &config) : config(config), mime_type(config.get_type_map())
-  { mime_type["default"] = config.Get_default_mime(); };
+  Server(const WebserverConfig &config)
+      : config(config), mime_type(config.get_type_map()) {
+    mime_type["default"] = config.Get_default_mime();
+  };
   ~Server(){};
 
   Result<Void> init();

@@ -1,6 +1,7 @@
 #ifndef HTTP_1_1_H
 #define HTTP_1_1_H
 
+#include "ParsingUtils.hpp"
 #include "json.h"
 #include <map>
 #include <string>

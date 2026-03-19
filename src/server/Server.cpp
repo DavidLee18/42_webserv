@@ -72,20 +72,23 @@ void Server::client_read(const FileDescriptor *client_fd) {
     std::string &in_buffer = clients.at(client_fd).in_buff;
     size_t header_end = in_buffer.find("\r\n\r\n");
 
-
     // todo: 해당 client의 포트 번호에 따른 config 적용
     // 맞는 로케이션 블럭
     if (header_end != std::string::npos) {
 
       Request request(in_buffer);
       // todo: method to string
-      std::cout << "[Request] " << request.get_method_string() << " " << request.get_path()
-                << std::endl;
+      std::cout << "[Request] " << request.get_method_string() << " "
+                << request.get_path() << std::endl;
 
       HttpResponse http =
           Response::generate(&request, clients.at(client_fd).config, mime_type);
-        std::cout << "Http file type: " << http.mime_type << std::endl;
-        std::cout << "Route: " << clients.at(client_fd).config->get_to(request.get_method(), request.get_path()) << std::endl << std::endl;
+      std::cout << "Http file type: " << http.mime_type << std::endl;
+      std::cout << "Route: "
+                << clients.at(client_fd).config->get_to(request.get_method(),
+                                                        request.get_path())
+                << std::endl
+                << std::endl;
 
       // HTTP 응답 메시지 조립
       // todo: 하드코딩된 response 말고 동적으로
@@ -185,7 +188,8 @@ Result<Void> Server::init() {
     FileDescriptor *fd_ptr = add_result.value();
     listeners[fd_ptr] = &it->second;
 
-    std::cout << "Server listening " << inet_ntoa(addr) << " : "  << port << std::endl;
+    std::cout << "Server listening " << inet_ntoa(addr) << " : " << port
+              << std::endl;
   }
   return OK(Void, Void());
 }

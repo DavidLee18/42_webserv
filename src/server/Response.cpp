@@ -74,7 +74,7 @@ int Response::check_path_type(const std::string &path) {
 }
 
 std::string find_file_type(std::string path) {
-  std::vector<std::string> file_type = string_split(path, ".");
+  std::vector<std::string> file_type = utils::string_split(path, ".");
   std::cout << "file type: " << file_type.back() << std::endl;
 
   if (file_type.size() <= 1)

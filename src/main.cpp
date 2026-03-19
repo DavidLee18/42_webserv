@@ -34,7 +34,6 @@ int main(const int argc, char *argv[]) {
       std::cerr << "Server Error: " << server_result.error() << std::endl;
       return 1;
     }
-    
   }
   return 0;
 }
