@@ -68,9 +68,6 @@ private:
   WebserverConfig(FileDescriptor &file);
 
 public:
-  WebserverConfig(const WebserverConfig &other)
-      : default_mime(other.default_mime), uwsgi(other.uwsgi),
-        type_map(other.type_map), serverconfig_map(other.serverconfig_map){};
 
   WebserverConfig &operator=(const WebserverConfig &other) {
     if (this != &other) {

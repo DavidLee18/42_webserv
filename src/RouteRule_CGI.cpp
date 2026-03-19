@@ -1,12 +1,5 @@
 #include "RouteRule_CGI.hpp"
 
-// Forward declarations of internal helper functions used in parse_cgi
-bool is_cgi(const std::string &line);
-static bool is_timeout(const std::string &line);
-static double parse_timeout(std::string &line);
-std::string parse_executable(const std::string &line, std::string &executable,
-                             std::map<std::string, std::string> &map);
-
 RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, std::string line) {
   err = "";
   timeout = 3;
@@ -25,7 +18,7 @@ std::string RouteRule_CGI::parse_cgi(FileDescriptor &fd, std::string line) {
   std::string err_msg = "";
   std::string file_line = utils::remove_char(line, '$');
 
-  err_msg = parse_executable(file_line, this->executable, this->env);
+  err_msg = RouteRule_CGI::parse_executable(file_line, this->executable, this->env);
   if (err_msg != "")
     return err_msg;
   while (true) {
@@ -43,7 +36,7 @@ std::string RouteRule_CGI::parse_cgi(FileDescriptor &fd, std::string line) {
     if (is_timeout(file_line))
       timeout = parse_timeout(file_line);
     else if (std::string::npos != file_line.find("="))
-      err_msg = parse_env(file_line, this->env);
+      err_msg = RouteRule_CGI::parse_env(file_line, this->env);
     else
       err_msg = "Error: \"" + file_line + "\" Syntax error";
     if (err_msg != "")
@@ -51,7 +44,7 @@ std::string RouteRule_CGI::parse_cgi(FileDescriptor &fd, std::string line) {
   }
 }
 
-bool is_executable_file(const std::string &path) {
+bool RouteRule_CGI::is_executable_file(const std::string &path) {
   // struct stat st;
 
   // if (stat(path.c_str(), &st) != 0)
@@ -65,7 +58,7 @@ bool is_executable_file(const std::string &path) {
   return true;
 }
 
-bool is_cgi(const std::string &line) {
+bool RouteRule_CGI::is_cgi(const std::string &line) {
   std::size_t i = 1;
 
   if (line.empty() || line[0] != '$' || utils::has_space(line))
@@ -74,7 +67,7 @@ bool is_cgi(const std::string &line) {
   std::size_t pos = line.find(".cgi");
   if (std::string::npos != pos) {
     i = pos + 4;
-    if (!is_executable_file(line.substr(1, pos + 3)))
+    if (!RouteRule_CGI::is_executable_file(line.substr(1, pos + 3)))
       return false;
   } else {
     while (i < line.length() && line[i] != '(') {
@@ -94,7 +87,7 @@ bool is_cgi(const std::string &line) {
   return true;
 }
 
-static bool is_timeout(const std::string &line) {
+bool RouteRule_CGI::is_timeout(const std::string &line) {
   if (line.length() < 4 || line[0] != '.' || line[1] != '.' || line[2] != '.')
     return false;
   double data = 0;
@@ -115,7 +108,7 @@ static bool is_timeout(const std::string &line) {
   return true;
 }
 
-static double parse_timeout(std::string &line) {
+double RouteRule_CGI::parse_timeout(std::string &line) {
   double time = 3;
   std::stringstream oss;
   oss << line.erase(0, 3);
@@ -139,7 +132,7 @@ static bool is_key(const std::string &key) {
   return true;
 }
 
-std::string parse_env(const std::string &line,
+std::string RouteRule_CGI::parse_env(const std::string &line,
                       std::map<std::string, std::string> &env) {
   std::vector<std::string> key_and_value = utils::string_split(line, "=");
   if (key_and_value.size() != 2)
@@ -153,10 +146,10 @@ std::string parse_env(const std::string &line,
   return "";
 }
 
-static bool is_uwsgi(std::vector<std::string> data) {
+bool is_uwsgi(std::vector<std::string> data) {
   if (data.size() != 2)
     return false;
-  if (!is_executable_file(data[0]))
+  if (!RouteRule_CGI::is_executable_file(data[0]))
     return false;
   for (std::size_t i = 0; i < data[1].size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(data[1][i])))
@@ -165,7 +158,7 @@ static bool is_uwsgi(std::vector<std::string> data) {
   return true;
 }
 
-std::string parse_config_uwsgi(FileDescriptor &fd,
+std::string RouteRule_CGI::parse_config_uwsgi(FileDescriptor &fd,
                                std::map<std::string, std::string> &uwsgi) {
   std::vector<std::string> value_and_key;
   std::string line = "";
@@ -196,7 +189,7 @@ std::string parse_config_uwsgi(FileDescriptor &fd,
   return "";
 }
 
-bool is_config_cgi(std::string line) {
+bool RouteRule_CGI::is_config_cgi(std::string line) {
   std::vector<std::string> split_line = utils::string_split(line, " ");
   if (split_line.size() != 3)
     return false;
@@ -223,7 +216,7 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
   return (os);
 }
 
-std::string parse_executable(const std::string &line, std::string &executable,
+std::string RouteRule_CGI::parse_executable(const std::string &line, std::string &executable,
                              std::map<std::string, std::string> &map) {
   std::string err_msg = "";
 
@@ -233,7 +226,7 @@ std::string parse_executable(const std::string &line, std::string &executable,
     std::size_t end = file_line.find(')');
     executable = file_line.substr(0, start);
     std::string env = file_line.substr(start + 1, end - start - 1);
-    err_msg = parse_env(env, map);
+    err_msg = RouteRule_CGI::parse_env(env, map);
     if (err_msg != "")
       return err_msg;
   } else

@@ -51,6 +51,8 @@ private:
   std::string err;
 
   std::string parse_cgi(FileDescriptor &fd, std::string line);
+  bool is_timeout(const std::string &line);
+  double parse_timeout(std::string &line);
 
 public:
   RouteRule_CGI() : executable(""), env(), timeout(-1), err("No parse"){};
@@ -60,17 +62,18 @@ public:
   const std::string get_executable() const { return executable; }
   const std::map<std::string, std::string> get_env() const { return env; }
   double get_timeout() const { return timeout; }
+
+  static std::string parse_config_uwsgi(FileDescriptor &fd,
+                               std::map<std::string, std::string> &uwsgi);
+  static bool is_config_cgi(std::string line);
+  static bool is_cgi(const std::string &line);
+  static bool is_executable_file(const std::string &path);
+  static std::string parse_env(const std::string &,
+                        std::map<std::string, std::string> &env);
+  static std::string parse_executable(const std::string &line, std::string &executable,
+                              std::map<std::string, std::string> &map);
 };
 
-std::string parse_config_uwsgi(FileDescriptor &fd,
-                               std::map<std::string, std::string> &uwsgi);
-bool is_config_cgi(std::string line);
-bool is_cgi(const std::string &line);
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data);
-bool is_executable_file(const std::string &path);
-std::string parse_env(const std::string &,
-                      std::map<std::string, std::string> &env);
-std::string parse_executable(const std::string &line, std::string &executable,
-                             std::map<std::string, std::string> &map);
 
 #endif

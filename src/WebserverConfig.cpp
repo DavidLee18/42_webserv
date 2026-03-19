@@ -32,7 +32,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (!set_serverconfig_map(file, line))
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
-      err_meg = parse_config_uwsgi(file, this->uwsgi);
+      err_meg = RouteRule_CGI::parse_config_uwsgi(file, this->uwsgi);
       if (err_meg != "")
         return false;
     } else {

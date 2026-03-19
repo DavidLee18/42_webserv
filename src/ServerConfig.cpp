@@ -166,10 +166,10 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           err_line = "Header syntax Error: " + err_line;
           return false;
         }
-      } else if (is_cgi(line)) {
+      } else if (RouteRule_CGI::is_cgi(line)) {
         std::string key;
         std::map<std::string, std::string> temp;
-        err_line = parse_executable(line, key, temp);
+        err_line = RouteRule_CGI::parse_executable(line, key, temp);
         if (err_line != "")
           return false;
         if (S_CGI.find(key) != S_CGI.end()) {
@@ -184,7 +184,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           err_line = "RouteRule syntax Error: " + err_line;
           return false;
         }
-      } else if (is_config_cgi(line)) {
+      } else if (RouteRule_CGI::is_config_cgi(line)) {
         RouteRule_CGI temp(fd, line);
         if (temp.get_err() != "") {
           err_line = temp.get_err();
