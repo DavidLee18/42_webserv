@@ -83,6 +83,7 @@ private:
    *
    * 입력 문자열은 정확히 하나의 "->"를 포함해야 하며,
    * 키와 값은 각각 유효한 type key, MIME type 형식이어야 한다.
+   * 함수 자체는 인스턴스에 의존하지 않으나, 내부 인스턴스 함수들의 의존한다.
    */
   bool parse_type_mapping(const std::string &line,
                        std::vector<std::string> &keys_out,
@@ -103,7 +104,7 @@ private:
    * 값은 정확히 하나의 '/'를 포함해야 하며,
    * type과 subtype은 비어 있을 수 없다.
    */
-  bool is_valid_mime_type(const std::string &value);
+  static bool is_valid_mime_type(const std::string &value);
   /**
    * @brief 문자열이 server 블록 시작 줄의 형식에 맞는지 검사하는 함수
    * @param line 검사할 문자열
@@ -112,7 +113,7 @@ private:
    * 문자열은 ':'로 시작해야 하며, 그 뒤에는 하나 이상의 숫자로 이루어진 포트 번호가 와야 한다.
    * 포트 번호 뒤에는 선택적으로 하나의 공백이 올 수 있고, 마지막에는 '='가 와야 한다.
    */
-  bool is_server_config_header(const std::string &line);
+  static bool is_server_config_header(const std::string &line);
   /**
    * @brief server 블록 시작 줄에서 포트 번호를 추출하고 ServerConfig 객체를 생성하여 저장하는 함수
    * @param file 파싱할 설정 파일
@@ -130,7 +131,7 @@ private:
    *
    * 입력 문자열은 사전에 server 설정 헤더 문법 검사를 통과한 문자열이어야 한다.
    */
-  unsigned int parse_server_port(const std::string &line);
+  static unsigned int parse_server_port(const std::string &line);
 
   WebserverConfig(FileDescriptor &file);
 public:

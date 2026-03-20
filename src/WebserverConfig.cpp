@@ -28,7 +28,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     if (line == "types =" || line == "types=") {
       if (!parse_types_block(file))
         return false;
-    } else if (is_server_config_header(line)) {
+    } else if (WebserverConfig::is_server_config_header(line)) {
       if (!parse_server_config_entry(file, line))
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
@@ -110,7 +110,7 @@ bool WebserverConfig::parse_type_mapping(const std::string &line,
   std::vector<std::string> type_data = utils::string_split(line, "->");
   if (type_data.size() != 2)
     return (false);
-  std::vector<std::string> keys = parse_type_keys(type_data[0]);
+  std::vector<std::string> keys = WebserverConfig::parse_type_keys(type_data[0]);
   if (keys.empty() || !is_valid_mime_type(type_data[1]))
     return (false);
   keys_out = keys;
@@ -188,7 +188,7 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   std::string temp(line);
   ServerConfig config(file);
 
-  key = parse_server_port(temp);
+  key = WebserverConfig::parse_server_port(temp);
   if (config.geterr_line() != "") {
     err_meg = temp + " " + config.geterr_line();
     return (false);
