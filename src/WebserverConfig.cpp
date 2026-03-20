@@ -26,10 +26,10 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       continue;
     line = utils::remove_char(temp.value(), '\n');
     if (line == "types =" || line == "types=") {
-      if (!set_type_map(file))
+      if (!parse_types_block(file))
         return false;
-    } else if (is_serverconfig(line)) {
-      if (!set_serverconfig_map(file, line))
+    } else if (is_server_config_header(line)) {
+      if (!parse_server_config_entry(file, line))
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
       err_meg = RouteRule_CGI::parse_uwsgi_block(file, this->uwsgi);
@@ -40,19 +40,21 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       return false;
     }
   }
-  if (this->type_map.empty() || this->default_mime.length() == 0)
-    return (false);
-  return (true);
+  if (this->type_map.empty() || this->default_mime.length() == 0) {
+    err_meg = "Required type configuration is missing";
+    return false;
+  }
+  return true;
 }
 
 // type_map method
-std::vector<std::string> WebserverConfig::is_type_key(const std::string &key) {
+std::vector<std::string> WebserverConfig::parse_type_keys(const std::string &key) {
   int number_of_key = 0;
   std::string temp = utils::trim_whitespace(key);
   std::vector<std::string> key_data;
 
   if (temp.empty() || utils::has_space(temp) ||
-      utils::contains_any_of(temp, "_|"))
+      utils::has_invalid_char(temp, "_|"))
     return (key_data);
   key_data = utils::string_split(temp, "|");
   number_of_key = utils::count_occurrences(temp, "|") + 1;
@@ -65,7 +67,7 @@ std::vector<std::string> WebserverConfig::is_type_key(const std::string &key) {
   return (key_data);
 }
 
-bool WebserverConfig::is_type_value(const std::string &value) {
+bool WebserverConfig::is_valid_mime_type(const std::string &value) {
   std::vector<std::string> value_data;
 
   if (value.empty())
@@ -75,7 +77,7 @@ bool WebserverConfig::is_type_value(const std::string &value) {
     return (false);
   std::string temp = utils::trim_whitespace(value);
   if (temp.empty() || utils::has_space(temp) ||
-      utils::contains_any_of(temp, "/-"))
+      utils::has_invalid_char(temp, "/-"))
     return (false);
   for (std::size_t i = 1; i < temp.size(); ++i) {
     if (temp[i] == '-' && temp[i - 1] == '-')
@@ -100,7 +102,7 @@ bool WebserverConfig::is_type_value(const std::string &value) {
   return (true);
 }
 
-bool WebserverConfig::parse_type_line(const std::string &line,
+bool WebserverConfig::parse_type_mapping(const std::string &line,
                                       std::vector<std::string> &keys_out,
                                       std::string &value_out) {
   if (utils::count_occurrences(line, "->") != 1)
@@ -108,19 +110,18 @@ bool WebserverConfig::parse_type_line(const std::string &line,
   std::vector<std::string> type_data = utils::string_split(line, "->");
   if (type_data.size() != 2)
     return (false);
-  std::vector<std::string> keys = is_type_key(type_data[0]);
-  if (keys.empty() || !is_type_value(type_data[1]))
+  std::vector<std::string> keys = parse_type_keys(type_data[0]);
+  if (keys.empty() || !is_valid_mime_type(type_data[1]))
     return (false);
   keys_out = keys;
   value_out = utils::trim_whitespace(type_data[1]);
   return (true);
 }
 
-bool WebserverConfig::set_type_map(FileDescriptor &file) {
+bool WebserverConfig::parse_types_block(FileDescriptor &file) {
   std::string line;
   std::string value;
   std::vector<std::string> keys;
-  std::vector<std::string> map_data;
 
   while (true) {
     Result<std::string> temp = file.read_file_line();
@@ -130,19 +131,25 @@ bool WebserverConfig::set_type_map(FileDescriptor &file) {
     }
     if (temp.value() == "\n" || temp.value() == "")
       break;
-    if (!utils::match_indent_level(temp.value(), 1)) {
+    std::string raw = utils::remove_char(temp.value(), '\n');
+    if (!utils::match_indent_level(temp.value(), 1) ||
+    (!raw.empty() && (raw[raw.length() - 1] == ' ' || raw[raw.length() - 1] == '\t'))) {
       err_meg = "Type syntax Error: " +
                 utils::trim_whitespace(utils::remove_char(temp.value(), '\n'));
       return (false);
     }
     line = utils::remove_char(temp.value(), '\n');
-    if (!parse_type_line(line, keys, value)) {
+    if (!parse_type_mapping(line, keys, value)) {
       err_meg = "Type syntax Error: " + line;
       return (false);
     }
     for (std::size_t i = 0; i < keys.size(); ++i) {
       const std::string &k = keys[i];
       if (k == "_") {
+      if (!default_mime.empty()) {
+        err_meg = "Type syntax Error: duplicate default MIME type";
+        return false;
+      }  
         default_mime = value;
         continue;
       }
@@ -153,7 +160,7 @@ bool WebserverConfig::set_type_map(FileDescriptor &file) {
 }
 
 // ServerConfig method
-bool WebserverConfig::is_serverconfig(const std::string &line) {
+bool WebserverConfig::is_server_config_header(const std::string &line) {
   std::size_t i = 1;
 
   if (line.empty())
@@ -175,13 +182,13 @@ bool WebserverConfig::is_serverconfig(const std::string &line) {
   return (i == line.size());
 }
 
-bool WebserverConfig::set_serverconfig_map(FileDescriptor &file,
+bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
                                            const std::string &line) {
   unsigned int key;
   std::string temp(line);
   ServerConfig config(file);
 
-  key = parse_serverconfig_key(temp);
+  key = parse_server_port(temp);
   if (config.geterr_line() != "") {
     err_meg = temp + " " + config.geterr_line();
     return (false);
@@ -194,7 +201,7 @@ bool WebserverConfig::set_serverconfig_map(FileDescriptor &file,
   return (true);
 }
 
-unsigned int WebserverConfig::parse_serverconfig_key(std::string &key) {
+unsigned int WebserverConfig::parse_server_port(const std::string &key) {
   std::size_t i = 1;
   std::size_t start = i;
 
@@ -216,7 +223,7 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
     os << "Type key: " << ty_it->first << ", Type value: " << ty_it->second
        << std::endl;
   }
-  os << "default_mime: " << data.Get_default_mime() << std::endl;
+  os << "default_mime: " << data.get_default_mime() << std::endl;
   os << "========================================================" << std::endl;
   os << "\n\n\n========================================================"
      << std::endl;

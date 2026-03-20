@@ -56,19 +56,83 @@ private:
    */
   std::map<unsigned int, ServerConfig> serverconfig_map;
 
+  /**
+   * @brief 설정 파일의 최상위 항목들을 파싱하는 함수
+   * @param file 파싱할 설정 파일
+   * @return 파싱에 성공하면 true, 실패하면 false
+   *
+   * types, server, uwsgi 항목을 순차적으로 읽어 각 멤버 변수에 저장한다.
+   * 유효하지 않은 줄이나 파싱 오류가 발생하면 err_meg에 오류 메시지를 저장한다.
+   */
   bool file_parsing(FileDescriptor &file);
-  bool set_type_map(FileDescriptor &file);
-  bool parse_type_line(const std::string &line,
+  /**
+   * @brief types 블록을 파싱하여 확장자별 MIME type과 기본 MIME type을 저장하는 함수
+   * @param file 파싱할 설정 파일
+   * @return 파싱에 성공하면 true, 실패하면 false
+   *
+   * '_' 키는 기본 MIME type으로 처리되며,
+   * 그 외의 키는 type_map에 확장자별 MIME type으로 저장된다.
+   */
+  bool parse_types_block(FileDescriptor &file);
+  /**
+   * @brief "key1|key2->value" 형식의 type 매핑 문자열을 파싱하는 함수
+   * @param line 파싱할 문자열
+   * @param keys_out 파싱한 키 목록을 저장할 변수
+   * @param value_out 파싱한 MIME type 값을 저장할 변수
+   * @return 파싱에 성공하면 true, 실패하면 false
+   *
+   * 입력 문자열은 정확히 하나의 "->"를 포함해야 하며,
+   * 키와 값은 각각 유효한 type key, MIME type 형식이어야 한다.
+   */
+  bool parse_type_mapping(const std::string &line,
                        std::vector<std::string> &keys_out,
                        std::string &value_out);
-  std::vector<std::string> is_type_key(const std::string &key);
-  bool is_type_value(const std::string &value);
-  bool is_serverconfig(const std::string &line);
-  bool set_serverconfig_map(FileDescriptor &file, const std::string &line);
-  unsigned int parse_serverconfig_key(std::string &key);
+  /**
+   * @brief type 키 문자열의 문법을 검사하고 확장자 목록으로 분리하는 함수
+   * @param key 파싱할 키 문자열
+   * @return 유효하면 '|'를 기준으로 분리된 키 목록, 그렇지 않으면 빈 벡터
+   *
+   * 각 키는 공백을 포함할 수 없으며, '_'와 중복된 확장자는 허용하지 않는다.
+   */
+  std::vector<std::string> parse_type_keys(const std::string &key);
+  /**
+   * @brief 문자열이 "type/subtype" 형식의 MIME type 문법에 맞는지 검사하는 함수
+   * @param value 검사할 문자열
+   * @return MIME type 문법에 맞으면 true, 그렇지 않으면 false
+   *
+   * 값은 정확히 하나의 '/'를 포함해야 하며,
+   * type과 subtype은 비어 있을 수 없다.
+   */
+  bool is_valid_mime_type(const std::string &value);
+  /**
+   * @brief 문자열이 server 블록 시작 줄의 형식에 맞는지 검사하는 함수
+   * @param line 검사할 문자열
+   * @return server 블록 시작 줄 형식이면 true, 그렇지 않으면 false
+   *
+   * 문자열은 ':'로 시작해야 하며, 그 뒤에는 하나 이상의 숫자로 이루어진 포트 번호가 와야 한다.
+   * 포트 번호 뒤에는 선택적으로 하나의 공백이 올 수 있고, 마지막에는 '='가 와야 한다.
+   */
+  bool is_server_config_header(const std::string &line);
+  /**
+   * @brief server 블록 시작 줄에서 포트 번호를 추출하고 ServerConfig 객체를 생성하여 저장하는 함수
+   * @param file 파싱할 설정 파일
+   * @param line server 블록의 시작 줄
+   * @return 저장에 성공하면 true, 실패하면 false
+   *
+   * 이미 같은 포트 번호가 등록되어 있으면 실패하며,
+   * 파싱 중 오류가 발생하면 err_meg에 오류 메시지를 저장한다.
+   */
+  bool parse_server_config_entry(FileDescriptor &file, const std::string &line);
+  /**
+   * @brief ":<포트번호> =" 형식의 문자열에서 포트 번호를 파싱하는 함수
+   * @param line 포트 번호를 추출할 server 설정 문자열
+   * @return 추출한 포트 번호
+   *
+   * 입력 문자열은 사전에 server 설정 헤더 문법 검사를 통과한 문자열이어야 한다.
+   */
+  unsigned int parse_server_port(const std::string &line);
 
   WebserverConfig(FileDescriptor &file);
-
 public:
 
   WebserverConfig &operator=(const WebserverConfig &other) {
@@ -82,7 +146,7 @@ public:
     return *this;
   }
 
-  const std::string &Get_default_mime(void) const { return default_mime; }
+  const std::string &get_default_mime(void) const { return default_mime; }
   const std::map<std::string, std::string> &get_uwsgi(void) const {
     return uwsgi;
   }
@@ -92,6 +156,14 @@ public:
   const std::map<unsigned int, ServerConfig> &get_serverconfig_map(void) const {
     return serverconfig_map;
   }
+  /**
+   * @brief 설정 파일을 파싱한 결과를 Result<WebserverConfig> 형태로 반환하는 함수
+   * @param file 파싱할 설정 파일
+   * @return 파싱이 성공하면 객체를, 실패하면 오류 메시지를 담은 Result
+   *
+   * 일반적인 방식으로 직접 생성할 수 없는 WebserverConfig 객체를
+   * 정적 함수 호출을 통해 획득할 수 있도록 제공한다.
+   */
   static Result<WebserverConfig> parse(FileDescriptor &file) {
     WebserverConfig temp(file);
     // OK
