@@ -49,16 +49,6 @@ std::string Response::get_pwd() {
   return "";
 }
 
-std::string Response::error_file_path(int error_code) {
-  if (error_code == 400)
-    return get_pwd() + "/spool/www/error/400.html";
-  else if (error_code == 403)
-    return get_pwd() + "/spool/www/error/403.html";
-  else if (error_code == 404)
-    return get_pwd() + "/spool/www/error/404.html";
-  return get_pwd() + "/spool/www/error/500.html";
-}
-
 int Response::check_path_type(const std::string &path) {
   struct stat info;
 
@@ -88,9 +78,7 @@ Response::generate(const Request *request, const ServerConfig *config,
   const RouteRule *rule =
       config->findRoute(request->get_method(), request->get_path());
   HttpResponse response;
-  Target target = resolve_target(
-      rule, config->Get_to(request->get_method(), request->get_path()));
-  std::cout << "CONFIG FIND ROUTE GET PATH: " << std::endl;
+  Target target = resolve_target(rule, config, request);
 
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
@@ -114,24 +102,25 @@ Response::generate(const Request *request, const ServerConfig *config,
   return response;
 }
 
-Target Response::resolve_target(const RouteRule *rule, std::string root) {
+Target Response::resolve_target(const RouteRule *rule, const ServerConfig *config, const Request *request) {
   Target target;
   if (rule == NULL) {
     target.type = NOT_FOUND_ERR;
     target.path = get_string_from_map(rule->errorPages, NOT_FOUND_ERR);
     return target;
   }
+  std::string root = config->Get_to(request->get_method(), request->get_path());
 
   target.path = get_pwd();
   std::cout << "Root: " << target.path + root << std::endl;
   int type = check_path_type(target.path + root);
   if (type == IS_DIR && rule->op != AUTOINDEX) {
     if (rule->index.empty())
-      target.path += root + "/index.html";
+      target.path += config->Get_to(request->get_method(), "/index.html");
     else
-      target.path += root + "/" + rule->index;
+      target.path += config->Get_to(request->get_method(), "/" + rule->index);
   } else if (type == NOT_FOUND_ERR)
-    target.path += get_string_from_map(rule->errorPages, NOT_FOUND_ERR);
+    target.path += config->Get_to(request->get_method(), get_string_from_map(rule->errorPages, NOT_FOUND_ERR));
   else if (type == FORBIDDEN_ERR)
     target.path += get_string_from_map(rule->errorPages, FORBIDDEN_ERR);
   else
@@ -164,24 +153,15 @@ std::string Response::make_autoindex_page(const std::string &real_path,
     if (name == ".")
       continue;
 
-    // 링크용 href 만들기
-    std::string href = name;
-
-    // 폴더인 경우 이름 끝에 '/'를 붙여주는 것이 관례입니다.
-    if (entity->d_type == DT_DIR) {
-      href += "/";
+    // 절대 경로를 합쳐서 진짜 폴더인지 검사
+    std::string full_item_path = real_path + "/" + name;
+    int type = check_path_type(full_item_path);
+    if (type == IS_DIR)
       name += "/";
-    }
-
-    // 3. <a> 태그를 사용해 클릭 가능한 링크 추가
-    html += "<a href=\"" + href + "\">" + name + "</a>\r\n<br>\r\n";
+    html += "<a href=\"" + name + "\">" + name + "</a>\r\n<br>\r\n";
   }
-
-  // 4. HTML 마무리
   html += "</pre><hr></body></html>";
   closedir(dir);
-
-  std::cout << html << std::endl;
 
   return html;
 }

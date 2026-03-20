@@ -23,8 +23,22 @@
 #include <utility>
 
 class ServerConfig;
+/**
+ * @brief Class to initiate and run server
+ * 
+ * Server class contains EPoll, Servers, 
+ * 
+ * @class Server
+ */
 class Server {
 private:
+/**
+ * @brief epoll
+ * 
+ * 
+ * 
+ * @var epoll
+ */
   EPoll epoll;
   WebserverConfig config;
   std::map<std::string, std::string> mime_type;
