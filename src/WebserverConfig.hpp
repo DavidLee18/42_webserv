@@ -10,6 +10,7 @@ private:
   std::string err_meg;
 
   std::string default_mime;
+  std::map<std::string, std::string> uwsgi;
   std::map<std::string, std::string> type_map;
 
   std::map<unsigned int, ServerConfig> ServerConfig_map;
@@ -31,12 +32,13 @@ private:
 
 public:
   WebserverConfig(const WebserverConfig &other)
-      : default_mime(other.default_mime), type_map(other.type_map),
-        ServerConfig_map(other.ServerConfig_map){};
+      : default_mime(other.default_mime), uwsgi(other.uwsgi),
+        type_map(other.type_map), ServerConfig_map(other.ServerConfig_map){};
 
   WebserverConfig &operator=(const WebserverConfig &other) {
     if (this != &other) {
       this->default_mime = other.default_mime;
+      this->uwsgi = other.uwsgi;
       this->type_map = other.type_map;
       this->ServerConfig_map = other.ServerConfig_map;
       this->err_meg.clear();
@@ -45,6 +47,9 @@ public:
   }
 
   const std::string &Get_default_mime(void) const { return default_mime; }
+  const std::map<std::string, std::string> &Get_Uwsgi(void) const {
+    return uwsgi;
+  }
   const std::map<std::string, std::string> &Get_Type_map(void) const {
     return type_map;
   }

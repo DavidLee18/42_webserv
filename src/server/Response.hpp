@@ -55,7 +55,8 @@ private:
   static std::string status_code_to_string(int status_code);
 
   static int check_path_type(const std::string &path);
-  static Target resolve_target(const RouteRule *rule, std::string root);
+  static Path resolve_path(const Http::Request *request,
+                           const ServerConfig *config);
   static std::string get_pwd();
   static std::string error_file_path(int error_code);
   static std::string make_autoindex_page(const std::string& real_path,

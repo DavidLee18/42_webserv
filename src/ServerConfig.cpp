@@ -149,7 +149,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
     Result<std::string> temp = fd.read_file_line();
     if (temp.error() != "") {
       err_line = "FileDescriptor Error: " + temp.error();
-      return (false);
+      return false;
     } else if (temp.value() == "\n") {
       end_flag += 1;
       if (end_flag == 2)
@@ -164,24 +164,41 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
       if (is_header(line)) {
         if (!parse_header_line(fd, line)) {
           err_line = "Header syntax Error: " + err_line;
-          return (false);
+          return false;
         }
+      } else if (is_CGI(line)) {
+        std::string key;
+        std::map<std::string, std::string> temp;
+        err_line = parse_Executable(line, key, temp);
+        if (err_line != "")
+          return false;
+        if (S_CGI.find(key) != S_CGI.end()) {
+          err_line = "Error: \"" + line + "\" duplicate key error";
+          return false;
+        }
+        S_CGI[key] = temp;
       } else if (is_serverResponseTime(line))
         parse_serverResponseTime(line);
       else if (is_RouteRule(line)) {
         if (!parse_RouteRule(line, fd)) {
           err_line = "RouteRule syntax Error: " + err_line;
-          return (false);
+          return false;
         }
-        // else if (is_Config_CGI())
+      } else if (is_Config_CGI(line)) {
+        RouteRule_CGI temp(fd, line);
+        if (temp.Get_err() != "") {
+          err_line = temp.Get_err();
+          return false;
+        }
+        R_CGI.push_back(temp);
       } else {
         err_line = "Invalid line Error: " + trim_space(line);
-        return (false);
+        return false;
       }
     } else
-      return (false);
+      return false;
   }
-  return (true);
+  return true;
 }
 
 // header method
@@ -584,23 +601,6 @@ RuleOperator ServerConfig::parse_RuleOperator(std::string indicator) {
     return (UNDEFINED);
 }
 
-// static bool match(const std::string& wildcard, const std::string& path) {
-//   std::vector<std::string> parts = string_split(wildcard, "*");
-//   size_t pos = 0;
-
-//   if (2 < parts.size())
-//     return (false);
-//   for (size_t i = 0; i < parts.size(); ++i) {
-//       pos = path.find(parts[i], pos);
-//       if (pos == std::string::npos)
-//           return false;
-//       pos += parts[i].length();
-//   }
-//   if (pos != path.size())
-//     return false;
-//   return true;
-// }
-
 bool ServerConfig::is_matching(PathPattern path, PathPattern root) {
   std::vector<std::string> path_pattern = path.Get_path();
   std::vector<std::string> root_pattern = root.Get_path();
@@ -760,7 +760,7 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
 
   const Header &header = data.Get_Header();
   Header::const_iterator header_it;
-  os << "\nHeader";
+  os << "\n\n\n<<Header>>";
   for (header_it = header.begin(); header_it != header.end(); ++header_it) {
     os << "\n\tkey: " << header_it->first << std::endl;
     if (header_it->second.empty())
@@ -773,8 +773,24 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
     }
   }
 
+  os << "\n\n\n<<Server CGI>>";
+  const Server_CGI &s = data.Get_Serve_CGI();
+  Server_CGI::const_iterator s_it;
+  if (s.empty())
+    os << "\n\tEmpty" << std::endl;
+  for (s_it = s.begin(); s_it != s.end(); ++s_it) {
+    os << "\n\tkey: " << s_it->first << std::endl;
+    if (s_it->second.empty())
+      os << "\tvalue: nosniff" << std::endl;
+    else {
+      std::map<std::string, std::string>::const_iterator temp;
+      for (temp = s_it->second.begin(); temp != s_it->second.end(); ++temp)
+        os << "\tvalue: " << temp->first << " " << temp->second << std::endl;
+    }
+  }
+
   const std::vector<RouteRule> &routes = data.Get_Routes();
-  os << "\nRoutes";
+  os << "\n\n\n<<Routes>>";
   for (size_t i = 0; i < routes.size(); ++i) {
     const RouteRule &route = routes[i];
     os << "\n\nRoute: ";
@@ -804,6 +820,14 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
         os << "\n\tError Page: " << err_it->first << " " << err_it->second;
     }
   }
+
+  std::vector<RouteRule_CGI> cgi = data.Get_RouteRule_CGI();
+  os << "\n\n\n\n<<Route CGI>>\n";
+  for (std::size_t i = 0; i < cgi.size(); ++i) {
+    os << cgi[i];
+  }
+  if (cgi.size() == 0)
+    os << "\n\tEmpty";
   os << "\n========================================================";
   return (os);
 }
@@ -836,7 +860,7 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
       break;
     }
   }
-  
+
   if (new_to.empty())
     return "";
 
