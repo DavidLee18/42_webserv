@@ -1,137 +1,5 @@
 #include "webserv.h"
 
-// Helper function to check if a segment matches a pattern
-// Pattern can contain * as wildcard
-bool PathPattern::segmentMatches(const std::string &pattern,
-                                 const std::string &segment) {
-  // If pattern is exactly "*", it matches anything
-  if (pattern == "*") {
-    return true;
-  }
-
-  // If no wildcard in pattern, must match exactly
-  if (pattern.find('*') == std::string::npos) {
-    return pattern == segment;
-  }
-
-  // Split pattern by * to get parts that must match
-  std::vector<std::string> parts = utils::string_split(pattern, "*");
-
-  size_t pos = 0;
-  for (size_t i = 0; i < parts.size(); ++i) {
-    if (parts[i].empty()) {
-      continue; // Skip empty parts from consecutive *
-    }
-
-    // Find this part in the segment
-    size_t found = segment.find(parts[i], pos);
-    if (found == std::string::npos) {
-      return false; // Required part not found
-    }
-
-    // For the first part, it should be at the beginning (unless pattern starts
-    // with *)
-    if (i == 0 && pattern[0] != '*' && found != 0) {
-      return false;
-    }
-
-    pos = found + parts[i].length();
-  }
-
-  // If pattern ends with a non-wildcard part, check that we matched to the end
-  if (!parts.empty() && !parts[parts.size() - 1].empty() &&
-      pattern[pattern.length() - 1] != '*') {
-    return pos == segment.length();
-  }
-
-  return true;
-}
-
-// Check if this pattern matches another PathPattern
-bool PathPattern::matches(const PathPattern &other) const {
-  // If this pattern is exactly "*", it matches anything
-  if (is_wildcard()) {
-    return true;
-  }
-
-  // If other is "*", we need to check if our pattern would match it
-  // In this case, only "*" matches "*"
-  if (other.is_wildcard()) {
-    return is_wildcard();
-  }
-
-  // If the path lengths are different and neither has wildcards, no match
-  // But if we have wildcards, we need more complex matching
-
-  // Check if any of our segments contain wildcards
-  bool hasWildcard = false;
-  for (size_t i = 0; i < path.size(); ++i) {
-    if (path[i].find('*') != std::string::npos) {
-      hasWildcard = true;
-      break;
-    }
-  }
-
-  if (!hasWildcard && path.size() != other.path.size()) {
-    return false;
-  }
-
-  // If we have wildcards, do more flexible matching
-  if (hasWildcard) {
-    // For patterns like "*.jpg", we want to match any path ending with .jpg
-    // regardless of directory depth
-    if (path.size() == 1 && path[0].find('*') != std::string::npos) {
-      // Single segment pattern like "*.jpg"
-      // Check if any segment in other matches this pattern
-      for (size_t i = 0; i < other.path.size(); ++i) {
-        if (segmentMatches(path[0], other.path[i])) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    // For multi-segment patterns, match segment by segment
-    if (path.size() != other.path.size()) {
-      return false;
-    }
-
-    for (size_t i = 0; i < path.size(); ++i) {
-      if (!segmentMatches(path[i], other.path[i])) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  // No wildcards - exact match required
-  for (size_t i = 0; i < path.size(); ++i) {
-    if (path[i] != other.path[i]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-// Check if this pattern matches a path string
-bool PathPattern::matches(const std::string &pathStr) const {
-  return matches(PathPattern(pathStr));
-}
-
-// Convert PathPattern to string for debugging/display
-std::string PathPattern::to_string() const {
-  if (path.empty()) {
-    return "/";
-  }
-  std::string result;
-  for (size_t i = 0; i < path.size(); ++i) {
-    result += "/";
-    result += path[i];
-  }
-  return result;
-}
-
 ServerConfig::ServerConfig(FileDescriptor &file) {
   err_line = "";
   server_response_time = 3;
@@ -166,7 +34,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           err_line = "Header syntax Error: " + err_line;
           return false;
         }
-      } else if (RouteRule_CGI::is_cgi(line)) {
+      } else if (RouteRule_CGI::matches_cgi_syntax(line)) {
         std::string key;
         std::map<std::string, std::string> temp;
         err_line = RouteRule_CGI::parse_executable(line, key, temp);
@@ -184,7 +52,7 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           err_line = "RouteRule syntax Error: " + err_line;
           return false;
         }
-      } else if (RouteRule_CGI::is_config_cgi(line)) {
+      } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
         RouteRule_CGI temp(fd, line);
         if (temp.get_err() != "") {
           err_line = temp.get_err();

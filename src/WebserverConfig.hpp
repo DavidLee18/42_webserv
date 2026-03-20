@@ -22,6 +22,8 @@ private:
   /**
    * @var err_meg
    * @brief 파싱 중 발생한 오류 메시지를 저장하는 멤버 변수
+   * 
+   * 정상적으로 파싱이 성공했을 시 빈 문자열을 가지고 있다.
    */
   std::string err_meg;
   /**
