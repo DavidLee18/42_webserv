@@ -1,6 +1,7 @@
 #include "webserv.h"
 
-int number_of_delim(const std::string &line, const std::string &delim) {
+int utils::count_occurrences(const std::string &line,
+                             const std::string &delim) {
   int count = 0;
   std::string::size_type pos = 0;
 
@@ -15,7 +16,8 @@ int number_of_delim(const std::string &line, const std::string &delim) {
   return (count);
 }
 
-bool is_have_special(const std::string &line, const std::string &allowed) {
+bool utils::contains_any_of(const std::string &line,
+                            const std::string &allowed) {
 
   for (std::size_t i = 0; i < line.size(); ++i) {
     unsigned char c = static_cast<unsigned char>(line[i]);
@@ -28,7 +30,7 @@ bool is_have_special(const std::string &line, const std::string &allowed) {
   return (false);
 }
 
-bool is_have_space(const std::string &line) {
+bool utils::has_space(const std::string &line) {
   std::size_t pos = line.find(' ');
 
   if (pos == std::string::npos)
@@ -36,7 +38,7 @@ bool is_have_space(const std::string &line) {
   return (true);
 }
 
-std::string trim_space(const std::string &s) {
+std::string utils::trim_whitespace(const std::string &s) {
   std::size_t start = s.find_first_not_of(" \t");
   std::size_t end = s.find_last_not_of(" \t");
 
@@ -46,7 +48,7 @@ std::string trim_space(const std::string &s) {
   return s.substr(start, end - start + 1);
 }
 
-bool is_tab_or_space(std::string line, size_t num) {
+bool utils::match_indent_level(std::string line, size_t num) {
   size_t len = 0;
   size_t i = 0;
 
@@ -62,8 +64,8 @@ bool is_tab_or_space(std::string line, size_t num) {
   return (len == (num * 4));
 }
 
-std::vector<std::string> string_split(const std::string &line,
-                                      const std::string &delim) {
+std::vector<std::string> utils::string_split(const std::string &line,
+                                             const std::string &delim) {
   std::vector<std::string> tokens;
   std::size_t start = 0;
   std::size_t end;
@@ -80,7 +82,7 @@ std::vector<std::string> string_split(const std::string &line,
   return tokens;
 }
 
-std::string trim_char(std::string s, char ch) {
+std::string utils::remove_char(std::string s, char ch) {
   s.erase(std::remove(s.begin(), s.end(), ch), s.end());
 
   return (s);

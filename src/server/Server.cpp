@@ -80,13 +80,17 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
       Request request(in_buffer);
       // todo: method to string
-      std::cout << "[Request] " << request.get_method_string() << " " << request.get_path()
-                << std::endl;
+      std::cout << "[Request] " << request.get_method_string() << " "
+                << request.get_path() << std::endl;
 
       HttpResponse http =
           Response::generate(&request, clients.at(client_fd).config, mime_type);
-        std::cout << "Http file type: " << http.mime_type << std::endl;
-        std::cout << "Route: " << clients.at(client_fd).config->Get_to(request.get_method(), request.get_path()) << std::endl << std::endl;
+      std::cout << "Http file type: " << http.mime_type << std::endl;
+      std::cout << "Route: "
+                << clients.at(client_fd).config->get_to(request.get_method(),
+                                                        request.get_path())
+                << std::endl
+                << std::endl;
 
       // HTTP 응답 메시지 조립
       // todo: 하드코딩된 response 말고 동적으로
@@ -136,7 +140,7 @@ Result<Void> Server::init() {
 
   // Init server socket for every port listed on configuration file
   const std::map<unsigned int, ServerConfig> &servers =
-      config.Get_ServerConfig_map();
+      config.get_serverconfig_map();
   for (std::map<unsigned int, ServerConfig>::const_iterator it =
            servers.begin();
        it != servers.end(); ++it) {
@@ -186,7 +190,8 @@ Result<Void> Server::init() {
     FileDescriptor *fd_ptr = add_result.value();
     listeners[fd_ptr] = &it->second;
 
-    std::cout << "Server listening " << inet_ntoa(addr) << " : "  << port << std::endl;
+    std::cout << "Server listening " << inet_ntoa(addr) << " : " << port
+              << std::endl;
   }
   return OK(Void, Void());
 }

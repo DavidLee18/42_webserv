@@ -28,7 +28,18 @@ private:
   bool content_full;
 
 public:
-  enum Method { GET, HEAD, OPTIONS, POST, DELETE, PUT, CONNECT, TRACE, PATCH, ERROR };
+  enum Method {
+    GET,
+    HEAD,
+    OPTIONS,
+    POST,
+    DELETE,
+    PUT,
+    CONNECT,
+    TRACE,
+    PATCH,
+    ERROR
+  };
   Request(std::string request);
   const std::string get_connection_string() const;
   Request::Method get_method() const;

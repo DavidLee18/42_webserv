@@ -13,22 +13,22 @@ static std::string normalize_header_name(const std::string &name) {
 
 // Helper function to trim whitespace from both ends of a string
 // RFC 2616 §4.2: LWS before/after field-content may be removed
-static std::string trim_whitespace(const std::string &str) {
-  size_t start = 0;
-  size_t end = str.length();
+// static std::string utils::trim_whitespace(const std::string &str) {
+//   size_t start = 0;
+//   size_t end = str.length();
 
-  // Trim leading whitespace
-  while (start < end && (str[start] == ' ' || str[start] == '\t')) {
-    start++;
-  }
+//   // Trim leading whitespace
+//   while (start < end && (str[start] == ' ' || str[start] == '\t')) {
+//     start++;
+//   }
 
-  // Trim trailing whitespace
-  while (end > start && (str[end - 1] == ' ' || str[end - 1] == '\t')) {
-    end--;
-  }
+//   // Trim trailing whitespace
+//   while (end > start && (str[end - 1] == ' ' || str[end - 1] == '\t')) {
+//     end--;
+//   }
 
-  return str.substr(start, end - start);
-}
+//   return str.substr(start, end - start);
+// }
 
 // Helper function to skip whitespace
 static size_t skip_whitespace(const char *input, size_t offset,
@@ -262,7 +262,7 @@ Http::Request::Parser::parse_headers(const char *input, size_t offset) {
     std::string normalized_name = normalize_header_name(header_name);
 
     // RFC 2616 §4.2: Trim leading/trailing whitespace from value
-    std::string trimmed_value = trim_whitespace(header_value);
+    std::string trimmed_value = utils::trim_whitespace(header_value);
 
     // Store header as string (HTTP/1.1 standard)
     headers[normalized_name] = trimmed_value;

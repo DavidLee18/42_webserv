@@ -20,6 +20,7 @@ int main(const int argc, char *argv[]) {
               << std::endl;
     return 1;
   } else {
+    // std::cout << result_config.value() << std::endl;
     const WebserverConfig &config = result_config.value();
     // Initiate server.
     Server server(config);
@@ -33,7 +34,6 @@ int main(const int argc, char *argv[]) {
       std::cerr << "Server Error: " << server_result.error() << std::endl;
       return 1;
     }
-    
   }
   return 0;
 }
