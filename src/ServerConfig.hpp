@@ -1,14 +1,8 @@
 #ifndef SERVERCONFIG_HPP
 #define SERVERCONFIG_HPP
 
-#include "ParsingUtils.hpp"
 #include "RouteRule_CGI.hpp"
-#include "file_descriptor.h"
-#include "server/Client.hpp"
-#include <iosfwd>
-#include <unistd.h>
 
-typedef std::map<std::string, std::map<std::string, std::string> > Header;
 /**
  * @typedef Server_CGI
  * @brief CGI 관련 메타변수 정보를 저장하기 위한 중첩 map 타입
@@ -147,7 +141,7 @@ private:
    * @var header
    * @brief 서버 설정의 공통 헤더 정보를 저장하는 멤버 변수
    */
-  Header header;
+  std::map<std::string, std::string> header;
   /**
    * @var server_response_time
    * @brief 서버의 응답 시간을 저장하는 멤버 변수
@@ -182,11 +176,22 @@ private:
   int end_flag;
 
   bool set_ServerConfig(FileDescriptor &fd);
-  // header method
-  bool is_header(const std::string &line);
-  bool parse_header_line(FileDescriptor &fd, std::string line);
-  bool is_header_key(std::string &key);
-  bool parse_header_value(std::string value, const std::string key);
+  /**
+   * @brief 문자열이 "[] +<=" 형식의 header 설정 시작 줄인지 검사하는 함수
+   * @param line 검사할 문자열
+   * @return header 설정 시작 줄이면 true, 그렇지 않으면 false
+   */
+  bool is_header_block(const std::string &line);
+  /**
+   * @brief header 항목을 파싱하여 key와 value를 header 맵에 저장하는 함수
+   * @param fd 설정 파일을 읽기 위한 FileDescriptor
+   * @param line 파싱할 header 항목 문자열
+   * @return 파싱에 성공하면 true, 실패하면 false
+   *
+   * 값의 끝에 ';'가 있으면 다음 들여쓰기 2단계 줄들을 이어 읽어 하나의 값으로 합친다.
+   * 파싱 중 오류가 발생하면 err_line에 오류 정보를 저장한다.
+   */
+  bool parse_header_entry(FileDescriptor &fd, const std::string &line);
   // server_response_time method
   bool is_server_response_time(std::string &line);
   void parse_server_response_time(std::string line);
@@ -206,7 +211,7 @@ public:
   ServerConfig(FileDescriptor &);
   ServerConfig()
       : header(), server_response_time(-1), routes(), err_line(), end_flag(0) {}
-  const Header &get_header(void) const { return header; }
+  const std::map<std::string, std::string> &get_header(void) const { return header; }
   int get_server_response_time(void) const { return (server_response_time); }
   const std::vector<RouteRule> &get_routes(void) const { return routes; }
   RouteRule const *find_route(Request::Method method,
@@ -215,7 +220,6 @@ public:
   const std::string &geterr_line(void) const { return err_line; }
   std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
   Server_CGI get_serve_cgi() const { return S_CGI; }
-  // Result<ServerConfig> read_from_file(FileDescriptor &);
 };
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data);

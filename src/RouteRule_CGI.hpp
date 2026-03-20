@@ -2,12 +2,11 @@
 #define ROUTERULE_CGI_HPP
 
 #include "ParsingUtils.hpp"
-#include "file_descriptor.h"
 #include "PathPattern.hpp"
-#include "http_1_1.h"
-#include <sstream>
-#include <sys/stat.h>
-#include <unistd.h>
+#include "result.h"
+#include "file_descriptor.h"
+#include <iostream>
+#include <map>
 
 /**
  * @class RouteRule_CGI

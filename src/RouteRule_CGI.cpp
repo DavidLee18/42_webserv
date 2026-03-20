@@ -67,7 +67,6 @@ bool RouteRule_CGI::is_executable_file(const std::string &path) {
 bool RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
   if (line.empty() || line[0] != '$' || utils::has_space(line))
     return false;
-
   std::size_t i = 1;
   std::size_t pos = line.find(".cgi", i);
   if (pos != std::string::npos) {

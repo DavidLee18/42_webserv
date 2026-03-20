@@ -14,7 +14,7 @@ uwsgi =
 
 
 :8080 =
-    [] +<= X-Content-Type-Options: "nosniff"
+    [] +<= X-Content-Type-Options: "nosniff";
 
     $add_csp_sha256.cgi
 
@@ -37,7 +37,7 @@ uwsgi =
 
 
 :8040 =
-    [] +<= X-Content-Type-Options: "nosniff"
+    [] +<= X-Content-Type-Options: "nosniff";
 
     ...30
 

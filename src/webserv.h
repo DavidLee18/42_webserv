@@ -7,8 +7,6 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 
-#include "ParsingUtils.hpp"
-#include "ServerConfig.hpp"
 #include "WebserverConfig.hpp"
 #include "cgi_1_1.h"
 #include "epoll_kqueue.h"

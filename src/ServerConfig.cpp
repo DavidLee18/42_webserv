@@ -1,4 +1,4 @@
-#include "webserv.h"
+#include "ServerConfig.hpp"
 
 ServerConfig::ServerConfig(FileDescriptor &file) {
   err_line = "";
@@ -27,10 +27,14 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
       break;
     end_flag = 0;
     line = utils::remove_char(temp.value(), '\n');
+    if (line[line.length() - 1] == ' ' || line[line.length() - 1] == '\t') {
+      err_line = "Invalid line Error: " + utils::trim_whitespace(line);
+      return false;
+    }
     if (utils::match_indent_level(line, 1)) {
       line = utils::trim_whitespace(line);
-      if (is_header(line)) {
-        if (!parse_header_line(fd, line)) {
+      if (is_header_block(line)) {
+        if (!parse_header_entry(fd, line)) {
           err_line = "Header syntax Error: " + err_line;
           return false;
         }
@@ -70,84 +74,49 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
 }
 
 // header method
-bool ServerConfig::is_header(const std::string &line) {
-  std::string temp = utils::trim_whitespace(line);
-  if (temp.empty())
-    return (false);
-  if (temp[0] == '[' && temp[1] == ']')
-    return (true);
-  return (false);
+bool ServerConfig::is_header_block(const std::string &line) {
+  std::vector<std::string> temp = utils::string_split(line, " ");
+  if (temp.size() != 4)
+    return false;
+  else if (temp[0] != "[]")
+    return false;
+  else if (temp[1] != "+<=")
+    return false;
+  else if (temp[2][temp[2].length() - 1] != ':')
+    return false;
+  else if (temp[3].length() < 1)
+    return false;
+  return true;
 }
 
-bool ServerConfig::parse_header_line(FileDescriptor &fd, std::string line) {
+bool ServerConfig::parse_header_entry(FileDescriptor &fd, const std::string &line) {
   std::string temp(line);
   std::vector<std::string> key_value = utils::string_split(temp, ":");
 
   err_line = temp;
   if (key_value.size() != 2)
-    return (false);
-  std::string key = utils::trim_whitespace(key_value[0]);
-  temp = key_value[1];
-  if (!is_header_key(key) || !parse_header_value(temp, key))
-    return (false);
-  while (!temp.empty() && temp[temp.length() - 1] == ';') {
+    return false;
+  std::string key = utils::string_split(key_value[0], " ")[2];
+  std::string value = utils::trim_whitespace(key_value[1]);
+  while (temp[temp.length() - 1] == ';') {
     Result<std::string> fd_line = fd.read_file_line();
     if (fd_line.error() != "") {
       err_line = "FileDescriptor Error: " + fd_line.error();
-      return (false);
-    }
-    if (fd_line.value() == "\n" || fd_line.value() == "") {
+      return false;
+    } else if (fd_line.value() == "\n" || fd_line.value() == "") {
       end_flag += 1;
       break;
     }
-    temp = line = utils::remove_char(fd_line.value(), '\n');
-    err_line = temp;
-    if (!utils::match_indent_level(temp, 2))
-      return (false);
-    if (!parse_header_value(temp, key))
-      return (false);
+    temp = utils::remove_char(fd_line.value(), '\n');
+    if (!utils::match_indent_level(temp, 2) || 
+      temp[temp.length() - 1] == ' ' || temp[temp.length() - 1] == '\t') {
+      err_line = "Error: \"" + temp + "\" Indentation or space error";
+      return false;
+    }
+    value += " " + utils::trim_whitespace(temp);
   }
   err_line = "";
-  return (true);
-}
-
-bool ServerConfig::is_header_key(std::string &key) {
-  std::vector<std::string> temp;
-
-  if (key.empty())
-    return (false);
-  temp = utils::string_split(key, " ");
-  if (temp.size() == 3)
-    key = temp[2];
-  return (true);
-}
-
-bool ServerConfig::parse_header_value(std::string value,
-                                      const std::string key) {
-  if (value.empty())
-    return false;
-  if (value[value.length() - 1] == ' ' || value[value.length() - 1] == '\t')
-    return false;
-  std::vector<std::string> values =
-      utils::string_split(utils::trim_whitespace(value), ";");
-  std::vector<std::string> temp;
-  for (size_t i = 0; i < values.size(); i++) {
-    values[i] = utils::trim_whitespace(values[i]);
-    temp = utils::string_split(values[i], " ");
-    if (temp.size() == 1 && temp[0] == "\"nosniff\"")
-      header[key];
-    else if (temp.size() == 2) {
-      if (temp[1].size() < 2)
-        return false;
-      if (temp[1][0] != '\'' || temp[1][temp[1].size() - 1] != '\'')
-        return false;
-      for (size_t j = 1; j + 1 < temp[1].size(); ++j)
-        if (temp[1][j] == '\'')
-          return false;
-      header[key][temp[0]] = temp[1];
-    } else
-      return false;
-  }
+  header[key] =  utils::remove_char(value, ';');
   return true;
 }
 
@@ -632,19 +601,11 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   os << "Server Response Time(s): " << data.get_server_response_time()
      << std::endl;
 
-  const Header &header = data.get_header();
-  Header::const_iterator header_it;
+  const std::map<std::string, std::string> &header = data.get_header();
+  std::map<std::string, std::string>::const_iterator header_it;
   os << "\n\n\n<<Header>>";
   for (header_it = header.begin(); header_it != header.end(); ++header_it) {
-    os << "\n\tkey: " << header_it->first << std::endl;
-    if (header_it->second.empty())
-      os << "\tvalue: nosniff" << std::endl;
-    else {
-      std::map<std::string, std::string>::const_iterator temp;
-      for (temp = header_it->second.begin(); temp != header_it->second.end();
-           ++temp)
-        os << "\tvalue: " << temp->first << " " << temp->second << std::endl;
-    }
+    os << "\n\tkey: " << header_it->first << ", value: " << header_it->second << std::endl;
   }
 
   os << "\n\n\n<<Server CGI>>";
