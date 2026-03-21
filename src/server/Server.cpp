@@ -85,8 +85,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
           Response::generate(&request, clients.at(client_fd).config, mime_type);
       std::cout << "Http file type: " << http.mime_type << std::endl;
       std::cout << "Route: "
-                << clients.at(client_fd).config->get_to(request.get_method(),
-                                                        request.get_path())
+                << clients.at(client_fd).config->get_rewritten_path(
+                       request.get_method(), request.get_path())
                 << std::endl
                 << std::endl;
 

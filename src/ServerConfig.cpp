@@ -177,7 +177,8 @@ bool ServerConfig::is_path_pattern_segment(const std::string &line) {
   return count >= 2;
 }
 
-std::vector<std::string> ServerConfig::get_pattern_candidates(const std::string &line) {
+std::vector<std::string>
+ServerConfig::get_pattern_candidates(const std::string &line) {
   std::vector<std::string> temp = utils::string_split(line, "*");
   std::string pattern = temp[temp.size() - 1];
   size_t l = pattern.find('(');
@@ -189,8 +190,7 @@ std::vector<std::string> ServerConfig::get_pattern_candidates(const std::string 
   return (temp);
 }
 
-std::vector<std::vector<std::string> >
-ServerConfig::expand_paths_with_pattern(
+std::vector<std::vector<std::string> > ServerConfig::expand_paths_with_pattern(
     const std::vector<std::vector<std::string> > &paths,
     const std::vector<std::string> &pattern, std::size_t index) {
   std::vector<std::vector<std::string> > new_paths;
@@ -253,7 +253,8 @@ bool ServerConfig::matches_route_rule_syntax(const std::string &line) {
     return (false);
   std::vector<std::string> split = utils::string_split(line, " ");
   if (split.size() != 4 || parse_rule_operator(split[2]) == UNDEFINED ||
-      !has_valid_wildcard_usage(split[1]) || !has_valid_wildcard_usage(split[3]))
+      !has_valid_wildcard_usage(split[1]) ||
+      !has_valid_wildcard_usage(split[3]))
     return (false);
 
   std::vector<std::string> method = utils::string_split(split[0], "|");
@@ -320,8 +321,9 @@ int ServerConfig::parse_error_page_entry(std::string &line) {
   return (key);
 }
 
-bool ServerConfig::apply_route_rule_entry(const std::vector<Request::Method> &mets,
-                              const std::string &key_data, const std::string &line) {
+bool ServerConfig::apply_route_rule_entry(
+    const std::vector<Request::Method> &mets, const std::string &key_data,
+    const std::string &line) {
   if (line.empty())
     return false;
   if (std::isspace(static_cast<unsigned char>(line[line.size() - 1])))
@@ -432,7 +434,8 @@ RuleOperator ServerConfig::parse_rule_operator(const std::string &indicator) {
     return (UNDEFINED);
 }
 
-bool ServerConfig::has_compatible_wildcards(const PathPattern &path, const PathPattern &root) {
+bool ServerConfig::has_compatible_wildcards(const PathPattern &path,
+                                            const PathPattern &root) {
   std::vector<std::string> path_pattern = path.get_path();
   std::vector<std::string> root_pattern = root.get_path();
 
@@ -458,8 +461,9 @@ bool ServerConfig::has_compatible_wildcards(const PathPattern &path, const PathP
   return true;
 }
 
-bool ServerConfig::create_route_rules(const std::vector<std::string> &data,
-                                    const std::vector<Request::Method> &mets) {
+bool ServerConfig::create_route_rules(
+    const std::vector<std::string> &data,
+    const std::vector<Request::Method> &mets) {
   RouteRule route;
   std::vector<std::vector<std::string> > path_url;
   std::vector<std::vector<std::string> > root_url;
@@ -498,7 +502,7 @@ bool ServerConfig::create_route_rules(const std::vector<std::string> &data,
 }
 
 bool ServerConfig::parse_route_rule_block(const std::string &method_line,
-                                   FileDescriptor &fd) {
+                                          FileDescriptor &fd) {
   std::string line;
   std::vector<Request::Method> mets;
   std::vector<std::string> method_line_data =
@@ -660,21 +664,22 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   return (os);
 }
 
-std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
-                                     PathPattern to) const {
-  std::vector<std::string> new_path = path.get_path();
+std::string ServerConfig::rewrite_path(const std::string &request_path,
+                                       const PathPattern &from_pattern,
+                                       const PathPattern &to_pattern) const {
+  std::vector<std::string> new_from = from_pattern.get_path();
   std::vector<std::string> wilds;
-  std::vector<std::string> new_to = to.get_path();
-  std::vector<std::string> split_from = utils::string_split(from, "/");
+  std::vector<std::string> new_to = to_pattern.get_path();
+  std::vector<std::string> split_path = utils::string_split(request_path, "/");
 
-  for (std::size_t i = 0; i < new_path.size(); ++i) {
-    if (i < split_from.size() && std::string::npos != new_path[i].find("*"))
-      wilds.push_back(split_from[i]);
-    if (i + 1 == new_path.size()) {
-      if (std::string::npos != new_path[i].find("*"))
+  for (std::size_t i = 0; i < new_from.size(); ++i) {
+    if (i < split_path.size() && std::string::npos != new_from[i].find("*"))
+      wilds.push_back(split_path[i]);
+    if (i + 1 == new_from.size()) {
+      if (std::string::npos != new_from[i].find("*"))
         i++;
-      for (std::size_t j = i; j < split_from.size(); ++j)
-        wilds.push_back(split_from[j]);
+      for (std::size_t j = i; j < split_path.size(); ++j)
+        wilds.push_back(split_path[j]);
     }
   }
 
@@ -692,21 +697,21 @@ std::string ServerConfig::rewrite_to(std::string from, PathPattern path,
   if (new_to.empty())
     return "";
 
-  std::string result = "/";
-  result += new_to[0];
+  std::string rewrite = "/";
+  rewrite += new_to[0];
   for (std::size_t i = 1; i < new_to.size(); ++i) {
     if (new_to[i].find("*") != std::string::npos)
       continue;
-    result += '/';
-    result += new_to[i]; // 수정됨: result_to -> new_to
+    rewrite += '/';
+    rewrite += new_to[i];
   }
-  return (result);
+  return (rewrite);
 }
 
-std::string ServerConfig::get_to(Request::Method method,
-                                 const std::string &path) const {
-  const RouteRule *temp = find_route(method, path);
-  if (!temp)
+std::string ServerConfig::get_rewritten_path(Request::Method method,
+                                             const std::string &path) const {
+  const RouteRule *route = find_route(method, path);
+  if (!route)
     return "";
-  return rewrite_to(path, temp->path, temp->root);
+  return rewrite_path(path, route->path, route->root);
 }

@@ -88,8 +88,9 @@ Response::generate(const Request *request, const ServerConfig *config,
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
   HttpResponse response;
-  Target target = resolve_target(
-      rule, config->get_to(request->get_method(), request->get_path()));
+  Target target =
+      resolve_target(rule, config->get_rewritten_path(request->get_method(),
+                                                      request->get_path()));
   std::cout << "CONFIG FIND ROUTE GET PATH: " << std::endl;
 
   response.mime_type =

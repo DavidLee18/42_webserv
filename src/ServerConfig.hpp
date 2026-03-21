@@ -5,7 +5,8 @@
 
 /**
  * @typedef Server_CGI
- * @brief server 단위 CGI 항목과 그에 대응하는 메타변수 정보를 저장하는 중첩 map 타입
+ * @brief server 단위 CGI 항목과 그에 대응하는 메타변수 정보를 저장하는 중첩 map
+ * 타입
  *
  * 바깥 map은 CGI 항목을 구분하는 키를 사용하고,
  * 내부 map은 메타변수 이름을 키로, 그 값을 값으로 저장한다.
@@ -212,7 +213,8 @@ private:
    */
   bool is_valid_server_response_time(const std::string &line);
   /**
-   * @brief 검증된 server response time 문자열에서 숫자 값을 추출하여 server_response_time에 저장하는 함수
+   * @brief 검증된 server response time 문자열에서 숫자 값을 추출하여
+   * server_response_time에 저장하는 함수
    * @param line 파싱할 문자열
    *
    * 입력 문자열은 is_valid_server_response_time(const std::string &line) 함수로
@@ -235,7 +237,8 @@ private:
    */
   std::vector<std::string> get_pattern_candidates(const std::string &line);
   /**
-   * @brief 기존 경로 조합의 특정 위치에 패턴 후보들을 적용하여 모든 조합을 생성하는 함수
+   * @brief 기존 경로 조합의 특정 위치에 패턴 후보들을 적용하여 모든 조합을
+   * 생성하는 함수
    * @param paths 기존 경로 조합 목록
    * @param pattern 적용할 후보 문자열 목록
    * @param index 치환할 경로 요소의 위치
@@ -244,19 +247,21 @@ private:
    * 원래 경로 요소의 prefix와 suffix는 유지하고,
    * 가운데 패턴 후보 부분만 교체하여 새 경로들을 생성한다.
    */
-  std::vector<std::vector<std::string> > expand_paths_with_pattern(
-      const std::vector<std::vector<std::string> > &paths,
-      const std::vector<std::string> &pattern,
-      std::size_t index);
+  std::vector<std::vector<std::string> >
+  expand_paths_with_pattern(const std::vector<std::vector<std::string> > &paths,
+                            const std::vector<std::string> &pattern,
+                            std::size_t index);
   /**
-   * @brief 경로 패턴 문자열을 분해하고 패턴 요소를 확장하여 경로 조합 목록으로 반환하는 함수
+   * @brief 경로 패턴 문자열을 분해하고 패턴 요소를 확장하여 경로 조합 목록으로
+   * 반환하는 함수
    * @param line 확장할 경로 패턴 문자열
    * @return 확장된 경로 조합 목록
    *
    * 경로는 '/'를 기준으로 분리되며,
    * 패턴 요소가 포함된 경우 가능한 모든 조합으로 확장된다.
    */
-  std::vector<std::vector<std::string> > expand_path_pattern(const std::string &line);
+  std::vector<std::vector<std::string> >
+  expand_path_pattern(const std::string &line);
   /**
    * @brief URL 패턴 문자열에서 경로 요소별 '*' 사용 규칙을 검사하는 함수
    * @param url 검사할 URL 패턴 문자열
@@ -309,7 +314,8 @@ private:
    *
    * path에 포함된 와일드카드가 root에서도 대응되는 위치를 가져야 한다.
    */
-  bool has_compatible_wildcards(const PathPattern &path, const PathPattern &root);
+  bool has_compatible_wildcards(const PathPattern &path,
+                                const PathPattern &root);
   /**
    * @brief RouteRule 블록을 파싱하여 규칙 정보를 저장하는 함수
    * @param method_line RouteRule 블록의 시작 줄
@@ -320,10 +326,12 @@ private:
    * 들여쓰기 2단계의 하위 줄들을 읽어 각 규칙 항목을 파싱한다.
    * 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
    */
-  bool parse_route_rule_block(const std::string &method_line, FileDescriptor &fd);
+  bool parse_route_rule_block(const std::string &method_line,
+                              FileDescriptor &fd);
   /**
    * @brief RouteRule 시작 줄 정보를 바탕으로 route 규칙들을 생성하는 함수
-   * @param data "<Method> <URL> <Operator> <URL>" 형식의 RouteRule 시작 줄을 공백 기준으로 분리한 문자열 목록
+   * @param data "<Method> <URL> <Operator> <URL>" 형식의 RouteRule 시작 줄을
+   * 공백 기준으로 분리한 문자열 목록
    * @param mets 적용할 HTTP 메서드 목록
    * @return 생성에 성공하면 true, 실패하면 false
    *
@@ -331,9 +339,10 @@ private:
    * 연산자 종류에 따라 root 또는 redirect_target을 설정한다.
    */
   bool create_route_rules(const std::vector<std::string> &data,
-      const std::vector<Request::Method> &mets);
+                          const std::vector<Request::Method> &mets);
   /**
-   * @brief RouteRule 하위 설정 항목을 파싱하여 해당 메서드와 경로의 routes에 적용하는 함수
+   * @brief RouteRule 하위 설정 항목을 파싱하여 해당 메서드와 경로의 routes에
+   * 적용하는 함수
    * @param mets 규칙이 적용될 HTTP 메서드 목록
    * @param key_data 규칙이 적용될 경로 패턴 문자열
    * @param line 파싱할 하위 규칙 문자열
@@ -342,32 +351,68 @@ private:
    * 동일한 메서드와 경로를 가진 RouteRule이 이미 존재하면 해당 객체를 갱신하고,
    * 존재하지 않으면 새 RouteRule을 생성한 뒤 규칙을 적용한다.
    */
-  bool apply_route_rule_entry(const std::vector<Request::Method> &mets, const std::string &key_data,
-      const std::string &line);
+  bool apply_route_rule_entry(const std::vector<Request::Method> &mets,
+                              const std::string &key_data,
+                              const std::string &line);
   /**
    * @brief 연산자 문자열을 RuleOperator 열거형 값으로 변환하는 함수
    * @param indicator 변환할 연산자 문자열
    * @return 변환된 RuleOperator 값, 유효하지 않으면 UNDEFINED
    */
   RuleOperator parse_rule_operator(const std::string &indicator);
-  std::string rewrite_to(std::string from, PathPattern path,
-                         PathPattern to) const;
+  /**
+   * @brief 요청 경로를 대상 패턴에 맞게 재작성한다.
+   * @param request_path 실제 요청 경로
+   * @param from_pattern wildcard 추출 기준이 되는 원본 패턴
+   * @param to_pattern wildcard를 치환할 대상 패턴
+   * @return 재작성된 경로 문자열
+   *
+   * request_path에서 from_pattern의 wildcard 위치에 대응하는 경로 조각을 추출한
+   * 뒤, 이를 to_pattern의 wildcard 위치에 순서대로 치환하여 최종 경로를
+   * 생성한다. 이 함수는 route 매칭과 config 유효성 검사가 이미 끝난 상태라고
+   * 가정한다.
+   */
+  std::string rewrite_path(const std::string &request_path,
+                           const PathPattern &from_pattern,
+                           const PathPattern &to_pattern) const;
 
 public:
   ServerConfig(FileDescriptor &);
   ServerConfig()
       : header(), server_response_time(-1), routes(), err_line(), end_flag(0) {}
+  /**
+   * @brief Request method와 path에 일치하는 route를 찾는다.
+   * @param method 요청 HTTP 메서드
+   * @param path 요청 경로
+   * @return 일치하는 RouteRule의 포인터, 없으면 NULL
+   *
+   * 등록된 route 목록을 순회하면서, 전달된 HTTP method와 path에
+   * 모두 일치하는 첫 번째 route를 반환한다.
+   */
+  RouteRule const *find_route(Request::Method method,
+                              const std::string &path) const;
+  /**
+   * @brief method와 path에 해당하는 rewrite 결과 경로를 반환한다.
+   * @param method 요청 HTTP 메서드
+   * @param path 요청 경로
+   * @return 재작성된 대상 경로, 일치하는 route가 없으면 빈 문자열
+   *
+   * 먼저 method와 path에 일치하는 route를 찾고, 해당 route의 패턴 정보로
+   * 요청 경로를 대상 경로로 재작성한다.
+   */
+  std::string get_rewritten_path(Request::Method method,
+                                 const std::string &path) const;
+
   const std::map<std::string, std::string> &get_header(void) const {
     return header;
   }
-  int get_server_response_time(void) const { return (server_response_time); }
-  const std::vector<RouteRule> &get_routes(void) const { return routes; }
-  RouteRule const *find_route(Request::Method method,
-                              const std::string &path) const;
-  std::string get_to(Request::Method method, const std::string &path) const;
   const std::string &geterr_line(void) const { return err_line; }
-  std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
-  Server_CGI get_serve_cgi() const { return S_CGI; }
+  const std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
+  const Server_CGI get_serve_cgi() const { return S_CGI; }
+  const std::vector<RouteRule> &get_routes(void) const { return routes; }
+  const int get_server_response_time(void) const {
+    return server_response_time;
+  }
 };
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data);
