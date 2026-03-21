@@ -4,13 +4,13 @@ ServerConfig::ServerConfig(FileDescriptor &file) {
   err_line = "";
   server_response_time = 3;
   end_flag = 0;
-  if (!set_ServerConfig(file)) {
+  if (!parse_server_block(file)) {
     return;
   }
   return;
 }
 
-bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
+bool ServerConfig::parse_server_block(FileDescriptor &fd) {
   std::string line;
 
   while (true) {
@@ -49,10 +49,10 @@ bool ServerConfig::set_ServerConfig(FileDescriptor &fd) {
           return false;
         }
         S_CGI[key] = temp;
-      } else if (is_server_response_time(line))
+      } else if (is_valid_server_response_time(line))
         parse_server_response_time(line);
-      else if (is_RouteRule(line)) {
-        if (!parse_RouteRule(line, fd)) {
+      else if (matches_route_rule_syntax(line)) {
+        if (!parse_route_rule_block(line, fd)) {
           err_line = "RouteRule syntax Error: " + err_line;
           return false;
         }
@@ -89,7 +89,8 @@ bool ServerConfig::is_header_block(const std::string &line) {
   return true;
 }
 
-bool ServerConfig::parse_header_entry(FileDescriptor &fd, const std::string &line) {
+bool ServerConfig::parse_header_entry(FileDescriptor &fd,
+                                      const std::string &line) {
   std::string temp(line);
   std::vector<std::string> key_value = utils::string_split(temp, ":");
 
@@ -98,7 +99,7 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd, const std::string &lin
     return false;
   std::string key = utils::string_split(key_value[0], " ")[2];
   std::string value = utils::trim_whitespace(key_value[1]);
-  while (temp[temp.length() - 1] == ';') {
+  while (!temp.empty() && temp[temp.length() - 1] == ';') {
     Result<std::string> fd_line = fd.read_file_line();
     if (fd_line.error() != "") {
       err_line = "FileDescriptor Error: " + fd_line.error();
@@ -108,24 +109,20 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd, const std::string &lin
       break;
     }
     temp = utils::remove_char(fd_line.value(), '\n');
-    if (!utils::match_indent_level(temp, 2) || 
-      temp[temp.length() - 1] == ' ' || temp[temp.length() - 1] == '\t') {
+    if (!utils::match_indent_level(temp, 2) || temp[temp.length() - 1] == ' ' ||
+        temp[temp.length() - 1] == '\t') {
       err_line = "Error: \"" + temp + "\" Indentation or space error";
       return false;
     }
     value += " " + utils::trim_whitespace(temp);
   }
   err_line = "";
-  header[key] =  utils::remove_char(value, ';');
+  header[key] = utils::remove_char(value, ';');
   return true;
 }
 
 // server_response_time method
-bool ServerConfig::is_server_response_time(std::string &line) {
-  if (line.empty() || line[line.length() - 1] == ' ' ||
-      line[line.length() - 1] == '\t')
-    return (false);
-  line = utils::trim_whitespace(line);
+bool ServerConfig::is_valid_server_response_time(const std::string &line) {
   if (line.length() < 4 || line[0] != '.' || line[1] != '.' || line[2] != '.')
     return (false);
   int data = 0;
@@ -141,15 +138,14 @@ bool ServerConfig::is_server_response_time(std::string &line) {
 
 void ServerConfig::parse_server_response_time(std::string line) {
   line.erase(0, 3);
-  std::stringstream oss;
-  oss << line;
-  oss >> server_response_time;
+  std::stringstream ss;
+  ss << line;
+  ss >> server_response_time;
 }
 
 // RouteRule method
-
-static bool is_pattern(std::string line) {
-  size_t pos = line.find("*.");
+bool ServerConfig::is_path_pattern_segment(const std::string &line) {
+  std::size_t pos = line.find("*.");
   if (pos == std::string::npos)
     return false;
   pos = pos + 2;
@@ -162,14 +158,14 @@ static bool is_pattern(std::string line) {
   if (inside.empty())
     return false;
 
-  size_t count = 0;
-  size_t start = 0;
+  std::size_t count = 0;
+  std::size_t start = 0;
   while (1) {
-    size_t pipePos = inside.find('|', start);
+    std::size_t pipePos = inside.find('|', start);
     std::string ext = inside.substr(start, pipePos - start);
     if (ext.empty())
       return false;
-    for (size_t i = 0; i < ext.size(); ++i) {
+    for (std::size_t i = 0; i < ext.size(); ++i) {
       if (!std::isalnum(static_cast<unsigned char>(ext[i])))
         return false;
     }
@@ -181,7 +177,7 @@ static bool is_pattern(std::string line) {
   return count >= 2;
 }
 
-static std::vector<std::string> get_pattern(std::string line) {
+std::vector<std::string> ServerConfig::get_pattern_candidates(const std::string &line) {
   std::vector<std::string> temp = utils::string_split(line, "*");
   std::string pattern = temp[temp.size() - 1];
   size_t l = pattern.find('(');
@@ -190,30 +186,27 @@ static std::vector<std::string> get_pattern(std::string line) {
   if (l != std::string::npos && r != std::string::npos && r > l)
     pattern = pattern.substr(l + 1, r - l - 1);
   temp = utils::string_split(pattern, "|");
-  // for (size_t i = 0; i < temp.size(); ++i)
-  // {
-  //   std::cout << temp[i] << std::endl;
-  // }
   return (temp);
 }
 
-static std::vector<std::vector<std::string> >
-make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
-                            std::vector<std::string> pattern, size_t index) {
+std::vector<std::vector<std::string> >
+ServerConfig::expand_paths_with_pattern(
+    const std::vector<std::vector<std::string> > &paths,
+    const std::vector<std::string> &pattern, std::size_t index) {
   std::vector<std::vector<std::string> > new_paths;
   std::string seg = paths[0][index];
   std::string prefix = "";
   std::string suffix = "";
 
   new_paths.reserve(paths.size() * pattern.size());
-  size_t pos = seg.find('(');
+  std::size_t pos = seg.find('(');
   prefix = seg.substr(0, pos);
   pos = seg.find(')', pos + 1);
   if (pos != std::string::npos && pos + 1 < seg.size())
     suffix = seg.substr(pos + 1);
 
-  for (size_t i = 0; i < paths.size(); ++i) {
-    for (size_t j = 0; j < pattern.size(); ++j) {
+  for (std::size_t i = 0; i < paths.size(); ++i) {
+    for (std::size_t j = 0; j < pattern.size(); ++j) {
       std::vector<std::string> new_path = paths[i];
       new_path[index] = prefix + pattern[j] + suffix;
       new_paths.push_back(new_path);
@@ -222,49 +215,49 @@ make_paths_from_url_pattern(std::vector<std::vector<std::string> > paths,
   return (new_paths);
 }
 
-static std::vector<std::vector<std::string> >
-expand_url_pattern(std::string line) {
+std::vector<std::vector<std::string> >
+ServerConfig::expand_path_pattern(const std::string &line) {
   std::vector<std::string> path(utils::string_split(line, "/"));
   std::vector<std::vector<std::string> > paths;
 
   paths.push_back(path);
-  for (size_t i = 0; i < path.size(); ++i) {
-    if (is_pattern(path[i])) {
-      std::vector<std::string> pattern = get_pattern(path[i]);
-      paths = make_paths_from_url_pattern(paths, pattern, i);
+  for (std::size_t i = 0; i < path.size(); ++i) {
+    if (is_path_pattern_segment(path[i])) {
+      std::vector<std::string> pattern = get_pattern_candidates(path[i]);
+      paths = expand_paths_with_pattern(paths, pattern, i);
     } else
       continue;
   }
   return (paths);
 }
 
-static bool is_url(std::string url) {
+bool ServerConfig::has_valid_wildcard_usage(const std::string &url) {
   size_t i = 0;
-  int flag = 0;
+  int count = 0;
 
   for (; i < url.size(); ++i) {
     if (url[i] == '*')
-      flag += 1;
+      count += 1;
     else if (url[i] == '/')
-      flag = 0;
-    if (flag > 1)
-      return (false);
+      count = 0;
+    if (count > 1)
+      return false;
   }
-  return (true);
+  return true;
 }
 
-bool ServerConfig::is_RouteRule(std::string line) {
+bool ServerConfig::matches_route_rule_syntax(const std::string &line) {
   if (line.empty())
     return (false);
   if (std::isspace(static_cast<unsigned char>(line[line.size() - 1])))
     return (false);
   std::vector<std::string> split = utils::string_split(line, " ");
-  if (split.size() != 4 || parse_RuleOperator(split[2]) == UNDEFINED ||
-      !is_url(split[1]) || !is_url(split[3])) // 크기 확인, op확인
+  if (split.size() != 4 || parse_rule_operator(split[2]) == UNDEFINED ||
+      !has_valid_wildcard_usage(split[1]) || !has_valid_wildcard_usage(split[3]))
     return (false);
 
   std::vector<std::string> method = utils::string_split(split[0], "|");
-  for (size_t i = 0; i < method.size(); ++i) {
+  for (std::size_t i = 0; i < method.size(); ++i) {
     if (method[i] == "GET")
       continue;
     else if (method[i] == "POST")
@@ -277,7 +270,7 @@ bool ServerConfig::is_RouteRule(std::string line) {
   return (true);
 }
 
-static int max_body_KB_parse(std::string line) {
+int ServerConfig::parse_max_body_size(std::string line) {
   size_t i = 0;
   int maxbody = 0;
   for (; i < line.size(); ++i) {
@@ -285,7 +278,7 @@ static int max_body_KB_parse(std::string line) {
       break;
     maxbody = maxbody * 10 + (line[i] - '0');
   }
-  if (i <= 0)
+  if (i == 0)
     return (-1);
   line = line.substr(i);
   if (line.empty() || line == "KB" || line == "KiB")
@@ -297,7 +290,7 @@ static int max_body_KB_parse(std::string line) {
   return (-1);
 }
 
-static std::string index_parse(std::string line) {
+std::string ServerConfig::get_valid_index_file(const std::string &line) {
   size_t i = 0;
   for (; i < line.size(); ++i) {
     if (line[i] == '.')
@@ -312,13 +305,13 @@ static std::string index_parse(std::string line) {
     return ("");
 }
 
-static int errPage_parse(std::string &line) {
+int ServerConfig::parse_error_page_entry(std::string &line) {
   int key = 0;
   std::vector<std::string> key_and_value = utils::string_split(line, ":");
 
   if (key_and_value.size() != 2)
     return (0);
-  for (size_t i = 0; i < key_and_value[0].size(); ++i) {
+  for (std::size_t i = 0; i < key_and_value[0].size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(key_and_value[0][i])))
       return (0);
     key = key * 10 + (key_and_value[0][i] - '0');
@@ -327,30 +320,30 @@ static int errPage_parse(std::string &line) {
   return (key);
 }
 
-bool ServerConfig::parse_rule(std::vector<Request::Method> mets,
-                              std::string key_data, std::string line) {
+bool ServerConfig::apply_route_rule_entry(const std::vector<Request::Method> &mets,
+                              const std::string &key_data, const std::string &line) {
   if (line.empty())
-    return (false);
+    return false;
   if (std::isspace(static_cast<unsigned char>(line[line.size() - 1])))
-    return (false);
+    return false;
 
   std::vector<std::string> rule =
       utils::string_split(utils::trim_whitespace(line), " ");
-  size_t size = rule.size();
+  std::size_t size = rule.size();
   PathPattern key(key_data);
 
   if (size < 2)
-    return (false);
+    return false;
 
   // Find or create routes for each method with this path pattern
-  for (size_t i = 0; i < mets.size(); ++i) {
-    size_t targetRouteIndex =
+  for (std::size_t i = 0; i < mets.size(); ++i) {
+    std::size_t targetRouteIndex =
         routes.size(); // Will be set to existing route index or stay as size
                        // (indicating new route)
 
     // Find existing route with matching method and path (exact match for
     // updating properties)
-    for (size_t j = 0; j < routes.size(); ++j) {
+    for (std::size_t j = 0; j < routes.size(); ++j) {
       // For updating route properties, we need exact path match, not wildcard
       // match
       if (routes[j].method == mets[i]) {
@@ -359,7 +352,7 @@ bool ServerConfig::parse_rule(std::vector<Request::Method> mets,
         const std::vector<std::string> &keyPath = key.get_path();
         if (routePath.size() == keyPath.size()) {
           bool exactMatch = true;
-          for (size_t k = 0; k < routePath.size(); ++k) {
+          for (std::size_t k = 0; k < routePath.size(); ++k) {
             if (routePath[k] != keyPath[k]) {
               exactMatch = false;
               break;
@@ -388,33 +381,33 @@ bool ServerConfig::parse_rule(std::vector<Request::Method> mets,
     // Update the route based on rule type (using index to avoid pointer
     // invalidation)
     if (rule[0] == "?") {
-      std::string index = index_parse(rule[1]);
+      std::string index = get_valid_index_file(rule[1]);
       if (size != 2 || index == "")
-        return (false);
+        return false;
       routes[targetRouteIndex].index = index;
     } else if (rule[0] == "@") {
       if (size != 2)
-        return (false);
+        return false;
       routes[targetRouteIndex].auth_info = rule[1];
     } else if (rule[0] == "->{}") {
-      int max = max_body_KB_parse(rule[1]);
+      int max = parse_max_body_size(rule[1]);
       if (max == -1 || size != 2)
-        return (false);
+        return false;
       routes[targetRouteIndex].max_body_KB = max;
     } else if (rule[0] == "!") {
       std::string errPageLine = rule[1]; // Make a copy to avoid modification
-      int err_key = errPage_parse(errPageLine);
+      int err_key = parse_error_page_entry(errPageLine);
       if (err_key == 0 || size != 2)
-        return (false);
+        return false;
       routes[targetRouteIndex].error_pages[err_key] = errPageLine;
     } else
-      return (false);
+      return false;
   }
 
-  return (true);
+  return true;
 }
 
-RuleOperator ServerConfig::parse_RuleOperator(std::string indicator) {
+RuleOperator ServerConfig::parse_rule_operator(const std::string &indicator) {
   if (indicator == "<-")
     return (SERVEFROM);
   else if (indicator == "->")
@@ -439,7 +432,7 @@ RuleOperator ServerConfig::parse_RuleOperator(std::string indicator) {
     return (UNDEFINED);
 }
 
-bool ServerConfig::is_matching(PathPattern path, PathPattern root) {
+bool ServerConfig::has_compatible_wildcards(const PathPattern &path, const PathPattern &root) {
   std::vector<std::string> path_pattern = path.get_path();
   std::vector<std::string> root_pattern = root.get_path();
 
@@ -465,24 +458,24 @@ bool ServerConfig::is_matching(PathPattern path, PathPattern root) {
   return true;
 }
 
-bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
-                                    std::vector<Request::Method> mets) {
+bool ServerConfig::create_route_rules(const std::vector<std::string> &data,
+                                    const std::vector<Request::Method> &mets) {
   RouteRule route;
   std::vector<std::vector<std::string> > path_url;
   std::vector<std::vector<std::string> > root_url;
 
   if (data.size() != 4)
     return (false);
+  path_url = expand_path_pattern(data[1]);
+  root_url = expand_path_pattern(data[3]);
   for (size_t i = 0; i < mets.size(); ++i) {
     route.method = mets[i];
-    route.op = parse_RuleOperator(data[2]);
+    route.op = parse_rule_operator(data[2]);
     if (route.op == UNDEFINED)
       return (false);
     route.index = "";
     route.auth_info = "";
     route.max_body_KB = 1;
-    path_url = expand_url_pattern(data[1]);
-    root_url = expand_url_pattern(data[3]);
     if (path_url.size() < 1 || root_url.size() < 1 ||
         path_url.size() != root_url.size())
       return (false);
@@ -490,7 +483,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
     for (size_t j = 0; j < path_url.size(); ++j) {
       route.path = path_url[j];
       route.root = root_url[j];
-      if (!is_matching(route.path, route.root))
+      if (!has_compatible_wildcards(route.path, route.root))
         return (false);
       if (route.op == REDIRECT)
         route.redirect_target = root_url[j];
@@ -504,7 +497,7 @@ bool ServerConfig::parse_Httpmethod(std::vector<std::string> data,
   return (true);
 }
 
-bool ServerConfig::parse_RouteRule(std::string method_line,
+bool ServerConfig::parse_route_rule_block(const std::string &method_line,
                                    FileDescriptor &fd) {
   std::string line;
   std::vector<Request::Method> mets;
@@ -514,7 +507,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
       utils::string_split(method_line_data[0], "|");
 
   err_line = method_line;
-  for (size_t i = 0; i < method.size(); ++i) {
+  for (std::size_t i = 0; i < method.size(); ++i) {
     if (method[i] == "GET")
       mets.push_back(Request::GET);
     else if (method[i] == "POST")
@@ -525,7 +518,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
       return (false);
   }
 
-  if (!parse_Httpmethod(method_line_data, mets))
+  if (!create_route_rules(method_line_data, mets))
     return (false);
 
   while (true) {
@@ -542,7 +535,7 @@ bool ServerConfig::parse_RouteRule(std::string method_line,
     err_line = line;
     if (utils::match_indent_level(line, 2) == false)
       return (false);
-    else if (parse_rule(mets, method_line_data[1], line))
+    else if (apply_route_rule_entry(mets, method_line_data[1], line))
       continue;
     else
       return (false);
@@ -605,7 +598,8 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   std::map<std::string, std::string>::const_iterator header_it;
   os << "\n\n\n<<Header>>";
   for (header_it = header.begin(); header_it != header.end(); ++header_it) {
-    os << "\n\tkey: " << header_it->first << ", value: " << header_it->second << std::endl;
+    os << "\n\tkey: " << header_it->first << ", value: " << header_it->second
+       << std::endl;
   }
 
   os << "\n\n\n<<Server CGI>>";

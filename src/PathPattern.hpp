@@ -36,7 +36,7 @@ public:
   PathPattern(const std::string &pathStr)
       : path(utils::string_split(pathStr, "/")) {}
   PathPattern(std::vector<std::string> path) : path(path) {}
-  PathPattern(const PathPattern& other) : path(other.path) {}
+  PathPattern(const PathPattern &other) : path(other.path) {}
 
   void add_path(std::string data) {
     path.push_back(data);

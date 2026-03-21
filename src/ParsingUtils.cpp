@@ -17,7 +17,7 @@ int utils::count_occurrences(const std::string &line,
 }
 
 bool utils::has_invalid_char(const std::string &line,
-                            const std::string &allowed) {
+                             const std::string &allowed) {
 
   for (std::size_t i = 0; i < line.size(); ++i) {
     unsigned char c = static_cast<unsigned char>(line[i]);

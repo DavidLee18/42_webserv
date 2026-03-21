@@ -3,8 +3,8 @@
 
 #include "ParsingUtils.hpp"
 #include "PathPattern.hpp"
-#include "result.h"
 #include "file_descriptor.h"
+#include "result.h"
 #include <iostream>
 #include <map>
 
@@ -47,7 +47,7 @@ private:
   /**
    * @var err
    * @brief CGI 규칙 파싱 또는 처리 중 발생한 오류 정보를 저장하는 멤버 변수
-   * 
+   *
    * 정상적으로 파싱이 성공했을 시 빈 문자열을 가지고 있다.
    */
   std::string err;
@@ -71,20 +71,23 @@ private:
    */
   double parse_timeout_value(std::string &line);
   /**
-   * @brief CGI 설정 블록을 파싱하여 실행 파일, 환경 변수, timeout 정보를 저장하는 함수
+   * @brief CGI 설정 블록을 파싱하여 실행 파일, 환경 변수, timeout 정보를
+   * 저장하는 함수
    * @param fd 설정 파일을 읽기 위한 FileDescriptor
    * @param line CGI 설정 블록의 첫 줄
    * @return 성공하면 빈 문자열, 실패하면 오류 메시지
    *
    * 첫 줄에서는 실행 파일 경로와 선택적인 환경 변수 정보를 파싱한다.
-   * 이후 들여쓰기 2단계의 하위 줄에서 timeout 또는 추가 환경 변수 정보를 읽는다.
+   * 이후 들여쓰기 2단계의 하위 줄에서 timeout 또는 추가 환경 변수 정보를
+   * 읽는다.
    */
   std::string parse_cgi_block(FileDescriptor &fd, std::string line);
-  
-  public:
+
+public:
   RouteRule_CGI() : executable(""), env(), timeout(-1), err("No parse"){};
   /**
-   * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는 생성자
+   * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
+   * 생성자
    * @param fd 설정 파일을 읽기 위한 FileDescriptor
    * @param line CGI 규칙의 첫 줄
    *
@@ -92,12 +95,12 @@ private:
    * 실행 파일, 환경 변수, timeout 정보를 초기화한다.
    */
   RouteRule_CGI(FileDescriptor &fd, const std::string &line);
-  
+
   const std::string get_err() const { return err; }
   const std::string get_executable() const { return executable; }
   const std::map<std::string, std::string> get_env() const { return env; }
   double get_timeout() const { return timeout; }
-  
+
   /**
    * @brief 문자열이 환경 변수 이름 문법에 맞는지 검사하는 함수
    * @param key 검사할 문자열
@@ -155,30 +158,36 @@ private:
    * key는 유효한 환경 변수 이름이어야 하고 중복될 수 없다.
    */
   static std::string parse_env_entry(const std::string &line,
-                        std::map<std::string, std::string> &env);
+                                     std::map<std::string, std::string> &env);
   /**
-   * @brief CGI 실행 문자열에서 실행 파일 경로와 선택적인 환경 변수 정보를 추출하는 함수
+   * @brief CGI 실행 문자열에서 실행 파일 경로와 선택적인 환경 변수 정보를
+   * 추출하는 함수
    * @param line 파싱할 문자열
    * @param executable 파싱한 실행 파일 경로를 저장할 변수
    * @param env 파싱한 환경 변수 정보를 저장할 변수
    * @return 성공하면 빈 문자열, 실패하면 오류 메시지
    *
    * 입력 문자열은 is_valid_cgi_config(const std::string &line) 또는
-   * matches_cgi_syntax(const std::string &line) 함수로 유효성이 확인된 상태여야 한다.
+   * matches_cgi_syntax(const std::string &line) 함수로 유효성이 확인된 상태여야
+   * 한다.
    */
-  static std::string parse_executable(const std::string &line, std::string &executable,
-                              std::map<std::string, std::string> &env);
+  static std::string parse_executable(const std::string &line,
+                                      std::string &executable,
+                                      std::map<std::string, std::string> &env);
   /**
-   * @brief uwsgi 설정 블록을 파싱하여 포트 번호를 키로, 실행 파일 경로를 값으로 저장하는 함수
+   * @brief uwsgi 설정 블록을 파싱하여 포트 번호를 키로, 실행 파일 경로를 값으로
+   * 저장하는 함수
    * @param fd 설정 파일을 읽기 위한 FileDescriptor
    * @param uwsgi 파싱한 uwsgi 설정 정보를 저장할 변수
    * @return 성공하면 빈 문자열, 실패하면 오류 메시지
    *
    * 빈 줄 또는 파일 끝을 만나면 파싱을 종료한다.
-   * 각 항목은 유효한 uwsgi 설정 형식을 따라야 하며, 실행 파일은 .py 확장자를 가져야 한다.
+   * 각 항목은 유효한 uwsgi 설정 형식을 따라야 하며, 실행 파일은 .py 확장자를
+   * 가져야 한다.
    */
-  static std::string parse_uwsgi_block(FileDescriptor &fd,
-                               std::map<std::string, std::string> &uwsgi);
+  static std::string
+  parse_uwsgi_block(FileDescriptor &fd,
+                    std::map<std::string, std::string> &uwsgi);
 };
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data);

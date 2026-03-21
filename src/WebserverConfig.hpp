@@ -21,7 +21,7 @@ private:
   /**
    * @var err_meg
    * @brief 파싱 중 발생한 오류 메시지를 저장하는 멤버 변수
-   * 
+   *
    * 정상적으로 파싱이 성공했을 시 빈 문자열을 가지고 있다.
    */
   std::string err_meg;
@@ -65,7 +65,8 @@ private:
    */
   bool file_parsing(FileDescriptor &file);
   /**
-   * @brief types 블록을 파싱하여 확장자별 MIME type과 기본 MIME type을 저장하는 함수
+   * @brief types 블록을 파싱하여 확장자별 MIME type과 기본 MIME type을 저장하는
+   * 함수
    * @param file 파싱할 설정 파일
    * @return 파싱에 성공하면 true, 실패하면 false
    *
@@ -85,8 +86,8 @@ private:
    * 함수 자체는 인스턴스에 의존하지 않으나, 내부 인스턴스 함수들의 의존한다.
    */
   bool parse_type_mapping(const std::string &line,
-                       std::vector<std::string> &keys_out,
-                       std::string &value_out);
+                          std::vector<std::string> &keys_out,
+                          std::string &value_out);
   /**
    * @brief type 키 문자열의 문법을 검사하고 확장자 목록으로 분리하는 함수
    * @param key 파싱할 키 문자열
@@ -109,12 +110,14 @@ private:
    * @param line 검사할 문자열
    * @return server 블록 시작 줄 형식이면 true, 그렇지 않으면 false
    *
-   * 문자열은 ':'로 시작해야 하며, 그 뒤에는 하나 이상의 숫자로 이루어진 포트 번호가 와야 한다.
-   * 포트 번호 뒤에는 선택적으로 하나의 공백이 올 수 있고, 마지막에는 '='가 와야 한다.
+   * 문자열은 ':'로 시작해야 하며, 그 뒤에는 하나 이상의 숫자로 이루어진 포트
+   * 번호가 와야 한다. 포트 번호 뒤에는 선택적으로 하나의 공백이 올 수 있고,
+   * 마지막에는 '='가 와야 한다.
    */
   static bool is_server_config_header(const std::string &line);
   /**
-   * @brief server 블록 시작 줄에서 포트 번호를 추출하고 ServerConfig 객체를 생성하여 저장하는 함수
+   * @brief server 블록 시작 줄에서 포트 번호를 추출하고 ServerConfig 객체를
+   * 생성하여 저장하는 함수
    * @param file 파싱할 설정 파일
    * @param line server 블록의 시작 줄
    * @return 저장에 성공하면 true, 실패하면 false
@@ -133,8 +136,8 @@ private:
   static unsigned int parse_server_port(const std::string &line);
 
   WebserverConfig(FileDescriptor &file);
-public:
 
+public:
   WebserverConfig &operator=(const WebserverConfig &other) {
     if (this != &other) {
       this->default_mime = other.default_mime;
@@ -157,7 +160,8 @@ public:
     return serverconfig_map;
   }
   /**
-   * @brief 설정 파일을 파싱한 결과를 Result<WebserverConfig> 형태로 반환하는 함수
+   * @brief 설정 파일을 파싱한 결과를 Result<WebserverConfig> 형태로 반환하는
+   * 함수
    * @param file 파싱할 설정 파일
    * @return 파싱이 성공하면 객체를, 실패하면 오류 메시지를 담은 Result
    *

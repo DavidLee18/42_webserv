@@ -48,7 +48,8 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
 }
 
 // type_map method
-std::vector<std::string> WebserverConfig::parse_type_keys(const std::string &key) {
+std::vector<std::string>
+WebserverConfig::parse_type_keys(const std::string &key) {
   int number_of_key = 0;
   std::string temp = utils::trim_whitespace(key);
   std::vector<std::string> key_data;
@@ -103,14 +104,15 @@ bool WebserverConfig::is_valid_mime_type(const std::string &value) {
 }
 
 bool WebserverConfig::parse_type_mapping(const std::string &line,
-                                      std::vector<std::string> &keys_out,
-                                      std::string &value_out) {
+                                         std::vector<std::string> &keys_out,
+                                         std::string &value_out) {
   if (utils::count_occurrences(line, "->") != 1)
     return (false);
   std::vector<std::string> type_data = utils::string_split(line, "->");
   if (type_data.size() != 2)
     return (false);
-  std::vector<std::string> keys = WebserverConfig::parse_type_keys(type_data[0]);
+  std::vector<std::string> keys =
+      WebserverConfig::parse_type_keys(type_data[0]);
   if (keys.empty() || !is_valid_mime_type(type_data[1]))
     return (false);
   keys_out = keys;
@@ -133,7 +135,8 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
       break;
     std::string raw = utils::remove_char(temp.value(), '\n');
     if (!utils::match_indent_level(temp.value(), 1) ||
-    (!raw.empty() && (raw[raw.length() - 1] == ' ' || raw[raw.length() - 1] == '\t'))) {
+        (!raw.empty() &&
+         (raw[raw.length() - 1] == ' ' || raw[raw.length() - 1] == '\t'))) {
       err_meg = "Type syntax Error: " +
                 utils::trim_whitespace(utils::remove_char(temp.value(), '\n'));
       return (false);
@@ -146,10 +149,10 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
     for (std::size_t i = 0; i < keys.size(); ++i) {
       const std::string &k = keys[i];
       if (k == "_") {
-      if (!default_mime.empty()) {
-        err_meg = "Type syntax Error: duplicate default MIME type";
-        return false;
-      }  
+        if (!default_mime.empty()) {
+          err_meg = "Type syntax Error: duplicate default MIME type";
+          return false;
+        }
         default_mime = value;
         continue;
       }
@@ -183,7 +186,7 @@ bool WebserverConfig::is_server_config_header(const std::string &line) {
 }
 
 bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
-                                           const std::string &line) {
+                                                const std::string &line) {
   unsigned int key;
   std::string temp(line);
   ServerConfig config(file);

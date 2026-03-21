@@ -5,7 +5,7 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line) {
   timeout = 3;
 
   std::vector<std::string> temp = utils::string_split(line, " ");
-  
+
   if (temp.size() != 3) {
     err = "Error: Invalid CGI config syntax";
     return;
@@ -20,11 +20,13 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line) {
   err = parse_cgi_block(fd, temp[2]);
 }
 
-std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd, std::string line) {
+std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
+                                           std::string line) {
   std::string err_msg = "";
   std::string file_line = utils::remove_char(line, '$');
 
-  err_msg = RouteRule_CGI::parse_executable(file_line, this->executable, this->env);
+  err_msg =
+      RouteRule_CGI::parse_executable(file_line, this->executable, this->env);
   if (err_msg != "")
     return err_msg;
   while (true) {
@@ -79,8 +81,7 @@ bool RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
       return false;
 
     i = exec_end;
-  }
-  else {
+  } else {
     std::size_t start = i;
 
     while (i < line.length() && line[i] != '(') {
@@ -154,8 +155,9 @@ bool RouteRule_CGI::is_valid_env_key(const std::string &key) {
   return true;
 }
 
-std::string RouteRule_CGI::parse_env_entry(const std::string &line,
-                      std::map<std::string, std::string> &env) {
+std::string
+RouteRule_CGI::parse_env_entry(const std::string &line,
+                               std::map<std::string, std::string> &env) {
   std::vector<std::string> key_and_value = utils::string_split(line, "=");
   if (key_and_value.size() != 2)
     return "Error: \"" + line + "\" Invalid environment variable syntax";
@@ -180,8 +182,9 @@ bool RouteRule_CGI::is_valid_uwsgi_config(std::vector<std::string> data) {
   return true;
 }
 
-std::string RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
-                               std::map<std::string, std::string> &uwsgi) {
+std::string
+RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
+                                 std::map<std::string, std::string> &uwsgi) {
   std::vector<std::string> value_and_key;
   std::string line = "";
 
@@ -238,8 +241,10 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
   return (os);
 }
 
-std::string RouteRule_CGI::parse_executable(const std::string &line, std::string &executable,
-                             std::map<std::string, std::string> &map) {
+std::string
+RouteRule_CGI::parse_executable(const std::string &line,
+                                std::string &executable,
+                                std::map<std::string, std::string> &map) {
   std::string err_msg = "";
 
   std::string file_line = utils::remove_char(line, '$');
