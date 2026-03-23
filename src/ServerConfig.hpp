@@ -410,7 +410,7 @@ public:
   const std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
   const Server_CGI get_serve_cgi() const { return S_CGI; }
   const std::vector<RouteRule> &get_routes(void) const { return routes; }
-  const int get_server_response_time(void) const {
+  int get_server_response_time(void) const {
     return server_response_time;
   }
 };
