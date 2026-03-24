@@ -9,8 +9,11 @@ types =
 
 uwsgi =
     /uwsgi/login.py:9000
-    /uwsgi/function2.py:9090
+    /uwsgi/handle_additional_errors.py:9090
 
+!404:/spool/www/error/404.html
+!$handle_errors.cgi
+!$9090
 
 
 :8080 =
