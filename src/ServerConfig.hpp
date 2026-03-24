@@ -8,8 +8,9 @@
  * @brief server 단위 CGI 항목과 그에 대응하는 메타변수 정보를 저장하는 중첩 map
  * 타입
  *
- * 바깥 map은 CGI 항목을 구분하는 키를 사용하고,
- * 내부 map은 메타변수 이름을 키로, 그 값을 값으로 저장한다.
+ * - 바깥 map은 CGI 항목을 구분하는 키를 사용한다.
+ * 
+ * - 내부 map은 메타변수 이름을 키로, 그 값을 값으로 저장한다.
  */
 typedef std::map<std::string, std::map<std::string, std::string> > CGI;
 
@@ -17,7 +18,7 @@ typedef std::map<std::string, std::map<std::string, std::string> > CGI;
  * @enum RuleOperator
  * @brief rewrite 규칙에서 사용되는 연산자 종류를 정의한 열거형
  *
- * 리다이렉트 상태 코드와 경로 변환 규칙을 구분하기 위해 사용한다.
+ * - 리다이렉트 상태 코드와 경로 변환 규칙을 구분하기 위해 사용한다.
  */
 enum RuleOperator {
   /**
@@ -70,7 +71,7 @@ enum RuleOperator {
  * @struct RouteRule
  * @brief 설정 파일에 정의된 경로 처리 규칙과 하위 설정 정보를 저장하는 구조체
  *
- * 상위 규칙에는 요청 메서드, 경로 패턴, 처리 연산자 및 대상 경로가 포함되며,
+ * - 상위 규칙에는 요청 메서드, 경로 패턴, 처리 연산자 및 대상 경로가 포함되며,
  * 하위 설정에는 index, auth, body size, error page 등의 추가 정보가 포함될 수
  * 있다.
  */
@@ -122,7 +123,7 @@ struct RouteRule {
    * @var error_pages
    * @brief HTTP 상태 코드별 오류 페이지 경로를 저장하는 멤버 변수
    *
-   * 상태 코드를 키로 하고, 해당 상태 코드에 대응하는 오류 페이지 경로를 값으로
+   * - 상태 코드를 키로 하고, 해당 상태 코드에 대응하는 오류 페이지 경로를 값으로
    * 저장한다.
    */
   std::map<int, std::string> error_pages;
@@ -132,7 +133,7 @@ struct RouteRule {
  * @class ServerConfig
  * @brief 설정 파일에서 파싱한 서버 설정 정보를 저장하는 클래스
  *
- * 서버 공통 설정과 라우팅 규칙, CGI 설정, 파싱 상태 정보를 포함하며,
+ * - 서버 공통 설정과 라우팅 규칙, CGI 설정, 파싱 상태 정보를 포함하며,
  * 하나의 서버 설정 단위를 표현한다.
  */
 class ServerConfig {
@@ -178,9 +179,10 @@ private:
    * @param fd 설정 파일을 읽기 위한 FileDescriptor
    * @return 파싱에 성공하면 true, 실패하면 false
    *
-   * server 블록 내부의 header, CGI 설정, 응답 시간, RouteRule, RouteRule_CGI
+   * - server 블록 내부의 header, CGI 설정, 응답 시간, RouteRule, RouteRule_CGI
    * 항목을 순차적으로 읽어 각 멤버 변수에 저장한다.
-   * 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
+   * 
+   * - 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
    */
   bool parse_server_block(FileDescriptor &fd);
   /**
@@ -195,11 +197,13 @@ private:
    * @param line 파싱할 header 항목 문자열
    * @return 파싱에 성공하면 true, 실패하면 false
    *
-   * line은 is_header_block(const std::string &line) 함수로
+   * - line은 is_header_block(const std::string &line) 함수로
    * 사전에 검증된 문자열이어야 한다.
-   * 값이 ';'로 끝나면 다음 들여쓰기 2단계 줄들을 이어 읽어
+   * 
+   * - 값이 ';'로 끝나면 다음 들여쓰기 2단계 줄들을 이어 읽어
    * 하나의 값으로 처리한다.
-   * 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
+   * 
+   * - 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
    */
   bool parse_header_entry(FileDescriptor &fd, const std::string &line);
   /**
@@ -208,8 +212,9 @@ private:
    * @param line 검사할 문자열
    * @return 문법과 범위 조건에 맞으면 true, 그렇지 않으면 false
    *
-   * 입력 문자열은 "...<숫자 문자열>" 형식을 따라야 한다.
-   * 숫자 값은 1 이상 900 이하여야 한다.
+   * - 입력 문자열은 "...<숫자 문자열>" 형식을 따라야 한다.
+   * 
+   * - 숫자 값은 1 이상 900 이하여야 한다.
    */
   bool is_valid_server_response_time(const std::string &line);
   /**
@@ -217,7 +222,7 @@ private:
    * server_response_time에 저장하는 함수
    * @param line 파싱할 문자열
    *
-   * 입력 문자열은 is_valid_server_response_time(const std::string &line) 함수로
+   * - 입력 문자열은 is_valid_server_response_time(const std::string &line) 함수로
    * 사전에 검증된 문자열이어야 한다.
    */
   void parse_server_response_time(std::string line);
@@ -226,8 +231,9 @@ private:
    * @param line 검사할 문자열
    * @return 유효한 패턴 요소이면 true, 그렇지 않으면 false
    *
-   * 괄호 안에는 '|'로 구분된 두 개 이상의 확장자 후보가 있어야 하며,
-   * 각 후보는 영숫자로만 구성되어야 한다.
+   * - 괄호 안에는 '|'로 구분된 두 개 이상의 확장자 후보가 있어야 한다.
+   * 
+   * - 각 후보는 영숫자로만 구성되어야 한다.
    */
   bool is_path_pattern_segment(const std::string &line);
   /**
@@ -244,7 +250,7 @@ private:
    * @param index 치환할 경로 요소의 위치
    * @return 패턴이 적용된 새로운 경로 조합 목록
    *
-   * 원래 경로 요소의 prefix와 suffix는 유지하고,
+   * - 원래 경로 요소의 prefix와 suffix는 유지하고,
    * 가운데 패턴 후보 부분만 교체하여 새 경로들을 생성한다.
    */
   std::vector<std::vector<std::string> >
@@ -257,7 +263,7 @@ private:
    * @param line 확장할 경로 패턴 문자열
    * @return 확장된 경로 조합 목록
    *
-   * 경로는 '/'를 기준으로 분리되며,
+   * - 경로는 '/'를 기준으로 분리되며,
    * 패턴 요소가 포함된 경우 가능한 모든 조합으로 확장된다.
    */
   std::vector<std::vector<std::string> >
@@ -267,8 +273,9 @@ private:
    * @param url 검사할 URL 패턴 문자열
    * @return 모든 경로 요소가 규칙을 만족하면 true, 그렇지 않으면 false
    *
-   * '*' 문자는 같은 경로 요소 안에서 두 번 이상 사용할 수 없으며,
-   * '/'를 만나면 다음 경로 요소에 대한 검사를 새로 시작한다.
+   * - '*' 문자는 같은 경로 요소 안에서 두 번 이상 사용할 수 없다.
+   * 
+   * - '/'를 만나면 다음 경로 요소에 대한 검사를 새로 시작한다.
    */
   bool has_valid_wildcard_usage(const std::string &url);
   /**
@@ -276,7 +283,7 @@ private:
    * @param line 검사할 문자열
    * @return 유효한 index 파일명이면 원본 문자열, 그렇지 않으면 빈 문자열
    *
-   * 현재는 .html 또는 .htm 확장자만 유효한 index 파일로 허용한다.
+   * - 현재는 .html 또는 .htm 확장자만 유효한 index 파일로 허용한다.
    */
   std::string get_valid_index_file(const std::string &line);
   /**
@@ -284,8 +291,9 @@ private:
    * @param line 파싱할 문자열
    * @return 파싱에 성공하면 상태 코드, 실패하면 0
    *
-   * 입력 문자열은 "<상태코드>:<경로>" 형식이어야 한다.
-   * 성공 시 line에는 오류 페이지 경로만 남는다.
+   * - 입력 문자열은 "<상태코드>:<경로>" 형식이어야 한다.
+   * 
+   * - 성공 시 line에는 오류 페이지 경로만 남는다.
    */
   int parse_error_page_entry(std::string &line);
   /**
@@ -293,7 +301,7 @@ private:
    * @param line 파싱할 문자열
    * @return 변환에 성공하면 KB 단위 크기, 실패하면 -1
    *
-   * 단위가 없거나 KB, KiB이면 그대로 사용하고,
+   * - 단위가 없거나 KB, KiB이면 그대로 사용하고,
    * MB와 MiB는 각각 1000배, 1024배로 변환한다.
    */
   int parse_max_body_size(std::string line);
@@ -302,8 +310,9 @@ private:
    * @param line 검사할 문자열
    * @return RouteRule 시작 줄 형식이면 true, 그렇지 않으면 false
    *
-   * 문자열은 "<Method> <URL> <Operator> <URL>" 형식이어야 한다.
-   * Method에는 GET, POST, DELETE를 '|'로 구분하여 하나 이상 지정할 수 있다.
+   * - 문자열은 "<Method> <URL> <Operator> <URL>" 형식이어야 한다.
+   * 
+   * - Method에는 GET, POST, DELETE를 '|'로 구분하여 하나 이상 지정할 수 있다.
    */
   bool matches_route_rule_syntax(const std::string &line);
   /**
@@ -312,7 +321,7 @@ private:
    * @param root 검사할 root 패턴
    * @return 두 패턴의 와일드카드 구성이 호환되면 true, 그렇지 않으면 false
    *
-   * path에 포함된 와일드카드가 root에서도 대응되는 위치를 가져야 한다.
+   * - path에 포함된 와일드카드가 root에서도 대응되는 위치를 가져야 한다.
    */
   bool has_compatible_wildcards(const PathPattern &path,
                                 const PathPattern &root);
@@ -322,9 +331,10 @@ private:
    * @param fd 설정 파일을 읽기 위한 FileDescriptor
    * @return 파싱에 성공하면 true, 실패하면 false
    *
-   * 시작 줄에서 HTTP 메서드와 경로 정보를 추출한 뒤,
+   * - 시작 줄에서 HTTP 메서드와 경로 정보를 추출한 뒤,
    * 들여쓰기 2단계의 하위 줄들을 읽어 각 규칙 항목을 파싱한다.
-   * 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
+   * 
+   * - 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
    */
   bool parse_route_rule_block(const std::string &method_line,
                               FileDescriptor &fd);
@@ -335,7 +345,7 @@ private:
    * @param mets 적용할 HTTP 메서드 목록
    * @return 생성에 성공하면 true, 실패하면 false
    *
-   * URL 패턴을 확장하여 각 메서드와 경로 조합에 대한 RouteRule을 생성하고,
+   * - URL 패턴을 확장하여 각 메서드와 경로 조합에 대한 RouteRule을 생성하고,
    * 연산자 종류에 따라 root 또는 redirect_target을 설정한다.
    */
   bool create_route_rules(const std::vector<std::string> &data,
@@ -348,8 +358,9 @@ private:
    * @param line 파싱할 하위 규칙 문자열
    * @return 파싱에 성공하면 true, 실패하면 false
    *
-   * 동일한 메서드와 경로를 가진 RouteRule이 이미 존재하면 해당 객체를 갱신하고,
-   * 존재하지 않으면 새 RouteRule을 생성한 뒤 규칙을 적용한다.
+   * - 동일한 메서드와 경로를 가진 RouteRule이 이미 존재하면 해당 객체를 갱신한다.
+   * 
+   * - 존재하지 않으면 새 RouteRule을 생성한 뒤 규칙을 적용한다.
    */
   bool apply_route_rule_entry(const std::vector<Request::Method> &mets,
                               const std::string &key_data,
@@ -367,10 +378,11 @@ private:
    * @param to_pattern wildcard를 치환할 대상 패턴
    * @return 재작성된 경로 문자열
    *
-   * request_path에서 from_pattern의 wildcard 위치에 대응하는 경로 조각을 추출한
+   * - request_path에서 from_pattern의 wildcard 위치에 대응하는 경로 조각을 추출한
    * 뒤, 이를 to_pattern의 wildcard 위치에 순서대로 치환하여 최종 경로를
-   * 생성한다. 이 함수는 route 매칭과 config 유효성 검사가 이미 끝난 상태라고
-   * 가정한다.
+   * 생성한다.
+   * (이 함수는 route 매칭과 config 유효성 검사가 이미 끝난 상태라고
+   * 가정한다.)
    */
   std::string rewrite_path(const std::string &request_path,
                            const PathPattern &from_pattern,
@@ -386,7 +398,7 @@ public:
    * @param path 요청 경로
    * @return 일치하는 RouteRule의 포인터, 없으면 NULL
    *
-   * 등록된 route 목록을 순회하면서, 전달된 HTTP method와 path에
+   * - 등록된 route 목록을 순회하면서, 전달된 HTTP method와 path에
    * 모두 일치하는 첫 번째 route를 반환한다.
    */
   RouteRule const *find_route(Request::Method method,
@@ -397,7 +409,7 @@ public:
    * @param path 요청 경로
    * @return 재작성된 대상 경로, 일치하는 route가 없으면 빈 문자열
    *
-   * 먼저 method와 path에 일치하는 route를 찾고, 해당 route의 패턴 정보로
+   * - 먼저 method와 path에 일치하는 route를 찾고, 해당 route의 패턴 정보로
    * 요청 경로를 대상 경로로 재작성한다.
    */
   std::string get_rewritten_path(Request::Method method,
