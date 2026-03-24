@@ -46,7 +46,7 @@ private:
    * @var err_meg
    * @brief 파싱 중 발생한 오류 메시지를 저장하는 멤버 변수
    *
-   * 정상적으로 파싱이 성공했을 시 빈 문자열을 가지고 있다.
+   * - 정상적으로 파싱이 성공했을 시 빈 문자열을 가지고 있다.
    */
   std::string err_meg;
   /**
@@ -58,15 +58,17 @@ private:
    * @var uwsgi
    * @brief 설정 파일의 uwsgi 항목 정보를 저장하는 멤버 변수
    *
-   * 포트 번호를 키로 하고, 실행 파일의 경로를 값으로 저장한다.
+   * - 포트 번호를 키로 하고, 실행 파일의 경로를 값으로 저장한다.
    */
   std::map<std::string, std::string> uwsgi;
   /**
    * @var type_map
    * @brief 파일 확장자와 MIME type의 매핑 정보를 저장하는 멤버 변수
    *
-   * 파일 확장자를 키로 하고, 해당 확장자에 대응하는 MIME type을 값으로
-   * 저장한다. 매핑되지 않은 확장자에 대해서는 멤버 변수 default_mime에 저장된
+   * - 파일 확장자를 키로 하고, 해당 확장자에 대응하는 MIME type을 값으로
+   * 저장한다.
+   * 
+   * - 매핑되지 않은 확장자에 대해서는 멤버 변수 default_mime에 저장된
    * 기본 MIME type을 사용한다.
    */
   std::map<std::string, std::string> type_map;
@@ -74,14 +76,14 @@ private:
    * @var serverconfig_map
    * @brief  설정 파일에서 파싱한 server 설정 정보를 저장하는 멤버 변수
    *
-   * 포트 번호를 키로 하고,
+   * - 포트 번호를 키로 하고,
    * 해당 포트에 대응하는 server 설정 정보를 값으로 저장한다.
    */
   std::map<unsigned int, ServerConfig> serverconfig_map;
   /**
    * @brief 서버의 기본 에러 응답 설정
    *
-   * 정적 에러 페이지 매핑과 CGI 기반 에러 처리 정보를 포함하는
+   * - 정적 에러 페이지 매핑과 CGI 기반 에러 처리 정보를 포함하는
    * 기본 에러 페이지 설정 객체이다.
    */
   DefaultErrPage default_err_page;

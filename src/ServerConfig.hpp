@@ -71,8 +71,9 @@ enum RuleOperator {
  * @struct RouteRule
  * @brief 설정 파일에 정의된 경로 처리 규칙과 하위 설정 정보를 저장하는 구조체
  *
- * - 상위 규칙에는 요청 메서드, 경로 패턴, 처리 연산자 및 대상 경로가 포함되며,
- * 하위 설정에는 index, auth, body size, error page 등의 추가 정보가 포함될 수
+ * - 상위 규칙에는 요청 메서드, 경로 패턴, 처리 연산자 및 대상 경로가 포함된다.
+ * 
+ * - 하위 설정에는 index, auth, body size, error page 등의 추가 정보가 포함될 수
  * 있다.
  */
 struct RouteRule {
@@ -133,8 +134,9 @@ struct RouteRule {
  * @class ServerConfig
  * @brief 설정 파일에서 파싱한 서버 설정 정보를 저장하는 클래스
  *
- * - 서버 공통 설정과 라우팅 규칙, CGI 설정, 파싱 상태 정보를 포함하며,
- * 하나의 서버 설정 단위를 표현한다.
+ * - 서버 공통 설정과 라우팅 규칙, CGI 설정, 파싱 상태 정보를 포함된다.
+ * 
+ * - 하나의 서버 설정 단위를 표현한다.
  */
 class ServerConfig {
 private:
@@ -263,8 +265,9 @@ private:
    * @param line 확장할 경로 패턴 문자열
    * @return 확장된 경로 조합 목록
    *
-   * - 경로는 '/'를 기준으로 분리되며,
-   * 패턴 요소가 포함된 경우 가능한 모든 조합으로 확장된다.
+   * - 경로는 '/'를 기준으로 분리된다.
+   * 
+   * - 패턴 요소가 포함된 경우 가능한 모든 조합으로 확장된다.
    */
   std::vector<std::vector<std::string> >
   expand_path_pattern(const std::string &line);
@@ -301,8 +304,9 @@ private:
    * @param line 파싱할 문자열
    * @return 변환에 성공하면 KB 단위 크기, 실패하면 -1
    *
-   * - 단위가 없거나 KB, KiB이면 그대로 사용하고,
-   * MB와 MiB는 각각 1000배, 1024배로 변환한다.
+   * - 단위가 없거나 KB, KiB이면 그대로 사용한다.
+   * 
+   * - MB와 MiB는 각각 1000배, 1024배로 변환한다.
    */
   int parse_max_body_size(std::string line);
   /**
@@ -345,8 +349,9 @@ private:
    * @param mets 적용할 HTTP 메서드 목록
    * @return 생성에 성공하면 true, 실패하면 false
    *
-   * - URL 패턴을 확장하여 각 메서드와 경로 조합에 대한 RouteRule을 생성하고,
-   * 연산자 종류에 따라 root 또는 redirect_target을 설정한다.
+   * - URL 패턴을 확장하여 각 메서드와 경로 조합에 대한 RouteRule을 생성한다.
+   * 
+   * - 연산자 종류에 따라 root 또는 redirect_target을 설정한다.
    */
   bool create_route_rules(const std::vector<std::string> &data,
                           const std::vector<Request::Method> &mets);
