@@ -35,6 +35,10 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       err_meg = RouteRule_CGI::parse_uwsgi_block(file, this->uwsgi);
       if (err_meg != "")
         return false;
+    } else if (line[0] == '!') {
+      err_meg = apply_default_err_page_entry(line);
+      if (err_meg != "")
+        return false;
     } else {
       err_meg = "Invalid line Error: " + line;
       return false;
@@ -45,6 +49,31 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     return false;
   }
   return true;
+}
+
+std::string WebserverConfig::apply_default_err_page_entry(const std::string &line)
+{
+  std::vector<std::string> split = utils::string_split(line, " ");
+
+  if (split.size() != 2)
+    return "Error: \"" + line + "\" Syntax error";
+  else if (split[1][0] != '$') {
+    split = utils::string_split(split[1], ":");
+    if (split.size() != 2)
+      return "Error: \"" + line + "\" Syntax error";
+    default_err_page.err_page[split[0]] = split[1];
+  } else if (split[1][0] == '$') {
+    std::string err_line;
+    std::string executable;
+    std::map<std::string, std::string> env;
+
+    err_line = RouteRule_CGI::parse_executable(split[1], executable, env);
+    if (err_line != "")
+      return err_line;
+    default_err_page.err_cgi[executable] = env;
+  } else 
+    return "Error: \"" + line + "\" Syntax error";
+  return "";
 }
 
 // type_map method
@@ -217,6 +246,7 @@ unsigned int WebserverConfig::parse_server_port(const std::string &key) {
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.get_type_map();
   const std::map<std::string, std::string> &uw = data.get_uwsgi();
+  const DefaultErrPage &d_e = data.get_default_err_page();
   std::map<std::string, std::string>::const_iterator ty_it;
   std::map<std::string, std::string>::const_iterator uw_it;
 
@@ -234,6 +264,35 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   for (uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
     os << "Uwsgi key: " << uw_it->first << ", Uwsgi value: " << uw_it->second
        << std::endl;
+  }
+  os << "========================================================" << std::endl;
+  os << "\n\n\n========================================================"
+     << std::endl;
+  
+  os << "<<DefaultErrPage>>\n" << std::endl;
+  
+  std::map<std::string, std::string>::const_iterator er_it;
+  CGI::const_iterator cgi_it;
+  
+  os << "\nerr_page\n" << std::endl;
+  for (er_it = d_e.err_page.begin(); er_it != d_e.err_page.end(); ++er_it) {
+    os << "\terr_page key: " << er_it->first << ", err_page value: " << er_it->second
+      << std::endl;
+  }
+  os << "\nerr_cgi\n" << std::endl;
+  for (cgi_it = d_e.err_cgi.begin(); cgi_it != d_e.err_cgi.end(); ++cgi_it) {
+    os << "\terr_cgi executable: " << cgi_it->first;
+    if (cgi_it->second.empty())
+      os << "\n\terr_cgi env: empty\n";
+    else {
+      os << "\n\terr_cgi env\n";
+      std::map<std::string, std::string>::const_iterator temp;
+      for (temp = cgi_it->second.begin(); temp != cgi_it->second.end(); ++temp) {
+        os << "\terr_cgi env key: " << temp->first << ", err_cgi env value: " << temp->second
+          << std::endl;
+      }
+    }   
+    os << std::endl;
   }
   os << "========================================================" << std::endl;
   os << "\n\n\n========================================================"

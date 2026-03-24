@@ -607,8 +607,8 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   }
 
   os << "\n\n\n<<Server CGI>>";
-  const Server_CGI &s = data.get_serve_cgi();
-  Server_CGI::const_iterator s_it;
+  const CGI &s = data.get_serve_cgi();
+  CGI::const_iterator s_it;
   if (s.empty())
     os << "\n\tEmpty" << std::endl;
   for (s_it = s.begin(); s_it != s.end(); ++s_it) {

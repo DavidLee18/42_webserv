@@ -11,7 +11,7 @@
  * 바깥 map은 CGI 항목을 구분하는 키를 사용하고,
  * 내부 map은 메타변수 이름을 키로, 그 값을 값으로 저장한다.
  */
-typedef std::map<std::string, std::map<std::string, std::string> > Server_CGI;
+typedef std::map<std::string, std::map<std::string, std::string> > CGI;
 
 /**
  * @enum RuleOperator
@@ -161,7 +161,7 @@ private:
    * @var S_CGI
    * @brief 서버 단위의 CGI 관련 설정 정보를 저장하는 멤버 변수
    */
-  Server_CGI S_CGI;
+  CGI S_CGI;
   /**
    * @var err_line
    * @brief 파싱 중 오류가 발생한 설정 파일의 줄 정보를 저장하는 멤버 변수
@@ -408,7 +408,7 @@ public:
   }
   const std::string &geterr_line(void) const { return err_line; }
   const std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
-  const Server_CGI get_serve_cgi() const { return S_CGI; }
+  const CGI get_serve_cgi() const { return S_CGI; }
   const std::vector<RouteRule> &get_routes(void) const { return routes; }
   int get_server_response_time(void) const {
     return server_response_time;

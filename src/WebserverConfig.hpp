@@ -4,6 +4,28 @@
 #include "ServerConfig.hpp"
 
 /**
+ * @brief 기본 에러 페이지 설정 정보를 저장하는 구조체
+ *
+ * HTTP 에러 코드별 정적 에러 페이지 경로와
+ * 에러 처리용 CGI 설정 정보를 함께 보관한다.
+ *
+ * - `err_page` : 에러 코드 문자열을 key로 사용하며,
+ *   해당 코드에 대응하는 에러 페이지 경로를 value로 저장한다.
+ * - `err_cgi` : 에러 페이지를 CGI 방식으로 처리할 때 사용하는 CGI 설정 정보이다.
+ */
+struct DefaultErrPage
+{
+  /**
+   * @brief 에러 코드별 기본 에러 페이지 경로 목록
+   */
+  std::map<std::string, std::string> err_page;
+  /**
+   * @brief 에러 페이지 처리에 사용되는 CGI 설정
+   */
+  CGI err_cgi;
+};
+
+/**
  * @class WebserverConfig
  * @brief 웹서버 설정 파일을 파싱하고 그 결과를 멤버 변수에 저장하는 클래스
  *
@@ -54,6 +76,13 @@ private:
    * 해당 포트에 대응하는 server 설정 정보를 값으로 저장한다.
    */
   std::map<unsigned int, ServerConfig> serverconfig_map;
+  /**
+   * @brief 서버의 기본 에러 응답 설정
+   *
+   * 정적 에러 페이지 매핑과 CGI 기반 에러 처리 정보를 포함하는
+   * 기본 에러 페이지 설정 객체이다.
+   */
+  DefaultErrPage default_err_page;
 
   /**
    * @brief 설정 파일의 최상위 항목들을 파싱하는 함수
@@ -134,17 +163,29 @@ private:
    * 입력 문자열은 사전에 server 설정 헤더 문법 검사를 통과한 문자열이어야 한다.
    */
   static unsigned int parse_server_port(const std::string &line);
+  /**
+   * @brief 기본 에러 페이지 설정 한 줄을 파싱하고 설정에 반영한다.
+   * @param line 설정 파일에서 읽은 default error page 관련 한 줄
+   * @return 성공 시 빈 문자열, 실패 시 에러 메시지
+   *
+   * 입력 문자열을 해석하여 정적 에러 페이지 경로 또는
+   * CGI 기반 에러 처리 정보를 `default_err_page`에 저장한다.
+   *
+   * - `key:value` 형식이면 정적 에러 페이지로 처리한다.
+   * - `$...` 형식이면 CGI 실행 정보로 처리한다.
+   */
+  std::string apply_default_err_page_entry(const std::string &line);
 
   WebserverConfig(FileDescriptor &file);
 
 public:
   WebserverConfig &operator=(const WebserverConfig &other) {
     if (this != &other) {
+      this->err_meg = other.err_meg;
       this->default_mime = other.default_mime;
       this->uwsgi = other.uwsgi;
       this->type_map = other.type_map;
       this->serverconfig_map = other.serverconfig_map;
-      this->err_meg.clear();
     }
     return *this;
   }
@@ -159,6 +200,7 @@ public:
   const std::map<unsigned int, ServerConfig> &get_serverconfig_map(void) const {
     return serverconfig_map;
   }
+  const DefaultErrPage &get_default_err_page(void) const { return default_err_page; }
   /**
    * @brief 설정 파일을 파싱한 결과를 Result<WebserverConfig> 형태로 반환하는
    * 함수
