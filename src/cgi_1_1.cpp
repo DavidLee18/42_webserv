@@ -1238,6 +1238,27 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   }
   FileDescriptor stdout_fd = stdout_fd_res.value();
 
+  // Set pipe FDs to non-blocking before adding to EPoll.
+  // This is required for correct EPoll usage: without O_NONBLOCK, read/write
+  // could block even after EPoll signals readiness (e.g. EAGAIN race), and
+  // EAGAIN must be detectable to correctly drain data in the event loop.
+  Result<Void> stdin_nb = stdin_fd.set_nonblocking();
+  if (!stdin_nb.has_value()) {
+    // stdin_fd and stdout_fd destructors close the pipe ends
+    kill(pid, SIGKILL);
+    waitpid(pid, NULL, 0);
+    return ERR(Http::Response,
+               "Failed to set stdin pipe to non-blocking mode");
+  }
+  Result<Void> stdout_nb = stdout_fd.set_nonblocking();
+  if (!stdout_nb.has_value()) {
+    // stdin_fd and stdout_fd destructors close the pipe ends
+    kill(pid, SIGKILL);
+    waitpid(pid, NULL, 0);
+    return ERR(Http::Response,
+               "Failed to set stdout pipe to non-blocking mode");
+  }
+
   // Prepare request body for writing
   const Http::Body &body = request.body();
   std::string body_str;
@@ -1351,6 +1372,10 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       ssize_t written = write(stdin_pipe[1], body_str.c_str() + total_written,
                               body_str.length() - total_written);
       if (written < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+          // Pipe buffer full; wait for the next EPoll write-ready event
+          continue;
+        }
         epoll->del_fd(*stdin_epoll);
         // FileDescriptor destructors will close the pipes
         kill(pid, SIGKILL);
@@ -1434,7 +1459,11 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         continue;
       }
       const Event *ev = event_result.value();
-      if (*ev->fd == stdout_pipe[0] && ev->in) {
+      // Also check hup/rdhup: when the write end of the pipe is closed (child
+      // exits), EPoll delivers EPOLLHUP even if EPOLLIN was not requested.
+      // Without this check, the loop would never set fd_ready=true on the final
+      // HUP-only event, spinning forever in level-triggered mode.
+      if (*ev->fd == stdout_pipe[0] && (ev->in || ev->hup || ev->rdhup)) {
         fd_ready = true;
         break;
       }
@@ -1454,7 +1483,13 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       // EOF reached
       break;
     } else {
-      // Read error
+      // With non-blocking pipes, read() may return EAGAIN/EWOULDBLOCK even
+      // after EPoll signals readiness (e.g. HUP received but no data).
+      // Treat this as "no data right now" and wait for the next EPoll event.
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        continue;
+      }
+      // Real read error
       epoll->del_fd(*stdout_epoll);
       // stdout_fd destructor will close stdout_pipe[0]
       kill(pid, SIGKILL);
