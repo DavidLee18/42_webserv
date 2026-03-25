@@ -1132,6 +1132,31 @@ static int remaining_ms(long long start_ms, int timeout_ms) {
   return (rem > 0) ? (int)rem : 0;
 }
 
+static const int kWaitpidPollIntervalUs = 1000;
+static const int kMaxReapWaitMs = 50;
+static const int kWaitpidReapAttempts =
+    (kMaxReapWaitMs * 1000) / kWaitpidPollIntervalUs;
+
+// Reap child without risking an unbounded blocking wait.
+static bool waitpid_nohang(pid_t pid) {
+  int status;
+  for (int i = 0; i < kWaitpidReapAttempts; ++i) {
+    pid_t wr = waitpid(pid, &status, WNOHANG);
+    if (wr == pid) {
+      return true;
+    }
+    if (wr == -1)
+      return false;
+    usleep(kWaitpidPollIntervalUs);
+  }
+  return false;
+}
+
+static void terminate_child(pid_t pid) {
+  kill(pid, SIGKILL);
+  (void)waitpid_nohang(pid);
+}
+
 Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
 
   if (epoll == NULL) {
@@ -1221,8 +1246,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   if (!stdin_fd_res.error().empty()) {
     close(stdin_pipe[1]);
     close(stdout_pipe[0]);
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
+    terminate_child(pid);
     return ERR(Http::Response, "Failed to create stdin FileDescriptor");
   }
   FileDescriptor stdin_fd = stdin_fd_res.value();
@@ -1232,8 +1256,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   if (!stdout_fd_res.error().empty()) {
     // stdin_pipe[1] is owned by stdin_fd, will be closed automatically
     close(stdout_pipe[0]);
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
+    terminate_child(pid);
     return ERR(Http::Response, "Failed to create stdout FileDescriptor");
   }
   FileDescriptor stdout_fd = stdout_fd_res.value();
@@ -1245,16 +1268,14 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   Result<Void> stdin_nb = stdin_fd.set_nonblocking();
   if (!stdin_nb.has_value()) {
     // stdin_fd and stdout_fd destructors close the pipe ends
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
+    terminate_child(pid);
     return ERR(Http::Response,
                "Failed to set stdin pipe to non-blocking mode");
   }
   Result<Void> stdout_nb = stdout_fd.set_nonblocking();
   if (!stdout_nb.has_value()) {
     // stdin_fd and stdout_fd destructors close the pipe ends
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
+    terminate_child(pid);
     return ERR(Http::Response,
                "Failed to set stdout pipe to non-blocking mode");
   }
@@ -1313,8 +1334,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
 
     if (!add_result.has_value()) {
       // FileDescriptor destructors will close the pipes
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
+      terminate_child(pid);
       return ERR(Http::Response, "Failed to add stdin to epoll");
     }
     FileDescriptor *stdin_epoll = add_result.value();
@@ -1325,16 +1345,14 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       int rem = remaining_ms(start_ms, timeout_ms);
       if (rem == 0) {
         epoll->del_fd(*stdin_epoll);
-        kill(pid, SIGKILL);
-        waitpid(pid, NULL, 0);
+        terminate_child(pid);
         return ERR(Http::Response, "Timeout waiting for stdin writability");
       }
       Result<Events> wait_result = epoll->wait(rem);
       if (!wait_result.error().empty()) {
         epoll->del_fd(*stdin_epoll);
         // FileDescriptor destructors will close the pipes
-        kill(pid, SIGKILL);
-        waitpid(pid, NULL, 0);
+        terminate_child(pid);
         return ERR(Http::Response, "EPoll wait failed for stdin");
       }
 
@@ -1344,8 +1362,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       if (events.is_end()) {
         epoll->del_fd(*stdin_epoll);
         // FileDescriptor destructors will close the pipes
-        kill(pid, SIGKILL);
-        waitpid(pid, NULL, 0);
+        terminate_child(pid);
         return ERR(Http::Response, "Timeout waiting for stdin writability");
       }
 
@@ -1374,15 +1391,13 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       if (written < 0) {
         epoll->del_fd(*stdin_epoll);
         // FileDescriptor destructors will close the pipes
-        kill(pid, SIGKILL);
-        waitpid(pid, NULL, 0);
+        terminate_child(pid);
         return ERR(Http::Response, "Failed to write to CGI stdin");
       } else if (written == 0) {
         // Pipe closed by reader (child process)
         epoll->del_fd(*stdin_epoll);
         // FileDescriptor destructors will close the pipes
-        kill(pid, SIGKILL);
-        waitpid(pid, NULL, 0);
+        terminate_child(pid);
         return ERR(Http::Response, "CGI process closed stdin prematurely");
       }
       total_written += static_cast<size_t>(written);
@@ -1408,8 +1423,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
 
   if (!add_stdout_result.has_value()) {
     // stdout_fd destructor will close stdout_pipe[0]
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
+    terminate_child(pid);
     return ERR(Http::Response, "Failed to add stdout to epoll");
   }
   FileDescriptor *stdout_epoll = add_stdout_result.value();
@@ -1423,16 +1437,14 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     int rem = remaining_ms(start_ms, timeout_ms);
     if (rem == 0) {
       epoll->del_fd(*stdout_epoll);
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
+      terminate_child(pid);
       return ERR(Http::Response, "CGI execution timeout");
     }
     Result<Events> wait_result = epoll->wait(rem);
     if (!wait_result.error().empty()) {
       epoll->del_fd(*stdout_epoll);
       // stdout_fd destructor will close stdout_pipe[0]
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
+      terminate_child(pid);
       return ERR(Http::Response, "EPoll wait failed for stdout");
     }
 
@@ -1442,8 +1454,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     if (events.is_end()) {
       epoll->del_fd(*stdout_epoll);
       // stdout_fd destructor will close stdout_pipe[0]
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
+      terminate_child(pid);
       return ERR(Http::Response, "CGI execution timeout");
     }
 
@@ -1482,8 +1493,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       // Read error
       epoll->del_fd(*stdout_epoll);
       // stdout_fd destructor will close stdout_pipe[0]
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
+      terminate_child(pid);
       return ERR(Http::Response, "Failed to read from CGI stdout");
     }
   }
@@ -1494,8 +1504,24 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
 
   // Wait for child process
   int status;
-  if (waitpid(pid, &status, 0) == -1) {
-    return ERR(Http::Response, "Failed to wait for child process");
+  while (true) {
+    pid_t wr = waitpid(pid, &status, WNOHANG);
+    if (wr == pid) {
+      break;
+    }
+    if (wr == -1) {
+      return ERR(Http::Response, "Failed to wait for child process");
+    }
+    int rem = remaining_ms(start_ms, timeout_ms);
+    if (rem == 0) {
+      terminate_child(pid);
+      return ERR(Http::Response, "CGI execution timeout");
+    }
+    long long rem_us = static_cast<long long>(rem) * 1000;
+    int sleep_us = rem_us < kWaitpidPollIntervalUs
+                       ? static_cast<int>(rem_us)
+                       : kWaitpidPollIntervalUs;
+    usleep(static_cast<useconds_t>(sleep_us));
   }
 
   if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
