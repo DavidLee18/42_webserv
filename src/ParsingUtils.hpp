@@ -1,8 +1,9 @@
 #ifndef PARSINGUTILS_HPP
 #define PARSINGUTILS_HPP
 
-#include <string>
-#include <vector>
+#include "server/Client.hpp"
+#include "file_descriptor.h"
+
 namespace utils {
 /**
  * @brief 문자열 내에 공백이 존재하는지 확인하는 함수

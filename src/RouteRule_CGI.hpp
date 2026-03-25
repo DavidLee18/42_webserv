@@ -1,12 +1,7 @@
 #ifndef ROUTERULE_CGI_HPP
 #define ROUTERULE_CGI_HPP
 
-#include "ParsingUtils.hpp"
 #include "PathPattern.hpp"
-#include "file_descriptor.h"
-#include "result.h"
-#include <iostream>
-#include <map>
 
 /**
  * @class RouteRule_CGI

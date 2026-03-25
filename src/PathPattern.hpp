@@ -2,10 +2,6 @@
 #define PATHPATTERN_HPP
 
 #include "ParsingUtils.hpp"
-#include "file_descriptor.h"
-#include "server/Client.hpp"
-#include <iosfwd>
-#include <unistd.h>
 
 /**
  * @class PathPattern
