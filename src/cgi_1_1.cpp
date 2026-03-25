@@ -1372,10 +1372,6 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       ssize_t written = write(stdin_pipe[1], body_str.c_str() + total_written,
                               body_str.length() - total_written);
       if (written < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-          // Pipe buffer full; wait for the next EPoll write-ready event
-          continue;
-        }
         epoll->del_fd(*stdin_epoll);
         // FileDescriptor destructors will close the pipes
         kill(pid, SIGKILL);
@@ -1483,13 +1479,7 @@ Result<Http::Response> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       // EOF reached
       break;
     } else {
-      // With non-blocking pipes, read() may return EAGAIN/EWOULDBLOCK even
-      // after EPoll signals readiness (e.g. HUP received but no data).
-      // Treat this as "no data right now" and wait for the next EPoll event.
-      if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        continue;
-      }
-      // Real read error
+      // Read error
       epoll->del_fd(*stdout_epoll);
       // stdout_fd destructor will close stdout_pipe[0]
       kill(pid, SIGKILL);
