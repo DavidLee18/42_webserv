@@ -1,7 +1,7 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-#include "../WebserverConfig.hpp"
+#include "../config/WebserverConfig.hpp"
 #include "../epoll_kqueue.h"
 #include "../errors.h"
 
