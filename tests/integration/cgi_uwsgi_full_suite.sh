@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 
-set -u
+set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 TEST_DIR="$ROOT_DIR/tests/integration"
 TMP_DIR="$TEST_DIR/tmp"
 mkdir -p "$TMP_DIR"
 UWSGI_SCRIPT="$TMP_DIR/login.py"
+PORT_WAIT_RETRIES=60
 
 WEB_PID=""
 UWSGI_PID=""
@@ -37,7 +38,7 @@ assert_contains() {
 
 wait_for_port() {
   local port="$1"
-  local retries=60
+  local retries="$PORT_WAIT_RETRIES"
   while [ "$retries" -gt 0 ]; do
     if python3 - "$port" <<'PY'
 import socket
@@ -81,9 +82,14 @@ out("uwsgi-ok\n")
 out("REQUEST_METHOD=%s\n" % os.environ.get("REQUEST_METHOD", ""))
 out("SCRIPT_NAME=%s\n" % os.environ.get("SCRIPT_NAME", ""))
 EOF
+chmod +x "$UWSGI_SCRIPT"
 
 echo "[integration] Validating CGI integration via parser dump"
 CGI_PARSE_OUT="$TMP_DIR/cgi_parse.out"
+if [ ! -f "$ROOT_DIR/default.wbsrv" ]; then
+  echo "Missing config: $ROOT_DIR/default.wbsrv"
+  exit 1
+fi
 "$ROOT_DIR/webserv" "$ROOT_DIR/default.wbsrv" >"$CGI_PARSE_OUT" 2>&1
 assert_contains "$CGI_PARSE_OUT" "Executable: upload_file.cgi"
 assert_contains "$CGI_PARSE_OUT" "key: add_csp_sha256.cgi"
@@ -124,14 +130,14 @@ int main() {
 }
 EOF
 
-c++ -Wall -Werror -Wextra -Wconversion -std=c++98 \
+"${CXX:-c++}" -Wall -Werror -Wextra -Wconversion -std=c++98 \
   -I"$ROOT_DIR/src" \
   "$TMP_DIR/uwsgi_client_test.cpp" \
   "$ROOT_DIR/src/uwsgi_client.cpp" \
   -o "$TMP_DIR/uwsgi_client_test"
 
 UWSGI_RESP_OUT="$TMP_DIR/uwsgi_response.out"
-"$TMP_DIR/uwsgi_client_test" >"$UWSGI_RESP_OUT"
+"$TMP_DIR/uwsgi_client_test" >"$UWSGI_RESP_OUT" 2>&1
 assert_contains "$UWSGI_RESP_OUT" "Status: 200 OK"
 assert_contains "$UWSGI_RESP_OUT" "uwsgi-ok"
 assert_contains "$UWSGI_RESP_OUT" "REQUEST_METHOD=POST"
