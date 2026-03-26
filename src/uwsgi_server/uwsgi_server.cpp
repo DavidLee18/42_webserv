@@ -285,26 +285,35 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
   }
   close(stdout_pipe[0]);
 
-  // Wait for the child with a timeout to prevent blocking indefinitely
-  // when a WSGI script hangs after producing its output.
-  // Sleep in 100 ms increments up to the remaining deadline to keep
-  // CPU usage low while still reaping promptly.
+  // Wait for the child with non-blocking waitpid(). Enforce the timeout and
+  // avoid blocking waits even during forced termination.
   int wstatus = 0;
   time_t deadline = time(NULL) + CHILD_TIMEOUT_SEC;
+  bool sent_sigkill = false;
+  time_t kill_deadline = 0;
   while (true) {
     pid_t waited = waitpid(pid, &wstatus, WNOHANG);
-    if (waited != 0)
+    if (waited == pid)
       break;
+    if (waited == -1)
+      break;
+
     time_t now = time(NULL);
     if (now >= deadline) {
-      kill(pid, SIGKILL);
-      // Loop until the killed child is fully reaped (may be interrupted)
-      while (waitpid(pid, &wstatus, 0) < 0) {
+      if (!sent_sigkill) {
+        kill(pid, SIGKILL);
+        sent_sigkill = true;
+        kill_deadline = now + 1;
       }
-      break;
+      if (now >= kill_deadline)
+        break;
     }
-    // Sleep up to 100 ms, but no more than the remaining timeout
-    long remaining_ms = static_cast<long>((deadline - now) * 1000L);
+
+    // Sleep up to 100 ms, but no more than the remaining timeout budget.
+    time_t sleep_until = sent_sigkill ? kill_deadline : deadline;
+    long remaining_ms = static_cast<long>((sleep_until - now) * 1000L);
+    if (remaining_ms <= 0)
+      continue;
     long sleep_ms = (remaining_ms < 100L) ? remaining_ms : 100L;
     struct timespec ts;
     ts.tv_sec = 0;
