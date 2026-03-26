@@ -556,8 +556,6 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
         raw_sock, reinterpret_cast<const char *>(&send_buf[0]) + total_sent,
         send_buf.size() - total_sent);
     if (written < 0) {
-      if (errno == EAGAIN || errno == EWOULDBLOCK)
-        continue;
       epoll->del_fd(*sock_epoll);
       return ERR(Http::Response, "uwsgi: write failed");
     } else if (written == 0) {
@@ -616,8 +614,6 @@ Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     } else if (n == 0) {
       break; // EOF: server closed connection
     } else {
-      if (errno == EAGAIN || errno == EWOULDBLOCK)
-        continue;
       epoll->del_fd(*sock_epoll);
       return ERR(Http::Response, "uwsgi: read error receiving response");
     }
