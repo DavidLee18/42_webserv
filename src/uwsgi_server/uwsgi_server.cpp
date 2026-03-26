@@ -1,6 +1,7 @@
 #include "uwsgi_server.h"
 
 #include <arpa/inet.h>
+#include <cerrno>
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
@@ -10,6 +11,7 @@
 #include <netinet/in.h>
 #include <sstream>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -19,6 +21,9 @@ static const long MAX_BODY_SIZE = 10 * 1024 * 1024;
 
 // Timeout in seconds for child WSGI process
 static const int CHILD_TIMEOUT_SEC = 30;
+static const long WAITPID_POLL_INTERVAL_MS = 100L;
+static const long CHILD_KILL_GRACE_MS = 1000L;
+static const long WAITPID_MIN_SLEEP_MS = 1L;
 
 // Allowlisted WSGI/CGI environment variable names (exact match).
 // Any key starting with "HTTP_" is also allowed.
@@ -114,6 +119,18 @@ void UwsgiServer::run() {
   std::cout << "WSGI script: " << _script_path << std::endl;
 
   while (true) {
+    // Reap any previously timed-out children in a non-blocking way.
+    int reap_status = 0;
+    while (true) {
+      pid_t reaped = waitpid(-1, &reap_status, WNOHANG);
+      if (reaped > 0)
+        continue;
+      if (reaped == 0)
+        break;
+      if (errno == EINTR)
+        continue;
+      break;
+    }
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
     int client_fd =
@@ -288,33 +305,53 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
   // Wait for the child with non-blocking waitpid(). Enforce the timeout and
   // avoid blocking waits even during forced termination.
   int wstatus = 0;
-  time_t deadline = time(NULL) + CHILD_TIMEOUT_SEC;
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  long long deadline_ms =
+      static_cast<long long>(tv.tv_sec) * 1000LL +
+      static_cast<long long>(tv.tv_usec) / 1000LL +
+      static_cast<long long>(CHILD_TIMEOUT_SEC) * 1000LL;
   bool sent_sigkill = false;
-  time_t kill_deadline = 0;
+  long long kill_deadline_ms = 0;
   while (true) {
     pid_t waited = waitpid(pid, &wstatus, WNOHANG);
     if (waited == pid)
       break;
-    if (waited == -1)
+    if (waited == -1) {
+      if (errno == EINTR)
+        continue;
       break;
+    }
 
-    time_t now = time(NULL);
-    if (now >= deadline) {
-      if (!sent_sigkill) {
-        kill(pid, SIGKILL);
-        sent_sigkill = true;
-        kill_deadline = now + 1;
-      }
-      if (now >= kill_deadline)
-        break;
+    gettimeofday(&tv, NULL);
+    long long now_ms = static_cast<long long>(tv.tv_sec) * 1000LL +
+                       static_cast<long long>(tv.tv_usec) / 1000LL;
+    if (!sent_sigkill && now_ms >= deadline_ms) {
+      kill(pid, SIGKILL);
+      sent_sigkill = true;
+      // Allow a short non-blocking grace window for SIGKILL to take effect.
+      kill_deadline_ms = now_ms + CHILD_KILL_GRACE_MS;
+    }
+    if (sent_sigkill && now_ms >= kill_deadline_ms) {
+      std::cerr << "child process " << pid
+                << " reap timed out after SIGKILL" << std::endl;
+      break;
     }
 
     // Sleep up to 100 ms, but no more than the remaining timeout budget.
-    time_t sleep_until = sent_sigkill ? kill_deadline : deadline;
-    long remaining_ms = static_cast<long>((sleep_until - now) * 1000L);
-    if (remaining_ms <= 0)
+    long long sleep_until_ms = sent_sigkill ? kill_deadline_ms : deadline_ms;
+    long long remaining_ms = sleep_until_ms - now_ms;
+    if (remaining_ms <= 0) {
+      struct timespec ts_min;
+      ts_min.tv_sec = 0;
+      ts_min.tv_nsec = WAITPID_MIN_SLEEP_MS * 1000000L;
+      nanosleep(&ts_min, NULL);
       continue;
-    long sleep_ms = (remaining_ms < 100L) ? remaining_ms : 100L;
+    }
+    long sleep_ms =
+        (remaining_ms < static_cast<long long>(WAITPID_POLL_INTERVAL_MS))
+            ? static_cast<long>(remaining_ms)
+            : WAITPID_POLL_INTERVAL_MS;
     struct timespec ts;
     ts.tv_sec = 0;
     ts.tv_nsec = sleep_ms * 1000000L;
