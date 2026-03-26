@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 UWSGI_APP="$TMP_DIR/login.py"
 PORT_UWSGI=19000
+MAX_RETRIES=100
 
 UWSGI_PID=
 
@@ -21,7 +22,7 @@ cat >"$UWSGI_APP" <<'PY'
 import json
 import sys
 
-def app():
+def main():
     body = sys.stdin.read()
     env = {
         "REQUEST_METHOD": "",
@@ -49,13 +50,13 @@ def app():
     sys.stdout.write("".join(out))
 
 if __name__ == "__main__":
-    app()
+    main()
 PY
 
 "$ROOT_DIR/uwsgi_server" "$UWSGI_APP" "$PORT_UWSGI" >"$TMP_DIR/uwsgi.log" 2>&1 &
 UWSGI_PID=$!
 
-for _ in $(seq 1 100); do
+for ((i=1; i<=MAX_RETRIES; i++)); do
   if grep -q "uWSGI server listening on port $PORT_UWSGI" "$TMP_DIR/uwsgi.log" 2>/dev/null; then
     break
   fi
@@ -126,6 +127,8 @@ for k, v in vars_map.items():
     vars_blob += len(kb).to_bytes(2, "little") + kb
     vars_blob += len(vb).to_bytes(2, "little") + vb
 
+# uWSGI packet format: [modifier1=0][datasize(2 bytes, little-endian)]
+# [modifier2=0][vars block][request body bytes]
 packet = bytes([0]) + len(vars_blob).to_bytes(2, "little") + bytes([0]) + vars_blob + body.encode()
 
 s = socket.create_connection(("127.0.0.1", port), timeout=5)
@@ -149,7 +152,8 @@ import json
 import sys
 
 path, expected_body = sys.argv[1], sys.argv[2]
-raw = open(path, "rb").read().decode("utf-8")
+with open(path, "rb") as f:
+    raw = f.read().decode("utf-8")
 _, body = raw.split("\r\n\r\n", 1)
 payload = json.loads(body)
 env = payload["env"]
