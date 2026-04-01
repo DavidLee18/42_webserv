@@ -22,7 +22,6 @@ int main(const int argc, char *argv[]) {
   } else {
     // std::cout << result_config.value() << std::endl;
     const WebserverConfig &config = result_config.value();
-    // Initiate server.
     Server server(config);
     Result<Void> init_result = server.init();
     if (!init_result.has_value()) {

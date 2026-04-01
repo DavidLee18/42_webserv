@@ -1,7 +1,7 @@
 #ifndef RESPONSE_HPP
 #define RESPONSE_HPP
 
-#include "../ServerConfig.hpp"
+#include "../config/ServerConfig.hpp"
 #include "Client.hpp"
 #include <dirent.h>
 #include <fstream>

@@ -1,8 +1,9 @@
 #ifndef PARSINGUTILS_HPP
 #define PARSINGUTILS_HPP
 
-#include <string>
-#include <vector>
+#include "server/Client.hpp"
+#include "file_descriptor.h"
+
 namespace utils {
 /**
  * @brief 문자열 내에 공백이 존재하는지 확인하는 함수
@@ -22,7 +23,7 @@ std::string trim_whitespace(const std::string &s);
  * @param num 기대하는 들여쓰기 수준
  * @return 들여쓰기 수준이 num과 같으면 true, 그렇지 않으면 false
  *
- * 탭 1개 또는 공백 4개를 동일한 들여쓰기 1단계로 처리한다.
+ * - 탭 1개 또는 공백 4개를 동일한 들여쓰기 1단계로 처리한다.
  */
 bool match_indent_level(std::string line, size_t num);
 /**
@@ -31,17 +32,17 @@ bool match_indent_level(std::string line, size_t num);
  * @param delim 문자열을 나눌 기준 구분자
  * @return 구분자를 기준으로 분리된 문자열들을 저장한 벡터
  *
- * 빈 문자열은 결과에 포함하지 않는다.
+ * - 빈 문자열은 결과에 포함하지 않는다.
  */
 std::vector<std::string> string_split(const std::string &line,
                                       const std::string &delim);
 /**
- * @brief 문자열에 지정한 문자들 중 하나라도 포함되어 있는지 확인하는 함수
+ * @brief 문자열에 허용되지 않은 문자가 포함되어 있는지 확인하는 함수
  * @param line 검사할 문자열
- * @param chars 포함 여부를 확인할 문자 집합
- * @return 지정한 문자들 중 하나라도 포함되어 있으면 true, 그렇지 않으면 false
+ * @param allowed 추가로 허용할 문자 집합
+ * @return 허용되지 않은 문자가 존재하면 true, 그렇지 않으면 false
  */
-bool contains_any_of(const std::string &line, const std::string &chars);
+bool has_invalid_char(const std::string &line, const std::string &chars);
 /**
  * @brief 문자열에서 특정 문자 또는 문자열의 출현 횟수를 계산한다.
  * @param line 검사할 문자열
