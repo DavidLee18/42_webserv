@@ -77,12 +77,14 @@ void Server::client_read(const FileDescriptor *client_fd) {
       std::cout << "[Request] " << request.get_method_string() << " "
                 << request.get_path() << std::endl;
 
+      // response generate
       Response http;
       if (ServerResponse::find_file_type(request.get_path()) == "cgi")
         http = ServerResponse::cgi_response(&request, clients.at(client_fd).config, &epoll);
       else
         http = ServerResponse::http_response(&request, clients.at(client_fd).config, mime_type);
-      // HTTP response
+
+      // read server response
       std::ostringstream server_response;
       if (!http.cgi.empty())
         server_response << http.cgi;
