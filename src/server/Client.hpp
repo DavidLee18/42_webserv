@@ -103,6 +103,20 @@ public:
    * @return const std::string The requested path.
    */
   const std::string get_path() const { return path; };
+
+  /**
+   * @brief Gets the parsed HTTP headers.
+   * 
+   * @return const std::map<std::string, std::string>& The headers map.
+   */
+  const std::map<std::string, std::string>& get_headers() const { return header; }
+
+  /**
+   * @brief Gets the request body.
+   * 
+   * @return const std::string& The request body.
+   */
+  const std::string& get_body() const { return body; }
 };
 
 #endif

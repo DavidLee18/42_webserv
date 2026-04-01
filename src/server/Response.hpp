@@ -15,6 +15,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+class EPoll;
+
 /**
  * @struct Target
  * @brief Represents the resolved target resource path and its type.
@@ -46,6 +48,7 @@ struct HttpResponse {
   std::string mime_type;    ///< The determined MIME type of the response payload.
   std::string redir;        ///< Redirect location, if applicable.
   bool keep_alive;          ///< Connection keep-alive status.
+  std::string cgi;          ///< Generated CGI script.
 };
 
 class Request;
@@ -67,7 +70,8 @@ public:
    */
   static HttpResponse
   generate(const Request *request, const ServerConfig *config,
-           const std::map<std::string, std::string> mime_type);
+           const std::map<std::string, std::string> mime_type,
+           EPoll *epoll);
 
 private:
   /**

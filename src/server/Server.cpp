@@ -81,25 +81,28 @@ void Server::client_read(const FileDescriptor *client_fd) {
                 << request.get_path() << std::endl;
 
       HttpResponse http =
-          Response::generate(&request, clients.at(client_fd).config, mime_type);
+          Response::generate(&request, clients.at(client_fd).config, mime_type, &epoll);
       std::cout << "Mime type: " << http.mime_type << std::endl;
       std::cout << "Response url: "
                 << clients.at(client_fd).config->get_rewritten_path(request.get_method(),
-                                                        request.get_path())
+                                                                     request.get_path())
                 << std::endl
                 << std::endl;
 
-      // HTTP 응답 메시지 조립
-      // todo: 하드코딩된 response 말고 동적으로
+      // HTTP response
       std::ostringstream server_response;
-      server_response << "HTTP/1.1 " << http.status_code << "\r\n";
-      if (!http.redir.empty())
-        server_response << "Location:" << http.redir << "\r\n";
-      server_response << "Content-Type:" << http.mime_type << "\r\n";
-      server_response << "Content-Length: " << http.body.length() << "\r\n";
-      server_response << "Connection: " << http.connection << "\r\n\r\n";
-      server_response << http.body;
-
+      if (!http.cgi.empty())
+        server_response << http.cgi;
+      else
+      {
+        server_response << "HTTP/1.1 " << http.status_code << "\r\n";
+        if (!http.redir.empty())
+          server_response << "Location:" << http.redir << "\r\n";
+        server_response << "Content-Type:" << http.mime_type << "\r\n";
+        server_response << "Content-Length: " << http.body.length() << "\r\n";
+        server_response << "Connection: " << http.connection << "\r\n\r\n";
+        server_response << http.body;
+      }
       clients.at(client_fd).out_buff += server_response.str();
       in_buffer.erase(0, header_end + 4);
     }

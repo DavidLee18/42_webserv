@@ -74,19 +74,67 @@ std::string find_file_type(std::string path) {
 
 HttpResponse
 Response::generate(const Request *request, const ServerConfig *config,
-                   const std::map<std::string, std::string> mime_type) {
+                   const std::map<std::string, std::string> mime_type,
+                   EPoll *epoll) {
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
   HttpResponse response;
   Target target = resolve_target(rule, config, request);
 
-  response.redir = "";
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
   if (find_file_type(target.path) == "cgi")
   {
-    CgiDelegate cgi(request, get_pwd() + request->get_path());
-    cgi.execute(config->get_server_response_time(), );
+    CgiDelegate cgi(*request, get_pwd() + request->get_path());
+    Result<std::string>cgi_result = cgi.execute(config->get_server_response_time(), epoll);
+    if (!cgi_result.has_value()) {
+      std::cerr << "CGI ERROR: " << cgi_result.error() << std::endl;
+      response.status_code = status_code_to_string(500);
+      response.mime_type = "text/plain";
+      response.body = "Internal Server Error: " + cgi_result.error();
+      return response;
+    }
+    
+    std::string out = cgi_result.value();
+    std::string headers_section;
+    std::string body_section;
+    size_t blank_line_pos = out.find("\r\n\r\n");
+
+    if (blank_line_pos == std::string::npos) {
+        blank_line_pos = out.find("\n\n");
+        if (blank_line_pos != std::string::npos) {
+            headers_section = out.substr(0, blank_line_pos);
+            body_section = out.substr(blank_line_pos + 2);
+        } else {
+            body_section = out;
+        }
+    } else {
+        headers_section = out.substr(0, blank_line_pos);
+        body_section = out.substr(blank_line_pos + 4);
+    }
+    
+    std::string status = "200 OK";
+    size_t status_pos = headers_section.find("Status: ");
+    if (status_pos != std::string::npos) {
+        size_t end = headers_section.find("\n", status_pos);
+        if (end != std::string::npos) {
+            status = headers_section.substr(status_pos + 8, end - status_pos - 8);
+            if (!status.empty() && status[status.length()-1] == '\r')
+                status = status.substr(0, status.length()-1);
+        } else {
+            status = headers_section.substr(status_pos + 8);
+        }
+    }
+    
+    std::ostringstream full_resp;
+    full_resp << "HTTP/1.1 " << status << "\r\n";
+    if (!headers_section.empty())
+        full_resp << headers_section << "\r\n";
+    full_resp << "Content-Length: " << body_section.length() << "\r\n\r\n";
+    full_resp << body_section;
+    
+    response.cgi = full_resp.str();
+    return response;
   }
   else if (rule->op == REDIRECT)
   {
