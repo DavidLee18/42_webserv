@@ -1,6 +1,6 @@
 CXX				:= c++
 CXXFLAGS_COMMON	:= -Wall -Werror -Wextra -Wconversion -std=c++98
-CXXFLAGS		:= -O2 -foptimize-sibling-calls -fPIE
+CXXFLAGS		:= -O2 -foptimize-sibling-calls
 DEBUG_CXXFLAGS	:= -g3 -O0 #-fsanitize=address -fno-omit-frame-pointer
 NAME			:= webserv
 
