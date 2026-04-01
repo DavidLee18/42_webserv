@@ -79,12 +79,16 @@ Response::generate(const Request *request, const ServerConfig *config,
       config->find_route(request->get_method(), request->get_path());
   HttpResponse response;
   Target target = resolve_target(rule, config, request);
-  std::cout << "CONFIG FIND ROUTE GET PATH: " << std::endl;
 
   response.redir = "";
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
-  if (rule->op == REDIRECT)
+  if (find_file_type(target.path) == "cgi")
+  {
+    CgiDelegate cgi(request, get_pwd() + request->get_path());
+    cgi.execute(config->get_server_response_time(), );
+  }
+  else if (rule->op == REDIRECT)
   {
     target.type = MOVED_PERMANENTLY;
     response.redir = rule->redirect_target.to_string();
