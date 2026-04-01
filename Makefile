@@ -35,6 +35,9 @@ CGI_SRC       := src/cgi/cgi_html_gen.cpp
 
 all: $(NAME) uwsgi cgi
 
+integration-test: all
+	bash tests/integration/cgi_uwsgi_full_suite.sh
+
 cgi: $(CGI_NAME)
 
 $(CGI_NAME): $(CGI_SRC)
@@ -69,4 +72,4 @@ $(UWSGI_BUILD_DIR)/%.o: $(UWSGI_SRC_DIR)/%.cpp
 -include $(DEPS)
 -include $(UWSGI_DEPS)
 
-.PHONY: all clean fclean re bonus rebo uwsgi cgi
+.PHONY: all clean fclean re bonus rebo uwsgi cgi integration-test
