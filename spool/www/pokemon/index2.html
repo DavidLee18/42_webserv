@@ -1,0 +1,104 @@
+<div class="cards-wrapper">
+  <div class="container">
+    <div class="overlay"></div>
+    <div class="kyogre"></div>
+  </div>
+  <div class="container">
+    <div class="overlay"></div>
+    <div class="rayquaza"></div>
+  </div>
+  <div class="container">
+    <div class="overlay"></div>
+    <div class="groudon"></div>
+  </div>
+</div>
+
+<script>
+  var containers = document.querySelectorAll('.container');
+  
+  containers.forEach(function(container) {
+    var overlay = container.querySelector('.overlay');
+    
+    container.addEventListener('mousemove', function(e){
+      var x = e.offsetX;
+      var y = e.offsetY;
+      var rotateY = -1/5 * x + 20;
+      var rotateX = 4/30 * y - 20;
+
+      overlay.style = `background-position : ${x/5 + y/5}%; filter : opacity(${x/200}) brightness(1.2)`;
+
+      container.style = `transform : perspective(350px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    });
+
+    container.addEventListener('mouseout', function(){
+      overlay.style = 'filter : opacity(0)';
+      container.style = 'transform : perspective(350px) rotateY(0deg) rotateX(0deg)';
+    });
+  });
+
+
+</script>
+
+<style>
+  body {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #1a1a1a;
+  }
+  .cards-wrapper {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 20px;
+  }
+  .container {
+    width: 220px; height: 310px; transition : all 0.1s;
+    position: relative;
+    border-radius: 10px;
+  }
+  .overlay {
+    position: absolute;
+    width: 220px;
+    height: 310px;
+    background: linear-gradient(105deg,
+    transparent 40%,
+    rgba(255, 219, 112, 0.8) 45%,
+    rgba(132, 50, 255 ,0.6) 50%,
+    transparent 54%);
+    filter: brightness(1.1) opacity(0.8);
+    mix-blend-mode: color-dodge;
+    background-size: 150% 150%;
+    background-position: 100%;
+    transition: all 0.1s;
+    border-radius: 10px;
+  }
+  .pikachu {
+    width: 220px; height: 310px;
+    background-image: url(pokemon/pika.webp);
+    background-size: cover;
+    border-radius: 10px;
+  }
+  .kyogre {
+    width: 220px; height: 310px;
+    background-image: url(pokemon/kyogre.webp);
+    background-size: cover;
+    border-radius: 10px;
+  }
+  .rayquaza {
+    width: 220px; height: 310px;
+    background-image: url(pokemon/rayquaza.webp);
+    background-size: cover;
+    border-radius: 10px;
+  }
+  .groudon {
+    width: 220px; height: 310px;
+    background-image: url(pokemon/groudon.webp);
+    background-size: cover;
+    border-radius: 10px;
+  }
+</style>
+

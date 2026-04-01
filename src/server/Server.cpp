@@ -93,7 +93,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
       // todo: 하드코딩된 response 말고 동적으로
       std::ostringstream server_response;
       server_response << "HTTP/1.1 " << http.status_code << "\r\n";
-
+      if (!http.redir.empty())
+        server_response << "Location:" << http.redir << "\r\n";
       server_response << "Content-Type:" << http.mime_type << "\r\n";
       server_response << "Content-Length: " << http.body.length() << "\r\n";
       server_response << "Connection: " << http.connection << "\r\n\r\n";

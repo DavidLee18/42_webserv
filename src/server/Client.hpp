@@ -1,33 +1,61 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
+/**
+ * @file Client.hpp
+ * @brief Defines the ClientSession struct and Request class for handling client HTTP requests.
+ */
+
 #include <map>
 #include <sstream>
 #include <string>
 
+/**
+ * @brief Utility function to retrieve a value from a map of strings based on a key.
+ * 
+ * @param map The map to search in.
+ * @param key The key to look for.
+ * @return std::string The value corresponding to the key, or an empty string if not found.
+ */
 std::string get_string_from_map(const std::map<std::string, std::string> map, std::string key);
 
 class ServerConfig;
+
+/**
+ * @struct ClientSession
+ * @brief Holds information and buffers for a single client session.
+ */
 struct ClientSession {
-  std::string in_buff;
-  std::string out_buff;
+  std::string in_buff;  ///< Buffer for incoming data.
+  std::string out_buff; ///< Buffer for outgoing data.
 
-  const ServerConfig *config;
+  const ServerConfig *config; ///< Pointer to the server configuration for this session.
 
+  /**
+   * @brief Default constructor. Initializes config to NULL.
+   */
   ClientSession() : config(NULL) {}
 };
 
+/**
+ * @class Request
+ * @brief Parses and stores information from an HTTP request.
+ */
 class Request {
 private:
-  std::string method; // "GET"
-  std::string path; // "/index.html"
-  std::string version; // "HTTP/1.1"
-  bool keep_alive; //
-  std::map<std::string, std::string> header;
-  std::string body;
-  bool content_full;
+  std::string method;       ///< The HTTP method (e.g., "GET").
+  std::string path;         ///< The requested path (e.g., "/index.html").
+  std::string version;      ///< The HTTP version (e.g., "HTTP/1.1").
+  bool keep_alive;          ///< Connection keep-alive status.
+  std::map<std::string, std::string> header; ///< Parsed HTTP headers.
+  std::string body;         ///< The request body, if any.
+  bool content_full;        ///< Flag indicating if the entire body has been received.
 
 public:
+  /**
+   * @enum Method
+   * @brief Enum representing standard HTTP methods.
+   */
   enum Method {
     GET,
     HEAD,
@@ -40,12 +68,41 @@ public:
     PATCH,
     ERROR
   };
+
+  /**
+   * @brief Construct a new Request object by parsing an HTTP request string.
+   * 
+   * @param request The raw HTTP request string.
+   */
   Request(std::string request);
+
+  /**
+   * @brief Gets the value of the Connection header.
+   * 
+   * @return const std::string Connection header value.
+   */
   const std::string get_connection_string() const;
+
+  /**
+   * @brief Gets the requested HTTP method as an enum value.
+   * 
+   * @return Request::Method The method enum.
+   */
   Request::Method get_method() const;
+
+  /**
+   * @brief Gets the requested HTTP method as a string.
+   * 
+   * @return const std::string The method string.
+   */
   const std::string get_method_string() const { return method; };
+
+  /**
+   * @brief Gets the requested path.
+   * 
+   * @return const std::string The requested path.
+   */
   const std::string get_path() const { return path; };
-  const std::string get_path_only() const;
 };
 
 #endif
