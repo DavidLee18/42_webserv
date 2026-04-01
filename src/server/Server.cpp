@@ -72,23 +72,16 @@ void Server::client_read(const FileDescriptor *client_fd) {
     std::string &in_buffer = clients.at(client_fd).in_buff;
     size_t header_end = in_buffer.find("\r\n\r\n");
 
-    // todo: 해당 client의 포트 번호에 따른 config 적용
-    // 맞는 로케이션 블럭
     if (header_end != std::string::npos) {
-
       Request request(in_buffer);
       std::cout << "[Request] " << request.get_method_string() << " "
                 << request.get_path() << std::endl;
 
-      HttpResponse http =
-          Response::generate(&request, clients.at(client_fd).config, mime_type, &epoll);
-      std::cout << "Mime type: " << http.mime_type << std::endl;
-      std::cout << "Response url: "
-                << clients.at(client_fd).config->get_rewritten_path(request.get_method(),
-                                                                     request.get_path())
-                << std::endl
-                << std::endl;
-
+      Response http;
+      if (ServerResponse::find_file_type(request.get_path()) == "cgi")
+        http = ServerResponse::cgi_response(&request, clients.at(client_fd).config, &epoll);
+      else
+        http = ServerResponse::http_response(&request, clients.at(client_fd).config, mime_type);
       // HTTP response
       std::ostringstream server_response;
       if (!http.cgi.empty())

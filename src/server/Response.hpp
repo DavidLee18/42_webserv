@@ -23,7 +23,8 @@ class EPoll;
  */
 struct Target {
   std::string path; ///< The absolute path to the target resource.
-  int type;         ///< The type or status of the target (e.g., IS_DIR, IS_FILE, errors).
+  int type; ///< The type or status of the target (e.g., IS_DIR, IS_FILE,
+            ///< errors).
 };
 
 /**
@@ -36,19 +37,19 @@ struct StatusInfo {
 };
 
 /**
- * @struct HttpResponse
+ * @struct Response
  * @brief Represents the components of an HTTP response.
  */
-struct HttpResponse {
+struct Response {
   std::string version;      ///< HTTP version (e.g., "HTTP/1.1").
   std::string status_code;  ///< HTTP status code and reason (e.g., "200 OK").
   std::string content_type; ///< Content-Type header.
   std::string connection;   ///< Connection header.
   std::string body;         ///< The response body payload.
-  std::string mime_type;    ///< The determined MIME type of the response payload.
-  std::string redir;        ///< Redirect location, if applicable.
-  bool keep_alive;          ///< Connection keep-alive status.
-  std::string cgi;          ///< Generated CGI script.
+  std::string mime_type; ///< The determined MIME type of the response payload.
+  std::string redir;     ///< Redirect location, if applicable.
+  bool keep_alive;       ///< Connection keep-alive status.
+  std::string cgi;       ///< Generated CGI script.
 };
 
 class Request;
@@ -58,20 +59,25 @@ class ServerConfig;
  * @class Response
  * @brief Static utility class for generating HTTP responses.
  */
-class Response {
+class ServerResponse {
 public:
+  static std::string find_file_type(std::string path);
   /**
-   * @brief Generates an HttpResponse based on the client request and server configuration.
-   * 
+   * @brief Generates an Response based on the client request and server
+   * configuration.
+   *
    * @param request Pointer to the parsed Request object.
    * @param config Pointer to the ServerConfig for the target server.
    * @param mime_type Map of file extension to MIME types.
-   * @return HttpResponse The fully formulated HTTP response components.
+   * @return Response The fully formulated HTTP response components.
    */
-  static HttpResponse
-  generate(const Request *request, const ServerConfig *config,
-           const std::map<std::string, std::string> mime_type,
-           EPoll *epoll);
+  static Response
+  http_response(const Request *request, const ServerConfig *config,
+                const std::map<std::string, std::string> mime_type);
+
+  static Response
+  cgi_response(const Request *request,
+               const ServerConfig *config, EPoll *epoll);
 
 private:
   /**
@@ -97,48 +103,53 @@ private:
 
   /**
    * @brief Converts an integer status code to its HTTP reason phrase string.
-   * 
+   *
    * @param status_code The numeric HTTP status code.
    * @return std::string The status line string (e.g., "200 OK").
    */
   static std::string status_code_to_string(int status_code);
 
   /**
-   * @brief Checks the file system to determine what kind of resource exists at the given path.
-   * 
+   * @brief Checks the file system to determine what kind of resource exists at
+   * the given path.
+   *
    * @param path The file system path to check.
-   * @return int The determined Status/Type (e.g., IS_DIR, IS_FILE, or error codes).
+   * @return int The determined Status/Type (e.g., IS_DIR, IS_FILE, or error
+   * codes).
    */
   static int check_path_type(const std::string &path);
 
   /**
    * @brief Resolves the final target resource according to matching RouteRule.
-   * 
+   *
    * @param rule Pointer to the matched RouteRule.
    * @param config Pointer to the relevant ServerConfig.
    * @param request Pointer to the Request object.
    * @return Target The resolved target path and its calculated type/status.
    */
-  static Target resolve_target(const RouteRule *rule, const ServerConfig *config, const Request *request);
+  static Target resolve_target(const RouteRule *rule,
+                               const ServerConfig *config,
+                               const Request *request);
 
   /**
    * @brief Retreives the current working directory of the process.
-   * 
+   *
    * @return std::string The absolute path of the current working directory.
    */
   static std::string get_pwd();
 
   /**
    * @brief Gets the custom error file path corresponding to a status code.
-   * 
+   *
    * @param error_code The HTTP error status code.
    * @return std::string Path to the configured error file.
    */
   static std::string error_file_path(int error_code);
 
   /**
-   * @brief Generates an HTML page listing the contents of a directory (autoindex).
-   * 
+   * @brief Generates an HTML page listing the contents of a directory
+   * (autoindex).
+   *
    * @param real_path The physical directory path on the local file system.
    * @param req_uri The request URI path used by the client.
    * @return std::string The HTML content representing the directory index.

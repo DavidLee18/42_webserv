@@ -21,7 +21,7 @@ std::string get_string_from_map(const std::map<std::string, std::string> map,
     return "";
 }
 
-std::string Response::status_code_to_string(int status_code) {
+std::string ServerResponse::status_code_to_string(int status_code) {
   if (status_code == 200)
     return "200 OK";
   else if (status_code == 301)
@@ -41,7 +41,7 @@ std::string Response::status_code_to_string(int status_code) {
   return "500 Internal Server Error";
 }
 
-std::string Response::get_pwd() {
+std::string ServerResponse::get_pwd() {
   char buffer[1024];
   if (getcwd(buffer, sizeof(buffer)) != NULL) {
     return std::string(buffer);
@@ -49,7 +49,7 @@ std::string Response::get_pwd() {
   return "";
 }
 
-int Response::check_path_type(const std::string &path) {
+int ServerResponse::check_path_type(const std::string &path) {
   struct stat info;
 
   if (stat(path.c_str(), &info) != 0)
@@ -63,87 +63,86 @@ int Response::check_path_type(const std::string &path) {
   return PATH_ERROR;
 }
 
-std::string find_file_type(std::string path) {
+std::string ServerResponse::find_file_type(std::string path) {
   std::vector<std::string> file_type = utils::string_split(path, ".");
-  std::cout << "file type: " << file_type.back() << std::endl;
 
   if (file_type.size() <= 1)
     return "default";
   return file_type.back();
 }
 
-HttpResponse
-Response::generate(const Request *request, const ServerConfig *config,
-                   const std::map<std::string, std::string> mime_type,
-                   EPoll *epoll) {
+Response ServerResponse::cgi_response(const Request *request,
+                                    const ServerConfig *config, EPoll *epoll) {
+  Response response;
+  CgiDelegate cgi(*request, get_pwd() + request->get_path());
+  Result<std::string> cgi_result =
+      cgi.execute(config->get_server_response_time(), epoll);
+  if (!cgi_result.has_value()) {
+    std::cerr << "CGI ERROR: " << cgi_result.error() << std::endl;
+    response.status_code = status_code_to_string(500);
+    response.mime_type = "text/plain";
+    response.body = "Internal Server Error: " + cgi_result.error();
+    return response;
+  }
+
+  std::string out = cgi_result.value();
+  std::string headers_section;
+  std::string body_section;
+  size_t blank_line_pos = out.find("\r\n\r\n");
+
+  if (blank_line_pos == std::string::npos) {
+    blank_line_pos = out.find("\n\n");
+    if (blank_line_pos != std::string::npos) {
+      headers_section = out.substr(0, blank_line_pos);
+      body_section = out.substr(blank_line_pos + 2);
+    } else {
+      body_section = out;
+    }
+  } else {
+    headers_section = out.substr(0, blank_line_pos);
+    body_section = out.substr(blank_line_pos + 4);
+  }
+
+  std::string status = "200 OK";
+  size_t status_pos = headers_section.find("Status: ");
+  if (status_pos != std::string::npos) {
+    size_t end = headers_section.find("\n", status_pos);
+    if (end != std::string::npos) {
+      status = headers_section.substr(status_pos + 8, end - status_pos - 8);
+      if (!status.empty() && status[status.length() - 1] == '\r')
+        status = status.substr(0, status.length() - 1);
+    } else {
+      status = headers_section.substr(status_pos + 8);
+    }
+  }
+
+  std::ostringstream full_resp;
+  full_resp << "HTTP/1.1 " << status << "\r\n";
+  if (!headers_section.empty())
+    full_resp << headers_section << "\r\n";
+  full_resp << "Content-Length: " << body_section.length() << "\r\n\r\n";
+  full_resp << body_section;
+
+  response.cgi = full_resp.str();
+  return response;
+}
+
+Response
+ServerResponse::http_response(const Request *request, const ServerConfig *config,
+                   const std::map<std::string, std::string> mime_type) {
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
-  HttpResponse response;
+  Response response;
   Target target = resolve_target(rule, config, request);
 
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
-  if (find_file_type(target.path) == "cgi")
-  {
-    CgiDelegate cgi(*request, get_pwd() + request->get_path());
-    Result<std::string>cgi_result = cgi.execute(config->get_server_response_time(), epoll);
-    if (!cgi_result.has_value()) {
-      std::cerr << "CGI ERROR: " << cgi_result.error() << std::endl;
-      response.status_code = status_code_to_string(500);
-      response.mime_type = "text/plain";
-      response.body = "Internal Server Error: " + cgi_result.error();
-      return response;
-    }
-    
-    std::string out = cgi_result.value();
-    std::string headers_section;
-    std::string body_section;
-    size_t blank_line_pos = out.find("\r\n\r\n");
-
-    if (blank_line_pos == std::string::npos) {
-        blank_line_pos = out.find("\n\n");
-        if (blank_line_pos != std::string::npos) {
-            headers_section = out.substr(0, blank_line_pos);
-            body_section = out.substr(blank_line_pos + 2);
-        } else {
-            body_section = out;
-        }
-    } else {
-        headers_section = out.substr(0, blank_line_pos);
-        body_section = out.substr(blank_line_pos + 4);
-    }
-    
-    std::string status = "200 OK";
-    size_t status_pos = headers_section.find("Status: ");
-    if (status_pos != std::string::npos) {
-        size_t end = headers_section.find("\n", status_pos);
-        if (end != std::string::npos) {
-            status = headers_section.substr(status_pos + 8, end - status_pos - 8);
-            if (!status.empty() && status[status.length()-1] == '\r')
-                status = status.substr(0, status.length()-1);
-        } else {
-            status = headers_section.substr(status_pos + 8);
-        }
-    }
-    
-    std::ostringstream full_resp;
-    full_resp << "HTTP/1.1 " << status << "\r\n";
-    if (!headers_section.empty())
-        full_resp << headers_section << "\r\n";
-    full_resp << "Content-Length: " << body_section.length() << "\r\n\r\n";
-    full_resp << body_section;
-    
-    response.cgi = full_resp.str();
-    return response;
-  }
-  else if (rule->op == REDIRECT)
-  {
+  if (rule->op == REDIRECT) {
     target.type = MOVED_PERMANENTLY;
     response.redir = rule->redirect_target.to_string();
     response.mime_type = "text/html";
     response.body = "<html><body><h1>301 Moved Permanently</h1></body></html>";
-  }
-  else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
+  } else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     target.type = OK;
     response.mime_type = "html";
     response.body = make_autoindex_page(target.path, request->get_path());
@@ -163,14 +162,17 @@ Response::generate(const Request *request, const ServerConfig *config,
   return response;
 }
 
-Target Response::resolve_target(const RouteRule *rule, const ServerConfig *config, const Request *request) {
+Target ServerResponse::resolve_target(const RouteRule *rule,
+                                const ServerConfig *config,
+                                const Request *request) {
   Target target;
   if (rule == NULL) {
     target.type = NOT_FOUND_ERR;
     target.path = get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
     return target;
   }
-  std::string root = config->get_rewritten_path(request->get_method(), request->get_path());
+  std::string root =
+      config->get_rewritten_path(request->get_method(), request->get_path());
 
   target.path = get_pwd();
   std::cout << "Root: " << target.path + root << std::endl;
@@ -183,9 +185,13 @@ Target Response::resolve_target(const RouteRule *rule, const ServerConfig *confi
   } else if (type == IS_DIR && rule->op == AUTOINDEX)
     target.path += root;
   else if (type == NOT_FOUND_ERR)
-    target.path += config->get_rewritten_path(request->get_method(), get_string_from_map(rule->error_pages, NOT_FOUND_ERR));
+    target.path += config->get_rewritten_path(
+        request->get_method(),
+        get_string_from_map(rule->error_pages, NOT_FOUND_ERR));
   else if (type == FORBIDDEN_ERR)
-    target.path += config->get_rewritten_path(request->get_method(), get_string_from_map(rule->error_pages, FORBIDDEN_ERR));
+    target.path += config->get_rewritten_path(
+        request->get_method(),
+        get_string_from_map(rule->error_pages, FORBIDDEN_ERR));
   else
     target.path += root;
   target.type = type;
@@ -200,7 +206,7 @@ Target Response::resolve_target(const RouteRule *rule, const ServerConfig *confi
   return target;
 }
 
-std::string Response::make_autoindex_page(const std::string &real_path,
+std::string ServerResponse::make_autoindex_page(const std::string &real_path,
                                           const std::string &req_uri) {
   DIR *dir = opendir(real_path.c_str());
   if (dir == NULL) {
