@@ -1,6 +1,6 @@
 CXX				:= c++
 CXXFLAGS_COMMON	:= -Wall -Werror -Wextra -Wconversion -std=c++98
-CXXFLAGS		:= -O2 -foptimize-sibling-calls
+CXXFLAGS		:= -O2 -foptimize-sibling-calls -fPIE
 DEBUG_CXXFLAGS	:= -g3 -O0 #-fsanitize=address -fno-omit-frame-pointer
 NAME			:= webserv
 
@@ -16,9 +16,9 @@ UWSGI_OBJS     := $(addprefix $(UWSGI_BUILD_DIR)/, $(UWSGI_SRC_FILES:.cpp=.o))
 UWSGI_DEPS     := $(addprefix $(UWSGI_BUILD_DIR)/, $(UWSGI_SRC_FILES:.cpp=.d))
 
 
-SRC_FILES	:= errors.cpp epoll_kqueue.cpp file_descriptor.cpp	\
-	ParsingUtils.cpp ServerConfig.cpp WebserverConfig.cpp		\
-	json.cpp cgi_1_1.cpp uwsgi.cpp uwsgi_client.cpp http_1_1.cpp \
+SRC_FILES	:= errors.cpp epoll_kqueue.cpp file_descriptor.cpp		\
+	ParsingUtils.cpp ServerConfig.cpp WebserverConfig.cpp			\
+	json.cpp cgi_1_1.cpp uwsgi.cpp uwsgi_client.cpp http_1_1.cpp	\
 	RouteRule_CGI.cpp main.cpp 
 SERVER		:=	Server.cpp	Client.cpp	Response.cpp
 

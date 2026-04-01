@@ -78,8 +78,7 @@ Response::generate(const Request *request, const ServerConfig *config,
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
   HttpResponse response;
-  Target target = resolve_target(
-      rule, config->get_to(request->get_method(), request->get_path()));
+  Target target = resolve_target(rule, config, request);
   std::cout << "CONFIG FIND ROUTE GET PATH: " << std::endl;
 
   response.mime_type =
@@ -111,16 +110,16 @@ Target Response::resolve_target(const RouteRule *rule, const ServerConfig *confi
     target.path = get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
     return target;
   }
-  std::string root = config->Get_to(request->get_method(), request->get_path());
+  std::string root = config->get_to(request->get_method(), request->get_path());
 
   target.path = get_pwd();
   std::cout << "Root: " << target.path + root << std::endl;
   int type = check_path_type(target.path + root);
   if (type == IS_DIR && rule->op != AUTOINDEX) {
     if (rule->index.empty())
-      target.path += config->Get_to(request->get_method(), "/index.html");
+      target.path += config->get_to(request->get_method(), "/index.html");
     else
-      target.path += config->Get_to(request->get_method(), "/" + rule->index);
+      target.path += config->get_to(request->get_method(), "/" + rule->index);
   } else if (type == NOT_FOUND_ERR)
     target.path += get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
   else if (type == FORBIDDEN_ERR)
