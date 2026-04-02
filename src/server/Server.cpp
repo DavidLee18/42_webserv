@@ -84,6 +84,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
       else
         http = ServerResponse::http_response(&request, clients.at(client_fd).config, mime_type);
 
+      
       // read server response
       std::ostringstream server_response;
       if (!http.cgi.empty())

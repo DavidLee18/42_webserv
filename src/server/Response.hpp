@@ -46,10 +46,10 @@ struct Response {
   std::string content_type; ///< Content-Type header.
   std::string connection;   ///< Connection header.
   std::string body;         ///< The response body payload.
-  std::string mime_type; ///< The determined MIME type of the response payload.
-  std::string redir;     ///< Redirect location, if applicable.
-  bool keep_alive;       ///< Connection keep-alive status.
-  std::string cgi;       ///< Generated CGI script.
+  std::string mime_type;    ///< The determined MIME type of the response payload.
+  std::string redir;        ///< Redirect location, if applicable.
+  bool keep_alive;          ///< Connection keep-alive status.
+  std::string cgi;          ///< Generated CGI script.
 };
 
 class Request;
