@@ -3,6 +3,7 @@
 
 #include "http_1_1.h"
 #include "result.h"
+#include "server/Client.hpp"
 #include <list>
 #include <map>
 #include <string>
@@ -527,19 +528,19 @@ private:
 
 class CgiInput {
   std::vector<CgiMetaVar> mvars;
-  Http::Body req_body;
+  std::string req_body;
 
 private:
   CgiInput();
-  CgiInput(std::vector<CgiMetaVar>, Http::Body);
-  CgiInput(Http::Request const &);
+  CgiInput(std::vector<CgiMetaVar>, std::string);
+  CgiInput(Request const &);
 
 public:
   class Parser {
     virtual void phantom() = 0;
 
   public:
-    static Result<CgiInput> parse(Http::Request const &);
+    static Result<CgiInput> parse(Request const &);
   };
 
   friend class Parser;
@@ -561,11 +562,11 @@ public:
 class CgiDelegate {
   CgiInput env;
   std::string script_path;
-  Http::Request request;
+  const Request& request;
 
 public:
-  CgiDelegate(const Http::Request &req, const std::string &script);
-  Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
+  CgiDelegate(const Request &req, const std::string &script);
+  Result<std::string> execute(int timeout_ms, EPoll *epoll);
   ~CgiDelegate();
 };
 

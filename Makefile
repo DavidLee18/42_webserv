@@ -17,13 +17,14 @@ UWSGI_DEPS     := $(addprefix $(UWSGI_BUILD_DIR)/, $(UWSGI_SRC_FILES:.cpp=.d))
 
 
 SRC_FILES	:= errors.cpp epoll_kqueue.cpp file_descriptor.cpp	\
-	ParsingUtils.cpp ServerConfig.cpp WebserverConfig.cpp		\
-	json.cpp cgi_1_1.cpp uwsgi.cpp uwsgi_client.cpp http_1_1.cpp \
-	RouteRule_CGI.cpp main.cpp 
-SERVER		:=	Server.cpp	Session.cpp	Response.cpp
+	ParsingUtils.cpp json.cpp cgi_1_1.cpp uwsgi.cpp uwsgi_client.cpp \
+	http_1_1.cpp main.cpp 
+SERVER		:=	Server.cpp	Client.cpp	Response.cpp
+CONFIG		:=	WebserverConfig.cpp ServerConfig.cpp \
+	RouteRule_CGI.cpp PathPattern.cpp
 
-SRC_DIRS	:= server
-SRCS		:= $(SRC_FILES) $(SERVER)
+SRC_DIRS	:= server config
+SRCS		:= $(SRC_FILES) $(CONFIG) $(SERVER)
 
 OBJS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.o))
 DEPS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.d))

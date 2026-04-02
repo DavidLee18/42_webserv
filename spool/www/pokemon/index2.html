@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Legendary Pokemon</title>
+  <link rel="icon" href="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" type="image/png">
+</head>
+<body>
+
+<a href="/" class="back-button">&#8592; Back to Main</a>
+<div class="page-container">
+  <div class="header">
+    <div class="badge">HOVER EFFECT</div>
+    <h1>Legendary Pokemon</h1>
+    <p class="subtext">Interactive 3D holographic cards</p>
+  </div>
+  <div class="cards-wrapper">
+    <div class="container">
+      <div class="overlay"></div>
+      <div class="kyogre"></div>
+  </div>
+  <div class="container">
+    <div class="overlay"></div>
+    <div class="rayquaza"></div>
+  </div>
+  <div class="container">
+    <div class="overlay"></div>
+    <div class="groudon"></div>
+  </div>
+</div>
+</div>
+
+<script>
+  var containers = document.querySelectorAll('.container');
+  
+  containers.forEach(function(container) {
+    var overlay = container.querySelector('.overlay');
+    
+    container.addEventListener('mousemove', function(e){
+      var x = e.offsetX;
+      var y = e.offsetY;
+      var rotateY = -1/5 * x + 20;
+      var rotateX = 4/30 * y - 20;
+
+      overlay.style = `background-position : ${x/5 + y/5}%; filter : opacity(${x/200}) brightness(1.2)`;
+
+      container.style = `transform : perspective(350px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    });
+
+    container.addEventListener('mouseout', function(){
+      overlay.style = 'filter : opacity(0)';
+      container.style = 'transform : perspective(350px) rotateY(0deg) rotateX(0deg)';
+    });
+  });
+
+
+</script>
+
+<style>
+  body {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% -20%, #2b2b2b, #0d0d0d);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #fff;
+    overflow-x: hidden;
+  }
+  .page-container {
+    text-align: center;
+    padding: 60px 80px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 32px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  }
+  .header {
+    margin-bottom: 40px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border: 1px solid rgba(255, 203, 5, 0.3);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #ffcb05;
+    letter-spacing: 1.5px;
+    margin-bottom: 16px;
+    background: rgba(255, 203, 5, 0.05);
+  }
+  h1 {
+    font-size: 42px;
+    margin: 0 0 12px 0;
+    letter-spacing: -1px;
+  }
+  .subtext {
+    color: #a8adb4;
+    font-size: 16px;
+    margin: 0;
+  }
+  .back-button {
+    position: absolute;
+    top: 50px;
+    left: 60px;
+    color: #f5f7fa;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: bold;
+    padding: 12px 24px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+    z-index: 10;
+  }
+  .back-button:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+  }
+  .cards-wrapper {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .container {
+    width: 220px; height: 310px; transition : all 0.1s;
+    position: relative;
+    border-radius: 10px;
+  }
+  .overlay {
+    position: absolute;
+    width: 220px;
+    height: 310px;
+    background: linear-gradient(105deg,
+    transparent 40%,
+    rgba(255, 219, 112, 0.8) 45%,
+    rgba(132, 50, 255 ,0.6) 50%,
+    transparent 54%);
+    filter: brightness(1.1) opacity(0.8);
+    mix-blend-mode: color-dodge;
+    background-size: 150% 150%;
+    background-position: 100%;
+    transition: all 0.1s;
+    border-radius: 10px;
+  }
+  .pikachu {
+    width: 220px; height: 310px;
+    background-image: url(pika.webp);
+    background-size: cover;
+    border-radius: 10px;
+  }
+  .kyogre {
+    width: 220px; height: 310px;
+    background-image: url(kyogre.webp);
+    background-size: cover;
+    border-radius: 10px;
+  }
+  .rayquaza {
+    width: 220px; height: 310px;
+    background-image: url(rayquaza.webp);
+    background-size: cover;
+    border-radius: 10px;
+  }
+  .groudon {
+    width: 220px; height: 310px;
+    background-image: url(groudon.webp);
+    background-size: cover;
+    border-radius: 10px;
+  }
+</style>
+</body>
+</html>
+
