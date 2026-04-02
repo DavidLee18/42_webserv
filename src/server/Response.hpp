@@ -94,9 +94,11 @@ private:
     OK = 200,
     MOVED_PERMANENTLY = 301,
     BAD_REQUEST = 400,
+    UNAUTHORIZED = 401,
     FORBIDDEN_ERR = 403,
     NOT_FOUND_ERR = 404,
     METHOD_NOT_ALLOWED = 405,
+    CONFLICT = 409,
     PAYLOAD_TOO_LARGE = 413,
     INTERNAL_SERVER_ERR = 500
   };
@@ -144,7 +146,7 @@ private:
    * @param error_code The HTTP error status code.
    * @return std::string Path to the configured error file.
    */
-  static std::string error_file_path(int error_code);
+  static Response error_response(int error_code);
 
   /**
    * @brief Generates an HTML page listing the contents of a directory
@@ -155,7 +157,8 @@ private:
    * @return std::string The HTML content representing the directory index.
    */
   static std::string make_autoindex_page(const std::string &real_path,
-                                         const std::string &req_uri);
+                                         const std::string &req_uri,
+                                         DIR *dir);
 };
 
 #endif

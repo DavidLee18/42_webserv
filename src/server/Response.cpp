@@ -71,6 +71,96 @@ std::string ServerResponse::find_file_type(std::string path) {
   return file_type.back();
 }
 
+
+Target ServerResponse::resolve_target(const RouteRule *rule,
+                                      const ServerConfig *config,
+                                      const Request *request) {
+  Target target;
+  if (rule == NULL) {
+    target.type = NOT_FOUND_ERR;
+    target.path = get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
+    return target;
+  }
+  std::string root =
+      config->get_rewritten_path(request->get_method(), request->get_path());
+
+  target.path = get_pwd();
+  std::cout << "Root: " << target.path + root << std::endl;
+  int type = check_path_type(target.path + root);
+  if (type == IS_DIR && rule->op != AUTOINDEX) {
+    if (rule->index.empty())
+      target.path += root + "/index.html";
+    else
+      target.path += root + "/" + rule->index;
+  } else if (type == IS_DIR && rule->op == AUTOINDEX)
+    target.path += root;
+  else if (type == NOT_FOUND_ERR)
+    target.path += config->get_rewritten_path(
+        request->get_method(),
+        get_string_from_map(rule->error_pages, NOT_FOUND_ERR));
+  else if (type == FORBIDDEN_ERR)
+    target.path += config->get_rewritten_path(
+        request->get_method(),
+        get_string_from_map(rule->error_pages, FORBIDDEN_ERR));
+  else
+    target.path += root;
+  target.type = type;
+
+  std::cout << "target path: " << target.path << std::endl;
+  std::cout << "rule index: " << rule->index << std::endl;
+  return target;
+}
+
+
+Response ServerResponse::error_response(int error_code)
+{
+  Response response;
+  if (error_code == NOT_FOUND_ERR)
+    return response;
+  return response;
+}
+
+
+Response
+ServerResponse::http_response(const Request *request, const ServerConfig *config,
+                   const std::map<std::string, std::string> mime_type) {
+  const RouteRule *rule =
+      config->find_route(request->get_method(), request->get_path());
+  Response response;
+  Target target = resolve_target(rule, config, request);
+
+  response.mime_type =
+      get_string_from_map(mime_type, find_file_type(target.path));
+  if (rule->op == REDIRECT) {
+    target.type = MOVED_PERMANENTLY;
+    response.redir = rule->redirect_target.to_string();
+    response.mime_type = "text/html";
+    response.body = "<html><body><h1>301 Moved Permanently</h1></body></html>";
+  } else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
+    DIR *dir = opendir(target.path.c_str());
+    if (dir == NULL) {
+      return error_response(NOT_FOUND_ERR); // 폴더를 열 권한이 없거나 없으면 빈 문자열 반환 (나중에 403처리)
+    }
+    target.type = OK;
+    response.mime_type = "html";
+    response.body = make_autoindex_page(target.path, request->get_path(), dir);
+    response.status_code = status_code_to_string(target.type);
+  } else {
+    std::ifstream file(target.path.c_str());
+    std::cout << "Target path: " << target.path << std::endl;
+    if (file.is_open()) {
+      std::ostringstream ss;
+      ss << file.rdbuf();
+      target.type = OK;
+      response.body = ss.str();
+      response.status_code = status_code_to_string(target.type);
+      file.close();
+    }
+  }
+  return response;
+}
+
+
 Response ServerResponse::cgi_response(const Request *request,
                                     const ServerConfig *config, EPoll *epoll) {
   Response response;
@@ -127,93 +217,10 @@ Response ServerResponse::cgi_response(const Request *request,
   return response;
 }
 
-Response
-ServerResponse::http_response(const Request *request, const ServerConfig *config,
-                   const std::map<std::string, std::string> mime_type) {
-  const RouteRule *rule =
-      config->find_route(request->get_method(), request->get_path());
-  Response response;
-  Target target = resolve_target(rule, config, request);
-
-  response.mime_type =
-      get_string_from_map(mime_type, find_file_type(target.path));
-  if (rule->op == REDIRECT) {
-    target.type = MOVED_PERMANENTLY;
-    response.redir = rule->redirect_target.to_string();
-    response.mime_type = "text/html";
-    response.body = "<html><body><h1>301 Moved Permanently</h1></body></html>";
-  } else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
-    target.type = OK;
-    response.mime_type = "html";
-    response.body = make_autoindex_page(target.path, request->get_path());
-    response.status_code = status_code_to_string(target.type);
-  } else {
-    std::ifstream file(target.path.c_str());
-    std::cout << "Target path: " << target.path << std::endl;
-    if (file.is_open()) {
-      std::ostringstream ss;
-      ss << file.rdbuf();
-      target.type = OK;
-      response.body = ss.str();
-      response.status_code = status_code_to_string(target.type);
-      file.close();
-    }
-  }
-  return response;
-}
-
-Target ServerResponse::resolve_target(const RouteRule *rule,
-                                const ServerConfig *config,
-                                const Request *request) {
-  Target target;
-  if (rule == NULL) {
-    target.type = NOT_FOUND_ERR;
-    target.path = get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
-    return target;
-  }
-  std::string root =
-      config->get_rewritten_path(request->get_method(), request->get_path());
-
-  target.path = get_pwd();
-  std::cout << "Root: " << target.path + root << std::endl;
-  int type = check_path_type(target.path + root);
-  if (type == IS_DIR && rule->op != AUTOINDEX) {
-    if (rule->index.empty())
-      target.path += root + "/index.html";
-    else
-      target.path += root + "/" + rule->index;
-  } else if (type == IS_DIR && rule->op == AUTOINDEX)
-    target.path += root;
-  else if (type == NOT_FOUND_ERR)
-    target.path += config->get_rewritten_path(
-        request->get_method(),
-        get_string_from_map(rule->error_pages, NOT_FOUND_ERR));
-  else if (type == FORBIDDEN_ERR)
-    target.path += config->get_rewritten_path(
-        request->get_method(),
-        get_string_from_map(rule->error_pages, FORBIDDEN_ERR));
-  else
-    target.path += root;
-  target.type = type;
-
-  if (rule->op == AUTOINDEX)
-    std::cout << "===is autoindex===" << std::endl;
-  else
-    std::cout << "===is not autoindex===" << std::endl;
-  std::cout << rule->op << std::endl;
-  std::cout << "target path: " << target.path << std::endl;
-  std::cout << "rule index: " << rule->index << std::endl;
-  return target;
-}
 
 std::string ServerResponse::make_autoindex_page(const std::string &real_path,
-                                          const std::string &req_uri) {
-  DIR *dir = opendir(real_path.c_str());
-  if (dir == NULL) {
-    return ""; // 폴더를 열 권한이 없거나 없으면 빈 문자열 반환 (나중에 403
-               // 처리)
-  }
-
+                                          const std::string &req_uri,
+                                          DIR *dir) {
   // 1. HTML 기본 뼈대 작성
   std::string html =
       "<html><head><title>Index of " + req_uri + "</title></head><body>\r\n";
@@ -241,3 +248,4 @@ std::string ServerResponse::make_autoindex_page(const std::string &real_path,
 
   return html;
 }
+
