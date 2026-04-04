@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webserv 로그인</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-box {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 300px;
+        }
+        .login-box h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #333333;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666666;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cccccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #0056b3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #004494;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        <h2>로그인</h2>
+        <!-- 
+          action: 폼 데이터를 전송할 서버의 경로
+          method: 중요 데이터이므로 반드시 POST 사용
+        -->
+        <form action="/login" method="POST">
+            <div class="input-group">
+                <label for="id">아이디 (ID)</label>
+                <!-- name="id" 속성이 서버에서 받는 Key가 됩니다. (id=입력값) -->
+                <input type="text" id="id" name="id" required placeholder="아이디를 입력하세요">
+            </div>
+            
+            <div class="input-group">
+                <label for="pw">비밀번호 (Password)</label>
+                <!-- name="pw" 속성이 서버에서 받는 Key가 됩니다. (pw=입력값) -->
+                <input type="password" id="pw" name="pw" required placeholder="비밀번호를 입력하세요">
+            </div>
+            
+            <button type="submit">로그인</button>
+        </form>
+    </div>
+
+</body>
+</html>

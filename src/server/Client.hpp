@@ -7,6 +7,7 @@
  */
 
 #include <map>
+#include <cctype>
 #include <sstream>
 #include <string>
 
@@ -46,8 +47,9 @@ private:
   std::string method;       ///< The HTTP method (e.g., "GET").
   std::string path;         ///< The requested path (e.g., "/index.html").
   std::string version;      ///< The HTTP version (e.g., "HTTP/1.1").
-  bool keep_alive;          ///< Connection keep-alive status.
   std::map<std::string, std::string> header; ///< Parsed HTTP headers.
+  bool keep_alive;          ///< Connection keep-alive status.
+  std::string cookie;
   std::string body;         ///< The request body, if any.
   bool content_full;        ///< Flag indicating if the entire body has been received.
 

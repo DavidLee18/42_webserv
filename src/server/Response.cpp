@@ -105,18 +105,36 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   else
     target.path += root;
   target.type = type;
-
+  
   std::cout << "target path: " << target.path << std::endl;
   std::cout << "rule index: " << rule->index << std::endl;
   return target;
 }
 
 
-Response ServerResponse::error_response(int error_code)
+Response ServerResponse::error_response(const ServerConfig *config,
+                                        const RouteRule *rule,
+                                        int err_code)
 {
   Response response;
-  if (error_code == NOT_FOUND_ERR)
-    return response;
+  std::string err_page = get_string_from_map(rule->error_pages, err_code);
+
+  if (err_page.empty())
+    return DefaultError::default_err_response(err_code);
+  (void)config;
+  if (check_path_type(err_page) != IS_FILE)
+    return DefaultError::default_err_response(err_code);
+  std::cout << "=== Error response ===" << std::endl;
+  std::ifstream file(err_page.c_str());
+  if (file.is_open()) {
+    response.status_code = status_code_to_string(OK);
+    std::ostringstream ss;
+    ss << file.rdbuf();
+    response.body = ss.str();
+    file.close();
+  } else {
+    return DefaultError::default_err_response(err_code);
+  }
   return response;
 }
 
@@ -132,6 +150,7 @@ ServerResponse::http_response(const Request *request, const ServerConfig *config
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
   if (rule->op == REDIRECT) {
+    std::cout << "=== redirection ===" << std::endl;
     target.type = MOVED_PERMANENTLY;
     response.redir = rule->redirect_target.to_string();
     response.mime_type = "text/html";
@@ -139,15 +158,16 @@ ServerResponse::http_response(const Request *request, const ServerConfig *config
   } else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     DIR *dir = opendir(target.path.c_str());
     if (dir == NULL) {
-      return error_response(NOT_FOUND_ERR); // 폴더를 열 권한이 없거나 없으면 빈 문자열 반환 (나중에 403처리)
+      return error_response(config, rule, NOT_FOUND_ERR); // 폴더를 열 권한이 없거나 없으면 빈 문자열 반환 (나중에 403처리)
     }
     target.type = OK;
     response.mime_type = "html";
     response.body = make_autoindex_page(target.path, request->get_path(), dir);
     response.status_code = status_code_to_string(target.type);
   } else {
+    if (check_path_type(target.path.c_str()) != IS_FILE)
+      return DefaultError::default_err_response(NOT_FOUND_ERR);
     std::ifstream file(target.path.c_str());
-    std::cout << "Target path: " << target.path << std::endl;
     if (file.is_open()) {
       std::ostringstream ss;
       ss << file.rdbuf();
@@ -155,6 +175,8 @@ ServerResponse::http_response(const Request *request, const ServerConfig *config
       response.body = ss.str();
       response.status_code = status_code_to_string(target.type);
       file.close();
+    } else {
+      return DefaultError::default_err_response(NOT_FOUND_ERR);
     }
   }
   return response;
@@ -162,7 +184,8 @@ ServerResponse::http_response(const Request *request, const ServerConfig *config
 
 
 Response ServerResponse::cgi_response(const Request *request,
-                                    const ServerConfig *config, EPoll *epoll) {
+                                      const ServerConfig *config,
+                                      EPoll *epoll) {
   Response response;
   CgiDelegate cgi(*request, get_pwd() + request->get_path());
   Result<std::string> cgi_result =

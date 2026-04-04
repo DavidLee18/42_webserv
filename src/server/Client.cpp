@@ -76,6 +76,10 @@ Request::Request(std::string request) {
   else
     keep_alive = false;
 
+  cookie = get_string_from_map(header, "Cookie");
+  std::cout << "==== cookie value ====" << std::endl;
+  std::cout << cookie << std::endl;
+
   content_full = true;
   if (!body.empty())
   {

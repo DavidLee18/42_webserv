@@ -8,6 +8,7 @@
 
 #include "../config/ServerConfig.hpp"
 #include "Client.hpp"
+#include "DefaultError.hpp"
 #include <dirent.h>
 #include <fstream>
 #include <sstream>
@@ -16,6 +17,23 @@
 #include <unistd.h>
 
 class EPoll;
+
+/**
+ * @enum StatusCode
+ * @brief Enum for commonly used HTTP status codes.
+ */
+enum StatusCode {
+  OK = 200,
+  MOVED_PERMANENTLY = 301,
+  BAD_REQUEST = 400,
+  UNAUTHORIZED = 401,
+  FORBIDDEN_ERR = 403,
+  NOT_FOUND_ERR = 404,
+  METHOD_NOT_ALLOWED = 405,
+  CONFLICT = 409,
+  PAYLOAD_TOO_LARGE = 413,
+  INTERNAL_SERVER_ERR = 500
+};
 
 /**
  * @struct Target
@@ -87,23 +105,6 @@ private:
   enum Type { IS_DIR, IS_FILE, PATH_ERROR };
 
   /**
-   * @enum StatusCode
-   * @brief Enum for commonly used HTTP status codes.
-   */
-  enum StatusCode {
-    OK = 200,
-    MOVED_PERMANENTLY = 301,
-    BAD_REQUEST = 400,
-    UNAUTHORIZED = 401,
-    FORBIDDEN_ERR = 403,
-    NOT_FOUND_ERR = 404,
-    METHOD_NOT_ALLOWED = 405,
-    CONFLICT = 409,
-    PAYLOAD_TOO_LARGE = 413,
-    INTERNAL_SERVER_ERR = 500
-  };
-
-  /**
    * @brief Converts an integer status code to its HTTP reason phrase string.
    *
    * @param status_code The numeric HTTP status code.
@@ -146,7 +147,9 @@ private:
    * @param error_code The HTTP error status code.
    * @return std::string Path to the configured error file.
    */
-  static Response error_response(int error_code);
+  static Response error_response(const ServerConfig *config,
+                                 const RouteRule *rule,
+                                 int error_code);
 
   /**
    * @brief Generates an HTML page listing the contents of a directory
