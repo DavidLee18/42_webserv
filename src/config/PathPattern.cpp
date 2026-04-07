@@ -4,12 +4,10 @@
 // Pattern can contain * as wildcard
 bool PathPattern::segmentMatches(const std::string &pattern,
                                  const std::string &segment) {
-  // If pattern is exactly "*", it matches anything
   if (pattern == "*") {
     return true;
   }
 
-  // If no wildcard in pattern, must match exactly
   if (pattern.find('*') == std::string::npos) {
     return pattern == segment;
   }
@@ -49,21 +47,12 @@ bool PathPattern::segmentMatches(const std::string &pattern,
 
 // Check if this pattern matches another PathPattern
 bool PathPattern::matches(const PathPattern &other) const {
-  // If this pattern is exactly "*", it matches anything
-  if (is_wildcard()) {
+  if (is_wildcard())
     return true;
-  }
 
-  // If other is "*", we need to check if our pattern would match it
-  // In this case, only "*" matches "*"
-  if (other.is_wildcard()) {
+  if (other.is_wildcard())
     return is_wildcard();
-  }
 
-  // If the path lengths are different and neither has wildcards, no match
-  // But if we have wildcards, we need more complex matching
-
-  // Check if any of our segments contain wildcards
   bool hasWildcard = false;
   for (size_t i = 0; i < path.size(); ++i) {
     if (path[i].find('*') != std::string::npos) {
@@ -72,9 +61,8 @@ bool PathPattern::matches(const PathPattern &other) const {
     }
   }
 
-  if (!hasWildcard && path.size() != other.path.size()) {
+  if (!hasWildcard && path.size() != other.path.size())
     return false;
-  }
 
   // If we have wildcards, do more flexible matching
   if (hasWildcard) {

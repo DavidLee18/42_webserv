@@ -549,6 +549,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
 }
 
 // Find a route that matches the given method and path
+// 리다이렉션, 오토인덱스가 rule의 wildcard 상관없이 매칭이 가능
 RouteRule const *ServerConfig::find_route(Request::Method method,
                                           const std::string &path) const {
   PathPattern pathPattern(path);
