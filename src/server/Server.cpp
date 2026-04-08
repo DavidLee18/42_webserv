@@ -115,7 +115,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
     else {
       server_response << "HTTP/1.1 " << http.status_code << "\r\n";
       if (!http.redir.empty())
-        server_response << "Location:" << http.redir << "\r\n";
+        server_response << "Location: " << http.redir << "\r\n";
+      std::cout << http.redir << std::endl;
       server_response << "Content-Type:" << http.mime_type << "\r\n";
       server_response << "Set-Cookie:" << "session_id=qwer; theme=dark" << "\r\n";
       server_response << "Content-Length: " << http.body.length() << "\r\n";
@@ -218,6 +219,7 @@ Result<Void> Server::init() {
 }
 
 Result<Void> Server::start() {
+  system("open http://localhost:8080");
   std::cout << "Starting server loop..." << std::endl;
   while (true) {
     // Waiting for events using epoll

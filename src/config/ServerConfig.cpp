@@ -491,10 +491,6 @@ bool ServerConfig::create_route_rules(
         return (false);
       if (route.op == REDIRECT)
         route.redirect_target = root_url[j];
-      if (route.op == AUTOINDEX) {
-        route.path.add_path("*");
-        route.root.add_path("*");
-      }
       routes.push_back(route);
     }
   }
@@ -678,6 +674,8 @@ std::string ServerConfig::rewrite_path(const std::string &request_path,
     if (i + 1 == new_from.size()) {
       if (std::string::npos != new_from[i].find("*"))
         i++;
+      else
+        break;
       for (std::size_t j = i; j < split_path.size(); ++j)
         wilds.push_back(split_path[j]);
     }
