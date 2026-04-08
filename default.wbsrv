@@ -23,7 +23,7 @@ uwsgi =
 
     GET /download/*/mp3/* =301> /*/mp3/*.mp3
 
-    GET /download/ <i- /spool/www
+    GET /download <i- /spool/www
 
     GET *.(jpg|jpeg|gif) <- /spool/www/*.(jpg|jpeg|gif)
 

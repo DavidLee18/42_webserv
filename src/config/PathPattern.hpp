@@ -25,8 +25,6 @@ private:
    * @brief 설정 파일의 경로 패턴을 분리하여 저장하는 멤버 변수
    */
   std::vector<std::string> path;
-  static bool segmentMatches(const std::string &pattern,
-                             const std::string &segment);
 
 public:
   PathPattern() : path() {}

@@ -679,6 +679,8 @@ std::string ServerConfig::rewrite_path(const std::string &request_path,
     if (i + 1 == new_from.size()) {
       if (std::string::npos != new_from[i].find("*"))
         i++;
+      else
+        break;
       for (std::size_t j = i; j < split_path.size(); ++j)
         wilds.push_back(split_path[j]);
     }

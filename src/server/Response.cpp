@@ -147,6 +147,10 @@ ServerResponse::http_response(const Request *request, const ServerConfig *config
   Response response;
   Target target = resolve_target(rule, config, request);
 
+  // std::cout << "rule root: " << rule->root << std::endl;
+  std::cout << "\nrule path: " << rule->path << std::endl;
+  std::cout << "requset path: " << request->get_path() << std::endl;
+
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
   if (rule->op == REDIRECT) {
