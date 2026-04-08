@@ -718,3 +718,86 @@ std::string ServerConfig::get_rewritten_path(Request::Method method,
     return "";
   return rewrite_path(path, route->path, route->root);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// static std::size_t count_wildcards(const std::string &str) {
+//   std::size_t count = 0;
+//   for (std::size_t i = 0; i < str.size(); ++i) {
+//     if (str[i] == '*')
+//       ++count;
+//   }
+//   return count;
+// }
+
+// std::string ServerConfig::rewrite_path(const std::string &request_path,
+//                                        const PathPattern &from_pattern,
+//                                        const PathPattern &to_pattern) const {
+//   std::string from = from_pattern.to_string();
+//   std::string to = to_pattern.to_string();
+
+//   std::vector<std::string> from_parts = utils::string_split(from, "*");
+//   std::vector<std::string> to_parts = utils::string_split(to, "*");
+//   std::vector<std::string> wilds;
+
+//   std::size_t from_wc = count_wildcards(from);
+//   std::size_t to_wc = count_wildcards(to);
+
+//   if (from_wc != to_wc)
+//     return "";
+
+//   if (from_wc == 0)
+//     return to;
+
+//   // from pattern의 첫 고정 문자열은 request_path 맨 앞에 있어야 함
+//   if (from_parts.empty() || request_path.find(from_parts[0]) != 0)
+//     return "";
+
+//   std::size_t search_pos = from_parts[0].size();
+
+//   for (std::size_t i = 1; i < from_parts.size(); ++i) {
+//     std::size_t found = request_path.find(from_parts[i], search_pos);
+//     if (found == std::string::npos)
+//       return "";
+
+//     wilds.push_back(request_path.substr(search_pos, found - search_pos));
+//     search_pos = found + from_parts[i].size();
+//   }
+
+//   wilds.push_back(request_path.substr(search_pos));
+
+//   std::string rewritten;
+//   if (!to_parts.empty())
+//     rewritten = to_parts[0];
+
+//   for (std::size_t i = 0; i < wilds.size(); ++i) {
+//     rewritten += wilds[i];
+//     if (i + 1 < to_parts.size())
+//       rewritten += to_parts[i + 1];
+//   }
+
+//   return rewritten;
+// }
