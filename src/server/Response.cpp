@@ -52,6 +52,7 @@ std::string ServerResponse::get_pwd() {
 int ServerResponse::check_path_type(const std::string &path) {
   struct stat info;
 
+  std::cout << "path: " << path << std::endl;
   if (stat(path.c_str(), &info) != 0)
     return NOT_FOUND_ERR;
   else if (access(path.c_str(), R_OK) != 0)
@@ -85,16 +86,13 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
       config->get_rewritten_path(request->get_method(), request->get_path());
 
   target.path = get_pwd();
-  std::cout << "Root: " << target.path + root << std::endl;
+  std::cout << "Root: " << root << std::endl;
   int type = check_path_type(target.path + root);
-  if (type == IS_DIR && rule->op != AUTOINDEX) {
-    if (rule->index.empty())
-      target.path += root + "/index.html";
-    else
-      target.path += root + "/" + rule->index;
-  } else if (type == IS_DIR && rule->op == AUTOINDEX)
-    target.path += root;
-  else if (type == NOT_FOUND_ERR)
+  if (type == IS_DIR) {
+      target.path += root + "/";
+      if (rule->op != AUTOINDEX)
+       target.path += rule->index;
+  } else if (type == NOT_FOUND_ERR)
     target.path += config->get_rewritten_path(
         request->get_method(),
         get_string_from_map(rule->error_pages, NOT_FOUND_ERR));
@@ -104,8 +102,8 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
         get_string_from_map(rule->error_pages, FORBIDDEN_ERR));
   else
     target.path += root;
-  target.type = type;
-  
+  target.type = check_path_type(target.path);
+
   std::cout << "target path: " << target.path << std::endl;
   std::cout << "rule index: " << rule->index << std::endl;
   return target;
@@ -124,7 +122,6 @@ Response ServerResponse::error_response(const ServerConfig *config,
   (void)config;
   if (check_path_type(err_page) != IS_FILE)
     return DefaultError::default_err_response(err_code);
-  std::cout << "=== Error response ===" << std::endl;
   std::ifstream file(err_page.c_str());
   if (file.is_open()) {
     response.status_code = status_code_to_string(OK);
@@ -147,25 +144,20 @@ ServerResponse::http_response(const Request *request, const ServerConfig *config
   Response response;
   Target target = resolve_target(rule, config, request);
 
-std::string new_path = rule->path.rewrite_path(request->get_path(), rule->root);
-
-std::cout << "\nrule path: " << rule->path << std::endl;
-std::cout << "rule root: " << rule->root << std::endl;
-std::cout << "request path: " << request->get_path() << std::endl;
-std::cout << "new path: [" << new_path << "]" << std::endl;
-
+  std::cout << "====checking===" << target.type << rule->op << std::endl;
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
   if (rule->op == REDIRECT) {
     std::cout << "=== redirection ===" << std::endl;
     target.type = MOVED_PERMANENTLY;
-    response.redir = rule->redirect_target.to_string();
+    response.redir = config->get_rewritten_path(request->get_method(), request->get_path());
+    response.status_code = status_code_to_string(target.type);
     response.mime_type = "text/html";
     response.body = "<html><body><h1>301 Moved Permanently</h1></body></html>";
   } else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     DIR *dir = opendir(target.path.c_str());
     if (dir == NULL) {
-      return error_response(config, rule, NOT_FOUND_ERR); // 폴더를 열 권한이 없거나 없으면 빈 문자열 반환 (나중에 403처리)
+      return error_response(config, rule, FORBIDDEN_ERR); // TODO: 폴더를 열 권한이 없거나 없으면 빈 문자열 반환 (나중에 403처리)
     }
     target.type = OK;
     response.mime_type = "html";
@@ -278,4 +270,3 @@ std::string ServerResponse::make_autoindex_page(const std::string &real_path,
 
   return html;
 }
-
