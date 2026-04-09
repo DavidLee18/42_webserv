@@ -102,7 +102,7 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
         get_string_from_map(rule->error_pages, FORBIDDEN_ERR));
   else
     target.path += root;
-  target.type = type;
+  target.type = check_path_type(target.path);
 
   std::cout << "target path: " << target.path << std::endl;
   std::cout << "rule index: " << rule->index << std::endl;
@@ -122,7 +122,6 @@ Response ServerResponse::error_response(const ServerConfig *config,
   (void)config;
   if (check_path_type(err_page) != IS_FILE)
     return DefaultError::default_err_response(err_code);
-  std::cout << "=== Error response ===" << std::endl;
   std::ifstream file(err_page.c_str());
   if (file.is_open()) {
     response.status_code = status_code_to_string(OK);
@@ -158,7 +157,7 @@ ServerResponse::http_response(const Request *request, const ServerConfig *config
   } else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     DIR *dir = opendir(target.path.c_str());
     if (dir == NULL) {
-      return error_response(config, rule, FORBIDDEN_ERR); // 폴더를 열 권한이 없거나 없으면 빈 문자열 반환 (나중에 403처리)
+      return error_response(config, rule, FORBIDDEN_ERR); // TODO: 폴더를 열 권한이 없거나 없으면 빈 문자열 반환 (나중에 403처리)
     }
     target.type = OK;
     response.mime_type = "html";
@@ -271,4 +270,3 @@ std::string ServerResponse::make_autoindex_page(const std::string &real_path,
 
   return html;
 }
-

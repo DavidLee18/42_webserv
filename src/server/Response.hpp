@@ -63,6 +63,7 @@ struct Response {
   std::string status_code;  ///< HTTP status code and reason (e.g., "200 OK").
   std::string content_type; ///< Content-Type header.
   std::string connection;   ///< Connection header.
+  std::string cookie;       ///< Cookies.
   std::string body;         ///< The response body payload.
   std::string mime_type;    ///< The determined MIME type of the response payload.
   std::string redir;        ///< Redirect location, if applicable.

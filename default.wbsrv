@@ -19,6 +19,8 @@ uwsgi =
 
     ...30
 
+    GET /old_stuff/* =301> /new_stuff/*
+
     GET /old_stuff/ =301> /new_stuff/
 
     GET /download/*/mp3/* =301> /*/mp3/*.mp3

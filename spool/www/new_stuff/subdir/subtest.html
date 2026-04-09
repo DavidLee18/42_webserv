@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Webserv Diagnostics</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 18% 20%, rgba(255,255,255,0.08), transparent 18%),
+                radial-gradient(circle at 82% 22%, rgba(199, 154, 92, 0.08), transparent 18%),
+                radial-gradient(circle at 50% 82%, rgba(74, 127, 168, 0.08), transparent 20%),
+                radial-gradient(circle at center, rgba(255,255,255,0.035), transparent 34%),
+                linear-gradient(135deg, #040404 0%, #090909 42%, #020202 100%);
+            color: #f5f5f5;
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #glass-bg {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .ambient {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(110px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .ambient-1 {
+            width: 420px;
+            height: 420px;
+            left: 6%;
+            top: 10%;
+            background: rgba(255,255,255,0.06);
+            opacity: 0.18;
+        }
+
+        .ambient-2 {
+            width: 420px;
+            height: 420px;
+            right: 6%;
+            top: 14%;
+            background: rgba(186, 142, 82, 0.07);
+            opacity: 0.14;
+        }
+
+        .ambient-3 {
+            width: 460px;
+            height: 460px;
+            left: 50%;
+            bottom: -40px;
+            transform: translateX(-50%);
+            background: rgba(76, 126, 166, 0.06);
+            opacity: 0.14;
+        }
+
+        .noise {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0.022;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+            background-size: 3px 3px, 3px 3px;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            background:
+                radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.18) 100%);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1220px;
+            padding: 38px 32px 28px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 28px;
+            background: rgba(255, 255, 255, 0.045);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow:
+                0 24px 64px rgba(0, 0, 0, 0.48),
+                0 0 60px rgba(255, 255, 255, 0.03),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            position: relative;
+            z-index: 3;
+            overflow: hidden;
+        }
+
+        .container::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 8%;
+            width: 84%;
+            height: 1px;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255,255,255,0.08),
+                rgba(255,255,255,0.26),
+                rgba(255,255,255,0.08),
+                transparent
+            );
+            box-shadow: 0 0 18px rgba(255,255,255,0.12);
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .badge {
+            display: inline-block;
+            margin-bottom: 16px;
+            padding: 7px 14px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 999px;
+            font-size: 12px;
+            color: #cfcfcf;
+            background: rgba(255,255,255,0.03);
+            letter-spacing: 0.7px;
+        }
+
+        h1 {
+            font-size: 46px;
+            line-height: 1.1;
+            margin-bottom: 12px;
+            letter-spacing: -1.2px;
+        }
+
+        .subtext {
+            color: #a8adb4;
+            font-size: 16px;
+            line-height: 1.6;
+            max-width: 760px;
+            margin: 0 auto;
+        }
+
+        .links {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .route-btn {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 240px;
+            text-decoration: none;
+            color: #f4f5f7;
+            padding: 22px 20px 18px;
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.11);
+            background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+            box-shadow:
+                0 10px 24px rgba(0, 0, 0, 0.26),
+                inset 0 1px 0 rgba(255,255,255,0.07);
+            overflow: hidden;
+            text-align: left;
+        }
+
+        .route-btn::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                120deg,
+                transparent 0%,
+                rgba(255,255,255,0.08) 35%,
+                transparent 70%
+            );
+            transform: translateX(-120%);
+            transition: transform 0.45s ease;
+        }
+
+        .route-btn:hover::before {
+            transform: translateX(120%);
+        }
+
+        .route-btn:hover {
+            transform: translateY(-6px);
+            border-color: rgba(255,255,255,0.18);
+            box-shadow:
+                0 20px 38px rgba(0, 0, 0, 0.36),
+                inset 0 1px 0 rgba(255,255,255,0.10);
+        }
+
+        .route-top,
+        .route-bottom {
+            position: relative;
+            z-index: 1;
+        }
+
+        .route-top {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .route-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .route-dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            box-shadow: 0 0 14px currentColor;
+            background: currentColor;
+            opacity: 0.95;
+        }
+
+        .route-tag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 48px;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.6px;
+            border: 1px solid currentColor;
+            background: rgba(255,255,255,0.04);
+            color: inherit;
+        }
+
+        .route-title {
+            font-size: 22px;
+            font-weight: bold;
+            line-height: 1.2;
+            color: #f5f7fa;
+        }
+
+        .route-desc {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #9ca4ae;
+        }
+
+        .route-bottom {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 14px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .route-path {
+            font-size: 13px;
+            color: #7e8791;
+            word-break: break-all;
+        }
+
+        .arrow {
+            font-size: 22px;
+            font-weight: bold;
+            opacity: 0.82;
+            transition: transform 0.25s ease, opacity 0.25s ease;
+        }
+
+        .route-btn:hover .arrow {
+            transform: translateX(6px);
+            opacity: 1;
+        }
+
+        .route-hello {
+            color: #d9dee5;
+        }
+
+        .route-403 {
+            color: #b98a4f;
+        }
+
+        .route-404 {
+            color: #5d87ad;
+        }
+
+        .footer {
+            margin-top: 22px;
+            text-align: center;
+            font-size: 12px;
+            color: #707780;
+        }
+
+        @media (max-width: 1100px) {
+            .links {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .route-btn {
+                min-height: 220px;
+            }
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 18px;
+            }
+
+            .container {
+                padding: 28px 18px 22px;
+            }
+
+            h1 {
+                font-size: 32px;
+            }
+
+            .subtext {
+                font-size: 14px;
+            }
+
+            .links {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+
+            .route-btn {
+                min-height: 180px;
+                padding: 18px 16px 16px;
+                border-radius: 20px;
+            }
+
+            .route-title {
+                font-size: 18px;
+            }
+
+            .route-desc {
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="glass-bg"></canvas>
+    <div class="ambient ambient-1"></div>
+    <div class="ambient ambient-2"></div>
+    <div class="ambient ambient-3"></div>
+    <div class="noise"></div>
+
+    <div class="container">
+        <div class="hero">
+            <div class="badge">WEBSERV DIAGNOSTICS</div>
+            <h1>Redirection New Stuff</h1>
+            <p class="subtext">
+                Successfully redirected
+            </p>
+        </div>
+
+        <div class="links" style="display: flex; justify-content: center; margin-bottom: 22px;">
+            <a href="test.html" class="route-btn" style="max-width: 320px; width: 100%;">
+                <div class="route-top">
+                    <div class="route-head">
+                        <div class="route-dot route-hello"></div>
+                        <div class="route-tag">LINK</div>
+                    </div>
+                    <div class="route-title">Test Page</div>
+                    <div class="route-desc">Go to test.html in the same directory</div>
+                </div>
+                <div class="route-bottom">
+                    <span class="route-path">test.html</span>
+                    <span class="arrow">&rarr;</span>
+                </div>
+            </a>
+        </div>
+
+        <div class="footer">Modern Webserv Route Test Interface</div>
+    </div>
+
+    <script>
+        (function () {
+            var canvas = document.getElementById("glass-bg");
+            var ctx = canvas.getContext("2d");
+
+            var dpr = Math.max(1, window.devicePixelRatio || 1);
+            var width = 0;
+            var height = 0;
+
+            var cellSize = 42;
+            var points = [];
+            var dusts = [];
+            var ripples = [];
+            var mouse = { x: -9999, y: -9999 };
+
+            function resize() {
+                width = window.innerWidth;
+                height = window.innerHeight;
+
+                canvas.width = Math.floor(width * dpr);
+                canvas.height = Math.floor(height * dpr);
+                canvas.style.width = width + "px";
+                canvas.style.height = height + "px";
+
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                buildGrid();
+                buildDust();
+            }
+
+            function randomRange(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            function buildGrid() {
+                points = [];
+                var cols = Math.ceil(width / cellSize) + 3;
+                var rows = Math.ceil(height / cellSize) + 3;
+
+                for (var y = -1; y < rows; y++) {
+                    for (var x = -1; x < cols; x++) {
+                        points.push({
+                            x: x * cellSize + randomRange(-8, 8),
+                            y: y * cellSize + randomRange(-8, 8),
+                            size: randomRange(10, 28),
+                            rot: randomRange(-0.8, 0.8),
+                            seed: Math.random() * Math.PI * 2
+                        });
+                    }
+                }
+            }
+
+            function buildDust() {
+                dusts = [];
+                var count = Math.floor((width * height) / 18000);
+                for (var i = 0; i < count; i++) {
+                    dusts.push({
+                        x: Math.random() * width,
+                        y: Math.random() * height,
+                        r: randomRange(0.6, 1.8),
+                        a: randomRange(0.03, 0.10),
+                        s: randomRange(0.1, 0.4)
+                    });
+                }
+            }
+
+            function addRipple(x, y, strength) {
+                ripples.push({
+                    x: x,
+                    y: y,
+                    radius: 0,
+                    life: 0,
+                    maxLife: 72,
+                    strength: strength || 1
+                });
+
+                if (ripples.length > 14) {
+                    ripples.shift();
+                }
+            }
+
+            function drawShard(px, py, size, rot, alphaFill, alphaStroke, glow) {
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.rotate(rot);
+
+                ctx.beginPath();
+                ctx.moveTo(-size * 0.45, -size * 0.10);
+                ctx.lineTo(-size * 0.10, -size * 0.48);
+                ctx.lineTo(size * 0.42, -size * 0.18);
+                ctx.lineTo(size * 0.30, size * 0.40);
+                ctx.lineTo(-size * 0.30, size * 0.32);
+                ctx.closePath();
+
+                ctx.fillStyle = "rgba(255,255,255," + alphaFill + ")";
+                ctx.fill();
+
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = "rgba(255,255,255," + alphaStroke + ")";
+                ctx.stroke();
+
+                if (glow > 0) {
+                    ctx.shadowColor = "rgba(255,255,255," + Math.min(glow, 0.32) + ")";
+                    ctx.shadowBlur = 16;
+                    ctx.strokeStyle = "rgba(255,255,255," + Math.min(alphaStroke + glow, 0.40) + ")";
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            function renderDust() {
+                for (var i = 0; i < dusts.length; i++) {
+                    var d = dusts[i];
+                    d.y -= d.s;
+                    if (d.y < -5) {
+                        d.y = height + 5;
+                        d.x = Math.random() * width;
+                    }
+                    ctx.beginPath();
+                    ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+                    ctx.fillStyle = "rgba(255,255,255," + d.a + ")";
+                    ctx.fill();
+                }
+            }
+
+            function render() {
+                ctx.clearRect(0, 0, width, height);
+
+                renderDust();
+
+                for (var i = 0; i < ripples.length; i++) {
+                    ripples[i].life += 1;
+                    ripples[i].radius += 7;
+                }
+
+                ripples = ripples.filter(function (r) {
+                    return r.life < r.maxLife;
+                });
+
+                for (var p = 0; p < points.length; p++) {
+                    var point = points[p];
+
+                    var baseAlphaFill = 0.022;
+                    var baseAlphaStroke = 0.055;
+                    var glow = 0;
+                    var waveBoost = 0;
+                    var driftX = 0;
+                    var driftY = 0;
+
+                    for (var r = 0; r < ripples.length; r++) {
+                        var ripple = ripples[r];
+                        var dx = point.x - ripple.x;
+                        var dy = point.y - ripple.y;
+                        var dist = Math.sqrt(dx * dx + dy * dy);
+
+                        var ringWidth = 34;
+                        var diff = Math.abs(dist - ripple.radius);
+                        if (diff < ringWidth) {
+                            var influence = (1 - diff / ringWidth) * (1 - ripple.life / ripple.maxLife);
+                            waveBoost += influence * 0.18 * ripple.strength;
+                            glow += influence * 0.18 * ripple.strength;
+
+                            if (dist > 0.001) {
+                                var nx = dx / dist;
+                                var ny = dy / dist;
+                                driftX += nx * influence * 2.8;
+                                driftY += ny * influence * 2.8;
+                            }
+                        }
+                    }
+
+                    var mouseDx = point.x - mouse.x;
+                    var mouseDy = point.y - mouse.y;
+                    var mouseDist = Math.sqrt(mouseDx * mouseDx + mouseDy * mouseDy);
+                    var mouseInfluence = Math.max(0, 1 - mouseDist / 180);
+
+                    var pulse = (Math.sin((Date.now() * 0.002) + point.seed) + 1) * 0.5;
+                    var flicker = pulse * 0.010;
+
+                    var alphaFill = baseAlphaFill + waveBoost * 0.55 + flicker + mouseInfluence * 0.01;
+                    var alphaStroke = baseAlphaStroke + waveBoost * 0.75 + mouseInfluence * 0.02;
+                    var size = point.size + waveBoost * 10 + mouseInfluence * 1.8;
+                    var rot = point.rot + waveBoost * 0.15;
+                    var px = point.x + driftX;
+                    var py = point.y + driftY;
+
+                    drawShard(
+                        px,
+                        py,
+                        size,
+                        rot,
+                        Math.min(alphaFill, 0.11),
+                        Math.min(alphaStroke, 0.18),
+                        glow
+                    );
+                }
+
+                requestAnimationFrame(render);
+            }
+
+            var lastRippleTime = 0;
+            document.addEventListener("mousemove", function (e) {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+
+                var now = Date.now();
+                if (now - lastRippleTime > 90) {
+                    addRipple(e.clientX, e.clientY, 1);
+                    lastRippleTime = now;
+                }
+            });
+
+            document.addEventListener("click", function (e) {
+                addRipple(e.clientX, e.clientY, 1.4);
+            });
+
+            window.addEventListener("resize", resize);
+
+            resize();
+            render();
+        })();
+    </script>
+</body>
+</html>
