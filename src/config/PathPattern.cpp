@@ -9,28 +9,30 @@ bool PathPattern::wildcard_match(const std::string &pattern,
   std::size_t last_star = std::string::npos;
   std::size_t last_match = std::string::npos;
 
+  // /asd/*/qwe   /asd/a/a/a/a/qwe/qwe
   while (t < target.size()) {
     if (p < pattern.size() && pattern[p] != '*' && pattern[p] == target[t]) {
       ++p;
       ++t;
-    } else if (p < pattern.size() && pattern[p] == '*') {
+    } // 패턴의 위치가 *이 아니면서 같은 글자: 패턴, 타겟 한글자식 이동
+    else if (p < pattern.size() && pattern[p] == '*') {
       last_star = p;
       last_match = t;
       ++p;
       ++t; // '*'는 최소 1글자 이상
-    } else if (last_star != std::string::npos) {
+    } // 패턴의 위치가 *인 상태 : 현재의 *위치 기억 및 타겟의 *의 위치 업데이트, *이 최소 한글자 이상이기에 패턴, 타겟 한글자 이동
+    else if (last_star != std::string::npos) {
       ++last_match;
       if (last_match >= target.size())
         return false;
       p = last_star + 1;
       t = last_match + 1;
-    } else {
+    } // 현재 패턴의 위치가 *의 안인 경우: 타겟의 *위치 업데이트 후 타겟은 한글자 상승, 패턴은 *다음 글자위치에 고정
+    else {
       return false;
     }
   }
 
-  // target은 끝났는데 pattern이 남아 있으면 실패
-  // 남은 '*'도 최소 1글자를 먹어야 하므로 실패
   if (p < pattern.size())
     return false;
 
@@ -41,12 +43,15 @@ bool PathPattern::matches(const PathPattern &other) const {
   std::string pattern = this->to_string();
   std::string target = other.to_string();
 
+  // root의 규칙에 wildcard가 존재 하면 경우 
   if (pattern.find('*') != std::string::npos)
     return wildcard_match(pattern, target);
 
+  // root의 규칙이 /으로 되어 있는 경우
   if (!pattern.empty() && pattern[pattern.size() - 1] == '/')
     return target.find(pattern) == 0;
 
+  // 그외에 완전히 매칭이 같아 하는 경우
   return pattern == target;
 }
 

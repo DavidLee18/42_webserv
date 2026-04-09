@@ -32,7 +32,7 @@ uwsgi =
     GET *.(jpg|jpeg|gif) <- /spool/www/*.(jpg|jpeg|gif)
 
     GET|POST|DELETE * <- /spool/www/*
-        ? index.html
+        ? index2.html
         @ auth_info
         ->{} 10MB
         ! 400:/spool/www/error/400.html
