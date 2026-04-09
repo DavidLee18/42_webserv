@@ -489,12 +489,12 @@ bool ServerConfig::create_route_rules(
       route.root = root_url[j];
       if (!has_compatible_wildcards(route.path, route.root))
         return (false);
+      if (data[1][data[1].length() - 1] == '/')
+        route.path.add_path("/");
+      if (data[3][data[3].length() - 1] == '/')
+        route.root.add_path("/");
       if (route.op == REDIRECT)
         route.redirect_target = root_url[j];
-      if (route.op == AUTOINDEX) {
-        route.path.add_path("*");
-        route.root.add_path("*");
-      }
       routes.push_back(route);
     }
   }
@@ -560,15 +560,12 @@ RouteRule const *ServerConfig::find_route(Request::Method method,
       return &routes[i];
     }
   }
-
   return NULL;
 }
 
 std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
-  const std::vector<std::string> &path = data.get_path();
-  size_t max = path.size();
-  for (size_t i = 0; i < max; ++i)
-    os << "/" << path[i];
+
+    os << data.to_string();
   return (os);
 }
 
@@ -665,58 +662,13 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   return (os);
 }
 
-std::string ServerConfig::rewrite_path(const std::string &request_path,
-                                       const PathPattern &from_pattern,
-                                       const PathPattern &to_pattern) const {
-  std::vector<std::string> new_from = from_pattern.get_path();
-  std::vector<std::string> wilds;
-  std::vector<std::string> new_to = to_pattern.get_path();
-  std::vector<std::string> split_path = utils::string_split(request_path, "/");
-
-  for (std::size_t i = 0; i < new_from.size(); ++i) {
-    if (i < split_path.size() && std::string::npos != new_from[i].find("*"))
-      wilds.push_back(split_path[i]);
-    if (i + 1 == new_from.size()) {
-      if (std::string::npos != new_from[i].find("*"))
-        i++;
-      else
-        break;
-      for (std::size_t j = i; j < split_path.size(); ++j)
-        wilds.push_back(split_path[j]);
-    }
-  }
-
-  std::size_t j = 0;
-  for (std::size_t i = 0; i < new_to.size(); ++i) {
-    if (j < wilds.size() && std::string::npos != new_to[i].find("*"))
-      new_to[i] = wilds[j++];
-    if (i + 1 == new_to.size()) {
-      for (; j < wilds.size(); ++j)
-        new_to.push_back(wilds[j]);
-      break;
-    }
-  }
-
-  if (new_to.empty())
-    return "";
-
-  std::string rewrite = "/";
-  rewrite += new_to[0];
-  for (std::size_t i = 1; i < new_to.size(); ++i) {
-    if (new_to[i].find("*") != std::string::npos)
-      continue;
-    rewrite += '/';
-    rewrite += new_to[i];
-  }
-  return (rewrite);
-}
 
 std::string ServerConfig::get_rewritten_path(Request::Method method,
                                              const std::string &path) const {
   const RouteRule *route = find_route(method, path);
   if (!route)
     return "";
-  return rewrite_path(path, route->path, route->root);
+  return route->path.rewrite_path(path, route->root);
 }
 
 
@@ -741,63 +693,3 @@ std::string ServerConfig::get_rewritten_path(Request::Method method,
 
 
 
-
-
-
-// static std::size_t count_wildcards(const std::string &str) {
-//   std::size_t count = 0;
-//   for (std::size_t i = 0; i < str.size(); ++i) {
-//     if (str[i] == '*')
-//       ++count;
-//   }
-//   return count;
-// }
-
-// std::string ServerConfig::rewrite_path(const std::string &request_path,
-//                                        const PathPattern &from_pattern,
-//                                        const PathPattern &to_pattern) const {
-//   std::string from = from_pattern.to_string();
-//   std::string to = to_pattern.to_string();
-
-//   std::vector<std::string> from_parts = utils::string_split(from, "*");
-//   std::vector<std::string> to_parts = utils::string_split(to, "*");
-//   std::vector<std::string> wilds;
-
-//   std::size_t from_wc = count_wildcards(from);
-//   std::size_t to_wc = count_wildcards(to);
-
-//   if (from_wc != to_wc)
-//     return "";
-
-//   if (from_wc == 0)
-//     return to;
-
-//   // from pattern의 첫 고정 문자열은 request_path 맨 앞에 있어야 함
-//   if (from_parts.empty() || request_path.find(from_parts[0]) != 0)
-//     return "";
-
-//   std::size_t search_pos = from_parts[0].size();
-
-//   for (std::size_t i = 1; i < from_parts.size(); ++i) {
-//     std::size_t found = request_path.find(from_parts[i], search_pos);
-//     if (found == std::string::npos)
-//       return "";
-
-//     wilds.push_back(request_path.substr(search_pos, found - search_pos));
-//     search_pos = found + from_parts[i].size();
-//   }
-
-//   wilds.push_back(request_path.substr(search_pos));
-
-//   std::string rewritten;
-//   if (!to_parts.empty())
-//     rewritten = to_parts[0];
-
-//   for (std::size_t i = 0; i < wilds.size(); ++i) {
-//     rewritten += wilds[i];
-//     if (i + 1 < to_parts.size())
-//       rewritten += to_parts[i + 1];
-//   }
-
-//   return rewritten;
-// }

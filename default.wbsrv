@@ -19,11 +19,13 @@ uwsgi =
 
     ...30
 
+    GET /old_stuff/ =301> /new_stuff/
+
     GET /old_stuff/* =301> /new_stuff/*
 
     GET /download/*/mp3/* =301> /*/mp3/*.mp3
 
-    GET /download <i- /spool/www
+    GET /download/ <i- /spool/www/
 
     GET *.(jpg|jpeg|gif) <- /spool/www/*.(jpg|jpeg|gif)
 
