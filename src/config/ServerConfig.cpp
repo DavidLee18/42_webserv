@@ -489,6 +489,10 @@ bool ServerConfig::create_route_rules(
       route.root = root_url[j];
       if (!has_compatible_wildcards(route.path, route.root))
         return (false);
+      if (data[1][data[1].length() - 1] == '/')
+        route.path.add_path("/");
+      if (data[3][data[3].length() - 1] == '/')
+        route.root.add_path("/");
       if (route.op == REDIRECT)
         route.redirect_target = root_url[j];
       routes.push_back(route);
@@ -545,6 +549,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
 }
 
 // Find a route that matches the given method and path
+// 리다이렉션, 오토인덱스가 rule의 wildcard 상관없이 매칭이 가능
 RouteRule const *ServerConfig::find_route(Request::Method method,
                                           const std::string &path) const {
   PathPattern pathPattern(path);
@@ -555,15 +560,12 @@ RouteRule const *ServerConfig::find_route(Request::Method method,
       return &routes[i];
     }
   }
-
   return NULL;
 }
 
 std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
-  const std::vector<std::string> &path = data.get_path();
-  size_t max = path.size();
-  for (size_t i = 0; i < max; ++i)
-    os << "/" << path[i];
+
+    os << data.to_string();
   return (os);
 }
 
@@ -660,56 +662,34 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   return (os);
 }
 
-std::string ServerConfig::rewrite_path(const std::string &request_path,
-                                       const PathPattern &from_pattern,
-                                       const PathPattern &to_pattern) const {
-  std::vector<std::string> new_from = from_pattern.get_path();
-  std::vector<std::string> wilds;
-  std::vector<std::string> new_to = to_pattern.get_path();
-  std::vector<std::string> split_path = utils::string_split(request_path, "/");
-
-  for (std::size_t i = 0; i < new_from.size(); ++i) {
-    if (i < split_path.size() && std::string::npos != new_from[i].find("*"))
-      wilds.push_back(split_path[i]);
-    if (i + 1 == new_from.size()) {
-      if (std::string::npos != new_from[i].find("*"))
-        i++;
-      else
-        break;
-      for (std::size_t j = i; j < split_path.size(); ++j)
-        wilds.push_back(split_path[j]);
-    }
-  }
-
-  std::size_t j = 0;
-  for (std::size_t i = 0; i < new_to.size(); ++i) {
-    if (j < wilds.size() && std::string::npos != new_to[i].find("*"))
-      new_to[i] = wilds[j++];
-    if (i + 1 == new_to.size()) {
-      for (; j < wilds.size(); ++j)
-        new_to.push_back(wilds[j]);
-      break;
-    }
-  }
-
-  if (new_to.empty())
-    return "";
-
-  std::string rewrite = "/";
-  rewrite += new_to[0];
-  for (std::size_t i = 1; i < new_to.size(); ++i) {
-    if (new_to[i].find("*") != std::string::npos)
-      continue;
-    rewrite += '/';
-    rewrite += new_to[i];
-  }
-  return (rewrite);
-}
 
 std::string ServerConfig::get_rewritten_path(Request::Method method,
                                              const std::string &path) const {
   const RouteRule *route = find_route(method, path);
   if (!route)
     return "";
-  return rewrite_path(path, route->path, route->root);
+  return route->path.rewrite_path(path, route->root);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -25,13 +25,22 @@ private:
    * @brief 설정 파일의 경로 패턴을 분리하여 저장하는 멤버 변수
    */
   std::vector<std::string> path;
-  static bool segmentMatches(const std::string &pattern,
-                             const std::string &segment);
 
+  bool wildcard_match(const std::string &pattern,
+                                 const std::string &target) const;
+  std::string apply_wildcards(
+    const std::string &to_pattern,
+    const std::vector<std::string> &wildcards) const;
+  bool extract_wildcards(const std::string &pattern,
+                                    const std::string &target,
+                                    std::vector<std::string> &wildcards) const;
 public:
   PathPattern() : path() {}
-  PathPattern(const std::string &pathStr)
-      : path(utils::string_split(pathStr, "/")) {}
+  PathPattern(const std::string &pathStr) {
+    path = utils::string_split(pathStr, "/");
+    if (!pathStr.empty() && pathStr[pathStr.length() - 1] == '/')
+      path.push_back("/");
+  }
   PathPattern(std::vector<std::string> path) : path(path) {}
   PathPattern(const PathPattern &other) : path(other.path) {}
 
@@ -44,6 +53,9 @@ public:
   bool matches(const std::string &pathStr) const;
   const std::vector<std::string> &get_path(void) const { return path; }
   std::string to_string() const;
+
+  std::string rewrite_path(const PathPattern &request_path,
+                                    const PathPattern &to_pattern) const;  
 };
 
 #endif

@@ -430,6 +430,7 @@ public:
   int get_server_response_time(void) const {
     return server_response_time;
   }
+
 };
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data);
