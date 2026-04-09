@@ -51,7 +51,6 @@ private:
   std::map<std::string, std::string> mime_type; ///< Map containing recognized MIME types.
   std::set<const FileDescriptor *> server_fds;  ///< Set of active server listening socket FileDescriptors.
 
-  Session session; ///< Session.
 
   /**
    * @brief Map tying server listening sockets to their specific ServerConfig settings.
