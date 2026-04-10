@@ -46,6 +46,7 @@ Request::Request(std::string request) {
     line_ss >> this->method;  // "GET"
     line_ss >> this->path;    // "/index.html"
     line_ss >> this->version; // "HTTP/1.1"
+    std::cout << "\n\n\n\n\n여기야~~" << this->path << std::endl;
   }
   while (std::getline(ss, line) && line != "\r" && line != "") {
     if (!line.empty() && line[line.size() - 1] == '\r')

@@ -26,6 +26,8 @@ private:
    */
   std::vector<std::string> path;
 
+  std::string extract_relative_path(const std::string &pattern,
+                                               const std::string &target) const;
   bool wildcard_match(const std::string &pattern,
                                  const std::string &target) const;
   std::string apply_wildcards(
@@ -37,16 +39,24 @@ private:
 public:
   PathPattern() : path() {}
   PathPattern(const std::string &pathStr) {
+    if (pathStr == "/") {
+      path.push_back("/");
+      return ;
+    }
     path = utils::string_split(pathStr, "/");
     if (!pathStr.empty() && pathStr[pathStr.length() - 1] == '/')
       path.push_back("/");
+    if (pathStr[0] == '/')
+      path[0] = "/" + path[0];
   }
-  PathPattern(std::vector<std::string> path) : path(path) {}
   PathPattern(const PathPattern &other) : path(other.path) {}
 
   void add_path(std::string data) {
     path.push_back(data);
     return;
+  }
+  void change_path(std::size_t i, std::string data) {
+    path[i] = data;
   }
   bool is_wildcard() const { return (path.size() == 1 && path[0] == "*"); }
   bool matches(const PathPattern &other) const;

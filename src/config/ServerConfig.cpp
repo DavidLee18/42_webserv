@@ -190,11 +190,11 @@ ServerConfig::get_pattern_candidates(const std::string &line) {
   return (temp);
 }
 
-std::vector<std::vector<std::string> > ServerConfig::expand_paths_with_pattern(
-    const std::vector<std::vector<std::string> > &paths,
+std::vector<PathPattern> ServerConfig::expand_paths_with_pattern(
+    const std::vector<PathPattern> &paths,
     const std::vector<std::string> &pattern, std::size_t index) {
-  std::vector<std::vector<std::string> > new_paths;
-  std::string seg = paths[0][index];
+  std::vector<PathPattern> new_paths;
+  std::string seg = paths[0].get_path()[index];
   std::string prefix = "";
   std::string suffix = "";
 
@@ -207,23 +207,24 @@ std::vector<std::vector<std::string> > ServerConfig::expand_paths_with_pattern(
 
   for (std::size_t i = 0; i < paths.size(); ++i) {
     for (std::size_t j = 0; j < pattern.size(); ++j) {
-      std::vector<std::string> new_path = paths[i];
-      new_path[index] = prefix + pattern[j] + suffix;
+      PathPattern new_path = paths[i];
+      new_path.change_path(index, prefix + pattern[j] + suffix);
       new_paths.push_back(new_path);
     }
   }
   return (new_paths);
 }
 
-std::vector<std::vector<std::string> >
+std::vector<PathPattern>
 ServerConfig::expand_path_pattern(const std::string &line) {
-  std::vector<std::string> path(utils::string_split(line, "/"));
-  std::vector<std::vector<std::string> > paths;
-
+  PathPattern path(line);
+  std::vector<PathPattern> paths;
+  std::vector<std::string> temp = path.get_path();
+  
   paths.push_back(path);
-  for (std::size_t i = 0; i < path.size(); ++i) {
-    if (is_path_pattern_segment(path[i])) {
-      std::vector<std::string> pattern = get_pattern_candidates(path[i]);
+  for (std::size_t i = 0; i < temp.size(); ++i) {
+    if (is_path_pattern_segment(temp[i])) {
+      std::vector<std::string> pattern = get_pattern_candidates(temp[i]);
       paths = expand_paths_with_pattern(paths, pattern, i);
     } else
       continue;
@@ -441,19 +442,15 @@ bool ServerConfig::has_compatible_wildcards(const PathPattern &path,
 
   int path_wild = 0;
   int root_wild = 0;
-  size_t j = 0;
   for (size_t i = 0; i < path_pattern.size(); ++i) {
     if (std::string::npos != path_pattern[i].find('*')) {
       path_wild++;
-      for (; j < root_pattern.size(); ++j) {
-        if (path_pattern[i] == root_pattern[j] ||
-            (path_pattern[i] == "*" && // root_pattern[i] == "*"
-             std::string::npos != root_pattern[j].find('*'))) {
-          j++;
-          root_wild++;
-          break;
-        }
-      }
+    }
+  }
+  for (size_t i = 0; i < root_pattern.size(); ++i) {
+    if (std::string::npos != root_pattern[i].find('*')) {
+      if (root_pattern[i] == "*" || root_pattern[i] == "/*")
+        root_wild++;
     }
   }
   if (path_wild != root_wild)
@@ -464,16 +461,14 @@ bool ServerConfig::has_compatible_wildcards(const PathPattern &path,
 bool ServerConfig::create_route_rules(
     const std::vector<std::string> &data,
     const std::vector<Request::Method> &mets) {
-  RouteRule route;
-  std::vector<std::vector<std::string> > path_url;
-  // std::vector<std::vector<std::string> > root_url;
-  std::vector<std::string> root_url;
-
   if (data.size() != 4)
     return (false);
-  path_url = expand_path_pattern(data[1]);
-  // root_url = expand_path_pattern(data[3]);
-  root_url = utils::string_split(data[3], "/");
+  
+  RouteRule route;
+  std::vector<PathPattern> path_url = expand_path_pattern(data[1]);
+  PathPattern root_url(data[3]);
+
+
   for (size_t i = 0; i < mets.size(); ++i) {
     route.method = mets[i];
     route.op = parse_rule_operator(data[2]);
@@ -482,22 +477,16 @@ bool ServerConfig::create_route_rules(
     route.index = "";
     route.auth_info = "";
     route.max_body_KB = 1;
-    if (path_url.size() < 1 || root_url.size() < 1) 
-      //|| path_url.size() != root_url.size())
-      return (std::cout << "1" << std::endl, false);
+    if (path_url.size() < 1 || root_url.get_path().size() < 1) 
+      return (false);
 
     for (size_t j = 0; j < path_url.size(); ++j) {
       route.path = path_url[j];
-      // route.root = root_url[j];
       route.root = root_url;
-      // if (!has_compatible_wildcards(route.path, route.root))
-      //   return (false);
-      if (data[1][data[1].length() - 1] == '/')
-        route.path.add_path("/");
-      if (data[3][data[3].length() - 1] == '/')
-        route.root.add_path("/");
+      if (!has_compatible_wildcards(route.path, route.root))
+        return (false);
       if (route.op == REDIRECT)
-        route.redirect_target = root_url[j];
+        route.redirect_target = route.root;
       routes.push_back(route);
     }
   }
@@ -665,12 +654,30 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   return (os);
 }
 
+// std::string normalize_slashes(const std::string &path) {
+//   std::string result;
+//   bool prev_slash = false;
+
+//   for (std::size_t i = 0; i < path.size(); ++i) {
+//     if (path[i] == '/') {
+//       if (!prev_slash)
+//         result += path[i];
+//       prev_slash = true;
+//     } else {
+//       result += path[i];
+//       prev_slash = false;
+//     }
+//   }
+//   return result;
+// }
+
 
 std::string ServerConfig::get_rewritten_path(Request::Method method,
                                              const std::string &path) const {
   const RouteRule *route = find_route(method, path);
   if (!route)
     return "";
+  // return normalize_slashes(route->path.rewrite_path(path, route->root));
   return route->path.rewrite_path(path, route->root);
 }
 

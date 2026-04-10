@@ -43,6 +43,8 @@ bool PathPattern::matches(const PathPattern &other) const {
   std::string pattern = this->to_string();
   std::string target = other.to_string();
 
+  // std::cout << "\n\nmatches pattern: " << pattern << std::endl;
+  // std::cout << "matches target: " << target << std::endl;
   // root의 규칙에 wildcard가 존재 하면 경우 
   if (pattern.find('*') != std::string::npos)
     return wildcard_match(pattern, target);
@@ -64,11 +66,13 @@ bool PathPattern::matches(const std::string &pathStr) const {
 // Convert PathPattern to string for debugging/display
 std::string PathPattern::to_string() const {
   if (path.empty()) {
-    return "/";
+    return "";
   }
+  if (path.size() == 1)
+    return path[0];
   std::string result;
   for (size_t i = 0; i < path.size(); ++i) {
-    if (path[0].find("*") == std::string::npos)
+    if (i != 0)
       result += "/";
     if (path[i] != "/")
       result += path[i];
@@ -76,19 +80,84 @@ std::string PathPattern::to_string() const {
   return result;
 }
 
+static std::size_t count_wildcards(const std::string &str) {
+  std::size_t count = 0;
+  for (std::size_t i = 0; i < str.size(); ++i) {
+    if (str[i] == '*')
+      ++count;
+  }
+  return count;
+}
+
+std::string PathPattern::extract_relative_path(const std::string &pattern,
+                                               const std::string &target) const {
+  if (pattern == "*") {
+    if (target == "/")
+      return "/";
+
+    if (!target.empty() && target[0] == '/')
+      return target.substr(1);
+
+    return target;
+  }
+
+  if (pattern.find('*') == std::string::npos) {
+    if (!pattern.empty() && pattern[pattern.size() - 1] == '/') {
+      if (target.find(pattern) != 0)
+        return "";
+      return target.substr(pattern.size());
+    }
+    if (pattern == target)
+      return "";
+    return "";
+  }
+
+  std::size_t first_star = pattern.find('*');
+  std::size_t last_star = pattern.rfind('*');
+
+  std::string prefix = pattern.substr(0, first_star);
+  std::string suffix = pattern.substr(last_star + 1);
+
+  if (!prefix.empty()) {
+    if (target.find(prefix) != 0)
+      return "";
+  }
+
+  if (!suffix.empty()) {
+    if (target.size() < suffix.size())
+      return "";
+    if (target.substr(target.size() - suffix.size()) != suffix)
+      return "";
+  }
+
+  std::size_t start = prefix.size();
+  std::size_t end = target.size() - suffix.size();
+
+  if (end < start)
+    return "";
+
+  std::string result = target.substr(start, end - start);
+
+  if (prefix.empty() && !result.empty() && result[0] == '/')
+    result.erase(0, 1);
+
+  result += suffix;
+  return result;
+}
 
 bool PathPattern::extract_wildcards(const std::string &pattern,
                                     const std::string &target,
                                     std::vector<std::string> &wildcards) const {
   wildcards.clear();
 
+  // 특수 케이스: pattern == "*"
   if (pattern == "*") {
     if (target.empty())
-      return false;   // 네 규칙이 * = 1글자 이상이면
-    wildcards.clear();
+      return false;
     wildcards.push_back(target);
     return true;
   }
+
   std::vector<std::string> parts;
   std::string current;
 
@@ -102,33 +171,38 @@ bool PathPattern::extract_wildcards(const std::string &pattern,
   }
   parts.push_back(current);
 
+  bool starts_with_star = !pattern.empty() && pattern[0] == '*';
+  bool ends_with_star = !pattern.empty() && pattern[pattern.size() - 1] == '*';
+
   std::size_t pos = 0;
-  std::size_t part_index = 0;
-  bool starts_with_star = (!pattern.empty() && pattern[0] == '*');
-  bool ends_with_star = (!pattern.empty() && pattern[pattern.size() - 1] == '*');
+  std::size_t first_literal = 0;
 
   if (!starts_with_star) {
-    if (parts.empty() || target.find(parts[0]) != 0)
+    if (parts.empty())
+      return false;
+    if (target.find(parts[0]) != 0)
       return false;
     pos = parts[0].size();
-    part_index = 1;
+    first_literal = 1;
   }
 
-  for (; part_index + 1 < parts.size(); ++part_index) {
-    std::size_t found = target.find(parts[part_index], pos);
+  for (std::size_t i = first_literal; i + 1 < parts.size(); ++i) {
+    if (parts[i].empty())
+      continue;
+
+    std::size_t found = target.find(parts[i], pos);
     if (found == std::string::npos)
       return false;
     if (found == pos)
       return false; // '*'는 최소 1글자 이상
 
     wildcards.push_back(target.substr(pos, found - pos));
-    pos = found + parts[part_index].size();
+    pos = found + parts[i].size();
   }
 
   if (!ends_with_star) {
-    if (parts.empty())
-      return false;
     const std::string &last = parts.back();
+
     if (target.size() < last.size())
       return false;
     if (target.substr(target.size() - last.size()) != last)
@@ -137,11 +211,10 @@ bool PathPattern::extract_wildcards(const std::string &pattern,
     std::size_t end_pos = target.size() - last.size();
     if (end_pos < pos)
       return false;
-    if (end_pos == pos && pattern.find('*') != std::string::npos)
-      return false;
+    if (end_pos == pos)
+      return false; // '*'는 최소 1글자 이상
 
-    if (parts.size() > 1)
-      wildcards.push_back(target.substr(pos, end_pos - pos));
+    wildcards.push_back(target.substr(pos, end_pos - pos));
   } else {
     if (pos >= target.size())
       return false;
@@ -187,15 +260,46 @@ std::string PathPattern::rewrite_path(const PathPattern &request_path,
   std::string target = request_path.to_string();
   std::string dest = to_pattern.to_string();
 
-  // 1. wildcard route
-  if (from.find('*') != std::string::npos) {
-    std::vector<std::string> wildcards;
-    if (!extract_wildcards(from, target, wildcards))
-      return "";
-    return apply_wildcards(dest, wildcards);
+  std::size_t from_wc = count_wildcards(from);
+  std::size_t dest_wc = count_wildcards(dest);
+
+  if (from_wc > 0) {
+    bool looks_like_root_mapping =
+        !dest.empty() && dest.find('/') != std::string::npos && dest_wc == 1;
+
+    // root 매핑은 먼저 처리
+    if (looks_like_root_mapping) {
+      std::string relative = extract_relative_path(from, target);
+      if (relative.empty() && target != from)
+        return "";
+
+      std::vector<std::string> mapped;
+      mapped.push_back(relative);
+      return apply_wildcards(dest, mapped);
+    }
+
+    // wildcard 개수가 같으면 캡처값 그대로 삽입
+    if (from_wc == dest_wc) {
+      std::vector<std::string> wildcards;
+      if (!extract_wildcards(from, target, wildcards))
+        return "";
+      return apply_wildcards(dest, wildcards);
+    }
+
+    // destination 쪽 wildcard가 1개면 relative path 사용
+    if (dest_wc == 1) {
+      std::string relative = extract_relative_path(from, target);
+      if (relative.empty() && target != from)
+        return "";
+
+      std::vector<std::string> mapped;
+      mapped.push_back(relative);
+      return apply_wildcards(dest, mapped);
+    }
+
+    return "";
   }
 
-  // 2. prefix route
   if (!from.empty() && from[from.size() - 1] == '/') {
     if (target.find(from) != 0)
       return "";
@@ -204,10 +308,11 @@ std::string PathPattern::rewrite_path(const PathPattern &request_path,
 
     if (!dest.empty() && dest[dest.size() - 1] == '/')
       return dest + suffix;
+    if (!suffix.empty() && suffix[0] == '/')
+      return dest + suffix;
     return dest + "/" + suffix;
   }
 
-  // 3. exact route
   if (from == target)
     return dest;
 

@@ -79,9 +79,10 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   Target target;
   if (rule == NULL) {
     target.type = NOT_FOUND_ERR;
-    target.path = get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
+    target.path = "/spool/www/error/404.html";
     return target;
   }
+  std::cout << "resolve_target request path: " << request->get_path() << std::endl;
   std::string root =
       config->get_rewritten_path(request->get_method(), request->get_path());
 
@@ -152,6 +153,7 @@ ServerResponse::http_response(const Request *request, const ServerConfig *config
     std::cout << "rule root   : [" << rule->root.to_string() << "]" << std::endl;
   }
 
+  std::cout << std::endl;
   if (rule != NULL) {
     PathPattern request_path(request->get_path());
 
