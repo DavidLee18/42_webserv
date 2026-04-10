@@ -654,22 +654,22 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   return (os);
 }
 
-// std::string normalize_slashes(const std::string &path) {
-//   std::string result;
-//   bool prev_slash = false;
+std::string normalize_slashes(const std::string &path) {
+  std::string result;
+  bool prev_slash = false;
 
-//   for (std::size_t i = 0; i < path.size(); ++i) {
-//     if (path[i] == '/') {
-//       if (!prev_slash)
-//         result += path[i];
-//       prev_slash = true;
-//     } else {
-//       result += path[i];
-//       prev_slash = false;
-//     }
-//   }
-//   return result;
-// }
+  for (std::size_t i = 0; i < path.size(); ++i) {
+    if (path[i] == '/') {
+      if (!prev_slash)
+        result += path[i];
+      prev_slash = true;
+    } else {
+      result += path[i];
+      prev_slash = false;
+    }
+  }
+  return result;
+}
 
 
 std::string ServerConfig::get_rewritten_path(Request::Method method,
@@ -677,8 +677,8 @@ std::string ServerConfig::get_rewritten_path(Request::Method method,
   const RouteRule *route = find_route(method, path);
   if (!route)
     return "";
-  // return normalize_slashes(route->path.rewrite_path(path, route->root));
-  return route->path.rewrite_path(path, route->root);
+  return normalize_slashes(route->path.rewrite_path(path, route->root));
+  // return route->path.rewrite_path(path, route->root);
 }
 
 
