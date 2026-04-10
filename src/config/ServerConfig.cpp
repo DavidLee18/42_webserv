@@ -447,7 +447,7 @@ bool ServerConfig::has_compatible_wildcards(const PathPattern &path,
       path_wild++;
       for (; j < root_pattern.size(); ++j) {
         if (path_pattern[i] == root_pattern[j] ||
-            (path_pattern[i] == "*" &&
+            (path_pattern[i] == "*" && // root_pattern[i] == "*"
              std::string::npos != root_pattern[j].find('*'))) {
           j++;
           root_wild++;
@@ -466,12 +466,14 @@ bool ServerConfig::create_route_rules(
     const std::vector<Request::Method> &mets) {
   RouteRule route;
   std::vector<std::vector<std::string> > path_url;
-  std::vector<std::vector<std::string> > root_url;
+  // std::vector<std::vector<std::string> > root_url;
+  std::vector<std::string> root_url;
 
   if (data.size() != 4)
     return (false);
   path_url = expand_path_pattern(data[1]);
-  root_url = expand_path_pattern(data[3]);
+  // root_url = expand_path_pattern(data[3]);
+  root_url = utils::string_split(data[3], "/");
   for (size_t i = 0; i < mets.size(); ++i) {
     route.method = mets[i];
     route.op = parse_rule_operator(data[2]);
@@ -480,15 +482,16 @@ bool ServerConfig::create_route_rules(
     route.index = "";
     route.auth_info = "";
     route.max_body_KB = 1;
-    if (path_url.size() < 1 || root_url.size() < 1 ||
-        path_url.size() != root_url.size())
-      return (false);
+    if (path_url.size() < 1 || root_url.size() < 1) 
+      //|| path_url.size() != root_url.size())
+      return (std::cout << "1" << std::endl, false);
 
     for (size_t j = 0; j < path_url.size(); ++j) {
       route.path = path_url[j];
-      route.root = root_url[j];
-      if (!has_compatible_wildcards(route.path, route.root))
-        return (false);
+      // route.root = root_url[j];
+      route.root = root_url;
+      // if (!has_compatible_wildcards(route.path, route.root))
+      //   return (false);
       if (data[1][data[1].length() - 1] == '/')
         route.path.add_path("/");
       if (data[3][data[3].length() - 1] == '/')
