@@ -79,9 +79,10 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   Target target;
   if (rule == NULL) {
     target.type = NOT_FOUND_ERR;
-    target.path = get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
+    target.path = "/spool/www/error/404.html";
     return target;
   }
+  std::cout << "resolve_target request path: " << request->get_path() << std::endl;
   std::string root =
       config->get_rewritten_path(request->get_method(), request->get_path());
 
@@ -144,13 +145,28 @@ ServerResponse::http_response(const Request *request, const ServerConfig *config
   Response response;
   Target target = resolve_target(rule, config, request);
 
-std::string new_path = rule->path.rewrite_path(request->get_path(), rule->root);
+  std::cout << std::endl;
+  if (rule == NULL) {
+    std::cout << "rule: NULL" << std::endl;
+  } else {
+    std::cout << "rule path   : [" << rule->path.to_string() << "]" << std::endl;
+    std::cout << "rule root   : [" << rule->root.to_string() << "]" << std::endl;
+  }
 
-std::cout << "\nrule path: " << rule->path << std::endl;
-std::cout << "rule root: " << rule->root << std::endl;
-std::cout << "request path: " << request->get_path() << std::endl;
-std::cout << "new path: [" << new_path << "]" << std::endl;
+  std::cout << std::endl;
+  if (rule != NULL) {
+    PathPattern request_path(request->get_path());
 
+    std::cout << "request path: [" << request_path.to_string() << "]" << std::endl;
+
+    std::cout << std::endl;
+    std::string new_path = rule->path.rewrite_path(request->get_path(), rule->root);
+    std::cout << "new path    : [" << new_path << "]" << std::endl;
+  }
+
+std::cout << "===============================\n" << std::endl;
+
+  std::cout << "====checking===" << target.type << rule->op << std::endl;
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
   if (rule->op == REDIRECT) {

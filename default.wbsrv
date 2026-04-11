@@ -23,16 +23,14 @@ uwsgi =
 
     GET /old_stuff/* =301> /new_stuff/*
 
-    GET /old_stuff/ =301> /new_stuff/
-
-    GET /download/*/mp3/* =301> /*/mp3/*
+    GET /download/*/mp3/*.mp3 =301> /*/mp3/*
 
     GET /download/ <i- /spool/www/
 
-    GET *.(jpg|jpeg|gif) <- /spool/www/*.(jpg|jpeg|gif)
+    GET *.(jpg|jpeg|gif) <- /spool/www/*
 
     GET|POST|DELETE * <- /spool/www/*
-        ? index.html
+        ? index2.html
         @ auth_info
         ->{} 10MB
         ! 400:/spool/www/error/400.html
@@ -55,11 +53,11 @@ uwsgi =
 
     GET /old_stuff/* =301> /new_stuff/*
 
-    GET /download/*/mp3/* =301> /*/mp3/*.mp3
+    GET /download/*/mp3/* =301> /*/mp3/*
 
     GET /download/ <i- /spool/www
 
-    GET *.(jpg|jpeg|gif) <- /spool/www/*.(jpg|jpeg|gif)
+    GET *.(jpg|jpeg|gif) <- /spool/www/*
 
     GET|POST|DELETE * <- /spool/www/*
         ? index2.html

@@ -255,8 +255,8 @@ private:
    * - 원래 경로 요소의 prefix와 suffix는 유지하고,
    * 가운데 패턴 후보 부분만 교체하여 새 경로들을 생성한다.
    */
-  std::vector<std::vector<std::string> >
-  expand_paths_with_pattern(const std::vector<std::vector<std::string> > &paths,
+  std::vector<PathPattern>
+  expand_paths_with_pattern(const std::vector<PathPattern> &paths,
                             const std::vector<std::string> &pattern,
                             std::size_t index);
   /**
@@ -269,7 +269,7 @@ private:
    * 
    * - 패턴 요소가 포함된 경우 가능한 모든 조합으로 확장된다.
    */
-  std::vector<std::vector<std::string> >
+  std::vector<PathPattern>
   expand_path_pattern(const std::string &line);
   /**
    * @brief URL 패턴 문자열에서 경로 요소별 '*' 사용 규칙을 검사하는 함수
@@ -376,22 +376,6 @@ private:
    * @return 변환된 RuleOperator 값, 유효하지 않으면 UNDEFINED
    */
   RuleOperator parse_rule_operator(const std::string &indicator);
-  /**
-   * @brief 요청 경로를 대상 패턴에 맞게 재작성한다.
-   * @param request_path 실제 요청 경로
-   * @param from_pattern wildcard 추출 기준이 되는 원본 패턴
-   * @param to_pattern wildcard를 치환할 대상 패턴
-   * @return 재작성된 경로 문자열
-   *
-   * - request_path에서 from_pattern의 wildcard 위치에 대응하는 경로 조각을 추출한
-   * 뒤, 이를 to_pattern의 wildcard 위치에 순서대로 치환하여 최종 경로를
-   * 생성한다.
-   * (이 함수는 route 매칭과 config 유효성 검사가 이미 끝난 상태라고
-   * 가정한다.)
-   */
-  std::string rewrite_path(const std::string &request_path,
-                           const PathPattern &from_pattern,
-                           const PathPattern &to_pattern) const;
 
 public:
   ServerConfig(FileDescriptor &);
