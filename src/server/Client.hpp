@@ -118,6 +118,14 @@ public:
   const std::string get_cookie() const { return cookie; };
 
   /**
+   * @brief Parses the cookie string and returns the value of a specific cookie by name.
+   * 
+   * @param name The name of the cookie to find (e.g., "session_id")
+   * @return std::string The value of the cookie, or empty string if not found.
+   */
+  std::string get_cookie_value(const std::string& name) const;
+
+  /**
    * @brief Sets client's cookie.
    */
   void set_cookie(std::string value) { cookie = value; };

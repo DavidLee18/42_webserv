@@ -9,6 +9,8 @@
 #include "../config/ServerConfig.hpp"
 #include "Client.hpp"
 #include "DefaultError.hpp"
+#include "Session.hpp"
+
 #include <dirent.h>
 #include <fstream>
 #include <sstream>
@@ -91,8 +93,9 @@ public:
    * @return Response The fully formulated HTTP response components.
    */
   static Response
-  http_response(const Request *request, const ServerConfig *config,
-                const std::map<std::string, std::string> mime_type);
+  http_response(const Request *request, const ClientSession *client,
+                const std::map<std::string, std::string> mime_type,
+                Session *session);
 
   static Response cgi_response(const Request *request,
                                const ServerConfig *config, EPoll *epoll);
@@ -165,9 +168,10 @@ private:
                                 const ServerConfig *config,
                                 const RouteRule *rule);
   static Response post_method(Target target, Response response,
-                              const ServerConfig *config,
+                              const ClientSession *client,
                               const RouteRule *rule,
-                              const Request *request);
+                              const Request *request,
+                              Session *session);
   static Response get_method(Target target, Response response,
                              const ServerConfig *config,
                              const RouteRule *rule,

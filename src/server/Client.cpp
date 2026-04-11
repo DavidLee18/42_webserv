@@ -29,6 +29,20 @@ const std::string Request::get_connection_string() const {
     return "close";
 }
 
+std::string Request::get_cookie_value(const std::string& name) const {
+  if (cookie.empty()) return "";
+
+  std::string target = name + "=";
+  size_t start = cookie.find(target);
+  if (start == std::string::npos) return "";
+
+  start += target.length();
+  size_t end = cookie.find(';', start);
+  if (end == std::string::npos) end = cookie.length();
+
+  return cookie.substr(start, end - start);
+}
+
 Request::Request(std::string request) {
   std::stringstream ss(request);
   std::string line;

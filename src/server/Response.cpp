@@ -1,4 +1,5 @@
 #include "Response.hpp"
+#include "Session.hpp"
 #include "../cgi_1_1.h"
 #include "ParsingUtils.hpp"
 
@@ -140,10 +141,12 @@ Response ServerResponse::delete_method(Target target, Response response,
 }
 
 Response ServerResponse::post_method(Target target, Response response,
-                                     const ServerConfig *config,
+                                     const ClientSession *client,
                                      const RouteRule *rule,
-                                     const Request *request) {
+                                     const Request *request,
+                                     Session *session) {
   (void)target;
+  const ServerConfig *config = client->config;
   if (request->get_path() == "/login" || request->get_path() == "/login.html") {
     std::string body = request->get_body();
     std::string id = "";
@@ -194,6 +197,7 @@ Response ServerResponse::post_method(Target target, Response response,
         response.redir = rule->index;
         response.mime_type = "text/html";
         response.body = "<html><body>Redirecting...</body></html>";
+        response.cookie = "session_id=" + session->create_session(id, client->ip) + "; Path=/; HttpOnly";
         return response;
       } else {
         std::cout << "Authentication FAILED for: " << id << std::endl;
@@ -256,14 +260,34 @@ Response ServerResponse::get_method(Target target, Response response,
 }
 
 Response ServerResponse::http_response(
-    const Request *request, const ServerConfig *config,
-    const std::map<std::string, std::string> mime_type) {
+    const Request *request, const ClientSession *client,
+    const std::map<std::string, std::string> mime_type,
+    Session *session) {
+  const ServerConfig *config = client->config;
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
   Response response;
   Target target = resolve_target(rule, config, request);
 
-  response.cookie = request->get_cookie();
+  // [쿠키 검증 로직 추가]
+  std::string session_id = request->get_cookie_value("session_id");
+  SessionData* user_session = NULL;
+  
+  if (!session_id.empty()) {
+    user_session = session->get_session(session_id);
+  }
+
+  if (user_session) {
+    std::cout << "[Authentication] Valid user session found! User ID: " << user_session->user_id << std::endl;
+  } else {
+    // 세션이 없는데 보호된 자원(예: DELETE 명령)을 요청하면 401 에러를 반환
+    if (request->get_method() == Request::DELETE) {
+      std::cout << "[Authentication] Blocked DELETE request. No valid session." << std::endl;
+      return error_response(config, rule, UNAUTHORIZED);
+    }
+    std::cout << "[Authentication] No valid session. Guest user." << std::endl;
+  }
+
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
   std::cout << "mime type: " << response.mime_type << std::endl;
@@ -271,7 +295,7 @@ Response ServerResponse::http_response(
   if (request->get_method() == Request::DELETE) {
     return ServerResponse::delete_method(target, response, config, rule);
   } else if (request->get_method() == Request::POST) {
-    return ServerResponse::post_method(target, response, config, rule, request);
+    return ServerResponse::post_method(target, response, client, rule, request, session);
   } else if (request->get_method() == Request::GET) {
     return ServerResponse::get_method(target, response, config, rule, request);
   } else {

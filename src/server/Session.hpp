@@ -14,6 +14,10 @@ struct SessionData
   time_t last_access;
 };
 
+/**
+ * @class Session
+ * @brief Session class to generate uuid and save data.
+ */
 class Session {
 private:
   /**

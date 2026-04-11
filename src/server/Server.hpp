@@ -35,7 +35,7 @@ class ServerConfig;
  * @brief Core server class to initiate, configure, and run the event loop.
  * 
  * The Server class is responsible for setting up listening sockets based on the configuration,
- * managing multiplexed I/O using EPoll (or Kqueue wrappers), and directing I/O events to
+ * managing multiplexed I/O using EPoll, and directing I/O events to
  * the respective ClientSession handlers.
  */
 class Server {
@@ -69,7 +69,7 @@ private:
    * @brief Server sessions.
    * Key: Session id. Value: User info.
    */
-  std::map<std::string, std::string> sessions;
+  Session sessions;
 
   /**
    * @brief Accepts a newly incoming connection from a specific server listening socket.

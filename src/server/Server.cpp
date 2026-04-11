@@ -112,7 +112,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
                                           clients.at(client_fd).config, &epoll);
     else
       http = ServerResponse::http_response(
-          &request, clients.at(client_fd).config, mime_type);
+          &request, &clients.at(client_fd), mime_type, &sessions);
 
     // read server response
     std::ostringstream server_response;
@@ -125,7 +125,10 @@ void Server::client_read(const FileDescriptor *client_fd) {
       std::cout << http.redir << std::endl;
       server_response << "Content-Type:" << http.mime_type << "\r\n";
       if (!http.cookie.empty())
+      {
         server_response << "Set-Cookie:" << http.cookie << "\r\n";
+        std::cout << "cookie value: " << http.cookie << std::endl;
+      }
       server_response << "Content-Length: " << http.body.length() << "\r\n";
       server_response << "Connection: " << http.connection << "\r\n\r\n";
       server_response << http.body;
