@@ -92,13 +92,9 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
     if (rule->op == SERVEFROM && request->get_path() == "/")
       target.path += rule->index;
   } else if (type == NOT_FOUND_ERR)
-    target.path += config->get_rewritten_path(
-        request->get_method(),
-        get_string_from_map(rule->error_pages, NOT_FOUND_ERR));
+    target.path += get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
   else if (type == FORBIDDEN_ERR)
-    target.path += config->get_rewritten_path(
-        request->get_method(),
-        get_string_from_map(rule->error_pages, FORBIDDEN_ERR));
+    target.path += get_string_from_map(rule->error_pages, FORBIDDEN_ERR);
   else
     target.path += root;
   target.type = check_path_type(target.path);
@@ -112,6 +108,7 @@ Response ServerResponse::error_response(const ServerConfig *config,
                                         const RouteRule *rule, int err_code) {
   Response response;
   std::string err_page = get_string_from_map(rule->error_pages, err_code);
+  std::cout << "error page: " << err_page << std::endl;
 
   if (err_page.empty())
     return DefaultError::default_err_response(err_code);
@@ -146,16 +143,18 @@ Response ServerResponse::post_method(Target target, Response response,
                                      const ServerConfig *config,
                                      const RouteRule *rule,
                                      const Request *request) {
+  (void)target;
   if (request->get_path() == "/login" || request->get_path() == "/login.html") {
     std::string body = request->get_body();
     std::string id = "";
     std::string pw = "";
 
-    std::string auth_target =
+    std::string auth_target = get_pwd() +
         config->get_rewritten_path(request->get_method(), rule->auth_info);
+    std::cout << "\n" << auth_target << "\n" << std::endl;
     std::ifstream file(auth_target.c_str());
     if (file.is_open()) {
-      // Body 파싱 (예: "id=qwer&pw=1234")
+      std::map<std::string, std::string> auth_info;
       size_t id_pos = body.find("id=");
       if (id_pos != std::string::npos) {
         size_t amp_pos = body.find('&', id_pos);
@@ -163,7 +162,6 @@ Response ServerResponse::post_method(Target target, Response response,
           amp_pos = body.length();
         id = body.substr(id_pos + 3, amp_pos - (id_pos + 3));
       }
-
       size_t pw_pos = body.find("pw=");
       if (pw_pos != std::string::npos) {
         size_t amp_pos = body.find('&', pw_pos);
@@ -172,23 +170,47 @@ Response ServerResponse::post_method(Target target, Response response,
         pw = body.substr(pw_pos + 3, amp_pos - (pw_pos + 3));
       }
 
-      std::cout << "\n===== [LOGIN PARSED DATA] =====" << std::endl;
-      std::cout << "ID : [" << id << "]" << std::endl;
-      std::cout << "PW : [" << pw << "]" << std::endl;
-      std::cout << "===============================\n" << std::endl;
+      std::string line;
+      bool is_authenticated = false;
+      std::string target_credential = id + ":" + pw;
 
-      // 3단계 작성을 위한 인증 임시 성공 처리
-      response.status_code = status_code_to_string(200);
-      response.mime_type = "text/html";
-      response.body =
-          "<html><body><h1>POST /login Parsing Success!</h1></body></html>";
-      return response;
+      while (std::getline(file, line)) {
+        if (!line.empty() && line[line.length() - 1] == '\r') {
+          line = line.substr(0, line.length() - 1);
+        }
+        if (line == target_credential) {
+          is_authenticated = true;
+          break;
+        }
+      }
+      file.close();
+
+      if (is_authenticated) {
+        std::cout << "Authentication SUCCESS for: " << id << std::endl;
+        
+        // 1. 브라우저에게 "이 주소로 가라"고 알리는 상태 코드 설정
+        // 일반적으로 다른 페이지 이동 시 302 혹은 303을 사용
+        response.status_code = "302 Found"; 
+        response.redir = rule->index;
+        response.mime_type = "text/html";
+        response.body = "<html><body>Redirecting...</body></html>";
+        return response;
+      } else {
+        std::cout << "Authentication FAILED for: " << id << std::endl;
+        
+        response.status_code = status_code_to_string(200);
+        response.mime_type = "text/html";
+        // 로그인 실패 시 브라우저 자체 Alert 팝업을 띄우고 이전(로그인) 화면으로 다시 돌려보냅니다.
+        response.body = "<script>"
+                        "alert('invalid id or password');"
+                        "window.location.href='/login.html';"
+                        "</script>";
+        return response;
+      }
     } else
       return error_response(config, rule, NOT_FOUND_ERR);
-  } else {
-    // /login이 아닌 다른 POST 요청은 일단 403이나 404로 막아둡니다.
-    return error_response(config, rule, FORBIDDEN_ERR);
   }
+  return error_response(config, rule, FORBIDDEN_ERR);
 }
 
 Response ServerResponse::get_method(Target target, Response response,
@@ -230,6 +252,7 @@ Response ServerResponse::get_method(Target target, Response response,
       return DefaultError::default_err_response(NOT_FOUND_ERR);
     }
   }
+  return response;
 }
 
 Response ServerResponse::http_response(
