@@ -107,7 +107,7 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
 Response ServerResponse::error_response(const ServerConfig *config,
                                         const RouteRule *rule, int err_code) {
   Response response;
-  std::string err_page = get_string_from_map(rule->error_pages, err_code);
+  std::string err_page = get_pwd() + get_string_from_map(rule->error_pages, err_code);
   std::cout << "error page: " << err_page << std::endl;
 
   if (err_page.empty())
