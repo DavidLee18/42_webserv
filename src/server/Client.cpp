@@ -29,8 +29,19 @@ const std::string Request::get_connection_string() const {
     return "close";
 }
 
-#include <iostream>
-#include <stdlib.h>
+std::string Request::get_cookie_value(const std::string& name) const {
+  if (cookie.empty()) return "";
+
+  std::string target = name + "=";
+  size_t start = cookie.find(target);
+  if (start == std::string::npos) return "";
+
+  start += target.length();
+  size_t end = cookie.find(';', start);
+  if (end == std::string::npos) end = cookie.length();
+
+  return cookie.substr(start, end - start);
+}
 
 Request::Request(std::string request) {
   std::stringstream ss(request);
@@ -44,7 +55,7 @@ Request::Request(std::string request) {
     std::stringstream line_ss(line);
 
     line_ss >> this->method;  // "GET"
-    line_ss >> this->path;    // "/index.html"
+    line_ss >> this->path;    // "/"
     line_ss >> this->version; // "HTTP/1.1"
   }
   while (std::getline(ss, line) && line != "\r" && line != "") {
@@ -75,6 +86,8 @@ Request::Request(std::string request) {
     keep_alive = true;
   else
     keep_alive = false;
+
+  cookie = get_string_from_map(header, "Cookie");
 
   content_full = true;
   if (!body.empty())

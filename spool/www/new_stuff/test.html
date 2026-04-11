@@ -391,8 +391,247 @@
             </p>
         </div>
 
+        <div class="links" style="display: flex; justify-content: center; margin-bottom: 22px;">
+            <a href="test.html" class="route-btn" style="max-width: 320px; width: 100%;">
+                <div class="route-top">
+                    <div class="route-head">
+                        <div class="route-dot route-hello"></div>
+                        <div class="route-tag">LINK</div>
+                    </div>
+                    <div class="route-title">Test Page</div>
+                    <div class="route-desc">Go to test.html in the same directory</div>
+                </div>
+                <div class="route-bottom">
+                    <span class="route-path">test.html</span>
+                    <span class="arrow">&rarr;</span>
+                </div>
+            </a>
+        </div>
+
         <div class="footer">Modern Webserv Route Test Interface</div>
     </div>
 
+    <script>
+        (function () {
+            var canvas = document.getElementById("glass-bg");
+            var ctx = canvas.getContext("2d");
+
+            var dpr = Math.max(1, window.devicePixelRatio || 1);
+            var width = 0;
+            var height = 0;
+
+            var cellSize = 42;
+            var points = [];
+            var dusts = [];
+            var ripples = [];
+            var mouse = { x: -9999, y: -9999 };
+
+            function resize() {
+                width = window.innerWidth;
+                height = window.innerHeight;
+
+                canvas.width = Math.floor(width * dpr);
+                canvas.height = Math.floor(height * dpr);
+                canvas.style.width = width + "px";
+                canvas.style.height = height + "px";
+
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                buildGrid();
+                buildDust();
+            }
+
+            function randomRange(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            function buildGrid() {
+                points = [];
+                var cols = Math.ceil(width / cellSize) + 3;
+                var rows = Math.ceil(height / cellSize) + 3;
+
+                for (var y = -1; y < rows; y++) {
+                    for (var x = -1; x < cols; x++) {
+                        points.push({
+                            x: x * cellSize + randomRange(-8, 8),
+                            y: y * cellSize + randomRange(-8, 8),
+                            size: randomRange(10, 28),
+                            rot: randomRange(-0.8, 0.8),
+                            seed: Math.random() * Math.PI * 2
+                        });
+                    }
+                }
+            }
+
+            function buildDust() {
+                dusts = [];
+                var count = Math.floor((width * height) / 18000);
+                for (var i = 0; i < count; i++) {
+                    dusts.push({
+                        x: Math.random() * width,
+                        y: Math.random() * height,
+                        r: randomRange(0.6, 1.8),
+                        a: randomRange(0.03, 0.10),
+                        s: randomRange(0.1, 0.4)
+                    });
+                }
+            }
+
+            function addRipple(x, y, strength) {
+                ripples.push({
+                    x: x,
+                    y: y,
+                    radius: 0,
+                    life: 0,
+                    maxLife: 72,
+                    strength: strength || 1
+                });
+
+                if (ripples.length > 14) {
+                    ripples.shift();
+                }
+            }
+
+            function drawShard(px, py, size, rot, alphaFill, alphaStroke, glow) {
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.rotate(rot);
+
+                ctx.beginPath();
+                ctx.moveTo(-size * 0.45, -size * 0.10);
+                ctx.lineTo(-size * 0.10, -size * 0.48);
+                ctx.lineTo(size * 0.42, -size * 0.18);
+                ctx.lineTo(size * 0.30, size * 0.40);
+                ctx.lineTo(-size * 0.30, size * 0.32);
+                ctx.closePath();
+
+                ctx.fillStyle = "rgba(255,255,255," + alphaFill + ")";
+                ctx.fill();
+
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = "rgba(255,255,255," + alphaStroke + ")";
+                ctx.stroke();
+
+                if (glow > 0) {
+                    ctx.shadowColor = "rgba(255,255,255," + Math.min(glow, 0.32) + ")";
+                    ctx.shadowBlur = 16;
+                    ctx.strokeStyle = "rgba(255,255,255," + Math.min(alphaStroke + glow, 0.40) + ")";
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            function renderDust() {
+                for (var i = 0; i < dusts.length; i++) {
+                    var d = dusts[i];
+                    d.y -= d.s;
+                    if (d.y < -5) {
+                        d.y = height + 5;
+                        d.x = Math.random() * width;
+                    }
+                    ctx.beginPath();
+                    ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+                    ctx.fillStyle = "rgba(255,255,255," + d.a + ")";
+                    ctx.fill();
+                }
+            }
+
+            function render() {
+                ctx.clearRect(0, 0, width, height);
+
+                renderDust();
+
+                for (var i = 0; i < ripples.length; i++) {
+                    ripples[i].life += 1;
+                    ripples[i].radius += 7;
+                }
+
+                ripples = ripples.filter(function (r) {
+                    return r.life < r.maxLife;
+                });
+
+                for (var p = 0; p < points.length; p++) {
+                    var point = points[p];
+
+                    var baseAlphaFill = 0.022;
+                    var baseAlphaStroke = 0.055;
+                    var glow = 0;
+                    var waveBoost = 0;
+                    var driftX = 0;
+                    var driftY = 0;
+
+                    for (var r = 0; r < ripples.length; r++) {
+                        var ripple = ripples[r];
+                        var dx = point.x - ripple.x;
+                        var dy = point.y - ripple.y;
+                        var dist = Math.sqrt(dx * dx + dy * dy);
+
+                        var ringWidth = 34;
+                        var diff = Math.abs(dist - ripple.radius);
+                        if (diff < ringWidth) {
+                            var influence = (1 - diff / ringWidth) * (1 - ripple.life / ripple.maxLife);
+                            waveBoost += influence * 0.18 * ripple.strength;
+                            glow += influence * 0.18 * ripple.strength;
+
+                            if (dist > 0.001) {
+                                var nx = dx / dist;
+                                var ny = dy / dist;
+                                driftX += nx * influence * 2.8;
+                                driftY += ny * influence * 2.8;
+                            }
+                        }
+                    }
+
+                    var mouseDx = point.x - mouse.x;
+                    var mouseDy = point.y - mouse.y;
+                    var mouseDist = Math.sqrt(mouseDx * mouseDx + mouseDy * mouseDy);
+                    var mouseInfluence = Math.max(0, 1 - mouseDist / 180);
+
+                    var pulse = (Math.sin((Date.now() * 0.002) + point.seed) + 1) * 0.5;
+                    var flicker = pulse * 0.010;
+
+                    var alphaFill = baseAlphaFill + waveBoost * 0.55 + flicker + mouseInfluence * 0.01;
+                    var alphaStroke = baseAlphaStroke + waveBoost * 0.75 + mouseInfluence * 0.02;
+                    var size = point.size + waveBoost * 10 + mouseInfluence * 1.8;
+                    var rot = point.rot + waveBoost * 0.15;
+                    var px = point.x + driftX;
+                    var py = point.y + driftY;
+
+                    drawShard(
+                        px,
+                        py,
+                        size,
+                        rot,
+                        Math.min(alphaFill, 0.11),
+                        Math.min(alphaStroke, 0.18),
+                        glow
+                    );
+                }
+
+                requestAnimationFrame(render);
+            }
+
+            var lastRippleTime = 0;
+            document.addEventListener("mousemove", function (e) {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+
+                var now = Date.now();
+                if (now - lastRippleTime > 90) {
+                    addRipple(e.clientX, e.clientY, 1);
+                    lastRippleTime = now;
+                }
+            });
+
+            document.addEventListener("click", function (e) {
+                addRipple(e.clientX, e.clientY, 1.4);
+            });
+
+            window.addEventListener("resize", resize);
+
+            resize();
+            render();
+        })();
+    </script>
 </body>
 </html>
