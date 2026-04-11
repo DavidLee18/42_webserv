@@ -4,7 +4,9 @@
 void Server::new_connection(const FileDescriptor *server_fd) {
   while (true) { // accept all clients until nothing to connect
     // init client socket
-    Result<FileDescriptor> client_result = server_fd->socket_accept(NULL, NULL);
+    struct sockaddr_in client_addr;
+    socklen_t client_len = sizeof(client_addr);
+    Result<FileDescriptor> client_result = server_fd->socket_accept((struct sockaddr*)&client_addr, &client_len);
     if (!client_result.has_value()) {
       const std::string &err = client_result.error();
       if (err == Errors::try_again)
@@ -16,13 +18,17 @@ void Server::new_connection(const FileDescriptor *server_fd) {
         break;
       }
     }
-
     FileDescriptor client_fd = client_result.value();
     if (!client_fd.set_nonblocking().has_value()) {
       std::cerr << "ERROR: failed to set client socket to non-blocking mode"
                 << std::endl;
       continue;
     }
+
+    ClientSession client;
+    char ip_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN);
+    client.ip = ip_str;
 
     // register client socket to EPoll
     Event client_event(&client_fd, true, true, false, false, false, false);
@@ -32,11 +38,10 @@ void Server::new_connection(const FileDescriptor *server_fd) {
         epoll.add_fd(client_fd, client_event, client_option);
     if (add_result.has_value()) {
       FileDescriptor *client_ptr = add_result.value();
-      ClientSession session;
       if (listeners.find(server_fd) != listeners.end()) {
-        session.config = listeners.at(server_fd);
+        client.config = listeners.at(server_fd);
       }
-      clients[client_ptr] = session;
+      clients[client_ptr] = client;
       std::cout << "New client connected!" << std::endl;
     } else {
       std::cerr << "ERROR: epoll add failed: " << add_result.error()
@@ -95,6 +100,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
     std::string request_str = in_buffer.substr(0, total_request_len);
     Request request(request_str);
 
+    std::cout << "\nclient ip: " << clients.at(client_fd).ip << std::endl;
     std::cout << "[Request] " << request.get_method_string() << " "
               << request.get_path() << " (Body: " << content_length << " bytes)"
               << std::endl;
@@ -118,7 +124,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
         server_response << "Location: " << http.redir << "\r\n";
       std::cout << http.redir << std::endl;
       server_response << "Content-Type:" << http.mime_type << "\r\n";
-      server_response << "Set-Cookie:" << "session_id=qwer; theme=dark" << "\r\n";
+      if (!http.cookie.empty())
+        server_response << "Set-Cookie:" << http.cookie << "\r\n";
       server_response << "Content-Length: " << http.body.length() << "\r\n";
       server_response << "Connection: " << http.connection << "\r\n\r\n";
       server_response << http.body;
@@ -126,7 +133,6 @@ void Server::client_read(const FileDescriptor *client_fd) {
     clients.at(client_fd).out_buff += server_response.str();
 
     in_buffer.erase(0, total_request_len);
-    std::cout << std::endl;
   }
 }
 

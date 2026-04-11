@@ -65,10 +65,10 @@ struct Response {
   std::string connection;   ///< Connection header.
   std::string cookie;       ///< Cookies.
   std::string body;         ///< The response body payload.
-  std::string mime_type;    ///< The determined MIME type of the response payload.
-  std::string redir;        ///< Redirect location, if applicable.
-  bool keep_alive;          ///< Connection keep-alive status.
-  std::string cgi;          ///< Generated CGI script.
+  std::string mime_type; ///< The determined MIME type of the response payload.
+  std::string redir;     ///< Redirect location, if applicable.
+  bool keep_alive;       ///< Connection keep-alive status.
+  std::string cgi;       ///< Generated CGI script.
 };
 
 class Request;
@@ -94,9 +94,8 @@ public:
   http_response(const Request *request, const ServerConfig *config,
                 const std::map<std::string, std::string> mime_type);
 
-  static Response
-  cgi_response(const Request *request,
-               const ServerConfig *config, EPoll *epoll);
+  static Response cgi_response(const Request *request,
+                               const ServerConfig *config, EPoll *epoll);
 
 private:
   /**
@@ -149,8 +148,7 @@ private:
    * @return std::string Path to the configured error file.
    */
   static Response error_response(const ServerConfig *config,
-                                 const RouteRule *rule,
-                                 int error_code);
+                                 const RouteRule *rule, int error_code);
 
   /**
    * @brief Generates an HTML page listing the contents of a directory
@@ -161,8 +159,19 @@ private:
    * @return std::string The HTML content representing the directory index.
    */
   static std::string make_autoindex_page(const std::string &real_path,
-                                         const std::string &req_uri,
-                                         DIR *dir);
+                                         const std::string &req_uri, DIR *dir);
+
+  static Response delete_method(Target target, Response response,
+                                const ServerConfig *config,
+                                const RouteRule *rule);
+  static Response post_method(Target target, Response response,
+                              const ServerConfig *config,
+                              const RouteRule *rule,
+                              const Request *request);
+  static Response get_method(Target target, Response response,
+                             const ServerConfig *config,
+                             const RouteRule *rule,
+                             const Request *request);
 };
 
 #endif

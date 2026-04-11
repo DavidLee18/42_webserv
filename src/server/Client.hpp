@@ -10,6 +10,8 @@
 #include <cctype>
 #include <sstream>
 #include <string>
+#include <iostream>
+#include <stdlib.h>
 
 /**
  * @brief Utility function to retrieve a value from a map of strings based on a key.
@@ -31,6 +33,8 @@ struct ClientSession {
   std::string out_buff; ///< Buffer for outgoing data.
 
   const ServerConfig *config; ///< Pointer to the server configuration for this session.
+  std::string cookie;
+  std::string ip;
 
   /**
    * @brief Default constructor. Initializes config to NULL.
@@ -105,6 +109,18 @@ public:
    * @return const std::string The requested path.
    */
   const std::string get_path() const { return path; };
+
+  /**
+   * @brief Gets client's cookie.
+   * 
+   * @return const std::string The client's cookie. Generate default cookie if none.
+   */
+  const std::string get_cookie() const { return cookie; };
+
+  /**
+   * @brief Sets client's cookie.
+   */
+  void set_cookie(std::string value) { cookie = value; };
 
   /**
    * @brief Gets the parsed HTTP headers.

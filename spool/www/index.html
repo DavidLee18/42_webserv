@@ -311,6 +311,34 @@
             }
         }
 
+        .login-btn-small {
+            position: absolute;
+            top: 32px;
+            right: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 22px;
+            border-radius: 999px;
+            background: rgba(79, 209, 197, 0.1);
+            color: #4fd1c5;
+            border: 1px solid rgba(79, 209, 197, 0.3);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.6px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: all 0.2s ease;
+            z-index: 100;
+        }
+
+        .login-btn-small:hover {
+            background: rgba(79, 209, 197, 0.2);
+            box-shadow: 0 0 16px rgba(79, 209, 197, 0.2);
+            transform: translateY(-1px);
+        }
+
         @media (max-width: 720px) {
             body {
                 padding: 18px;
@@ -346,11 +374,21 @@
             .route-desc {
                 font-size: 13px;
             }
+
+            .login-btn-small {
+                top: 16px;
+                right: 16px;
+            }
         }
     </style>
 </head>
 <body>
-        <div class="ambient ambient-1"></div>
+    <a href="/login.html" class="login-btn-small">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Login
+    </a>
+
+    <div class="ambient ambient-1"></div>
     <div class="ambient ambient-2"></div>
     <div class="ambient ambient-3"></div>
     <div class="noise"></div>
@@ -454,9 +492,9 @@
                 <div class="route-top">
                     <div class="route-head">
                         <div class="route-dot" style="color: #ffcb05;"></div>
-                        <div class="route-tag" style="color: #ffcb05;">CGI</div>
+                        <div class="route-tag" style="color: #ffcb05;">CSS</div>
                     </div>
-                    <div class="route-title">포켓몬 (CGI)</div>
+                    <div class="route-title">포켓몬 카드</div>
                     <div class="route-desc">
                         Dynamic content generation and CGI script execution test.
                     </div>
