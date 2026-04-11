@@ -25,7 +25,7 @@ uwsgi =
 
     GET /old_stuff/ =301> /new_stuff/
 
-    GET /download/*/mp3/* =301> /*/mp3/*.mp3
+    GET /download/*/mp3/* =301> /*/mp3/*
 
     GET /download/ <i- /spool/www/
 
