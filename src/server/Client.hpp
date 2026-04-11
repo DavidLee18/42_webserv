@@ -49,7 +49,7 @@ struct ClientSession {
 class Request {
 private:
   std::string method;       ///< The HTTP method (e.g., "GET").
-  std::string path;         ///< The requested path (e.g., "/index.html").
+  std::string path;         ///< The requested path (e.g., "/").
   std::string version;      ///< The HTTP version (e.g., "HTTP/1.1").
   std::map<std::string, std::string> header; ///< Parsed HTTP headers.
   bool keep_alive;          ///< Connection keep-alive status.

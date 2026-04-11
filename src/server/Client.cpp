@@ -41,7 +41,7 @@ Request::Request(std::string request) {
     std::stringstream line_ss(line);
 
     line_ss >> this->method;  // "GET"
-    line_ss >> this->path;    // "/index.html"
+    line_ss >> this->path;    // "/"
     line_ss >> this->version; // "HTTP/1.1"
   }
   while (std::getline(ss, line) && line != "\r" && line != "") {
