@@ -1122,29 +1122,16 @@ unsigned char to_upper(unsigned char c) {
 // CgiDelegate implementation
 
 CgiDelegate::CgiDelegate(const Request &req, const std::string &script)
-    : env(), script_path(script), request(req) {
+    : env(), script_path(script), request(req),
+      _state(NOT_STARTED), _epoll(NULL), _pid(-1),
+      _stdin_raw(-1), _stdout_raw(-1),
+      _stdin_epoll(NULL), _stdout_epoll(NULL),
+      _body(), _total_written(0), _output(), _error() {
   // Parse the HTTP request to CgiInput
   Result<CgiInput> parse_result = CgiInput::Parser::parse(req);
   if (parse_result.error().empty()) {
     env = parse_result.value();
   }
-}
-
-// Returns the number of milliseconds remaining until the deadline.
-// If timeout_ms <= 0 the caller requested no deadline and -1 is returned
-// (epoll_wait interprets -1 as "wait indefinitely").
-// Returns 0 when the deadline has already passed.
-static int remaining_ms(long long start_ms, int timeout_ms) {
-  if (timeout_ms <= 0)
-    return -1;
-  struct timeval tv_now;
-  gettimeofday(&tv_now, NULL);
-  long long now_ms = (long long)tv_now.tv_sec * 1000 + tv_now.tv_usec / 1000;
-  // Guard against clock going backwards (e.g. NTP adjustment)
-  if (now_ms < start_ms)
-    return timeout_ms;
-  long long rem = (long long)timeout_ms - (now_ms - start_ms);
-  return (rem > 0) ? (int)rem : 0;
 }
 
 static const int kWaitpidPollIntervalUs = 1000;
@@ -1153,10 +1140,13 @@ static const int kWaitpidReapAttempts =
     (kMaxReapWaitMs * 1000) / kWaitpidPollIntervalUs;
 
 // Reap child without risking an unbounded blocking wait.
-static bool waitpid_nohang(pid_t pid) {
-  int status;
+// Writes the exit status through 'status' when a child is successfully
+// reaped, leaves it untouched otherwise.
+static bool waitpid_nohang(pid_t pid, int *status) {
+  int dummy;
+  int *s = (status != NULL) ? status : &dummy;
   for (int i = 0; i < kWaitpidReapAttempts; ++i) {
-    pid_t wr = waitpid(pid, &status, WNOHANG);
+    pid_t wr = waitpid(pid, s, WNOHANG);
     if (wr == pid) {
       return true;
     }
@@ -1169,32 +1159,64 @@ static bool waitpid_nohang(pid_t pid) {
 
 static void terminate_child(pid_t pid) {
   kill(pid, SIGKILL);
-  (void)waitpid_nohang(pid);
+  (void)waitpid_nohang(pid, NULL);
 }
 
-Result<std::string> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
+void CgiDelegate::_cleanup_epoll() {
+  if (_epoll == NULL)
+    return;
+  if (_stdin_epoll != NULL) {
+    _epoll->del_fd(*_stdin_epoll);
+    _stdin_epoll = NULL;
+  }
+  if (_stdout_epoll != NULL) {
+    _epoll->del_fd(*_stdout_epoll);
+    _stdout_epoll = NULL;
+  }
+  _stdin_raw = -1;
+  _stdout_raw = -1;
+}
 
+void CgiDelegate::_fail(const std::string &msg) {
+  _state = FAILED;
+  _error = msg;
+  _cleanup_epoll();
+  if (_pid > 0) {
+    terminate_child(_pid);
+    _pid = -1;
+  }
+}
+
+// Phase 1: create pipes, fork the CGI process, and register the parent's
+// pipe ends with the shared epoll instance. No epoll_wait() is performed
+// here - the caller's main loop is the sole owner of epoll_wait() and
+// will drive handle_event() for each event delivered.
+Result<Void> CgiDelegate::start(EPoll *epoll) {
   if (epoll == NULL) {
-    return ERR(std::string, "EPoll instance required");
+    return ERR(Void, "EPoll instance required");
+  }
+  if (_state != NOT_STARTED) {
+    return ERR(Void, "CgiDelegate::start() already called");
   }
 
-  // Capture start time for end-to-end deadline tracking
-  struct timeval tv_start;
-  gettimeofday(&tv_start, NULL);
-  long long start_ms =
-      (long long)tv_start.tv_sec * 1000 + tv_start.tv_usec / 1000;
+  _epoll = epoll;
+  _body = request.get_body();
 
   // Create pipes for communication
   int stdin_pipe[2];
   int stdout_pipe[2];
 
   if (pipe(stdin_pipe) == -1) {
-    return ERR(std::string, "Failed to create stdin pipe");
+    _state = FAILED;
+    _error = "Failed to create stdin pipe";
+    return ERR(Void, _error);
   }
   if (pipe(stdout_pipe) == -1) {
     close(stdin_pipe[0]);
     close(stdin_pipe[1]);
-    return ERR(std::string, "Failed to create stdout pipe");
+    _state = FAILED;
+    _error = "Failed to create stdout pipe";
+    return ERR(Void, _error);
   }
 
   // Fork the process
@@ -1204,17 +1226,16 @@ Result<std::string> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
     close(stdin_pipe[1]);
     close(stdout_pipe[0]);
     close(stdout_pipe[1]);
-    return ERR(std::string, "Failed to fork process");
+    _state = FAILED;
+    _error = "Failed to fork process";
+    return ERR(Void, _error);
   }
 
   if (pid == 0) {
     // Child process
+    close(stdin_pipe[1]);
+    close(stdout_pipe[0]);
 
-    // Close unused pipe ends
-    close(stdin_pipe[1]);  // Close write end of stdin pipe
-    close(stdout_pipe[0]); // Close read end of stdout pipe
-
-    // Redirect stdin and stdout
     if (dup2(stdin_pipe[0], STDIN_FILENO) == -1) {
       std::cerr << "Failed to redirect stdin" << std::endl;
       exit(1);
@@ -1223,24 +1244,17 @@ Result<std::string> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
       std::cerr << "Failed to redirect stdout" << std::endl;
       exit(1);
     }
-
-    // Close the pipe file descriptors after duplication
     close(stdin_pipe[0]);
     close(stdout_pipe[1]);
 
-    // Prepare environment variables
     char **envp = env.to_envp();
-
-    // Prepare arguments
     char *argv[2];
     argv[0] = const_cast<char *>(script_path.c_str());
     argv[1] = NULL;
 
-    // Execute the CGI script
     execve(script_path.c_str(), argv, envp);
 
-    // If execve returns, it failed
-    // Clean up allocated memory before exit
+    // execve failed
     for (size_t i = 0; envp[i] != NULL; i++) {
       delete[] envp[i];
     }
@@ -1251,262 +1265,268 @@ Result<std::string> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   }
 
   // Parent process
+  close(stdin_pipe[0]);
+  close(stdout_pipe[1]);
 
-  // Close unused pipe ends
-  close(stdin_pipe[0]);  // Close read end of stdin pipe
-  close(stdout_pipe[1]); // Close write end of stdout pipe
+  _pid = pid;
+  _stdin_raw = stdin_pipe[1];
+  _stdout_raw = stdout_pipe[0];
 
-  // Create FileDescriptor objects for the pipes
+  // Wrap the pipe ends so they are closed automatically. add_fd() takes
+  // ownership of each FileDescriptor by moving it into its internal list.
   Result<FileDescriptor> stdin_fd_res = FileDescriptor::from_raw(stdin_pipe[1]);
   if (!stdin_fd_res.error().empty()) {
     close(stdin_pipe[1]);
     close(stdout_pipe[0]);
-    terminate_child(pid);
-    return ERR(std::string, "Failed to create stdin FileDescriptor");
+    terminate_child(_pid);
+    _pid = -1;
+    _stdin_raw = -1;
+    _stdout_raw = -1;
+    _state = FAILED;
+    _error = "Failed to create stdin FileDescriptor";
+    return ERR(Void, _error);
   }
   FileDescriptor stdin_fd = stdin_fd_res.value();
 
   Result<FileDescriptor> stdout_fd_res =
       FileDescriptor::from_raw(stdout_pipe[0]);
   if (!stdout_fd_res.error().empty()) {
-    // stdin_pipe[1] is owned by stdin_fd, will be closed automatically
+    // stdin_fd destructor closes stdin_pipe[1]
     close(stdout_pipe[0]);
-    terminate_child(pid);
-    return ERR(std::string, "Failed to create stdout FileDescriptor");
+    terminate_child(_pid);
+    _pid = -1;
+    _stdin_raw = -1;
+    _stdout_raw = -1;
+    _state = FAILED;
+    _error = "Failed to create stdout FileDescriptor";
+    return ERR(Void, _error);
   }
   FileDescriptor stdout_fd = stdout_fd_res.value();
 
-  // Set pipe FDs to non-blocking before adding to EPoll.
-  // This is required for correct EPoll usage: without O_NONBLOCK, read/write
-  // could block even after EPoll signals readiness (e.g. EAGAIN race), and
-  // EAGAIN must be detectable to correctly drain data in the event loop.
+  // Non-blocking is mandatory: epoll readiness does not imply non-blocking
+  // semantics of read/write, and partial IO is expected in the event loop.
   Result<Void> stdin_nb = stdin_fd.set_nonblocking();
   if (!stdin_nb.has_value()) {
-    // stdin_fd and stdout_fd destructors close the pipe ends
-    terminate_child(pid);
-    return ERR(std::string,
-               "Failed to set stdin pipe to non-blocking mode");
+    terminate_child(_pid);
+    _pid = -1;
+    _stdin_raw = -1;
+    _stdout_raw = -1;
+    _state = FAILED;
+    _error = "Failed to set stdin pipe to non-blocking mode";
+    return ERR(Void, _error);
   }
   Result<Void> stdout_nb = stdout_fd.set_nonblocking();
   if (!stdout_nb.has_value()) {
-    // stdin_fd and stdout_fd destructors close the pipe ends
-    terminate_child(pid);
-    return ERR(std::string,
-               "Failed to set stdout pipe to non-blocking mode");
+    terminate_child(_pid);
+    _pid = -1;
+    _stdin_raw = -1;
+    _stdout_raw = -1;
+    _state = FAILED;
+    _error = "Failed to set stdout pipe to non-blocking mode";
+    return ERR(Void, _error);
   }
 
-  // Prepare request body for writing
-  std::string body_str = request.get_body();
-
-  // Write request body to CGI stdin if present, using EPoll to check
-  // writability
-  if (!body_str.empty()) {
-    // Add stdin_fd to epoll for writing
-    const FileDescriptor *stdin_fd_ptr = &stdin_fd;
-    Event write_event(stdin_fd_ptr, false, true, false, false, false, false);
+  // Register stdin for EPOLLOUT only when we actually have a body to send.
+  // If there is no body, let the stdin_fd destructor close the pipe so the
+  // CGI script sees EOF on its stdin.
+  if (!_body.empty()) {
+    const FileDescriptor *in_ptr = &stdin_fd;
+    Event write_event(in_ptr, false, true, false, false, true, true);
     Option write_option(false, false, false, false);
-    Result<FileDescriptor *> add_result =
-        epoll->add_fd(stdin_fd, write_event, write_option);
-
-    if (!add_result.has_value()) {
-      // FileDescriptor destructors will close the pipes
-      terminate_child(pid);
-      return ERR(std::string, "Failed to add stdin to epoll");
+    Result<FileDescriptor *> add_res =
+        _epoll->add_fd(stdin_fd, write_event, write_option);
+    if (!add_res.has_value()) {
+      terminate_child(_pid);
+      _pid = -1;
+      _stdin_raw = -1;
+      _stdout_raw = -1;
+      _state = FAILED;
+      _error = "Failed to add stdin to epoll";
+      return ERR(Void, _error);
     }
-    FileDescriptor *stdin_epoll = add_result.value();
-
-    size_t total_written = 0;
-    while (total_written < body_str.length()) {
-      // Wait for the fd to be writable (respects the end-to-end deadline)
-      int rem = remaining_ms(start_ms, timeout_ms);
-      if (rem == 0) {
-        epoll->del_fd(*stdin_epoll);
-        terminate_child(pid);
-        return ERR(std::string, "Timeout waiting for stdin writability");
-      }
-      Result<Events> wait_result = epoll->wait(rem);
-      if (!wait_result.error().empty()) {
-        epoll->del_fd(*stdin_epoll);
-        // FileDescriptor destructors will close the pipes
-        terminate_child(pid);
-        return ERR(std::string, "EPoll wait failed for stdin");
-      }
-
-      Events events = wait_result.value();
-
-      // Check if timeout occurred (no events returned)
-      if (events.is_end()) {
-        epoll->del_fd(*stdin_epoll);
-        // FileDescriptor destructors will close the pipes
-        terminate_child(pid);
-        return ERR(std::string, "Timeout waiting for stdin writability");
-      }
-
-      bool fd_ready = false;
-
-      for (; !events.is_end(); ++events) {
-        Result<const Event *> event_result = *events;
-        if (!event_result.error().empty()) {
-          continue;
-        }
-        const Event *ev = event_result.value();
-        if (*ev->fd == stdin_pipe[1] && ev->out) {
-          fd_ready = true;
-          break;
-        }
-      }
-
-      if (!fd_ready) {
-        // Got events but not for our fd, continue waiting
-        continue;
-      }
-
-      // FD is ready, perform write
-      ssize_t written = write(stdin_pipe[1], body_str.c_str() + total_written,
-                              body_str.length() - total_written);
-      if (written < 0) {
-        epoll->del_fd(*stdin_epoll);
-        // FileDescriptor destructors will close the pipes
-        terminate_child(pid);
-        return ERR(std::string, "Failed to write to CGI stdin");
-      } else if (written == 0) {
-        // Pipe closed by reader (child process)
-        epoll->del_fd(*stdin_epoll);
-        // FileDescriptor destructors will close the pipes
-        terminate_child(pid);
-        return ERR(std::string, "CGI process closed stdin prematurely");
-      }
-      total_written += static_cast<size_t>(written);
-    }
-
-    // Remove stdin from epoll and close it
-    epoll->del_fd(*stdin_epoll);
-  }
-  // Close stdin by letting stdin_fd go out of scope
-  // (Manual close would be a double-close bug)
-  {
-    // Create a scope to destroy stdin_fd and close stdin_pipe[1]
-    FileDescriptor temp_fd = stdin_fd;
-    // temp_fd destructor will close stdin_pipe[1]
+    _stdin_epoll = add_res.value();
+  } else {
+    // No body: the stdin_fd local will go out of scope and close the pipe.
+    _stdin_raw = -1;
   }
 
-  // Add stdout_fd to epoll for reading
-  const FileDescriptor *stdout_fd_ptr = &stdout_fd;
-  Event read_event(stdout_fd_ptr, true, false, false, false, false, false);
+  // Register stdout for EPOLLIN (plus err/hup so we notice child exit).
+  const FileDescriptor *out_ptr = &stdout_fd;
+  Event read_event(out_ptr, true, false, true, false, true, true);
   Option read_option(false, false, false, false);
-  Result<FileDescriptor *> add_stdout_result =
-      epoll->add_fd(stdout_fd, read_event, read_option);
-
-  if (!add_stdout_result.has_value()) {
-    // stdout_fd destructor will close stdout_pipe[0]
-    terminate_child(pid);
-    return ERR(std::string, "Failed to add stdout to epoll");
+  Result<FileDescriptor *> add_out_res =
+      _epoll->add_fd(stdout_fd, read_event, read_option);
+  if (!add_out_res.has_value()) {
+    if (_stdin_epoll != NULL) {
+      _epoll->del_fd(*_stdin_epoll);
+      _stdin_epoll = NULL;
+    }
+    terminate_child(_pid);
+    _pid = -1;
+    _stdin_raw = -1;
+    _stdout_raw = -1;
+    _state = FAILED;
+    _error = "Failed to add stdout to epoll";
+    return ERR(Void, _error);
   }
-  FileDescriptor *stdout_epoll = add_stdout_result.value();
+  _stdout_epoll = add_out_res.value();
 
-  // Read output using EPoll to check readability
-  std::string output;
-  char buffer[4096];
+  _state = RUNNING;
+  return OKV;
+}
 
-  while (true) {
-    // Wait for data to be available (respects the end-to-end deadline)
-    int rem = remaining_ms(start_ms, timeout_ms);
-    if (rem == 0) {
-      epoll->del_fd(*stdout_epoll);
-      terminate_child(pid);
-      return ERR(std::string, "CGI execution timeout");
+// Phase 2: consume one event delivered by the caller's shared epoll_wait.
+// Caller is expected to filter events and only forward those belonging to
+// fds this delegate registered. Unknown events are ignored.
+Result<Void> CgiDelegate::handle_event(const Event *ev) {
+  if (_state != RUNNING) {
+    return OKV;
+  }
+  if (ev == NULL || ev->fd == NULL) {
+    return OKV;
+  }
+
+  const bool is_stdin =
+      (_stdin_epoll != NULL && _stdin_raw != -1 && *ev->fd == _stdin_raw);
+  const bool is_stdout =
+      (_stdout_epoll != NULL && _stdout_raw != -1 && *ev->fd == _stdout_raw);
+
+  if (!is_stdin && !is_stdout) {
+    return OKV; // not for us
+  }
+
+  if (is_stdin) {
+    if (ev->err) {
+      _fail("EPoll error on CGI stdin");
+      return ERR(Void, _error);
     }
-    Result<Events> wait_result = epoll->wait(rem);
-    if (!wait_result.error().empty()) {
-      epoll->del_fd(*stdout_epoll);
-      // stdout_fd destructor will close stdout_pipe[0]
-      terminate_child(pid);
-      return ERR(std::string, "EPoll wait failed for stdout");
-    }
-
-    Events events = wait_result.value();
-
-    // Check if timeout occurred (no events returned)
-    if (events.is_end()) {
-      epoll->del_fd(*stdout_epoll);
-      // stdout_fd destructor will close stdout_pipe[0]
-      terminate_child(pid);
-      return ERR(std::string, "CGI execution timeout");
-    }
-
-    bool fd_ready = false;
-
-    for (; !events.is_end(); ++events) {
-      Result<const Event *> event_result = *events;
-      if (!event_result.error().empty()) {
-        continue;
-      }
-      const Event *ev = event_result.value();
-      // Also check hup/rdhup: when the write end of the pipe is closed (child
-      // exits), EPoll delivers EPOLLHUP even if EPOLLIN was not requested.
-      // Without this check, the loop would never set fd_ready=true on the final
-      // HUP-only event, spinning forever in level-triggered mode.
-      if (*ev->fd == stdout_pipe[0] && (ev->in || ev->hup || ev->rdhup)) {
-        fd_ready = true;
-        break;
+    if (ev->out && _total_written < _body.length()) {
+      ssize_t written = write(_stdin_raw, _body.c_str() + _total_written,
+                              _body.length() - _total_written);
+      if (written > 0) {
+        _total_written += static_cast<size_t>(written);
+      } else if (written == 0) {
+        _fail("CGI process closed stdin prematurely");
+        return ERR(Void, _error);
+      } else {
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+          return OKV;
+        }
+        _fail("Failed to write to CGI stdin");
+        return ERR(Void, _error);
       }
     }
-
-    if (!fd_ready) {
-      // Got events but not for our fd, continue waiting
-      continue;
+    if (_total_written >= _body.length()) {
+      // Done writing: drop stdin from epoll, which also closes the pipe,
+      // signalling EOF to the CGI script.
+      _epoll->del_fd(*_stdin_epoll);
+      _stdin_epoll = NULL;
+      _stdin_raw = -1;
     }
+    return OKV;
+  }
 
-    // FD is ready, perform read
-    ssize_t bytes_read = read(stdout_pipe[0], buffer, sizeof(buffer));
-
+  // is_stdout
+  if (ev->in || ev->hup || ev->rdhup) {
+    char buffer[4096];
+    ssize_t bytes_read = read(_stdout_raw, buffer, sizeof(buffer));
     if (bytes_read > 0) {
-      output.append(buffer, static_cast<size_t>(bytes_read));
-    } else if (bytes_read == 0) {
-      // EOF reached
-      break;
-    } else {
-      // Read error
-      epoll->del_fd(*stdout_epoll);
-      // stdout_fd destructor will close stdout_pipe[0]
-      terminate_child(pid);
-      return ERR(std::string, "Failed to read from CGI stdout");
+      _output.append(buffer, static_cast<size_t>(bytes_read));
+      return OKV;
     }
+    if (bytes_read < 0) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+        return OKV;
+      }
+      _fail("Failed to read from CGI stdout");
+      return ERR(Void, _error);
+    }
+
+    // bytes_read == 0: EOF, drain any remaining IO bookkeeping.
+    _epoll->del_fd(*_stdout_epoll);
+    _stdout_epoll = NULL;
+    _stdout_raw = -1;
+    if (_stdin_epoll != NULL) {
+      _epoll->del_fd(*_stdin_epoll);
+      _stdin_epoll = NULL;
+      _stdin_raw = -1;
+    }
+
+    int status = 0;
+    if (!waitpid_nohang(_pid, &status)) {
+      terminate_child(_pid);
+      _pid = -1;
+      _fail("CGI child process did not exit cleanly");
+      return ERR(Void, _error);
+    }
+    _pid = -1;
+
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      _state = FAILED;
+      _error = "CGI script failed";
+      return ERR(Void, _error);
+    }
+
+    _state = COMPLETE;
+    return OKV;
   }
 
-  // Remove stdout from epoll and close it
-  epoll->del_fd(*stdout_epoll);
-  // stdout_fd destructor will close stdout_pipe[0] when it goes out of scope
-
-  // Wait for child process
-  int status;
-  while (true) {
-    pid_t wr = waitpid(pid, &status, WNOHANG);
-    if (wr == pid) {
-      break;
-    }
-    if (wr == -1) {
-      return ERR(std::string, "Failed to wait for child process");
-    }
-    int rem = remaining_ms(start_ms, timeout_ms);
-    if (rem == 0) {
-      terminate_child(pid);
-      return ERR(std::string, "CGI execution timeout");
-    }
-    long long rem_us = static_cast<long long>(rem) * 1000;
-    int sleep_us = rem_us < kWaitpidPollIntervalUs
-                       ? static_cast<int>(rem_us)
-                       : kWaitpidPollIntervalUs;
-    usleep(static_cast<useconds_t>(sleep_us));
+  if (ev->err) {
+    _fail("EPoll error on CGI stdout");
+    return ERR(Void, _error);
   }
+  return OKV;
+}
 
-  if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-    return ERR(std::string, "CGI script failed");
+Result<std::string> CgiDelegate::result() const {
+  if (_state == FAILED) {
+    return ERR(std::string, _error);
   }
+  if (_state != COMPLETE) {
+    return ERR(std::string, "CGI execution not complete");
+  }
+  return OK(std::string, _output);
+}
 
-  return OK(std::string, output);
+// DEPRECATED: synchronous wrapper retained only so that legacy callers
+// compile during migration. Internally still performs an epoll_wait, so
+// it violates the single-epoll_wait constraint. New code must use
+// start() + handle_event() and let the main loop own epoll_wait().
+Result<std::string> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
+  (void)timeout_ms;
+  Result<Void> s = start(epoll);
+  if (!s.has_value()) {
+    return ERR(std::string, s.error());
+  }
+  while (!is_done()) {
+    Result<Events> wait_result = epoll->wait(timeout_ms > 0 ? timeout_ms : -1);
+    if (!wait_result.has_value()) {
+      _fail("EPoll wait failed");
+      return ERR(std::string, _error);
+    }
+    Events events = wait_result.value();
+    if (events.is_end()) {
+      _fail("CGI execution timeout");
+      return ERR(std::string, _error);
+    }
+    for (; !events.is_end(); ++events) {
+      Result<const Event *> ev_res = *events;
+      if (!ev_res.has_value())
+        continue;
+      Result<Void> he = handle_event(ev_res.value());
+      (void)he;
+      if (is_done())
+        break;
+    }
+  }
+  return result();
 }
 
 CgiDelegate::~CgiDelegate() {
-  // env is now a value member, will be automatically destroyed
+  _cleanup_epoll();
+  if (_pid > 0) {
+    terminate_child(_pid);
+    _pid = -1;
+  }
+  // env is a value member, destroyed automatically
 }
