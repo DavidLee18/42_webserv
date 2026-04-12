@@ -11,6 +11,9 @@
 // Forward declarations
 class CgiInput;
 class EPoll;
+class Event;
+class FileDescriptor;
+#include <sys/types.h>
 
 class CgiAuthType {
 public:
@@ -560,13 +563,58 @@ public:
 };
 
 class CgiDelegate {
+public:
+  enum State { NOT_STARTED, RUNNING, COMPLETE, FAILED };
+
+private:
   CgiInput env;
   std::string script_path;
   const Request& request;
 
+  // Execution state. epoll_wait() is NOT performed inside this class; the
+  // main event loop is the sole owner of epoll_wait() and drives the
+  // delegate through start()/handle_event() until is_done() is true.
+  State _state;
+  EPoll *_epoll;          // borrowed, not owned
+  pid_t _pid;
+  int _stdin_raw;         // raw write end of stdin pipe; -1 when closed
+  int _stdout_raw;        // raw read end of stdout pipe; -1 when closed
+  FileDescriptor *_stdin_epoll;   // non-null while registered in epoll
+  FileDescriptor *_stdout_epoll;  // non-null while registered in epoll
+  std::string _body;
+  size_t _total_written;
+  std::string _output;
+  std::string _error;
+
+  void _fail(const std::string &msg);
+  void _cleanup_epoll();
+
 public:
   CgiDelegate(const Request &req, const std::string &script);
+
+  // Phase 1: create pipes, fork, register the pipe fds with epoll.
+  // After this returns OK, the main event loop will deliver events on the
+  // registered fds; the caller must route them to handle_event().
+  Result<Void> start(EPoll *epoll);
+
+  // Phase 2: process a single epoll event for this CGI. Performs
+  // non-blocking IO only; never calls epoll->wait(). Returns an error if
+  // the CGI fails, in which case is_done() also becomes true.
+  Result<Void> handle_event(const Event *ev);
+
+  bool is_done() const { return _state == COMPLETE || _state == FAILED; }
+  State state() const { return _state; }
+
+  // Retrieve the script output. Valid once is_done() is true.
+  Result<std::string> result() const;
+
+  // DEPRECATED convenience wrapper that drives start() + handle_event()
+  // using the given epoll directly. Kept only so existing synchronous
+  // callers continue to compile while they migrate to the event-loop
+  // API above. New code MUST use start()/handle_event() and let the main
+  // loop be the sole owner of epoll_wait().
   Result<std::string> execute(int timeout_ms, EPoll *epoll);
+
   ~CgiDelegate();
 };
 
