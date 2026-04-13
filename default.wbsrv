@@ -9,8 +9,7 @@ types =
     _        -> application/octet-stream
 
 uwsgi =
-    /uwsgi/login.py:9000
-    /uwsgi/handle_additional_errors.py:9090
+    /uwsgi/get_files.py:9000
 
 
 :8080 =
@@ -28,13 +27,13 @@ uwsgi =
 
     GET /download/ <i- /spool/www/
 
-    GET /files/me/* <- $get_files.cgi
-        @ /spool/www/authinfo
+    GET /files/* -> $9000(AUTH_INFO="/spool/www/auth_info")
 
     GET *.(jpg|jpeg|gif) <- /spool/www/*
 
     GET * <- /spool/www/*
         ? login.html
+        @ auth_info
         ->{} 10MB
         ! 400:/spool/www/error/400.html
         ! 401:/spool/www/error/401.html
@@ -45,11 +44,9 @@ uwsgi =
         ! 413:/spool/www/error/413.html
         ! 500:/spool/www/error/500.html
 
-    POST /files/upload/ <- $upload.cgi
-        @ /spool/www/authinfo
+    POST /files/*/upload/ -> $upload.cgi(DIST_DIR="/spool/files", AUTH_INFO="/spool/www/auth_info")
 
-    DELETE /files/ <- $delete_file.cgi
-        @ /spool/www/auth_info
+    DELETE /files/* -> $delete_file.cgi(AUTH_INFO="/spool/www/auth_info")
 
 
 
