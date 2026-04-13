@@ -1400,6 +1400,10 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       _fail("EPoll error on CGI stdin");
       return ERR(Void, _error);
     }
+    if (ev->hup || ev->rdhup) {
+      _fail("CGI process closed stdin before all data was written");
+      return ERR(Void, _error);
+    }
     if (ev->out && _total_written < _body.length()) {
       ssize_t written = write(_stdin_raw, _body.c_str() + _total_written,
                               _body.length() - _total_written);
