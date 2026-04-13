@@ -8,6 +8,9 @@
 
 #include "../config/ServerConfig.hpp"
 #include "Client.hpp"
+#include "DefaultError.hpp"
+#include "Session.hpp"
+
 #include <dirent.h>
 #include <fstream>
 #include <sstream>
@@ -16,6 +19,23 @@
 #include <unistd.h>
 
 class EPoll;
+
+/**
+ * @enum StatusCode
+ * @brief Enum for commonly used HTTP status codes.
+ */
+enum StatusCode {
+  OK = 200,
+  MOVED_PERMANENTLY = 301,
+  BAD_REQUEST = 400,
+  UNAUTHORIZED = 401,
+  FORBIDDEN_ERR = 403,
+  NOT_FOUND_ERR = 404,
+  METHOD_NOT_ALLOWED = 405,
+  CONFLICT = 409,
+  PAYLOAD_TOO_LARGE = 413,
+  INTERNAL_SERVER_ERR = 500
+};
 
 /**
  * @struct Target
@@ -45,11 +65,12 @@ struct Response {
   std::string status_code;  ///< HTTP status code and reason (e.g., "200 OK").
   std::string content_type; ///< Content-Type header.
   std::string connection;   ///< Connection header.
+  std::string cookie;       ///< Cookies.
   std::string body;         ///< The response body payload.
-  std::string mime_type;    ///< The determined MIME type of the response payload.
-  std::string redir;        ///< Redirect location, if applicable.
-  bool keep_alive;          ///< Connection keep-alive status.
-  std::string cgi;          ///< Generated CGI script.
+  std::string mime_type; ///< The determined MIME type of the response payload.
+  std::string redir;     ///< Redirect location, if applicable.
+  bool keep_alive;       ///< Connection keep-alive status.
+  std::string cgi;       ///< Generated CGI script.
 };
 
 class Request;
@@ -72,12 +93,12 @@ public:
    * @return Response The fully formulated HTTP response components.
    */
   static Response
-  http_response(const Request *request, const ServerConfig *config,
-                const std::map<std::string, std::string> mime_type);
+  http_response(const Request *request, const ClientSession *client,
+                const std::map<std::string, std::string> mime_type,
+                Session *session);
 
-  static Response
-  cgi_response(const Request *request,
-               const ServerConfig *config, EPoll *epoll);
+  static Response cgi_response(const Request *request,
+                               const ServerConfig *config, EPoll *epoll);
 
 private:
   /**
@@ -85,23 +106,6 @@ private:
    * @brief Enum for internal target path typing.
    */
   enum Type { IS_DIR, IS_FILE, PATH_ERROR };
-
-  /**
-   * @enum StatusCode
-   * @brief Enum for commonly used HTTP status codes.
-   */
-  enum StatusCode {
-    OK = 200,
-    MOVED_PERMANENTLY = 301,
-    BAD_REQUEST = 400,
-    UNAUTHORIZED = 401,
-    FORBIDDEN_ERR = 403,
-    NOT_FOUND_ERR = 404,
-    METHOD_NOT_ALLOWED = 405,
-    CONFLICT = 409,
-    PAYLOAD_TOO_LARGE = 413,
-    INTERNAL_SERVER_ERR = 500
-  };
 
   /**
    * @brief Converts an integer status code to its HTTP reason phrase string.
@@ -146,7 +150,8 @@ private:
    * @param error_code The HTTP error status code.
    * @return std::string Path to the configured error file.
    */
-  static Response error_response(int error_code);
+  static Response error_response(const ServerConfig *config,
+                                 const RouteRule *rule, int error_code);
 
   /**
    * @brief Generates an HTML page listing the contents of a directory
@@ -157,8 +162,20 @@ private:
    * @return std::string The HTML content representing the directory index.
    */
   static std::string make_autoindex_page(const std::string &real_path,
-                                         const std::string &req_uri,
-                                         DIR *dir);
+                                         const std::string &req_uri, DIR *dir);
+
+  static Response delete_method(Target target, Response response,
+                                const ServerConfig *config,
+                                const RouteRule *rule);
+  static Response post_method(Target target, Response response,
+                              const ClientSession *client,
+                              const RouteRule *rule,
+                              const Request *request,
+                              Session *session);
+  static Response get_method(Target target, Response response,
+                             const ServerConfig *config,
+                             const RouteRule *rule,
+                             const Request *request);
 };
 
 #endif

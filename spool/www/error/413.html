@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>400 - Bad Request</title>
+    <title>413 - Payload Too Large</title>
     <style>
         * {
             box-sizing: border-box;
@@ -167,16 +167,17 @@
     <div class="noise"></div>
 
     <main class="container">
-        <div class="badge">400 BAD REQUEST</div>
+        <div class="badge">413 PAYLOAD TOO LARGE</div>
 
-        <div class="error-code">400</div>
-        <h1>잘못된 요청입니다</h1>
+        <div class="error-code">413</div>
+        <h1>요청 본문이 너무 큽니다</h1>
 
         <p class="subtext">
-            요청의 구문이 잘못되었거나 처리할 수 없습니다. 요청을 확인한 후 다시 시도해 주세요.
+            클라이언트가 보낸 데이터의 크기가 서버에서 허용하는 제한을 초과했습니다. 
         </p>
 
         <a href="/" class="action-btn">메인 페이지로 이동</a>
     </main>
 </body>
+</html>
 </html>

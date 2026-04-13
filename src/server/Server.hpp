@@ -12,6 +12,7 @@
 
 #include "Client.hpp"
 #include "Response.hpp"
+#include "Session.hpp"
 
 #include <arpa/inet.h>
 #include <csignal>
@@ -34,7 +35,7 @@ class ServerConfig;
  * @brief Core server class to initiate, configure, and run the event loop.
  * 
  * The Server class is responsible for setting up listening sockets based on the configuration,
- * managing multiplexed I/O using EPoll (or Kqueue wrappers), and directing I/O events to
+ * managing multiplexed I/O using EPoll, and directing I/O events to
  * the respective ClientSession handlers.
  */
 class Server {
@@ -50,6 +51,8 @@ private:
   std::map<std::string, std::string> mime_type; ///< Map containing recognized MIME types.
   std::set<const FileDescriptor *> server_fds;  ///< Set of active server listening socket FileDescriptors.
 
+  // Session session; ///< Session.
+
   /**
    * @brief Map tying server listening sockets to their specific ServerConfig settings.
    * Key: Server socket FileDescriptor. Value: Pointer to corresponding ServerConfig.
@@ -61,6 +64,12 @@ private:
    * Key: Client connection socket FileDescriptor. Value: Active ClientSession info.
    */
   std::map<const FileDescriptor *, ClientSession> clients;
+
+  /**
+   * @brief Server sessions.
+   * Key: Session id. Value: User info.
+   */
+  Session sessions;
 
   /**
    * @brief Accepts a newly incoming connection from a specific server listening socket.

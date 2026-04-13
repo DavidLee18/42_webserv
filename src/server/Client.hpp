@@ -7,8 +7,11 @@
  */
 
 #include <map>
+#include <cctype>
 #include <sstream>
 #include <string>
+#include <iostream>
+#include <stdlib.h>
 
 /**
  * @brief Utility function to retrieve a value from a map of strings based on a key.
@@ -30,6 +33,8 @@ struct ClientSession {
   std::string out_buff; ///< Buffer for outgoing data.
 
   const ServerConfig *config; ///< Pointer to the server configuration for this session.
+  std::string cookie;
+  std::string ip;
 
   /**
    * @brief Default constructor. Initializes config to NULL.
@@ -44,10 +49,11 @@ struct ClientSession {
 class Request {
 private:
   std::string method;       ///< The HTTP method (e.g., "GET").
-  std::string path;         ///< The requested path (e.g., "/index.html").
+  std::string path;         ///< The requested path (e.g., "/").
   std::string version;      ///< The HTTP version (e.g., "HTTP/1.1").
-  bool keep_alive;          ///< Connection keep-alive status.
   std::map<std::string, std::string> header; ///< Parsed HTTP headers.
+  bool keep_alive;          ///< Connection keep-alive status.
+  std::string cookie;
   std::string body;         ///< The request body, if any.
   bool content_full;        ///< Flag indicating if the entire body has been received.
 
@@ -103,6 +109,26 @@ public:
    * @return const std::string The requested path.
    */
   const std::string get_path() const { return path; };
+
+  /**
+   * @brief Gets client's cookie.
+   * 
+   * @return const std::string The client's cookie. Generate default cookie if none.
+   */
+  const std::string get_cookie() const { return cookie; };
+
+  /**
+   * @brief Parses the cookie string and returns the value of a specific cookie by name.
+   * 
+   * @param name The name of the cookie to find (e.g., "session_id")
+   * @return std::string The value of the cookie, or empty string if not found.
+   */
+  std::string get_cookie_value(const std::string& name) const;
+
+  /**
+   * @brief Sets client's cookie.
+   */
+  void set_cookie(std::string value) { cookie = value; };
 
   /**
    * @brief Gets the parsed HTTP headers.

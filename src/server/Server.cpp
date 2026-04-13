@@ -4,7 +4,9 @@
 void Server::new_connection(const FileDescriptor *server_fd) {
   while (true) { // accept all clients until nothing to connect
     // init client socket
-    Result<FileDescriptor> client_result = server_fd->socket_accept(NULL, NULL);
+    struct sockaddr_in client_addr;
+    socklen_t client_len = sizeof(client_addr);
+    Result<FileDescriptor> client_result = server_fd->socket_accept((struct sockaddr*)&client_addr, &client_len);
     if (!client_result.has_value()) {
       const std::string &err = client_result.error();
       if (err == Errors::try_again)
@@ -16,13 +18,17 @@ void Server::new_connection(const FileDescriptor *server_fd) {
         break;
       }
     }
-
     FileDescriptor client_fd = client_result.value();
     if (!client_fd.set_nonblocking().has_value()) {
       std::cerr << "ERROR: failed to set client socket to non-blocking mode"
                 << std::endl;
       continue;
     }
+
+    ClientSession client;
+    char ip_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN);
+    client.ip = ip_str;
 
     // register client socket to EPoll
     Event client_event(&client_fd, true, true, false, false, false, false);
@@ -32,11 +38,10 @@ void Server::new_connection(const FileDescriptor *server_fd) {
         epoll.add_fd(client_fd, client_event, client_option);
     if (add_result.has_value()) {
       FileDescriptor *client_ptr = add_result.value();
-      ClientSession session;
       if (listeners.find(server_fd) != listeners.end()) {
-        session.config = listeners.at(server_fd);
+        client.config = listeners.at(server_fd);
       }
-      clients[client_ptr] = session;
+      clients[client_ptr] = client;
       std::cout << "New client connected!" << std::endl;
     } else {
       std::cerr << "ERROR: epoll add failed: " << add_result.error()
@@ -67,41 +72,70 @@ void Server::client_read(const FileDescriptor *client_fd) {
   }
 
   // HTTP parsing and response generate
-  if (clients.find(client_fd) != clients.end() &&
-      !clients.at(client_fd).in_buff.empty()) {
-    std::string &in_buffer = clients.at(client_fd).in_buff;
+  std::string &in_buffer = clients.at(client_fd).in_buff;
+  while (!in_buffer.empty()) {
     size_t header_end = in_buffer.find("\r\n\r\n");
-
-    if (header_end != std::string::npos) {
-      Request request(in_buffer);
-      std::cout << "[Request] " << request.get_method_string() << " "
-                << request.get_path() << std::endl;
-
-      // response generate
-      Response http;
-      if (ServerResponse::find_file_type(request.get_path()) == "cgi")
-        http = ServerResponse::cgi_response(&request, clients.at(client_fd).config, &epoll);
-      else
-        http = ServerResponse::http_response(&request, clients.at(client_fd).config, mime_type);
-
-      
-      // read server response
-      std::ostringstream server_response;
-      if (!http.cgi.empty())
-        server_response << http.cgi;
-      else
-      {
-        server_response << "HTTP/1.1 " << http.status_code << "\r\n";
-        if (!http.redir.empty())
-          server_response << "Location:" << http.redir << "\r\n";
-        server_response << "Content-Type:" << http.mime_type << "\r\n";
-        server_response << "Content-Length: " << http.body.length() << "\r\n";
-        server_response << "Connection: " << http.connection << "\r\n\r\n";
-        server_response << http.body;
-      }
-      clients.at(client_fd).out_buff += server_response.str();
-      in_buffer.erase(0, header_end + 4);
+    if (header_end == std::string::npos) {
+      break; // 헤더가 다 안 들어왔으면 다음 epoll 이벤트 대기
     }
+
+    // checking Content-Length
+    size_t content_length = 0;
+    std::string header_lower = in_buffer.substr(0, header_end);
+    for (size_t i = 0; i < header_lower.length(); ++i) {
+      header_lower[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(header_lower[i])));
+    }
+    size_t cl_pos = header_lower.find("content-length: ");
+    if (cl_pos != std::string::npos) {
+      content_length = std::atoi(header_lower.c_str() + cl_pos + 16);
+    }
+
+    // check body if body not full break to get more event
+    size_t total_request_len = header_end + 4 + content_length;
+    if (in_buffer.length() < total_request_len) {
+      break;
+    }
+
+    // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
+    std::string request_str = in_buffer.substr(0, total_request_len);
+    Request request(request_str);
+
+    std::cout << "\nclient ip: " << clients.at(client_fd).ip << std::endl;
+    std::cout << "[Request] " << request.get_method_string() << " "
+              << request.get_path() << " (Body: " << content_length << " bytes)"
+              << std::endl;
+
+    // response generate
+    Response http;
+    if (ServerResponse::find_file_type(request.get_path()) == "cgi")
+      http = ServerResponse::cgi_response(&request,
+                                          clients.at(client_fd).config, &epoll);
+    else
+      http = ServerResponse::http_response(
+          &request, &clients.at(client_fd), mime_type, &sessions);
+
+    // read server response
+    std::ostringstream server_response;
+    if (!http.cgi.empty())
+      server_response << http.cgi;
+    else {
+      server_response << "HTTP/1.1 " << http.status_code << "\r\n";
+      if (!http.redir.empty())
+        server_response << "Location: " << http.redir << "\r\n";
+      std::cout << http.redir << std::endl;
+      server_response << "Content-Type:" << http.mime_type << "\r\n";
+      if (!http.cookie.empty())
+      {
+        server_response << "Set-Cookie:" << http.cookie << "\r\n";
+        std::cout << "cookie value: " << http.cookie << std::endl;
+      }
+      server_response << "Content-Length: " << http.body.length() << "\r\n";
+      server_response << "Connection: " << http.connection << "\r\n\r\n";
+      server_response << http.body;
+    }
+    clients.at(client_fd).out_buff += server_response.str();
+
+    in_buffer.erase(0, total_request_len);
   }
 }
 
@@ -194,6 +228,7 @@ Result<Void> Server::init() {
 }
 
 Result<Void> Server::start() {
+  system("open http://localhost:8080");
   std::cout << "Starting server loop..." << std::endl;
   while (true) {
     // Waiting for events using epoll

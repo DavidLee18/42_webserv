@@ -19,7 +19,7 @@ UWSGI_DEPS     := $(addprefix $(UWSGI_BUILD_DIR)/, $(UWSGI_SRC_FILES:.cpp=.d))
 SRC_FILES	:= errors.cpp epoll_kqueue.cpp file_descriptor.cpp	\
 	ParsingUtils.cpp json.cpp cgi_1_1.cpp uwsgi.cpp uwsgi_client.cpp \
 	http_1_1.cpp main.cpp 
-SERVER		:=	Server.cpp	Client.cpp	Response.cpp
+SERVER		:=	Server.cpp	Client.cpp	Response.cpp DefaultError.cpp Session.cpp
 CONFIG		:=	WebserverConfig.cpp ServerConfig.cpp \
 	RouteRule_CGI.cpp PathPattern.cpp
 

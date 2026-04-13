@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>400 - Bad Request</title>
+    <title>405 - Method Not Allowed</title>
     <style>
         * {
             box-sizing: border-box;
@@ -167,13 +167,13 @@
     <div class="noise"></div>
 
     <main class="container">
-        <div class="badge">400 BAD REQUEST</div>
+        <div class="badge">405 METHOD NOT ALLOWED</div>
 
-        <div class="error-code">400</div>
-        <h1>잘못된 요청입니다</h1>
+        <div class="error-code">405</div>
+        <h1>허용되지 않은 메서드입니다</h1>
 
         <p class="subtext">
-            요청의 구문이 잘못되었거나 처리할 수 없습니다. 요청을 확인한 후 다시 시도해 주세요.
+            요청하신 HTTP 메서드는 현재 리소스에서 지원하지 않습니다. 
         </p>
 
         <a href="/" class="action-btn">메인 페이지로 이동</a>
