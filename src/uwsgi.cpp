@@ -498,7 +498,9 @@ Result<Void> UwsgiDelegate::_switch_to_sending() {
   const FileDescriptor *sock_fd_ptr = _sock_epoll;
   Event write_event(sock_fd_ptr, false, true, false, false, true, true);
   Option write_option(false, false, false, false);
-  _epoll->modify_fd(*_sock_epoll, write_event, write_option);
+  Result<Void> mod = _epoll->modify_fd(*_sock_epoll, write_event, write_option);
+  if (!mod.has_value())
+    return ERR(Void, mod.error());
   _state = SENDING;
   return OKV;
 }
@@ -511,7 +513,9 @@ Result<Void> UwsgiDelegate::_switch_to_receiving() {
   const FileDescriptor *sock_fd_ptr = _sock_epoll;
   Event read_event(sock_fd_ptr, true, false, true, false, true, true);
   Option read_option(false, false, false, false);
-  _epoll->modify_fd(*_sock_epoll, read_event, read_option);
+  Result<Void> mod = _epoll->modify_fd(*_sock_epoll, read_event, read_option);
+  if (!mod.has_value())
+    return ERR(Void, mod.error());
   _state = RECEIVING;
   return OKV;
 }
