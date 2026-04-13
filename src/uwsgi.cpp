@@ -620,6 +620,10 @@ Result<Void> UwsgiDelegate::handle_event(const Event *ev) {
       _fail("uwsgi: socket error during send");
       return ERR(Void, _error);
     }
+    if (ev->hup || ev->rdhup) {
+      _fail("uwsgi: connection closed by peer during send");
+      return ERR(Void, _error);
+    }
     if (ev->out && _total_sent < _send_buf.size()) {
       ssize_t written = write(
           _raw_sock,
