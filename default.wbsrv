@@ -5,6 +5,7 @@ types =
     json     -> application/json
     jpg|jpeg -> image/jpeg
     png      -> image/png
+    mp3      -> audio/mpeg
     _        -> application/octet-stream
 
 uwsgi =
@@ -27,11 +28,13 @@ uwsgi =
 
     GET /download/ <i- /spool/www/
 
+    GET /files/me/* <- $get_files.cgi
+        @ /spool/www/authinfo
+
     GET *.(jpg|jpeg|gif) <- /spool/www/*
 
-    GET|POST|DELETE * <- /spool/www/*
-        ? index.html
-        @ auth_info
+    GET * <- /spool/www/*
+        ? login.html
         ->{} 10MB
         ! 400:/spool/www/error/400.html
         ! 401:/spool/www/error/401.html
@@ -41,6 +44,12 @@ uwsgi =
         ! 409:/spool/www/error/409.html
         ! 413:/spool/www/error/413.html
         ! 500:/spool/www/error/500.html
+
+    POST /files/upload/ <- $upload.cgi
+        @ /spool/www/authinfo
+
+    DELETE /files/ <- $delete_file.cgi
+        @ /spool/www/auth_info
 
 
 
