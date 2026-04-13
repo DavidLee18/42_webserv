@@ -695,32 +695,9 @@ Result<Void> UwsgiDelegate::handle_event(const Event *ev) {
 // it violates the single-epoll_wait constraint. New code must use
 // start() + handle_event() and let the main loop own epoll_wait().
 Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
-  Result<Void> s = start(epoll);
-  if (!s.has_value()) {
-    return ERR(Http::Response, s.error());
-  }
-  while (!is_done()) {
-    Result<Events> wait_result = epoll->wait(timeout_ms > 0 ? timeout_ms : -1);
-    if (!wait_result.has_value()) {
-      _fail("uwsgi: epoll wait failed");
-      return ERR(Http::Response, _error);
-    }
-    Events events = wait_result.value();
-    if (events.is_end()) {
-      _fail("uwsgi: execution timeout");
-      return ERR(Http::Response, _error);
-    }
-    for (; !events.is_end(); ++events) {
-      Result<const Event *> ev_res = *events;
-      if (!ev_res.has_value())
-        continue;
-      Result<Void> he = handle_event(ev_res.value());
-      (void)he;
-      if (is_done())
-        break;
-    }
-  }
-  return result();
+  (void)timeout_ms;
+  (void)epoll;
+  return ERR(Http::Response, "deprecated");
 }
 
 Result<Http::Response> UwsgiDelegate::result() const {

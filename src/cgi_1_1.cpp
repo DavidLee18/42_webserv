@@ -1505,32 +1505,8 @@ Result<std::string> CgiDelegate::result() const {
 // start() + handle_event() and let the main loop own epoll_wait().
 Result<std::string> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
   (void)timeout_ms;
-  Result<Void> s = start(epoll);
-  if (!s.has_value()) {
-    return ERR(std::string, s.error());
-  }
-  while (!is_done()) {
-    Result<Events> wait_result = epoll->wait(timeout_ms > 0 ? timeout_ms : -1);
-    if (!wait_result.has_value()) {
-      _fail("EPoll wait failed");
-      return ERR(std::string, _error);
-    }
-    Events events = wait_result.value();
-    if (events.is_end()) {
-      _fail("CGI execution timeout");
-      return ERR(std::string, _error);
-    }
-    for (; !events.is_end(); ++events) {
-      Result<const Event *> ev_res = *events;
-      if (!ev_res.has_value())
-        continue;
-      Result<Void> he = handle_event(ev_res.value());
-      (void)he;
-      if (is_done())
-        break;
-    }
-  }
-  return result();
+  (void)epoll;
+  return ERR(std::string, "deprecated");
 }
 
 CgiDelegate::~CgiDelegate() {
