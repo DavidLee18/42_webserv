@@ -114,18 +114,20 @@ public:
 
 #define ERR(t, e) (Result<t>(e))
 
-#define TRY(t, vt, v, r)                                                       \
-  if (!(r).error().empty()) {                                                  \
+#define TRY(t, rt, v, r)                                                       \
+  rt _result = r;                                                              \
+  if (!_result.error().empty()) {                                              \
     return ERR(t, (r).error());                                                \
   } else {                                                                     \
-    v = (r).value();                                                           \
+    v = _result.value();                                                       \
   }
 
-#define TRYF(t, vt, v, r, f)                                                   \
-  if (!(r).error().empty()) {                                                  \
+#define TRYF(t, rt, v, r, f)                                                   \
+  rt _result = rt;                                                             \
+  if (!_result.error().empty()) {                                              \
     f return ERR(t, (r).error());                                              \
   } else {                                                                     \
-    v = (r).value();                                                           \
+    v = _result.value();                                                       \
   }
 
 struct Void {};

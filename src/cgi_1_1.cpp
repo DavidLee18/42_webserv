@@ -1,6 +1,5 @@
 #include "webserv.h"
 
-// Forward declaration
 unsigned char to_upper(unsigned char);
 
 Result<Void> ContentType::add_param(std::string k, std::string v) {
@@ -268,10 +267,8 @@ CgiMetaVar::Parser::parse_content_type(std::string raw) {
     return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
 
   std::string type_str = raw.substr(0, slash_pos);
-  // Convert to lowercase for comparison
   std::transform(type_str.begin(), type_str.end(), type_str.begin(), ::tolower);
 
-  // Parse main type
   ContentType::Type type;
   if (type_str == "application")
     type = ContentType::application;
@@ -300,7 +297,6 @@ CgiMetaVar::Parser::parse_content_type(std::string raw) {
 
   consumed = slash_pos + 1;
 
-  // Parse subtype (everything until semicolon or end of string)
   size_t semicolon_pos = raw.find(';', consumed);
   std::string subtype;
   if (semicolon_pos == std::string::npos) {
@@ -648,9 +644,7 @@ CgiMetaVar::Parser::parse(std::string const &name, std::string const &value) {
 }
 
 // CgiInput constructors
-CgiInput::CgiInput()
-    : mvars(), req_body() {
-}
+CgiInput::CgiInput() : mvars(), req_body() {}
 
 CgiInput::CgiInput(std::vector<CgiMetaVar> vars, std::string body)
     : mvars(vars), req_body(body) {}
@@ -664,31 +658,41 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
   // Convert Request::Method to Http::Method for backwards compatibility
   Http::Method h_method;
   switch (req.get_method()) {
-    case Request::GET: h_method = Http::GET; break;
-    case Request::HEAD: h_method = Http::HEAD; break;
-    case Request::POST: h_method = Http::POST; break;
-    case Request::PUT: h_method = Http::PUT; break;
-    case Request::DELETE: h_method = Http::DELETE; break;
-    case Request::OPTIONS: h_method = Http::OPTIONS; break;
-    case Request::CONNECT: h_method = Http::CONNECT; break;
-    case Request::TRACE: h_method = Http::TRACE; break;
-    case Request::PATCH: h_method = Http::PATCH; break;
-    default: h_method = Http::GET; break;
+  case Request::GET:
+    h_method = Http::GET;
+    break;
+  case Request::HEAD:
+    h_method = Http::HEAD;
+    break;
+  case Request::POST:
+    h_method = Http::POST;
+    break;
+  case Request::PUT:
+    h_method = Http::PUT;
+    break;
+  case Request::DELETE:
+    h_method = Http::DELETE;
+    break;
+  case Request::OPTIONS:
+    h_method = Http::OPTIONS;
+    break;
+  case Request::CONNECT:
+    h_method = Http::CONNECT;
+    break;
+  case Request::TRACE:
+    h_method = Http::TRACE;
+    break;
+  case Request::PATCH:
+    h_method = Http::PATCH;
+    break;
+  default:
+    h_method = Http::GET;
+    break;
   }
 
-  // Add REQUEST_METHOD
-  CgiMetaVar method_var = CgiMetaVar::request_method(h_method);
-  input.mvars.push_back(method_var);
-
-  // Add SERVER_PROTOCOL
-  CgiMetaVar protocol_var = CgiMetaVar::server_protocol(Http_1_1);
-  input.mvars.push_back(protocol_var);
-
-  // Add GATEWAY_INTERFACE
-  CgiMetaVar gateway_var = CgiMetaVar::gateway_interface(Cgi_1_1);
-  input.mvars.push_back(gateway_var);
-
-  // Add SERVER_SOFTWARE
+  input.mvars.push_back(CgiMetaVar::request_method(h_method));
+  input.mvars.push_back(CgiMetaVar::server_protocol(Http_1_1));
+  input.mvars.push_back(CgiMetaVar::gateway_interface(Cgi_1_1));
   input.mvars.push_back(CgiMetaVar::server_software(Webserv));
 
   // Parse path for SCRIPT_NAME, PATH_INFO, and QUERY_STRING
@@ -738,11 +742,8 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
     std::string pair;
     while (std::getline(ss, pair, '&')) {
       size_t eq_pos = pair.find('=');
-      if (eq_pos != std::string::npos) {
+      if (eq_pos != std::string::npos)
         query_map[pair.substr(0, eq_pos)] = pair.substr(eq_pos + 1);
-      } else {
-        query_map[pair] = "";
-      }
     }
     input.mvars.push_back(CgiMetaVar::query_string(query_map));
   }
@@ -798,8 +799,9 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
     }
     Result<std::pair<ServerName, size_t> > sn_res =
         ServerName::Parser::parse(server_name_str);
-    if (sn_res.error().empty())
-      input.mvars.push_back(CgiMetaVar::server_name(sn_res.value().first));
+    if (!sn_res.error().empty())
+      return ERR(CgiInput, Errors::invalid_format);
+    input.mvars.push_back(CgiMetaVar::server_name(sn_res.value().first));
     input.mvars.push_back(CgiMetaVar::server_port(server_port_val));
   }
 
@@ -849,21 +851,19 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
     if (header_name == "CONTENT_TYPE") {
       Result<std::pair<CgiMetaVar, size_t> > res =
           CgiMetaVar::Parser::parse("CONTENT_TYPE", value);
-      if (res.error().empty()) {
-        input.mvars.push_back(res.value().first);
-      }
+      if (!res.error().empty())
+        return ERR(CgiInput, Errors::invalid_format);
+      input.mvars.push_back(res.value().first);
     } else if (header_name == "CONTENT_LENGTH") {
       Result<std::pair<CgiMetaVar, size_t> > res =
           CgiMetaVar::Parser::parse("CONTENT_LENGTH", value);
-      if (res.error().empty()) {
-        input.mvars.push_back(res.value().first);
-      }
+      if (!res.error().empty())
+        return ERR(CgiInput, Errors::invalid_format);
+      input.mvars.push_back(res.value().first);
     } else {
       // Add as HTTP_* variable
-      std::string cgi_name = "HTTP_" + header_name;
-      CgiMetaVar custom_var =
-          CgiMetaVar::custom_var(EtcMetaVar::Http, cgi_name, value);
-      input.mvars.push_back(custom_var);
+      input.mvars.push_back(CgiMetaVar::custom_var(
+          EtcMetaVar::Http, "HTTP_" + header_name, value));
     }
   }
 
@@ -871,7 +871,6 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
 }
 
 char **CgiInput::to_envp() const {
-  // Allocate array with space for all variables plus NULL terminator
   char **envp = new char *[mvars.size() + 1];
 
   for (size_t i = 0; i < mvars.size(); i++) {
@@ -882,13 +881,12 @@ char **CgiInput::to_envp() const {
     switch (var.get_name()) {
     case CgiMetaVar::AUTH_TYPE:
       env_str = "AUTH_TYPE=";
-      if (var.get_val().auth_type->type() == CgiAuthType::Basic) {
+      if (var.get_val().auth_type->type() == CgiAuthType::Basic)
         env_str += "Basic";
-      } else if (var.get_val().auth_type->type() == CgiAuthType::Digest) {
+      else if (var.get_val().auth_type->type() == CgiAuthType::Digest)
         env_str += "Digest";
-      } else if (var.get_val().auth_type->other() != NULL) {
+      else if (var.get_val().auth_type->other() != NULL)
         env_str += *var.get_val().auth_type->other();
-      }
       break;
 
     case CgiMetaVar::CONTENT_LENGTH: {
@@ -1104,14 +1102,11 @@ char **CgiInput::to_envp() const {
       break;
     }
 
-    // Allocate and copy the string
     envp[i] = new char[env_str.length() + 1];
-    std::strcpy(envp[i], env_str.c_str());
+    std::strncpy(envp[i], env_str.c_str(), env_str.size());
   }
 
-  // NULL terminate the array
   envp[mvars.size()] = NULL;
-
   return envp;
 }
 
@@ -1119,15 +1114,11 @@ unsigned char to_upper(unsigned char c) {
   return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
 }
 
-// CgiDelegate implementation
-
 CgiDelegate::CgiDelegate(const Request &req, const std::string &script)
-    : env(), script_path(script), request(req),
-      _state(NOT_STARTED), _epoll(NULL), _pid(-1),
-      _stdin_raw(-1), _stdout_raw(-1),
-      _stdin_epoll(NULL), _stdout_epoll(NULL),
-      _body(), _total_written(0), _output(), _error() {
-  // Parse the HTTP request to CgiInput
+    : env(), script_path(script), request(req), _state(NOT_STARTED),
+      _epoll(NULL), _pid(-1), _stdin_raw(-1), _stdout_raw(-1),
+      _stdin_epoll(NULL), _stdout_epoll(NULL), _body(), _total_written(0),
+      _output(), _error() {
   Result<CgiInput> parse_result = CgiInput::Parser::parse(req);
   if (parse_result.error().empty()) {
     env = parse_result.value();

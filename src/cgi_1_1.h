@@ -7,13 +7,12 @@
 #include <list>
 #include <map>
 #include <string>
+#include <sys/types.h>
 
-// Forward declarations
 class CgiInput;
 class EPoll;
 class Event;
 class FileDescriptor;
-#include <sys/types.h>
 
 class CgiAuthType {
 public:
@@ -125,12 +124,10 @@ public:
 
   ServerName &operator=(const ServerName &other) {
     if (this != &other) {
-      // Clean up existing value
       if (type == Host) {
         delete val.host_name;
       }
 
-      // Copy new value
       type = other.type;
       if (type == Host) {
         val.host_name = new std::list<std::string>(*other.val.host_name);
@@ -346,17 +343,8 @@ public:
     }
   }
 
-  // Assigns from another CgiMetaVar, performing a deep copy of the active
-  // value. The operator first releases any currently owned dynamic resources
-  // associated with this->name, then copies the discriminator and value from
-  // 'other' in a way that mirrors the copy constructor. Self-assignment is
-  // explicitly guarded against so we never delete resources before reading from
-  // them.
   CgiMetaVar &operator=(const CgiMetaVar &other) {
-    // Protect against self-assignment; required because we delete current
-    // resources before copying from 'other'.
     if (this != &other) {
-      // Clean up the value currently selected by 'name' before overwriting it.
       switch (name) {
       case AUTH_TYPE:
         delete val.auth_type;
@@ -395,7 +383,6 @@ public:
         break;
       }
 
-      // Copy new value
       name = other.name;
       switch (name) {
       case AUTH_TYPE:
@@ -569,18 +556,18 @@ public:
 private:
   CgiInput env;
   std::string script_path;
-  const Request& request;
+  const Request &request;
 
   // Execution state. epoll_wait() is NOT performed inside this class; the
   // main event loop is the sole owner of epoll_wait() and drives the
   // delegate through start()/handle_event() until is_done() is true.
   State _state;
-  EPoll *_epoll;          // borrowed, not owned
+  EPoll *_epoll;
   pid_t _pid;
-  int _stdin_raw;         // raw write end of stdin pipe; -1 when closed
-  int _stdout_raw;        // raw read end of stdout pipe; -1 when closed
-  FileDescriptor *_stdin_epoll;   // non-null while registered in epoll
-  FileDescriptor *_stdout_epoll;  // non-null while registered in epoll
+  int _stdin_raw;                // raw write end of stdin pipe; -1 when closed
+  int _stdout_raw;               // raw read end of stdout pipe; -1 when closed
+  FileDescriptor *_stdin_epoll;  // non-null while registered in epoll
+  FileDescriptor *_stdout_epoll; // non-null while registered in epoll
   std::string _body;
   size_t _total_written;
   std::string _output;
@@ -607,13 +594,6 @@ public:
 
   // Retrieve the script output. Valid once is_done() is true.
   Result<std::string> result() const;
-
-  // DEPRECATED convenience wrapper that drives start() + handle_event()
-  // using the given epoll directly. Kept only so existing synchronous
-  // callers continue to compile while they migrate to the event-loop
-  // API above. New code MUST use start()/handle_event() and let the main
-  // loop be the sole owner of epoll_wait().
-  Result<std::string> execute(int timeout_ms, EPoll *epoll);
 
   ~CgiDelegate();
 };
