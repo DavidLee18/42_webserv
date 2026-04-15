@@ -1488,8 +1488,6 @@ static void terminate_child(pid_t pid) {
   (void)waitpid_nohang(pid, NULL);
 }
 
-void CgiDelegate::_cleanup_epoll() {}
-
 // Phase 1: create pipes, fork the CGI process, and register the parent's
 // pipe ends with the shared epoll instance. No epoll_wait() is performed
 // here - the caller's main loop is the sole owner of epoll_wait() and
