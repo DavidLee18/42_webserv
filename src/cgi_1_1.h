@@ -287,7 +287,8 @@ class CgiDelegate {
   FileDescriptor *_stdin;
   FileDescriptor *_stdout;
   size_t _total_written;
-  Result<std::string> _res;
+  std::string _output;
+  bool _completed;
 
   CgiDelegate(Request const &, EPoll &);
 

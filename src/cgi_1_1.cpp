@@ -1449,7 +1449,7 @@ unsigned char to_upper(unsigned char c) {
 
 CgiDelegate::CgiDelegate(Request const &req, EPoll &ep)
     : _env(), _script_path(), _req(req), _epoll(ep), _pid(-1), _stdin(NULL),
-      _stdout(NULL), _total_written(0), _res(Errors::invalid_fd) {}
+      _stdout(NULL), _total_written(0), _output(), _completed(false) {}
 
 Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
                                           const std::string &script_path) {
@@ -1681,8 +1681,10 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
   if (ev->in || ev->hup || ev->rdhup) {
     char buffer[4096];
     Result<ssize_t> bytes_read = _stdout->pipe_read(buffer, sizeof(buffer));
-    if (bytes_read.has_value() && bytes_read.value() > 0)
+    if (bytes_read.has_value() && bytes_read.value() > 0) {
+      _output.append(buffer, static_cast<size_t>(bytes_read.value()));
       return OKV;
+    }
     if (!bytes_read.has_value() || bytes_read.value() < 0)
       return ERR(Void, "Failed to read from CGI stdout");
 
@@ -1695,6 +1697,7 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       delete _stdin;
       _stdin = NULL;
     }
+    _completed = true;
 
     int status = 0;
     if (!waitpid_nohang(_pid, &status)) {
@@ -1713,6 +1716,11 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
   if (ev->err)
     return ERR(Void, "EPoll error on CGI stdout");
   return OKV;
+}
+
+Result<std::string> CgiDelegate::poll() {
+  return _completed ? OK(std::string, _output)
+                    : ERR(std::string, Errors::try_again);
 }
 
 CgiDelegate::~CgiDelegate() {

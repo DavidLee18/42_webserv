@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 
-// Forward declarations
 class UwsgiInput;
 class EPoll;
 class Event;
@@ -99,14 +98,7 @@ public:
 
 class UwsgiDelegate {
 public:
-  enum State {
-    NOT_STARTED,
-    CONNECTING,
-    SENDING,
-    RECEIVING,
-    COMPLETE,
-    FAILED
-  };
+  enum State { NOT_STARTED, CONNECTING, SENDING, RECEIVING, COMPLETE, FAILED };
 
 private:
   UwsgiInput env;
@@ -114,8 +106,8 @@ private:
   Http::Request request;
 
   State _state;
-  EPoll *_epoll;             // borrowed, not owned
-  int _raw_sock;             // raw socket fd; -1 when not registered
+  EPoll *_epoll;               // borrowed, not owned
+  int _raw_sock;               // raw socket fd; -1 when not registered
   FileDescriptor *_sock_epoll; // non-null while registered in epoll
   std::vector<unsigned char> _send_buf;
   size_t _total_sent;
@@ -147,11 +139,6 @@ public:
 
   // Retrieve the parsed HTTP response. Valid once is_done() is true.
   Result<Http::Response> result() const;
-
-  // DEPRECATED convenience wrapper. Kept so existing synchronous callers
-  // compile while they migrate to start()/handle_event(). New code MUST
-  // use start()/handle_event() and let the main loop own epoll_wait().
-  Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
 
   ~UwsgiDelegate();
 };
