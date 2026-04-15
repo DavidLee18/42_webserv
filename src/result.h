@@ -115,17 +115,17 @@ public:
 #define ERR(t, e) (Result<t>(e))
 
 #define TRY(t, rt, v, r)                                                       \
-  rt _result = r;                                                              \
+  Result<rt> _result = r;                                                      \
   if (!_result.error().empty()) {                                              \
-    return ERR(t, (r).error());                                                \
+    return ERR(t, _result.error());                                            \
   } else {                                                                     \
     v = _result.value();                                                       \
   }
 
 #define TRYF(t, rt, v, r, f)                                                   \
-  rt _result = rt;                                                             \
+  Result<rt> _result = rt;                                                     \
   if (!_result.error().empty()) {                                              \
-    f return ERR(t, (r).error());                                              \
+    f return ERR(t, _result.error());                                          \
   } else {                                                                     \
     v = _result.value();                                                       \
   }

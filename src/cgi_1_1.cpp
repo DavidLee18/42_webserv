@@ -2,6 +2,53 @@
 
 unsigned char to_upper(unsigned char);
 
+CgiAuthType::CgiAuthType(CgiAuthType::Type type) : _type(type), _other(NULL) {}
+
+CgiAuthType::CgiAuthType(CgiAuthType::Type type, std::string other)
+    : _type(type), _other(new std::string(other)) {}
+
+CgiAuthType::CgiAuthType(const CgiAuthType &other) : _type(other._type) {
+  if (other._other != NULL) {
+    _other = new std::string(*other._other);
+  } else {
+    _other = NULL;
+  }
+}
+
+CgiAuthType &CgiAuthType::operator=(const CgiAuthType &other) {
+  if (this != &other) {
+    delete _other;
+    _type = other._type;
+    if (other._other != NULL) {
+      _other = new std::string(*other._other);
+    } else {
+      _other = NULL;
+    }
+  }
+  return *this;
+}
+
+CgiAuthType::~CgiAuthType() { delete _other; }
+
+CgiAuthType::Type const &CgiAuthType::type() { return _type; }
+
+std::string const *CgiAuthType::other() { return _other; }
+
+ContentType::ContentType(ContentType::Type ty, std::string const &subty)
+    : type(ty), subtype(subty), params() {}
+
+ContentType::ContentType(ContentType const &other)
+    : type(other.type), subtype(other.subtype), params(other.params) {}
+
+ContentType &ContentType::operator=(const ContentType &other) {
+  if (this != &other) {
+    type = other.type;
+    subtype = other.subtype;
+    params = other.params;
+  }
+  return *this;
+}
+
 Result<Void> ContentType::add_param(std::string k, std::string v) {
   std::map<std::string, std::string>::iterator iter = params.find(k);
   if (iter == params.end())
@@ -109,24 +156,296 @@ ServerName::Parser::parse(std::string raw) {
   return parse_ipv4(raw);
 }
 
-std::string ServerName::to_string() const {
+ServerName::ServerName(ServerName::Type ty, ServerName::Val v)
+    : type(ty), val(v) {}
+
+ServerName::ServerName(const ServerName &other) : type(other.type) {
   if (type == Host) {
-    std::string result;
+    val.host_name = new std::list<std::string>(*other.val.host_name);
+  } else {
+    val.ipv4[0] = other.val.ipv4[0];
+    val.ipv4[1] = other.val.ipv4[1];
+    val.ipv4[2] = other.val.ipv4[2];
+    val.ipv4[3] = other.val.ipv4[3];
+  }
+}
+
+ServerName::~ServerName() {
+  if (type == ServerName::Host) {
+    delete val.host_name;
+  }
+}
+
+ServerName &ServerName::operator=(const ServerName &other) {
+  if (this != &other) {
+    if (type == Host) {
+      delete val.host_name;
+    }
+
+    type = other.type;
+    if (type == Host) {
+      val.host_name = new std::list<std::string>(*other.val.host_name);
+    } else {
+      val.ipv4[0] = other.val.ipv4[0];
+      val.ipv4[1] = other.val.ipv4[1];
+      val.ipv4[2] = other.val.ipv4[2];
+      val.ipv4[3] = other.val.ipv4[3];
+    }
+  }
+  return *this;
+}
+
+ServerName::Type const &ServerName::get_type() const { return type; }
+ServerName::Val const &ServerName::get_val() const { return val; }
+
+std::ostream &operator<<(std::ostream &os, ServerName const &srvn) {
+  if (srvn.get_type() == ServerName::Host) {
     bool first = true;
-    for (std::list<std::string>::const_iterator it = val.host_name->begin();
-         it != val.host_name->end(); ++it) {
+    for (std::list<std::string>::const_iterator it =
+             srvn.get_val().host_name->begin();
+         it != srvn.get_val().host_name->end(); ++it) {
       if (!first)
-        result += ".";
-      result += *it;
+        os << '.';
+      os << *it;
       first = false;
     }
-    return result;
+    return os;
   } else {
-    std::stringstream ss;
-    ss << static_cast<int>(val.ipv4[0]) << "." << static_cast<int>(val.ipv4[1])
-       << "." << static_cast<int>(val.ipv4[2]) << "."
-       << static_cast<int>(val.ipv4[3]);
-    return ss.str();
+    os << static_cast<int>(srvn.get_val().ipv4[0]) << "."
+       << static_cast<int>(srvn.get_val().ipv4[1]) << "."
+       << static_cast<int>(srvn.get_val().ipv4[2]) << "."
+       << static_cast<int>(srvn.get_val().ipv4[3]);
+    return os;
+  }
+}
+
+EtcMetaVar::EtcMetaVar(EtcMetaVar::Type ty, std::string const &n,
+                       std::string const &v)
+    : type(ty), name(n), value(v) {}
+
+EtcMetaVar::EtcMetaVar(EtcMetaVar const &other)
+    : type(other.type), name(other.name), value(other.value) {}
+
+EtcMetaVar &EtcMetaVar::operator=(const EtcMetaVar &other) {
+  if (this != &other) {
+    type = other.type;
+    name = other.name;
+    value = other.value;
+  }
+  return *this;
+}
+
+CgiMetaVar::CgiMetaVar(CgiMetaVar::Name n, CgiMetaVar::Val v)
+    : name(n), val(v) {}
+
+CgiMetaVar::Name const &CgiMetaVar::get_name() const { return name; }
+CgiMetaVar::Val const &CgiMetaVar::get_val() const { return val; }
+
+CgiMetaVar::CgiMetaVar(const CgiMetaVar &other) : name(other.name) {
+  switch (name) {
+  case AUTH_TYPE:
+    val.auth_type = new CgiAuthType(*other.val.auth_type);
+    break;
+  case CONTENT_LENGTH:
+    val.content_length = other.val.content_length;
+    break;
+  case CONTENT_TYPE:
+    val.content_type = new ContentType(*other.val.content_type);
+    break;
+  case GATEWAY_INTERFACE:
+    val.gateway_interface = other.val.gateway_interface;
+    break;
+  case PATH_INFO:
+    val.path_info = new std::list<std::string>(*other.val.path_info);
+    break;
+  case PATH_TRANSLATED:
+    val.path_translated = new std::string(*other.val.path_translated);
+    break;
+  case QUERY_STRING:
+    val.query_string =
+        new std::map<std::string, std::string>(*other.val.query_string);
+    break;
+  case REMOTE_ADDR:
+    val.remote_addr[0] = other.val.remote_addr[0];
+    val.remote_addr[1] = other.val.remote_addr[1];
+    val.remote_addr[2] = other.val.remote_addr[2];
+    val.remote_addr[3] = other.val.remote_addr[3];
+    break;
+  case REMOTE_HOST:
+    val.remote_host = new std::list<std::string>(*other.val.remote_host);
+    break;
+  case REMOTE_IDENT:
+    val.remote_ident = new std::string(*other.val.remote_ident);
+    break;
+  case REMOTE_USER:
+    val.remote_user = new std::string(*other.val.remote_user);
+    break;
+  case REQUEST_METHOD:
+    val.request_method = other.val.request_method;
+    break;
+  case SCRIPT_NAME:
+    val.script_name = new std::list<std::string>(*other.val.script_name);
+    break;
+  case SERVER_NAME:
+    val.server_name = new ServerName(*other.val.server_name);
+    break;
+  case SERVER_PORT:
+    val.server_port = other.val.server_port;
+    break;
+  case SERVER_PROTOCOL:
+    val.server_protocol = other.val.server_protocol;
+    break;
+  case SERVER_SOFTWARE:
+    val.server_software = other.val.server_software;
+    break;
+  case X_:
+    val.etc_val = new EtcMetaVar(*other.val.etc_val);
+    break;
+  }
+}
+
+CgiMetaVar &CgiMetaVar::operator=(const CgiMetaVar &other) {
+  if (this != &other) {
+    switch (name) {
+    case AUTH_TYPE:
+      delete val.auth_type;
+      break;
+    case CONTENT_TYPE:
+      delete val.content_type;
+      break;
+    case PATH_INFO:
+      delete val.path_info;
+      break;
+    case PATH_TRANSLATED:
+      delete val.path_translated;
+      break;
+    case QUERY_STRING:
+      delete val.query_string;
+      break;
+    case REMOTE_HOST:
+      delete val.remote_host;
+      break;
+    case REMOTE_IDENT:
+      delete val.remote_ident;
+      break;
+    case REMOTE_USER:
+      delete val.remote_user;
+      break;
+    case SCRIPT_NAME:
+      delete val.script_name;
+      break;
+    case SERVER_NAME:
+      delete val.server_name;
+      break;
+    case X_:
+      delete val.etc_val;
+      break;
+    default:
+      break;
+    }
+
+    name = other.name;
+    switch (name) {
+    case AUTH_TYPE:
+      val.auth_type = new CgiAuthType(*other.val.auth_type);
+      break;
+    case CONTENT_LENGTH:
+      val.content_length = other.val.content_length;
+      break;
+    case CONTENT_TYPE:
+      val.content_type = new ContentType(*other.val.content_type);
+      break;
+    case GATEWAY_INTERFACE:
+      val.gateway_interface = other.val.gateway_interface;
+      break;
+    case PATH_INFO:
+      val.path_info = new std::list<std::string>(*other.val.path_info);
+      break;
+    case PATH_TRANSLATED:
+      val.path_translated = new std::string(*other.val.path_translated);
+      break;
+    case QUERY_STRING:
+      val.query_string =
+          new std::map<std::string, std::string>(*other.val.query_string);
+      break;
+    case REMOTE_ADDR:
+      val.remote_addr[0] = other.val.remote_addr[0];
+      val.remote_addr[1] = other.val.remote_addr[1];
+      val.remote_addr[2] = other.val.remote_addr[2];
+      val.remote_addr[3] = other.val.remote_addr[3];
+      break;
+    case REMOTE_HOST:
+      val.remote_host = new std::list<std::string>(*other.val.remote_host);
+      break;
+    case REMOTE_IDENT:
+      val.remote_ident = new std::string(*other.val.remote_ident);
+      break;
+    case REMOTE_USER:
+      val.remote_user = new std::string(*other.val.remote_user);
+      break;
+    case REQUEST_METHOD:
+      val.request_method = other.val.request_method;
+      break;
+    case SCRIPT_NAME:
+      val.script_name = new std::list<std::string>(*other.val.script_name);
+      break;
+    case SERVER_NAME:
+      val.server_name = new ServerName(*other.val.server_name);
+      break;
+    case SERVER_PORT:
+      val.server_port = other.val.server_port;
+      break;
+    case SERVER_PROTOCOL:
+      val.server_protocol = other.val.server_protocol;
+      break;
+    case SERVER_SOFTWARE:
+      val.server_software = other.val.server_software;
+      break;
+    case X_:
+      val.etc_val = new EtcMetaVar(*other.val.etc_val);
+      break;
+    }
+  }
+  return *this;
+}
+
+CgiMetaVar::~CgiMetaVar() {
+  switch (name) {
+  case AUTH_TYPE:
+    delete val.auth_type;
+    break;
+  case CONTENT_TYPE:
+    delete val.content_type;
+    break;
+  case PATH_INFO:
+    delete val.path_info;
+    break;
+  case PATH_TRANSLATED:
+    delete val.path_translated;
+    break;
+  case QUERY_STRING:
+    delete val.query_string;
+    break;
+  case REMOTE_HOST:
+    delete val.remote_host;
+    break;
+  case REMOTE_IDENT:
+    delete val.remote_ident;
+    break;
+  case REMOTE_USER:
+    delete val.remote_user;
+    break;
+  case SCRIPT_NAME:
+    delete val.script_name;
+    break;
+  case SERVER_NAME:
+    delete val.server_name;
+    break;
+  case X_:
+    delete val.etc_val;
+    break;
+  default:
+    break;
   }
 }
 
@@ -646,10 +965,21 @@ CgiMetaVar::Parser::parse(std::string const &name, std::string const &value) {
 // CgiInput constructors
 CgiInput::CgiInput() : mvars(), req_body() {}
 
-CgiInput::CgiInput(std::vector<CgiMetaVar> vars, std::string body)
+CgiInput::CgiInput(std::vector<CgiMetaVar> const &vars, std::string body)
     : mvars(vars), req_body(body) {}
 
 CgiInput::CgiInput(Request const &req) : mvars(), req_body(req.get_body()) {}
+
+CgiInput::CgiInput(const CgiInput &other)
+    : mvars(other.mvars), req_body(other.req_body) {}
+
+CgiInput &CgiInput::operator=(const CgiInput &other) {
+  if (this != &other) {
+    mvars = other.mvars;
+    req_body = other.req_body;
+  }
+  return *this;
+}
 
 Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
   CgiInput input;
@@ -1072,12 +1402,15 @@ char **CgiInput::to_envp() const {
       }
       break;
 
-    case CgiMetaVar::SERVER_NAME:
-      env_str = "SERVER_NAME=";
+    case CgiMetaVar::SERVER_NAME: {
+      std::ostringstream oss;
+      oss << "SERVER_NAME=";
       if (var.get_val().server_name != NULL) {
-        env_str += var.get_val().server_name->to_string();
+        oss << var.get_val().server_name;
       }
+      env_str = oss.str();
       break;
+    }
 
     case CgiMetaVar::SERVER_PORT: {
       std::stringstream ss;
@@ -1114,15 +1447,17 @@ unsigned char to_upper(unsigned char c) {
   return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
 }
 
-CgiDelegate::CgiDelegate(const Request &req, const std::string &script)
-    : env(), script_path(script), request(req), _state(NOT_STARTED),
-      _epoll(NULL), _pid(-1), _stdin_raw(-1), _stdout_raw(-1),
-      _stdin_epoll(NULL), _stdout_epoll(NULL), _body(), _total_written(0),
-      _output(), _error() {
-  Result<CgiInput> parse_result = CgiInput::Parser::parse(req);
-  if (parse_result.error().empty()) {
-    env = parse_result.value();
-  }
+CgiDelegate::CgiDelegate(Request const &req, EPoll &ep)
+    : _env(), _script_path(), _req(req), _epoll(ep), _pid(-1), _stdin(NULL),
+      _stdout(NULL), _total_written(0), _res(Errors::invalid_fd) {}
+
+Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
+                                          const std::string &script_path) {
+  CgiDelegate del(req, ep);
+  CgiInput parse_result;
+  TRY(CgiDelegate, CgiInput, parse_result, CgiInput::Parser::parse(req))
+  del._script_path = script_path;
+  return OK(CgiDelegate, del);
 }
 
 static const int kWaitpidPollIntervalUs = 1000;
@@ -1153,97 +1488,74 @@ static void terminate_child(pid_t pid) {
   (void)waitpid_nohang(pid, NULL);
 }
 
-void CgiDelegate::_cleanup_epoll() {
-  if (_epoll == NULL)
-    return;
-  if (_stdin_epoll != NULL) {
-    _epoll->del_fd(*_stdin_epoll);
-    _stdin_epoll = NULL;
-  }
-  if (_stdout_epoll != NULL) {
-    _epoll->del_fd(*_stdout_epoll);
-    _stdout_epoll = NULL;
-  }
-  _stdin_raw = -1;
-  _stdout_raw = -1;
-}
-
-void CgiDelegate::_fail(const std::string &msg) {
-  _state = FAILED;
-  _error = msg;
-  _cleanup_epoll();
-  if (_pid > 0) {
-    terminate_child(_pid);
-    _pid = -1;
-  }
-}
+void CgiDelegate::_cleanup_epoll() {}
 
 // Phase 1: create pipes, fork the CGI process, and register the parent's
 // pipe ends with the shared epoll instance. No epoll_wait() is performed
 // here - the caller's main loop is the sole owner of epoll_wait() and
 // will drive handle_event() for each event delivered.
-Result<Void> CgiDelegate::start(EPoll *epoll) {
-  if (epoll == NULL) {
-    return ERR(Void, "EPoll instance required");
-  }
-  if (_state != NOT_STARTED) {
+Result<Void> CgiDelegate::register_() {
+  if (_pid != -1)
     return ERR(Void, "CgiDelegate::start() already called");
+
+  Result<std::pair<FileDescriptor, FileDescriptor> > stdin_pipe_res =
+      FileDescriptor::pipe();
+  Result<std::pair<FileDescriptor, FileDescriptor> > stdout_pipe_res =
+      FileDescriptor::pipe();
+
+  if (!stdin_pipe_res.has_value())
+    return ERR(Void, "Failed to create stdin pipe");
+  if (!stdout_pipe_res.has_value()) {
+    {
+      FileDescriptor stdin0(stdin_pipe_res.value().first);
+      FileDescriptor stdin1(stdin_pipe_res.value().second);
+    }
+    return ERR(Void, "Failed to create stdout pipe");
   }
 
-  _epoll = epoll;
-  _body = request.get_body();
-
-  // Create pipes for communication
-  int stdin_pipe[2];
-  int stdout_pipe[2];
-
-  if (pipe(stdin_pipe) == -1) {
-    _state = FAILED;
-    _error = "Failed to create stdin pipe";
-    return ERR(Void, _error);
-  }
-  if (pipe(stdout_pipe) == -1) {
-    close(stdin_pipe[0]);
-    close(stdin_pipe[1]);
-    _state = FAILED;
-    _error = "Failed to create stdout pipe";
-    return ERR(Void, _error);
-  }
-
-  // Fork the process
   pid_t pid = fork();
   if (pid == -1) {
-    close(stdin_pipe[0]);
-    close(stdin_pipe[1]);
-    close(stdout_pipe[0]);
-    close(stdout_pipe[1]);
-    _state = FAILED;
-    _error = "Failed to fork process";
-    return ERR(Void, _error);
+    {
+      FileDescriptor stdin0(stdin_pipe_res.value().first);
+      FileDescriptor stdin1(stdin_pipe_res.value().second);
+      FileDescriptor stdout0(stdout_pipe_res.value().first);
+      FileDescriptor stdout1(stdout_pipe_res.value().second);
+    }
+    return ERR(Void, "Failed to fork process");
   }
 
   if (pid == 0) {
-    // Child process
-    close(stdin_pipe[1]);
-    close(stdout_pipe[0]);
-
-    if (dup2(stdin_pipe[0], STDIN_FILENO) == -1) {
-      std::cerr << "Failed to redirect stdin" << std::endl;
-      exit(1);
+    {
+      FileDescriptor stdin1 = stdin_pipe_res.value().second;
+      FileDescriptor stdout0 = stdout_pipe_res.value().first;
     }
-    if (dup2(stdout_pipe[1], STDOUT_FILENO) == -1) {
-      std::cerr << "Failed to redirect stdout" << std::endl;
-      exit(1);
-    }
-    close(stdin_pipe[0]);
-    close(stdout_pipe[1]);
 
-    char **envp = env.to_envp();
+    _stdin = new FileDescriptor(stdin_pipe_res.value().first);
+    _stdout = new FileDescriptor(stdout_pipe_res.value().second);
+
+    Result<Void> res = _stdin->dup2stdin();
+    if (!res.has_value()) {
+      std::cerr << res.error() << std::endl;
+      std::exit(1);
+    }
+
+    res = _stdout->dup2stdout();
+    if (!res.has_value()) {
+      std::cerr << res.error() << std::endl;
+      std::exit(1);
+    }
+
+    delete _stdin;
+    _stdin = NULL;
+    delete _stdout;
+    _stdout = NULL;
+
+    char **envp = _env.to_envp();
     char *argv[2];
-    argv[0] = const_cast<char *>(script_path.c_str());
+    argv[0] = const_cast<char *>(_script_path.c_str());
     argv[1] = NULL;
 
-    execve(script_path.c_str(), argv, envp);
+    execve(_script_path.c_str(), argv, envp);
 
     // execve failed
     for (size_t i = 0; envp[i] != NULL; i++) {
@@ -1251,118 +1563,69 @@ Result<Void> CgiDelegate::start(EPoll *epoll) {
     }
     delete[] envp;
 
-    std::cerr << "Failed to execute CGI script: " << script_path << std::endl;
+    std::cerr << "Failed to execute CGI script: " << _script_path << std::endl;
     exit(1);
   }
 
-  // Parent process
-  close(stdin_pipe[0]);
-  close(stdout_pipe[1]);
+  {
+    FileDescriptor _stdin0(stdin_pipe_res.value().first);
+    FileDescriptor _stdout1(stdout_pipe_res.value().second);
+  }
 
   _pid = pid;
-  _stdin_raw = stdin_pipe[1];
-  _stdout_raw = stdout_pipe[0];
-
-  // Wrap the pipe ends so they are closed automatically. add_fd() takes
-  // ownership of each FileDescriptor by moving it into its internal list.
-  Result<FileDescriptor> stdin_fd_res = FileDescriptor::from_raw(stdin_pipe[1]);
-  if (!stdin_fd_res.error().empty()) {
-    close(stdin_pipe[1]);
-    close(stdout_pipe[0]);
-    terminate_child(_pid);
-    _pid = -1;
-    _stdin_raw = -1;
-    _stdout_raw = -1;
-    _state = FAILED;
-    _error = "Failed to create stdin FileDescriptor";
-    return ERR(Void, _error);
-  }
-  FileDescriptor stdin_fd = stdin_fd_res.value();
-
-  Result<FileDescriptor> stdout_fd_res =
-      FileDescriptor::from_raw(stdout_pipe[0]);
-  if (!stdout_fd_res.error().empty()) {
-    // stdin_fd destructor closes stdin_pipe[1]
-    close(stdout_pipe[0]);
-    terminate_child(_pid);
-    _pid = -1;
-    _stdin_raw = -1;
-    _stdout_raw = -1;
-    _state = FAILED;
-    _error = "Failed to create stdout FileDescriptor";
-    return ERR(Void, _error);
-  }
-  FileDescriptor stdout_fd = stdout_fd_res.value();
+  _stdin = new FileDescriptor(stdin_pipe_res.value().second);
+  _stdout = new FileDescriptor(stdout_pipe_res.value().first);
 
   // Non-blocking is mandatory: epoll readiness does not imply non-blocking
   // semantics of read/write, and partial IO is expected in the event loop.
-  Result<Void> stdin_nb = stdin_fd.set_nonblocking();
-  if (!stdin_nb.has_value()) {
+  Result<Void> res = _stdin->set_nonblocking();
+  if (!res.has_value()) {
     terminate_child(_pid);
     _pid = -1;
-    _stdin_raw = -1;
-    _stdout_raw = -1;
-    _state = FAILED;
-    _error = "Failed to set stdin pipe to non-blocking mode";
-    return ERR(Void, _error);
+    return ERR(Void, "Failed to set stdin pipe to non-blocking mode");
   }
-  Result<Void> stdout_nb = stdout_fd.set_nonblocking();
-  if (!stdout_nb.has_value()) {
+
+  res = _stdout->set_nonblocking();
+  if (!res.has_value()) {
     terminate_child(_pid);
     _pid = -1;
-    _stdin_raw = -1;
-    _stdout_raw = -1;
-    _state = FAILED;
-    _error = "Failed to set stdout pipe to non-blocking mode";
-    return ERR(Void, _error);
+    return ERR(Void, "Failed to set stdout pipe to non-blocking mode");
   }
 
   // Register stdin for EPOLLOUT only when we actually have a body to send.
   // If there is no body, let the stdin_fd destructor close the pipe so the
   // CGI script sees EOF on its stdin.
-  if (!_body.empty()) {
-    const FileDescriptor *in_ptr = &stdin_fd;
-    Event write_event(in_ptr, false, true, false, false, true, true);
+  if (!_req.get_body().empty()) {
+    Event write_event(_stdin, false, true, false, false, true, true);
     Option write_option(false, false, false, false);
     Result<FileDescriptor *> add_res =
-        _epoll->add_fd(stdin_fd, write_event, write_option);
+        _epoll.add_fd(*_stdin, write_event, write_option);
     if (!add_res.has_value()) {
       terminate_child(_pid);
       _pid = -1;
-      _stdin_raw = -1;
-      _stdout_raw = -1;
-      _state = FAILED;
-      _error = "Failed to add stdin to epoll";
-      return ERR(Void, _error);
+      return ERR(Void, "Failed to add stdin to epoll");
     }
-    _stdin_epoll = add_res.value();
-  } else {
-    // No body: the stdin_fd local will go out of scope and close the pipe.
-    _stdin_raw = -1;
+    delete _stdin;
+    _stdin = add_res.value();
   }
 
   // Register stdout for EPOLLIN (plus err/hup so we notice child exit).
-  const FileDescriptor *out_ptr = &stdout_fd;
-  Event read_event(out_ptr, true, false, true, false, true, true);
+  Event read_event(_stdout, true, false, true, false, true, true);
   Option read_option(false, false, false, false);
   Result<FileDescriptor *> add_out_res =
-      _epoll->add_fd(stdout_fd, read_event, read_option);
+      _epoll.add_fd(*_stdout, read_event, read_option);
   if (!add_out_res.has_value()) {
-    if (_stdin_epoll != NULL) {
-      _epoll->del_fd(*_stdin_epoll);
-      _stdin_epoll = NULL;
+    if (_stdin != NULL) {
+      _epoll.del_fd(*_stdin);
+      delete _stdin;
+      _stdin = NULL;
     }
     terminate_child(_pid);
     _pid = -1;
-    _stdin_raw = -1;
-    _stdout_raw = -1;
-    _state = FAILED;
-    _error = "Failed to add stdout to epoll";
-    return ERR(Void, _error);
+    return ERR(Void, "Failed to add stdout to epoll");
   }
-  _stdout_epoll = add_out_res.value();
+  _stdout = add_out_res.value();
 
-  _state = RUNNING;
   return OKV;
 }
 
@@ -1370,141 +1633,103 @@ Result<Void> CgiDelegate::start(EPoll *epoll) {
 // Caller is expected to filter events and only forward those belonging to
 // fds this delegate registered. Unknown events are ignored.
 Result<Void> CgiDelegate::handle_event(const Event *ev) {
-  if (_state != RUNNING) {
-    return OKV;
-  }
   if (ev == NULL || ev->fd == NULL) {
     return OKV;
   }
 
-  const bool is_stdin =
-      (_stdin_epoll != NULL && _stdin_raw != -1 && *ev->fd == _stdin_raw);
-  const bool is_stdout =
-      (_stdout_epoll != NULL && _stdout_raw != -1 && *ev->fd == _stdout_raw);
+  const bool is_stdin = (_stdin != NULL && *ev->fd == *_stdin);
+  const bool is_stdout = (_stdout != NULL && *ev->fd == *_stdout);
 
   if (!is_stdin && !is_stdout) {
     return OKV; // not for us
   }
 
   if (is_stdin) {
-    if (ev->err) {
-      _fail("EPoll error on CGI stdin");
-      return ERR(Void, _error);
-    }
+    if (ev->err)
+      return ERR(Void, "EPoll error on CGI stdin");
     if (ev->hup || ev->rdhup) {
-      if (_total_written < _body.length()) {
-        _fail("CGI process closed stdin before all data was written");
-        return ERR(Void, _error);
-      }
+      if (_total_written < _req.get_body().length())
+        return ERR(Void,
+                   "CGI process closed stdin before all data was written");
       // All data was already written; close stdin and continue.
-      _epoll->del_fd(*_stdin_epoll);
-      _stdin_epoll = NULL;
-      _stdin_raw = -1;
+      _epoll.del_fd(*_stdin);
+      delete _stdin;
+      _stdin = NULL;
       return OKV;
     }
-    if (ev->out && _total_written < _body.length()) {
-      ssize_t written = write(_stdin_raw, _body.c_str() + _total_written,
-                              _body.length() - _total_written);
-      if (written > 0) {
-        _total_written += static_cast<size_t>(written);
-      } else if (written == 0) {
-        _fail("CGI process closed stdin prematurely");
-        return ERR(Void, _error);
-      } else {
-        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-          return OKV;
-        }
-        _fail("Failed to write to CGI stdin");
-        return ERR(Void, _error);
-      }
+    if (ev->out && _total_written < _req.get_body().length()) {
+      Result<ssize_t> written =
+          _stdin->pipe_write(_req.get_body().c_str() + _total_written,
+                             _req.get_body().length() - _total_written);
+      if (written.has_value() && written.value() > 0)
+        _total_written += static_cast<size_t>(written.value());
+      else if (written.has_value() && written.value() == 0)
+        return ERR(Void, "CGI process closed stdin prematurely");
+      else
+        return ERR(Void, "Failed to write to CGI stdin");
     }
-    if (_total_written >= _body.length()) {
-      // Done writing: drop stdin from epoll, which also closes the pipe,
-      // signalling EOF to the CGI script.
-      _epoll->del_fd(*_stdin_epoll);
-      _stdin_epoll = NULL;
-      _stdin_raw = -1;
-    }
-    return OKV;
   }
+
+  if (_total_written >= _req.get_body().length()) {
+    // Done writing: drop stdin from epoll, which also closes the pipe,
+    // signalling EOF to the CGI script.
+    _epoll.del_fd(*_stdin);
+    delete _stdin;
+    _stdin = NULL;
+  }
+  return OKV;
 
   // is_stdout
   if (ev->in || ev->hup || ev->rdhup) {
     char buffer[4096];
-    ssize_t bytes_read = read(_stdout_raw, buffer, sizeof(buffer));
-    if (bytes_read > 0) {
-      _output.append(buffer, static_cast<size_t>(bytes_read));
+    Result<ssize_t> bytes_read = _stdout->pipe_read(buffer, sizeof(buffer));
+    if (bytes_read.has_value() && bytes_read.value() > 0)
       return OKV;
-    }
-    if (bytes_read < 0) {
-      if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-        return OKV;
-      }
-      _fail("Failed to read from CGI stdout");
-      return ERR(Void, _error);
-    }
+    if (!bytes_read.has_value() || bytes_read.value() < 0)
+      return ERR(Void, "Failed to read from CGI stdout");
 
     // bytes_read == 0: EOF, drain any remaining IO bookkeeping.
-    _epoll->del_fd(*_stdout_epoll);
-    _stdout_epoll = NULL;
-    _stdout_raw = -1;
-    if (_stdin_epoll != NULL) {
-      _epoll->del_fd(*_stdin_epoll);
-      _stdin_epoll = NULL;
-      _stdin_raw = -1;
+    _epoll.del_fd(*_stdout);
+    delete _stdout;
+    _stdout = NULL;
+    if (_stdin != NULL) {
+      _epoll.del_fd(*_stdin);
+      delete _stdin;
+      _stdin = NULL;
     }
 
     int status = 0;
     if (!waitpid_nohang(_pid, &status)) {
       terminate_child(_pid);
       _pid = -1;
-      _fail("CGI child process did not exit cleanly");
-      return ERR(Void, _error);
+      return ERR(Void, "CGI child process did not exit cleanly");
     }
     _pid = -1;
 
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-      _state = FAILED;
-      _error = "CGI script failed";
-      return ERR(Void, _error);
-    }
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+      return ERR(Void, "CGI script failed");
 
-    _state = COMPLETE;
     return OKV;
   }
 
-  if (ev->err) {
-    _fail("EPoll error on CGI stdout");
-    return ERR(Void, _error);
-  }
+  if (ev->err)
+    return ERR(Void, "EPoll error on CGI stdout");
   return OKV;
 }
 
-Result<std::string> CgiDelegate::result() const {
-  if (_state == FAILED) {
-    return ERR(std::string, _error);
-  }
-  if (_state != COMPLETE) {
-    return ERR(std::string, "CGI execution not complete");
-  }
-  return OK(std::string, _output);
-}
-
-// DEPRECATED: synchronous wrapper retained only so that legacy callers
-// compile during migration. Internally still performs an epoll_wait, so
-// it violates the single-epoll_wait constraint. New code must use
-// start() + handle_event() and let the main loop own epoll_wait().
-Result<std::string> CgiDelegate::execute(int timeout_ms, EPoll *epoll) {
-  (void)timeout_ms;
-  (void)epoll;
-  return ERR(std::string, "deprecated");
-}
-
 CgiDelegate::~CgiDelegate() {
-  _cleanup_epoll();
+  if (_stdin != NULL) {
+    _epoll.del_fd(*_stdin);
+    delete _stdin;
+    _stdin = NULL;
+  }
+  if (_stdout != NULL) {
+    _epoll.del_fd(*_stdout);
+    delete _stdout;
+    _stdout = NULL;
+  }
   if (_pid > 0) {
     terminate_child(_pid);
     _pid = -1;
   }
-  // env is a value member, destroyed automatically
 }

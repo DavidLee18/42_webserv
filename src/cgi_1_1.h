@@ -1,11 +1,14 @@
 #ifndef CGI_1_1_H
 #define CGI_1_1_H
 
+#include "errors.h"
 #include "http_1_1.h"
 #include "result.h"
 #include "server/Client.hpp"
+#include <cstddef>
 #include <list>
 #include <map>
+#include <ostream>
 #include <string>
 #include <sys/types.h>
 
@@ -21,31 +24,13 @@ public:
     Digest,
     CgiAuthOther,
   };
-  explicit CgiAuthType(Type type) : _type(type), _other(NULL) {}
-  explicit CgiAuthType(Type type, std::string other)
-      : _type(type), _other(new std::string(other)) {}
-  CgiAuthType(const CgiAuthType &other) : _type(other._type) {
-    if (other._other != NULL) {
-      _other = new std::string(*other._other);
-    } else {
-      _other = NULL;
-    }
-  }
-  CgiAuthType &operator=(const CgiAuthType &other) {
-    if (this != &other) {
-      delete _other;
-      _type = other._type;
-      if (other._other != NULL) {
-        _other = new std::string(*other._other);
-      } else {
-        _other = NULL;
-      }
-    }
-    return *this;
-  }
-  ~CgiAuthType() { delete _other; }
-  Type const &type() { return _type; }
-  std::string const *other() { return _other; }
+  explicit CgiAuthType(Type);
+  CgiAuthType(Type, std::string);
+  CgiAuthType(const CgiAuthType &);
+  CgiAuthType &operator=(const CgiAuthType &);
+  ~CgiAuthType();
+  Type const &type();
+  std::string const *other();
 
 private:
   Type _type;
@@ -67,18 +52,9 @@ public:
     text,
     video
   };
-  ContentType(Type ty, std::string subty)
-      : type(ty), subtype(subty), params() {}
-  ContentType(ContentType const &other)
-      : type(other.type), subtype(other.subtype), params(other.params) {}
-  ContentType &operator=(const ContentType &other) {
-    if (this != &other) {
-      type = other.type;
-      subtype = other.subtype;
-      params = other.params;
-    }
-    return *this;
-  }
+  ContentType(Type, std::string const &);
+  ContentType(ContentType const &);
+  ContentType &operator=(ContentType const &);
   Result<Void> add_param(std::string, std::string);
 
 public:
@@ -111,54 +87,25 @@ public:
   };
 
 public:
-  ServerName(const ServerName &other) : type(other.type) {
-    if (type == Host) {
-      val.host_name = new std::list<std::string>(*other.val.host_name);
-    } else {
-      val.ipv4[0] = other.val.ipv4[0];
-      val.ipv4[1] = other.val.ipv4[1];
-      val.ipv4[2] = other.val.ipv4[2];
-      val.ipv4[3] = other.val.ipv4[3];
-    }
-  }
+  ServerName(ServerName const &);
+  ServerName &operator=(ServerName const &);
+  ~ServerName();
 
-  ServerName &operator=(const ServerName &other) {
-    if (this != &other) {
-      if (type == Host) {
-        delete val.host_name;
-      }
-
-      type = other.type;
-      if (type == Host) {
-        val.host_name = new std::list<std::string>(*other.val.host_name);
-      } else {
-        val.ipv4[0] = other.val.ipv4[0];
-        val.ipv4[1] = other.val.ipv4[1];
-        val.ipv4[2] = other.val.ipv4[2];
-        val.ipv4[3] = other.val.ipv4[3];
-      }
-    }
-    return *this;
-  }
-
-  ~ServerName() {
-    if (type == Host) {
-      delete val.host_name;
-    }
-  }
-
-  std::string to_string() const;
+  Type const &get_type() const;
+  Val const &get_val() const;
 
 private:
   Type type;
   Val val;
 
-  explicit ServerName(Type ty, Val v) : type(ty), val(v) {}
+  ServerName(Type, Val);
 
   static ServerName host(std::list<std::string>);
   static ServerName ipv4(unsigned char, unsigned char, unsigned char,
                          unsigned char);
 };
+
+std::ostream &operator<<(std::ostream &, ServerName const &);
 
 enum ServerProtocol { Http_1_1 };
 
@@ -168,22 +115,13 @@ class EtcMetaVar {
 
 public:
   enum Type { Http, Custom };
-  EtcMetaVar(Type ty, std::string n, std::string v)
-      : type(ty), name(n), value(v) {}
-  EtcMetaVar(EtcMetaVar const &other)
-      : type(other.type), name(other.name), value(other.value) {}
-  EtcMetaVar &operator=(const EtcMetaVar &other) {
-    if (this != &other) {
-      type = other.type;
-      name = other.name;
-      value = other.value;
-    }
-    return *this;
-  }
+  EtcMetaVar(Type, std::string const &, std::string const &);
+  EtcMetaVar(EtcMetaVar const &);
+  EtcMetaVar &operator=(EtcMetaVar const &);
 
-  Type const &get_type() const { return type; }
-  std::string const &get_name() const { return name; }
-  std::string const &get_value() const { return value; }
+  Type const &get_type() const;
+  std::string const &get_name() const;
+  std::string const &get_value() const;
 
 private:
   Type type;
@@ -280,221 +218,19 @@ public:
   friend class CgiInput;
 
 public:
-  CgiMetaVar(const CgiMetaVar &other) : name(other.name) {
-    switch (name) {
-    case AUTH_TYPE:
-      val.auth_type = new CgiAuthType(*other.val.auth_type);
-      break;
-    case CONTENT_LENGTH:
-      val.content_length = other.val.content_length;
-      break;
-    case CONTENT_TYPE:
-      val.content_type = new ContentType(*other.val.content_type);
-      break;
-    case GATEWAY_INTERFACE:
-      val.gateway_interface = other.val.gateway_interface;
-      break;
-    case PATH_INFO:
-      val.path_info = new std::list<std::string>(*other.val.path_info);
-      break;
-    case PATH_TRANSLATED:
-      val.path_translated = new std::string(*other.val.path_translated);
-      break;
-    case QUERY_STRING:
-      val.query_string =
-          new std::map<std::string, std::string>(*other.val.query_string);
-      break;
-    case REMOTE_ADDR:
-      val.remote_addr[0] = other.val.remote_addr[0];
-      val.remote_addr[1] = other.val.remote_addr[1];
-      val.remote_addr[2] = other.val.remote_addr[2];
-      val.remote_addr[3] = other.val.remote_addr[3];
-      break;
-    case REMOTE_HOST:
-      val.remote_host = new std::list<std::string>(*other.val.remote_host);
-      break;
-    case REMOTE_IDENT:
-      val.remote_ident = new std::string(*other.val.remote_ident);
-      break;
-    case REMOTE_USER:
-      val.remote_user = new std::string(*other.val.remote_user);
-      break;
-    case REQUEST_METHOD:
-      val.request_method = other.val.request_method;
-      break;
-    case SCRIPT_NAME:
-      val.script_name = new std::list<std::string>(*other.val.script_name);
-      break;
-    case SERVER_NAME:
-      val.server_name = new ServerName(*other.val.server_name);
-      break;
-    case SERVER_PORT:
-      val.server_port = other.val.server_port;
-      break;
-    case SERVER_PROTOCOL:
-      val.server_protocol = other.val.server_protocol;
-      break;
-    case SERVER_SOFTWARE:
-      val.server_software = other.val.server_software;
-      break;
-    case X_:
-      val.etc_val = new EtcMetaVar(*other.val.etc_val);
-      break;
-    }
-  }
+  CgiMetaVar(CgiMetaVar const &);
+  CgiMetaVar &operator=(CgiMetaVar const &);
+  ~CgiMetaVar();
 
-  CgiMetaVar &operator=(const CgiMetaVar &other) {
-    if (this != &other) {
-      switch (name) {
-      case AUTH_TYPE:
-        delete val.auth_type;
-        break;
-      case CONTENT_TYPE:
-        delete val.content_type;
-        break;
-      case PATH_INFO:
-        delete val.path_info;
-        break;
-      case PATH_TRANSLATED:
-        delete val.path_translated;
-        break;
-      case QUERY_STRING:
-        delete val.query_string;
-        break;
-      case REMOTE_HOST:
-        delete val.remote_host;
-        break;
-      case REMOTE_IDENT:
-        delete val.remote_ident;
-        break;
-      case REMOTE_USER:
-        delete val.remote_user;
-        break;
-      case SCRIPT_NAME:
-        delete val.script_name;
-        break;
-      case SERVER_NAME:
-        delete val.server_name;
-        break;
-      case X_:
-        delete val.etc_val;
-        break;
-      default:
-        break;
-      }
-
-      name = other.name;
-      switch (name) {
-      case AUTH_TYPE:
-        val.auth_type = new CgiAuthType(*other.val.auth_type);
-        break;
-      case CONTENT_LENGTH:
-        val.content_length = other.val.content_length;
-        break;
-      case CONTENT_TYPE:
-        val.content_type = new ContentType(*other.val.content_type);
-        break;
-      case GATEWAY_INTERFACE:
-        val.gateway_interface = other.val.gateway_interface;
-        break;
-      case PATH_INFO:
-        val.path_info = new std::list<std::string>(*other.val.path_info);
-        break;
-      case PATH_TRANSLATED:
-        val.path_translated = new std::string(*other.val.path_translated);
-        break;
-      case QUERY_STRING:
-        val.query_string =
-            new std::map<std::string, std::string>(*other.val.query_string);
-        break;
-      case REMOTE_ADDR:
-        val.remote_addr[0] = other.val.remote_addr[0];
-        val.remote_addr[1] = other.val.remote_addr[1];
-        val.remote_addr[2] = other.val.remote_addr[2];
-        val.remote_addr[3] = other.val.remote_addr[3];
-        break;
-      case REMOTE_HOST:
-        val.remote_host = new std::list<std::string>(*other.val.remote_host);
-        break;
-      case REMOTE_IDENT:
-        val.remote_ident = new std::string(*other.val.remote_ident);
-        break;
-      case REMOTE_USER:
-        val.remote_user = new std::string(*other.val.remote_user);
-        break;
-      case REQUEST_METHOD:
-        val.request_method = other.val.request_method;
-        break;
-      case SCRIPT_NAME:
-        val.script_name = new std::list<std::string>(*other.val.script_name);
-        break;
-      case SERVER_NAME:
-        val.server_name = new ServerName(*other.val.server_name);
-        break;
-      case SERVER_PORT:
-        val.server_port = other.val.server_port;
-        break;
-      case SERVER_PROTOCOL:
-        val.server_protocol = other.val.server_protocol;
-        break;
-      case SERVER_SOFTWARE:
-        val.server_software = other.val.server_software;
-        break;
-      case X_:
-        val.etc_val = new EtcMetaVar(*other.val.etc_val);
-        break;
-      }
-    }
-    return *this;
-  }
-
-  ~CgiMetaVar() {
-    switch (name) {
-    case AUTH_TYPE:
-      delete val.auth_type;
-      break;
-    case CONTENT_TYPE:
-      delete val.content_type;
-      break;
-    case PATH_INFO:
-      delete val.path_info;
-      break;
-    case PATH_TRANSLATED:
-      delete val.path_translated;
-      break;
-    case QUERY_STRING:
-      delete val.query_string;
-      break;
-    case REMOTE_HOST:
-      delete val.remote_host;
-      break;
-    case REMOTE_IDENT:
-      delete val.remote_ident;
-      break;
-    case REMOTE_USER:
-      delete val.remote_user;
-      break;
-    case SCRIPT_NAME:
-      delete val.script_name;
-      break;
-    case SERVER_NAME:
-      delete val.server_name;
-      break;
-    case X_:
-      delete val.etc_val;
-      break;
-    default:
-      break;
-    }
-  }
-
-  Name const &get_name() const { return name; }
-  Val const &get_val() const { return val; }
+  Name const &get_name() const;
+  Val const &get_val() const;
 
 private:
   Name name;
   Val val;
-  CgiMetaVar(Name n, Val v) : name(n), val(v) {}
+
+  CgiMetaVar(Name, Val);
+
   static CgiMetaVar auth_type(CgiAuthType);
   static CgiMetaVar content_length(unsigned int);
   static CgiMetaVar content_type(const ContentType &);
@@ -522,7 +258,7 @@ class CgiInput {
 
 private:
   CgiInput();
-  CgiInput(std::vector<CgiMetaVar>, std::string);
+  CgiInput(std::vector<CgiMetaVar> const &, std::string);
   CgiInput(Request const &);
 
 public:
@@ -536,64 +272,39 @@ public:
   friend class Parser;
   friend class CgiDelegate;
 
-  CgiInput(const CgiInput &other)
-      : mvars(other.mvars), req_body(other.req_body) {}
-  CgiInput &operator=(const CgiInput &other) {
-    if (this != &other) {
-      mvars = other.mvars;
-      req_body = other.req_body;
-    }
-    return *this;
-  }
+  CgiInput(const CgiInput &);
+  CgiInput &operator=(const CgiInput &);
   void add_mvar(std::string const &, std::string const &);
   char **to_envp() const;
 };
 
 class CgiDelegate {
-public:
-  enum State { NOT_STARTED, RUNNING, COMPLETE, FAILED };
-
-private:
-  CgiInput env;
-  std::string script_path;
-  const Request &request;
-
-  // Execution state. epoll_wait() is NOT performed inside this class; the
-  // main event loop is the sole owner of epoll_wait() and drives the
-  // delegate through start()/handle_event() until is_done() is true.
-  State _state;
-  EPoll *_epoll;
+  CgiInput _env;
+  std::string _script_path;
+  const Request &_req;
+  EPoll &_epoll;
   pid_t _pid;
-  int _stdin_raw;                // raw write end of stdin pipe; -1 when closed
-  int _stdout_raw;               // raw read end of stdout pipe; -1 when closed
-  FileDescriptor *_stdin_epoll;  // non-null while registered in epoll
-  FileDescriptor *_stdout_epoll; // non-null while registered in epoll
-  std::string _body;
+  FileDescriptor *_stdin;
+  FileDescriptor *_stdout;
   size_t _total_written;
-  std::string _output;
-  std::string _error;
+  Result<std::string> _res;
 
-  void _fail(const std::string &msg);
-  void _cleanup_epoll();
+  CgiDelegate(Request const &, EPoll &);
 
 public:
-  CgiDelegate(const Request &req, const std::string &script);
+  Result<CgiDelegate> from_req(Request const &, EPoll &, std::string const &);
 
   // Phase 1: create pipes, fork, register the pipe fds with epoll.
   // After this returns OK, the main event loop will deliver events on the
   // registered fds; the caller must route them to handle_event().
-  Result<Void> start(EPoll *epoll);
+  Result<Void> register_();
 
   // Phase 2: process a single epoll event for this CGI. Performs
   // non-blocking IO only; never calls epoll->wait(). Returns an error if
   // the CGI fails, in which case is_done() also becomes true.
-  Result<Void> handle_event(const Event *ev);
+  Result<Void> handle_event(const Event *);
 
-  bool is_done() const { return _state == COMPLETE || _state == FAILED; }
-  State state() const { return _state; }
-
-  // Retrieve the script output. Valid once is_done() is true.
-  Result<std::string> result() const;
+  Result<std::string> poll();
 
   ~CgiDelegate();
 };

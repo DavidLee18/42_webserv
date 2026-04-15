@@ -96,6 +96,28 @@ Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
   return OK(FileDescriptor, fd);
 }
 
+Result<std::pair<FileDescriptor, FileDescriptor> > FileDescriptor::pipe() {
+  int pipes[2];
+  if (::pipe(pipes) != 0) {
+    switch (errno) {
+    case EFAULT:
+    case EINVAL:
+      return ERR_PAIR(FileDescriptor, FileDescriptor, Errors::invalid_format);
+    case EMFILE:
+    case ENFILE:
+      return ERR_PAIR(FileDescriptor, FileDescriptor, Errors::fd_too_many);
+    default:
+      return ERR_PAIR(FileDescriptor, FileDescriptor,
+                      Errors::invalid_operation);
+    }
+  }
+  FileDescriptor pread;
+  pread._fd = pipes[0];
+  FileDescriptor pwrite;
+  pwrite._fd = pipes[1];
+  return OK_PAIR(FileDescriptor, FileDescriptor, pread, pwrite);
+}
+
 // Move-like copy constructor: transfers ownership from other
 FileDescriptor::FileDescriptor(const FileDescriptor &other)
     : _fd(other._fd), fp(other.fp) {
@@ -226,11 +248,15 @@ Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
 
 Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) const {
   ssize_t res = recv(_fd, buf, size, 0);
-  if (res < 0) {
-    if (errno == EAGAIN || errno == EWOULDBLOCK)
-      return ERR(ssize_t, Errors::try_again);
-    return ERR(ssize_t, std::string("`recv` failed: ") + strerror(errno));
-  }
+  if (res < 0)
+    return ERR(ssize_t, "`recv` failed: ");
+  return OK(ssize_t, res);
+}
+
+Result<ssize_t> FileDescriptor::pipe_read(void *buf, size_t size) const {
+  ssize_t res = read(_fd, buf, size);
+  if (res < 0)
+    return ERR(ssize_t, "`read` failed");
   return OK(ssize_t, res);
 }
 
@@ -281,12 +307,15 @@ Result<Void> FileDescriptor::set_socket_option(int level, int optname,
 
 Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) const {
   ssize_t res = send(_fd, buf, size, 0);
-  if (res < 0) {
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      return OK(ssize_t, 0); // Return 0 for would block
-    }
+  if (res < 0)
     return ERR(ssize_t, "send failed");
-  }
+  return OK(ssize_t, res);
+}
+
+Result<ssize_t> FileDescriptor::pipe_write(void const *buf, size_t size) const {
+  ssize_t res = write(_fd, buf, size);
+  if (res < 0)
+    return ERR(ssize_t, "write to pipe failed");
   return OK(ssize_t, res);
 }
 
@@ -310,6 +339,18 @@ Result<std::string> FileDescriptor::read_file_line() {
   res += buf;
   delete[] buf;
   return OK(std::string, res);
+}
+
+Result<Void> FileDescriptor::dup2stdin() {
+  if (dup2(_fd, 0) != 0)
+    return ERR(Void, "dup2 to stdin failed");
+  return OKV;
+}
+
+Result<Void> FileDescriptor::dup2stdout() {
+  if (dup2(_fd, 1) != 0)
+    return ERR(Void, "dup2 to stdout failed");
+  return OKV;
 }
 
 bool operator==(const int &lhs, const FileDescriptor &rhs) {
