@@ -260,19 +260,27 @@ std::string PathPattern::rewrite_path(const PathPattern &request_path,
   std::string target = request_path.to_string();
   std::string dest = to_pattern.to_string();
 
+  // from과 dest에 있는 wildcard 수 확인 
   std::size_t from_wc = count_wildcards(from);
   std::size_t dest_wc = count_wildcards(dest);
 
+  // from에 wildcard가 존재할 때
   if (from_wc > 0) {
+    // dest의 구조가 '/'이 있으면서 wildcard가 한개만 존재하는 지 확인
+    // 이런 경우는 보통 실제 파일 경로 root에 request를 붙이는 용도라고 본다.
     bool looks_like_root_mapping =
         !dest.empty() && dest.find('/') != std::string::npos && dest_wc == 1;
+    // root 매핑은 먼저 처리 또는
+    // destination 쪽 wildcard가 1개면 relative path 사용
+    bool use_relative_mapping = (looks_like_root_mapping || dest_wc == 1);
 
-    // root 매핑은 먼저 처리
-    if (looks_like_root_mapping) {
+    if (use_relative_mapping) {
+      // from을 기준으로 target의 wildcard원소들을 추출
       std::string relative = extract_relative_path(from, target);
       if (relative.empty() && target != from)
         return "";
 
+      // apply_wildcards를 통해 추출한 원소들을 넣어서 만들어진 new path를 반환
       std::vector<std::string> mapped;
       mapped.push_back(relative);
       return apply_wildcards(dest, mapped);
@@ -281,31 +289,26 @@ std::string PathPattern::rewrite_path(const PathPattern &request_path,
     // wildcard 개수가 같으면 캡처값 그대로 삽입
     if (from_wc == dest_wc) {
       std::vector<std::string> wildcards;
+      // from을 기준으로 target의 wildcard원소들을 추출 후 wildcards에 담아서 나온다.
       if (!extract_wildcards(from, target, wildcards))
         return "";
+      // apply_wildcards를 통해 추출한 원소들을 넣어서 만들어진 new path를 반환
       return apply_wildcards(dest, wildcards);
-    }
-
-    // destination 쪽 wildcard가 1개면 relative path 사용
-    if (dest_wc == 1) {
-      std::string relative = extract_relative_path(from, target);
-      if (relative.empty() && target != from)
-        return "";
-
-      std::vector<std::string> mapped;
-      mapped.push_back(relative);
-      return apply_wildcards(dest, mapped);
     }
 
     return "";
   }
 
+  // from에 '/'으로 끝나고 wildcard가 존재하지 않을 때
+  // target에서 from으로 시작하지 않을시 에러.
   if (!from.empty() && from[from.size() - 1] == '/') {
     if (target.find(from) != 0)
       return "";
 
+    // from에서 뒤 부부만 추출 ex) from = /download/, target = /download/file.txt, suffix = file.txt
     std::string suffix = target.substr(from.size());
 
+    // '/'가 중복으로 붙지 않게 new path를 생성후 반한.
     if (!dest.empty() && dest[dest.size() - 1] == '/')
       return dest + suffix;
     if (!suffix.empty() && suffix[0] == '/')
