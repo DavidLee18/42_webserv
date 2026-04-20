@@ -248,14 +248,7 @@ Response ServerResponse::post_method(Target target, Response response,
     std::cout << "Boundary: " << boundary << std::endl;
 
     // Create upload directory if it doesn't exist
-    std::string upload_path;
-    if (!rule->upload_dir.empty() && rule->upload_dir[0] == '/') {
-      // Absolute path
-      upload_path = rule->upload_dir;
-    } else {
-      // Relative path
-      upload_path = get_pwd() + rule->upload_dir;
-    }
+    std::string upload_path = get_pwd() + "/" + rule->upload_dir;
     if (mkdir(upload_path.c_str(), 0755) != 0 && errno != EEXIST) {
       std::cout << "Failed to create upload directory: " << upload_path << std::endl;
       return error_response(config, rule, FORBIDDEN_ERR);
@@ -285,6 +278,11 @@ Response ServerResponse::post_method(Target target, Response response,
 
         std::string file_path = upload_path + "/" + filename;
         std::cout << "Uploading file: " << file_path << " (size: " << part_data.length() << ")" << std::endl;
+        std::cout << "First 20 bytes (hex): ";
+        for (size_t i = 0; i < std::min(size_t(20), part_data.length()); i++) {
+          printf("%02x ", (unsigned char)part_data[i]);
+        }
+        std::cout << std::endl;
 
         // Try to open file for writing
         std::ofstream outfile(file_path.c_str(), std::ios::binary);
@@ -600,8 +598,11 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
 
   // Find end of headers (blank line: \r\n\r\n or \n\n)
   size_t header_end = body.find("\r\n\r\n", part_start);
-  if (header_end == std::string::npos)
+  size_t skip_length = 4; // \r\n\r\n
+  if (header_end == std::string::npos) {
     header_end = body.find("\n\n", part_start);
+    skip_length = 2; // \n\n
+  }
 
   if (header_end == std::string::npos)
     return std::string::npos;
@@ -640,11 +641,7 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
   }
 
   // Find start of part body (skip blank line)
-  size_t body_start = header_end;
-  if (body_start < body.length() && body[body_start] == '\r')
-    body_start++;
-  if (body_start < body.length() && body[body_start] == '\n')
-    body_start++;
+  size_t body_start = header_end + skip_length;
 
   // Find end of part body (next boundary)
   size_t next_boundary = body.find("\r\n--" + boundary, body_start);

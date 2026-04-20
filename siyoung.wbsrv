@@ -29,8 +29,17 @@ uwsgi =
 
     GET *.(jpg|jpeg|gif) <- /spool/www/*
 
-    POST * <- /tmp/*
+    POST /storage/ <- /spool/www/storage/
+        +> spool/www/storage/
         ->{} 10MB
+        @ auth_info
+        ! 400:/tmp/error_400.html
+        ! 413:/tmp/error_413.html
+        ! 500:/tmp/error_500.html
+
+    POST|DELETE /storage/* <- /spool/www/storage/*
+        ->{} 10MB
+        @ auth_info
         ! 400:/tmp/error_400.html
         ! 413:/tmp/error_413.html
         ! 500:/tmp/error_500.html

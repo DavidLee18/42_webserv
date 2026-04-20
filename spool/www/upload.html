@@ -158,7 +158,7 @@
 
             try {
                 // Use current server location
-                const uploadUrl = window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + '/';
+                const uploadUrl = window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + '/storage/';
                 const response = await fetch(uploadUrl, {
                     method: 'POST',
                     body: formData
