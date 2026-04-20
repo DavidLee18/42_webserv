@@ -115,6 +115,13 @@ struct RouteRule {
    */
   std::string auth_info;
   /**
+   * @var upload_dir
+   * @brief 클라이언트 파일 업로드를 허용할 디렉토리 경로를 저장하는 멤버 변수
+   *
+   * - 빈 문자열이면 해당 규칙에서는 파일 업로드가 비활성화된다.
+   */
+  std::string upload_dir;
+  /**
    * @var max_body_KB
    * @brief 해당 규칙에서 허용하는 최대 요청 바디 크기를 KB 단위로 저장하는 멤버
    * 변수
@@ -305,10 +312,18 @@ private:
    * @return 변환에 성공하면 KB 단위 크기, 실패하면 -1
    *
    * - 단위가 없거나 KB, KiB이면 그대로 사용한다.
-   * 
+   *
    * - MB와 MiB는 각각 1000배, 1024배로 변환한다.
    */
   int parse_max_body_size(std::string line);
+  /**
+   * @brief 업로드 디렉토리 경로 문자열을 검증하고 반환하는 함수
+   * @param line 파싱할 문자열
+   * @return 유효한 경로이면 경로 문자열, 그렇지 않으면 빈 문자열
+   *
+   * - 입력 문자열이 비어 있지 않으면 유효한 것으로 간주한다.
+   */
+  std::string parse_upload_dir(const std::string &line);
   /**
    * @brief 문자열이 RouteRule 시작 줄 형식에 맞는지 검사하는 함수
    * @param line 검사할 문자열

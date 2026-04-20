@@ -2,6 +2,7 @@
 #include "Session.hpp"
 #include "../cgi_1_1.h"
 #include "ParsingUtils.hpp"
+#include <errno.h>
 
 std::string get_string_from_map(const std::map<int, std::string> map, int key) {
   std::map<int, std::string>::const_iterator it = map.find(key);
@@ -147,6 +148,8 @@ Response ServerResponse::post_method(Target target, Response response,
                                      Session *session) {
   (void)target;
   const ServerConfig *config = client->config;
+
+  // Handle login/authentication
   if (request->get_path() == "/login" || request->get_path() == "/login.html") {
     std::string body = request->get_body();
     std::string id = "";
@@ -190,10 +193,10 @@ Response ServerResponse::post_method(Target target, Response response,
 
       if (is_authenticated) {
         std::cout << "Authentication SUCCESS for: " << id << std::endl;
-        
+
         // 1. 브라우저에게 "이 주소로 가라"고 알리는 상태 코드 설정
         // 일반적으로 다른 페이지 이동 시 302 혹은 303을 사용
-        response.status_code = "302 Found"; 
+        response.status_code = "302 Found";
         response.redir = rule->index;
         response.mime_type = "text/html";
         response.body = "<html><body>Redirecting...</body></html>";
@@ -201,7 +204,7 @@ Response ServerResponse::post_method(Target target, Response response,
         return response;
       } else {
         std::cout << "Authentication FAILED for: " << id << std::endl;
-        
+
         response.status_code = status_code_to_string(200);
         response.mime_type = "text/html";
         // 로그인 실패 시 브라우저 자체 Alert 팝업을 띄우고 이전(로그인) 화면으로 다시 돌려보냅니다.
@@ -214,6 +217,118 @@ Response ServerResponse::post_method(Target target, Response response,
     } else
       return error_response(config, rule, NOT_FOUND_ERR);
   }
+
+  // Handle file uploads
+  if (!rule->upload_dir.empty()) {
+    std::string body = request->get_body();
+    const std::map<std::string, std::string>& headers = request->get_headers();
+
+    // Check Content-Type for multipart/form-data
+    std::map<std::string, std::string>::const_iterator content_type_it = headers.find("Content-Type");
+    if (content_type_it == headers.end())
+      return error_response(config, rule, BAD_REQUEST);
+
+    std::string content_type = content_type_it->second;
+    if (content_type.find("multipart/form-data") == std::string::npos)
+      return error_response(config, rule, BAD_REQUEST);
+
+    // Check body size limit
+    int max_body_KB = rule->max_body_KB;
+    if (static_cast<int>(body.length()) > max_body_KB * 1024) {
+      std::cout << "Upload rejected: body size " << body.length()
+                << " exceeds limit " << (max_body_KB * 1024) << std::endl;
+      return error_response(config, rule, PAYLOAD_TOO_LARGE);
+    }
+
+    // Extract boundary
+    std::string boundary = extract_boundary(content_type);
+    if (boundary.empty())
+      return error_response(config, rule, BAD_REQUEST);
+
+    std::cout << "Boundary: " << boundary << std::endl;
+
+    // Create upload directory if it doesn't exist
+    std::string upload_path;
+    if (!rule->upload_dir.empty() && rule->upload_dir[0] == '/') {
+      // Absolute path
+      upload_path = rule->upload_dir;
+    } else {
+      // Relative path
+      upload_path = get_pwd() + rule->upload_dir;
+    }
+    if (mkdir(upload_path.c_str(), 0755) != 0 && errno != EEXIST) {
+      std::cout << "Failed to create upload directory: " << upload_path << std::endl;
+      return error_response(config, rule, FORBIDDEN_ERR);
+    }
+
+    // Parse multipart parts and save files
+    std::size_t pos = 0;
+    int files_uploaded = 0;
+    std::string error_msg = "";
+
+    while (true) {
+      std::string filename, fieldname, part_data;
+      std::size_t next_pos = parse_multipart_part(body, boundary, pos, filename, fieldname, part_data);
+
+      if (filename.empty() && fieldname.empty())
+        break; // No more parts
+
+      if (!filename.empty()) {
+        // Validate filename - reject path traversal attempts
+        if (filename.find("..") != std::string::npos ||
+            filename.find("/") != std::string::npos ||
+            filename.find("\\") != std::string::npos) {
+          std::cout << "Rejected filename with path traversal: " << filename << std::endl;
+          error_msg = "Invalid filename";
+          break;
+        }
+
+        std::string file_path = upload_path + "/" + filename;
+        std::cout << "Uploading file: " << file_path << " (size: " << part_data.length() << ")" << std::endl;
+
+        // Try to open file for writing
+        std::ofstream outfile(file_path.c_str(), std::ios::binary);
+        if (!outfile.is_open()) {
+          std::cout << "Failed to open file for writing: " << file_path << std::endl;
+          return error_response(config, rule, FORBIDDEN_ERR);
+        }
+
+        // Write file data
+        outfile.write(part_data.c_str(), part_data.length());
+        if (outfile.fail()) {
+          std::cout << "Failed to write file: " << file_path << std::endl;
+          outfile.close();
+          return error_response(config, rule, FORBIDDEN_ERR);
+        }
+
+        outfile.close();
+        files_uploaded++;
+      }
+
+      if (next_pos == std::string::npos)
+        break; // No more parts
+
+      pos = next_pos;
+    }
+
+    if (!error_msg.empty())
+      return error_response(config, rule, BAD_REQUEST);
+
+    if (files_uploaded > 0) {
+      response.status_code = status_code_to_string(OK);
+      response.mime_type = "text/plain";
+      std::ostringstream oss;
+      oss << "Successfully uploaded " << files_uploaded << " file(s)";
+      response.body = oss.str();
+      return response;
+    } else {
+      response.status_code = status_code_to_string(BAD_REQUEST);
+      response.mime_type = "text/plain";
+      response.body = "No files uploaded";
+      return response;
+    }
+  }
+
   return error_response(config, rule, FORBIDDEN_ERR);
 }
 
@@ -440,4 +555,122 @@ std::string ServerResponse::make_autoindex_page(const std::string &real_path,
   closedir(dir);
 
   return html.str();
+}
+
+std::string ServerResponse::extract_boundary(const std::string &content_type) {
+  size_t boundary_pos = content_type.find("boundary=");
+  if (boundary_pos == std::string::npos)
+    return "";
+
+  boundary_pos += 9; // Length of "boundary="
+  size_t end_pos = content_type.find(';', boundary_pos);
+  if (end_pos == std::string::npos)
+    end_pos = content_type.find('\r', boundary_pos);
+  if (end_pos == std::string::npos)
+    end_pos = content_type.find('\n', boundary_pos);
+  if (end_pos == std::string::npos)
+    end_pos = content_type.length();
+
+  return content_type.substr(boundary_pos, end_pos - boundary_pos);
+}
+
+std::size_t ServerResponse::parse_multipart_part(const std::string &body,
+                                                  const std::string &boundary,
+                                                  std::size_t start_pos,
+                                                  std::string &out_filename,
+                                                  std::string &out_fieldname,
+                                                  std::string &out_data) {
+  out_filename = "";
+  out_fieldname = "";
+  out_data = "";
+
+  // Find the start of this part (after boundary marker)
+  std::string boundary_marker = "--" + boundary;
+  size_t part_start = body.find(boundary_marker, start_pos);
+
+  if (part_start == std::string::npos)
+    return std::string::npos;
+
+  // Skip past boundary and line ending
+  part_start += boundary_marker.length();
+  if (part_start < body.length() && body[part_start] == '\r')
+    part_start++;
+  if (part_start < body.length() && body[part_start] == '\n')
+    part_start++;
+
+  // Find end of headers (blank line: \r\n\r\n or \n\n)
+  size_t header_end = body.find("\r\n\r\n", part_start);
+  if (header_end == std::string::npos)
+    header_end = body.find("\n\n", part_start);
+
+  if (header_end == std::string::npos)
+    return std::string::npos;
+
+  // Extract and parse headers
+  std::string headers_section = body.substr(part_start, header_end - part_start);
+
+  // Parse Content-Disposition header to extract name and filename
+  size_t disp_pos = headers_section.find("Content-Disposition:");
+  if (disp_pos != std::string::npos) {
+    size_t line_end = headers_section.find('\n', disp_pos);
+    if (line_end == std::string::npos)
+      line_end = headers_section.length();
+
+    std::string disp_line = headers_section.substr(disp_pos, line_end - disp_pos);
+
+    // Extract name="fieldname"
+    size_t name_pos = disp_line.find("name=\"");
+    if (name_pos != std::string::npos) {
+      name_pos += 6; // Length of 'name="'
+      size_t name_end = disp_line.find('"', name_pos);
+      if (name_end != std::string::npos) {
+        out_fieldname = disp_line.substr(name_pos, name_end - name_pos);
+      }
+    }
+
+    // Extract filename="filename.txt"
+    size_t filename_pos = disp_line.find("filename=\"");
+    if (filename_pos != std::string::npos) {
+      filename_pos += 10; // Length of 'filename="'
+      size_t filename_end = disp_line.find('"', filename_pos);
+      if (filename_end != std::string::npos) {
+        out_filename = disp_line.substr(filename_pos, filename_end - filename_pos);
+      }
+    }
+  }
+
+  // Find start of part body (skip blank line)
+  size_t body_start = header_end;
+  if (body_start < body.length() && body[body_start] == '\r')
+    body_start++;
+  if (body_start < body.length() && body[body_start] == '\n')
+    body_start++;
+
+  // Find end of part body (next boundary)
+  size_t next_boundary = body.find("\r\n--" + boundary, body_start);
+  if (next_boundary == std::string::npos)
+    next_boundary = body.find("\n--" + boundary, body_start);
+
+  if (next_boundary == std::string::npos)
+    next_boundary = body.find("--" + boundary, body_start);
+
+  if (next_boundary == std::string::npos) {
+    // Last part - take rest of body
+    out_data = body.substr(body_start);
+    // Remove trailing CRLF if present
+    if (out_data.length() >= 2 && out_data.substr(out_data.length() - 2) == "\r\n")
+      out_data = out_data.substr(0, out_data.length() - 2);
+    else if (out_data.length() >= 1 && out_data[out_data.length() - 1] == '\n')
+      out_data = out_data.substr(0, out_data.length() - 1);
+    return std::string::npos;
+  }
+
+  // Extract data and trim trailing line ending
+  out_data = body.substr(body_start, next_boundary - body_start);
+  if (out_data.length() >= 2 && out_data.substr(out_data.length() - 2) == "\r\n")
+    out_data = out_data.substr(0, out_data.length() - 2);
+  else if (out_data.length() >= 1 && out_data[out_data.length() - 1] == '\n')
+    out_data = out_data.substr(0, out_data.length() - 1);
+
+  return next_boundary;
 }

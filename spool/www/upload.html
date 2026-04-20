@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: bold;
+        }
+        input[type="file"] {
+            display: block;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #007bff;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .info {
+            background-color: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            color: #0c5460;
+        }
+        .success {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+        #response {
+            margin-top: 20px;
+            display: none;
+        }
+        .file-info {
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📤 File Upload Test</h1>
+
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="fileInput">Select file to upload:</label>
+                <input type="file" id="fileInput" name="file" required>
+            </div>
+
+            <button type="submit">Upload File</button>
+        </form>
+
+        <div class="info">
+            <strong>ℹ️ Info:</strong>
+            <ul>
+                <li>Max file size: 10 MB</li>
+                <li>Upload directory: /tmp/webserv_uploads</li>
+                <li>Server: <span id="serverInfo">localhost:9999</span></li>
+            </ul>
+        </div>
+
+        <div id="response"></div>
+
+        <div class="file-info" id="fileInfo"></div>
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('fileInput');
+        const responseDiv = document.getElementById('response');
+        const fileInfo = document.getElementById('fileInfo');
+
+        // Update server info on page load
+        window.addEventListener('load', function() {
+            const serverInfo = window.location.hostname + ':' + window.location.port;
+            document.getElementById('serverInfo').textContent = serverInfo;
+        });
+
+        // Show file info when file is selected
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const file = this.files[0];
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                fileInfo.innerHTML = `
+                    <strong>Selected File:</strong><br>
+                    Name: ${file.name}<br>
+                    Size: ${sizeMB} MB<br>
+                    Type: ${file.type || 'unknown'}
+                `;
+            }
+        });
+
+        uploadForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const formData = new FormData();
+            const fileInput = document.getElementById('fileInput');
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showResponse('Please select a file first!', 'error');
+                return;
+            }
+
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                // Use current server location
+                const uploadUrl = window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + '/';
+                const response = await fetch(uploadUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const text = await response.text();
+
+                if (response.ok || response.status === 200) {
+                    showResponse('✅ File uploaded successfully!', 'success');
+                    fileInput.value = ''; // Clear the input
+                    fileInfo.innerHTML = '';
+                } else if (response.status === 413) {
+                    showResponse('❌ File too large! Maximum size is 10 MB.', 'error');
+                } else if (response.status === 400) {
+                    showResponse('❌ Bad request. Make sure the file is valid.', 'error');
+                } else if (response.status === 403) {
+                    showResponse('❌ Permission denied. Upload directory may not be accessible.', 'error');
+                } else {
+                    showResponse(`❌ Upload failed with status ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showResponse(`❌ Error: ${error.message}`, 'error');
+            }
+        });
+
+        function showResponse(message, type) {
+            responseDiv.textContent = message;
+            responseDiv.className = 'info ' + type;
+            responseDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

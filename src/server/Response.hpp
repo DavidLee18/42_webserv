@@ -164,6 +164,30 @@ private:
   static std::string make_autoindex_page(const std::string &real_path,
                                          const std::string &req_uri, DIR *dir);
 
+  /**
+   * @brief Extract boundary string from Content-Type header for multipart requests.
+   * @param content_type The Content-Type header value
+   * @return The boundary string (without -- prefix), or empty string if not multipart
+   */
+  static std::string extract_boundary(const std::string &content_type);
+
+  /**
+   * @brief Parse a single part from multipart form data body
+   * @param body The request body
+   * @param boundary The boundary marker
+   * @param start_pos Starting position in body to search from
+   * @param out_filename Reference to store extracted filename (empty if not a file field)
+   * @param out_fieldname Reference to store extracted field name
+   * @param out_data Reference to store the part body data
+   * @return Position of next part boundary, or string::npos if no more parts
+   */
+  static std::size_t parse_multipart_part(const std::string &body,
+                                          const std::string &boundary,
+                                          std::size_t start_pos,
+                                          std::string &out_filename,
+                                          std::string &out_fieldname,
+                                          std::string &out_data);
+
   static Response delete_method(Target target, Response response,
                                 const ServerConfig *config,
                                 const RouteRule *rule);
