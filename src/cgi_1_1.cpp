@@ -1454,8 +1454,7 @@ CgiDelegate::CgiDelegate(Request const &req, EPoll &ep)
 Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
                                           const std::string &script_path) {
   CgiDelegate del(req, ep);
-  CgiInput parse_result;
-  TRY(CgiDelegate, CgiInput, parse_result, CgiInput::Parser::parse(req))
+  TRY(CgiDelegate, CgiInput, _env, CgiInput::Parser::parse(req))
   del._script_path = script_path;
   return OK(CgiDelegate, del);
 }

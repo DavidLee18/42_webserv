@@ -1,14 +1,4 @@
-#include "uwsgi_client.h"
 #include "webserv.h"
-
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <sstream>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <vector>
-
-// UwsgiMetaVar implementation
 
 UwsgiMetaVar::UwsgiMetaVar(const UwsgiMetaVar &other)
     : name(other.name), value(other.value) {}
@@ -27,15 +17,13 @@ UwsgiMetaVar UwsgiMetaVar::create(Name n, std::string v) {
   return UwsgiMetaVar(n, v);
 }
 
-// UwsgiInput implementation
-
 UwsgiInput::UwsgiInput()
-    : mvars(), req_body(Http::Body::Empty, Http::Body::Value()) {}
+    : mvars(), req_body(Request::Body::Empty, Request::Body::Value()) {}
 
-UwsgiInput::UwsgiInput(std::vector<UwsgiMetaVar> vars, Http::Body body)
+UwsgiInput::UwsgiInput(std::vector<UwsgiMetaVar> vars, Request::Body body)
     : mvars(vars), req_body(body) {}
 
-UwsgiInput::UwsgiInput(Http::Request const &req)
+UwsgiInput::UwsgiInput(Request::Request const &req)
     : mvars(), req_body(req.body()) {}
 
 void UwsgiInput::add_mvar(std::string const &name, std::string const &value) {
@@ -147,14 +135,14 @@ char **UwsgiInput::to_envp() const {
       {
         std::string env_str = mvar.get_value();
         envp[i] = new char[env_str.length() + 1];
-        std::strcpy(envp[i], env_str.c_str());
+        std::strncpy(envp[i], env_str.c_str(), env_str.length());
         continue;
       }
     }
 
     std::string env_str = name + "=" + mvar.get_value();
     envp[i] = new char[env_str.length() + 1];
-    std::strcpy(envp[i], env_str.c_str());
+    std::strncpy(envp[i], env_str.c_str(), env_str.length());
   }
 
   envp[count] = NULL;
@@ -218,7 +206,7 @@ std::map<std::string, std::string> UwsgiInput::to_map() const {
   return result;
 }
 
-Result<UwsgiInput> UwsgiInput::Parser::parse(Http::Request const &req) {
+Result<UwsgiInput> UwsgiInput::Parser::parse(Request const &req) {
   UwsgiInput input(req);
 
   // Add standard WSGI environment variables
@@ -228,42 +216,41 @@ Result<UwsgiInput> UwsgiInput::Parser::parse(Http::Request const &req) {
   input.add_mvar("WSGI_MULTIPROCESS", "True");
   input.add_mvar("WSGI_RUN_ONCE", "True");
 
-  // Add request method
-  switch (req.method()) {
-  case Http::GET:
+  switch (req.get_method()) {
+  case Request::GET:
     input.add_mvar("REQUEST_METHOD", "GET");
     break;
-  case Http::POST:
+  case Request::POST:
     input.add_mvar("REQUEST_METHOD", "POST");
     break;
-  case Http::PUT:
+  case Request::PUT:
     input.add_mvar("REQUEST_METHOD", "PUT");
     break;
-  case Http::DELETE:
+  case Request::DELETE:
     input.add_mvar("REQUEST_METHOD", "DELETE");
     break;
-  case Http::HEAD:
+  case Request::HEAD:
     input.add_mvar("REQUEST_METHOD", "HEAD");
     break;
-  case Http::OPTIONS:
+  case Request::OPTIONS:
     input.add_mvar("REQUEST_METHOD", "OPTIONS");
     break;
-  case Http::TRACE:
+  case Request::TRACE:
     input.add_mvar("REQUEST_METHOD", "TRACE");
     break;
-  case Http::CONNECT:
+  case Request::CONNECT:
     input.add_mvar("REQUEST_METHOD", "CONNECT");
     break;
-  case Http::PATCH:
+  case Request::PATCH:
     input.add_mvar("REQUEST_METHOD", "PATCH");
     break;
+  default:
+    return ERR(UwsgiInput, "unknown request method");
   }
 
-  // Add path info
-  const std::string &path = req.path();
+  const std::string &path = req.get_path();
   std::string path_str = path;
 
-  // Parse query string from path if present
   std::string query_str;
   size_t query_pos = path.find('?');
   if (query_pos != std::string::npos) {
@@ -275,17 +262,12 @@ Result<UwsgiInput> UwsgiInput::Parser::parse(Http::Request const &req) {
   input.add_mvar("PATH_INFO", path_str);
   input.add_mvar("SCRIPT_NAME", "");
   input.add_mvar("QUERY_STRING", query_str);
-
-  // Add server info
   input.add_mvar("SERVER_NAME", "localhost");
   input.add_mvar("SERVER_PORT", "8080");
   input.add_mvar("SERVER_PROTOCOL", "HTTP/1.1");
-
-  // Add remote address
   input.add_mvar("REMOTE_ADDR", "127.0.0.1");
 
-  // Add content type and length
-  const std::map<std::string, std::string> &headers = req.headers();
+  const std::map<std::string, std::string> &headers = req.get_headers();
 
   for (std::map<std::string, std::string>::const_iterator it = headers.begin();
        it != headers.end(); ++it) {
@@ -310,83 +292,30 @@ Result<UwsgiInput> UwsgiInput::Parser::parse(Http::Request const &req) {
   return OK(UwsgiInput, input);
 }
 
-// UwsgiDelegate implementation
+UwsgiDelegate::UwsgiDelegate(EPoll &epoll, Request const &req)
+    : _env(), _port(0), _req(req), _epoll(epoll), _sock(NULL), _send_buf(),
+      _total_sent(0), _output(), _error() {}
 
-UwsgiDelegate::UwsgiDelegate(const Http::Request &req, int uwsgi_port)
-    : env(req), _uwsgi_port(uwsgi_port), request(req),
-      _state(NOT_STARTED), _epoll(NULL), _raw_sock(-1),
-      _sock_epoll(NULL), _send_buf(), _total_sent(0), _output(),
-      _response(NULL), _error() {
-  Result<UwsgiInput> env_result = UwsgiInput::Parser::parse(req);
-  if (env_result.error().empty()) {
-    env = env_result.value();
-  }
-}
-
-void UwsgiDelegate::_cleanup_epoll() {
-  if (_epoll != NULL && _sock_epoll != NULL) {
-    _epoll->del_fd(*_sock_epoll);
-    _sock_epoll = NULL;
-  }
-  _raw_sock = -1;
-}
-
-void UwsgiDelegate::_fail(const std::string &msg) {
-  _state = FAILED;
-  _error = msg;
-  _cleanup_epoll();
+Result<UwsgiDelegate> UwsgiDelegate::from_req(EPoll &epoll, Request const &req,
+                                              unsigned short port) {
+  UwsgiDelegate del(epoll, req);
+  UwsgiInput input;
+  TRY(UwsgiDelegate, UwsgiInput, input, UwsgiInput::Parser::parse(req))
+  del._env = input;
+  del._port = port;
+  return OK(UwsgiDelegate, del);
 }
 
 // Phase 1: build the uwsgi packet, open a non-blocking TCP socket to the
 // uwsgi server, and register it with the shared epoll for writability so
 // the connect completion notifies through the caller's main event loop.
 // epoll_wait() is NEVER called from this class.
-Result<Void> UwsgiDelegate::start(EPoll *epoll) {
-  if (epoll == NULL) {
-    return ERR(Void, "EPoll instance required");
-  }
-  if (_state != NOT_STARTED) {
-    return ERR(Void, "UwsgiDelegate::start() already called");
-  }
-  _epoll = epoll;
+Result<Void> UwsgiDelegate::register_() {
+  if (_sock != NULL)
+    return ERR(Void, "UwsgiDelegate already started");
+  std::map<std::string, std::string> vars = _env.to_map();
 
-  // Collect CGI/HTTP vars from the parsed WSGI environment
-  std::map<std::string, std::string> vars = env.to_map();
-
-  // Serialise request body
-  std::string body_str;
-  const Http::Body &body = request.body();
-  switch (body.type()) {
-  case Http::Body::Html:
-    if (body.value().html_raw != NULL)
-      body_str = *body.value().html_raw;
-    break;
-  case Http::Body::HttpJson:
-    if (body.value().json != NULL) {
-      std::stringstream ss;
-      Json json_copy = *body.value().json;
-      ss << json_copy;
-      body_str = ss.str();
-    }
-    break;
-  case Http::Body::HttpFormUrlEncoded:
-    if (body.value().form != NULL) {
-      std::stringstream ss;
-      const std::map<std::string, std::string> &form = *body.value().form;
-      bool first = true;
-      for (std::map<std::string, std::string>::const_iterator it = form.begin();
-           it != form.end(); ++it) {
-        if (!first)
-          ss << "&";
-        ss << it->first << "=" << it->second;
-        first = false;
-      }
-      body_str = ss.str();
-    }
-    break;
-  case Http::Body::Empty:
-    break;
-  }
+  const std::string &body_str = _req.get_body();
 
   // Build uwsgi vars block: repeated [key_len:2B LE][key][val_len:2B LE][val]
   std::vector<unsigned char> vars_block;
@@ -404,18 +333,15 @@ Result<Void> UwsgiDelegate::start(EPoll *epoll) {
     vars_block.insert(vars_block.end(), val.begin(), val.end());
   }
   if (vars_block.size() > static_cast<size_t>(USHRT_MAX)) {
-    _state = FAILED;
     _error = "uwsgi vars block exceeds 64 KiB limit";
     return ERR(Void, _error);
   }
 
   // 4-byte uwsgi header: [modifier1=0][datasize:2B LE][modifier2=0]
   unsigned short datasize = static_cast<unsigned short>(vars_block.size());
-  unsigned char uwsgi_header[4];
-  uwsgi_header[0] = 0;
-  uwsgi_header[1] = static_cast<unsigned char>(datasize & 0xFF);
-  uwsgi_header[2] = static_cast<unsigned char>((datasize >> 8) & 0xFF);
-  uwsgi_header[3] = 0;
+  unsigned char uwsgi_header[4] = {
+      0, static_cast<unsigned char>(datasize & 0xFF),
+      static_cast<unsigned char>((datasize >> 8) & 0xFF), 0};
 
   // Build the full send buffer (header + vars_block + body) into the
   // member so it persists across handle_event() calls.
@@ -424,295 +350,79 @@ Result<Void> UwsgiDelegate::start(EPoll *epoll) {
   _send_buf.insert(_send_buf.end(), vars_block.begin(), vars_block.end());
   _send_buf.insert(_send_buf.end(), body_str.begin(), body_str.end());
 
-  // Create a non-blocking TCP socket and connect to 127.0.0.1:_uwsgi_port
-  struct addrinfo hints, *res = NULL;
-  std::memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
-  std::ostringstream port_ss;
-  port_ss << _uwsgi_port;
-  if (getaddrinfo("127.0.0.1", port_ss.str().c_str(), &hints, &res) != 0) {
-    _state = FAILED;
-    _error = "uwsgi: failed to resolve server address";
-    return ERR(Void, _error);
+  std::ostringstream oss;
+  oss << _port;
+  struct addrinfo *ad_info = NULL;
+  Result<std::pair<FileDescriptor, struct addrinfo *> > client_res =
+      FileDescriptor::socket_client_new("127.0.0.1", oss.str());
+  if (client_res.has_value()) {
+    _sock = const_cast<FileDescriptor *>(&client_res.value().first);
+    ad_info = client_res.value().second;
   }
-
-  int raw_sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-  if (raw_sock < 0) {
-    freeaddrinfo(res);
-    _state = FAILED;
-    _error = "uwsgi: failed to create socket";
-    return ERR(Void, _error);
-  }
-
-  // Wrap so the fd is automatically closed. add_fd takes ownership.
-  Result<FileDescriptor> sock_fd_res = FileDescriptor::from_raw(raw_sock);
-  if (!sock_fd_res.error().empty()) {
-    freeaddrinfo(res);
-    close(raw_sock);
-    _state = FAILED;
-    _error = "uwsgi: failed to wrap socket fd";
-    return ERR(Void, _error);
-  }
-  FileDescriptor sock_fd = sock_fd_res.value();
-
-  Result<Void> nb_res = sock_fd.set_nonblocking();
+  Result<Void> nb_res = _sock->set_nonblocking();
   if (!nb_res.error().empty()) {
-    freeaddrinfo(res);
-    _state = FAILED;
+    freeaddrinfo(ad_info);
     _error = "uwsgi: failed to set socket non-blocking";
     return ERR(Void, _error);
   }
 
-  int conn_ret = connect(raw_sock, res->ai_addr, res->ai_addrlen);
-  freeaddrinfo(res);
-  if (conn_ret < 0 && errno != EINPROGRESS) {
-    _state = FAILED;
-    _error = "uwsgi: connect failed";
-    return ERR(Void, _error);
-  }
-
-  _raw_sock = raw_sock;
+  _sock->socket_connect(ad_info);
 
   // Monitor for writability (connect completion) and errors.
-  const FileDescriptor *sock_fd_ptr = &sock_fd;
-  Event connect_event(sock_fd_ptr, false, true, false, false, true, true);
-  Option connect_option(false, false, false, false);
   Result<FileDescriptor *> add_res =
-      _epoll->add_fd(sock_fd, connect_event, connect_option);
+      _epoll.add_fd(*_sock, Event(_sock, false, true, false, false, true, true),
+                    Option(false, false, false, false));
   if (!add_res.has_value()) {
-    _raw_sock = -1;
-    _state = FAILED;
     _error = "uwsgi: failed to add socket to epoll";
     return ERR(Void, _error);
   }
-  _sock_epoll = add_res.value();
+  _sock = add_res.value();
 
-  _state = (conn_ret == 0) ? SENDING : CONNECTING;
-  return OKV;
-}
-
-Result<Void> UwsgiDelegate::_switch_to_sending() {
-  if (_sock_epoll == NULL)
-    return ERR(Void, "uwsgi: internal state: socket not registered");
-  const FileDescriptor *sock_fd_ptr = _sock_epoll;
-  Event write_event(sock_fd_ptr, false, true, false, false, true, true);
-  Option write_option(false, false, false, false);
-  Result<Void> mod = _epoll->modify_fd(*_sock_epoll, write_event, write_option);
-  if (!mod.has_value())
-    return ERR(Void, mod.error());
-  _state = SENDING;
-  return OKV;
-}
-
-Result<Void> UwsgiDelegate::_switch_to_receiving() {
-  if (_sock_epoll == NULL)
-    return ERR(Void, "uwsgi: internal state: socket not registered");
-  // Half-close the write side so the server sees EOF on the request.
-  shutdown(_raw_sock, SHUT_WR);
-  const FileDescriptor *sock_fd_ptr = _sock_epoll;
-  Event read_event(sock_fd_ptr, true, false, true, false, true, true);
-  Option read_option(false, false, false, false);
-  Result<Void> mod = _epoll->modify_fd(*_sock_epoll, read_event, read_option);
-  if (!mod.has_value())
-    return ERR(Void, mod.error());
-  _state = RECEIVING;
-  return OKV;
-}
-
-Result<Void> UwsgiDelegate::_parse_response() {
-  if (_output.empty()) {
-    _state = FAILED;
-    _error = "Empty response from uwsgi server";
-    return ERR(Void, _error);
-  }
-
-  std::string headers_section;
-  std::string body_section;
-  size_t blank_line_pos = _output.find("\r\n\r\n");
-
-  if (blank_line_pos == std::string::npos) {
-    blank_line_pos = _output.find("\n\n");
-    if (blank_line_pos != std::string::npos) {
-      headers_section = _output.substr(0, blank_line_pos);
-      body_section = _output.substr(blank_line_pos + 2);
-    } else {
-      body_section = _output;
-    }
-  } else {
-    headers_section = _output.substr(0, blank_line_pos);
-    body_section = _output.substr(blank_line_pos + 4);
-  }
-
-  std::map<std::string, std::string> response_headers;
-  int status_code = 200;
-
-  if (!headers_section.empty()) {
-    std::istringstream header_stream(headers_section);
-    std::string line;
-    while (std::getline(header_stream, line)) {
-      if (!line.empty() && line[line.length() - 1] == '\r') {
-        line = line.substr(0, line.length() - 1);
-      }
-      size_t colon_pos = line.find(':');
-      if (colon_pos != std::string::npos) {
-        std::string header_name = line.substr(0, colon_pos);
-        std::string header_value = line.substr(colon_pos + 1);
-        size_t value_start = header_value.find_first_not_of(" \t");
-        if (value_start != std::string::npos) {
-          header_value = header_value.substr(value_start);
-        }
-        if (header_name == "Status") {
-          std::istringstream status_stream(header_value);
-          status_stream >> status_code;
-        }
-        response_headers[header_name] = header_value;
-      }
-    }
-  }
-
-  Http::Body::Value body_val;
-  body_val.html_raw = new std::string(body_section);
-  Http::Body result_body(Http::Body::Html, body_val);
-  delete _response;
-  _response = new Http::Response(status_code, response_headers, result_body);
   return OKV;
 }
 
 // Phase 2: drive the state machine based on a single epoll event.
 Result<Void> UwsgiDelegate::handle_event(const Event *ev) {
-  if (_state == COMPLETE || _state == FAILED || _state == NOT_STARTED) {
+  if (ev == NULL || ev->fd == NULL || _sock == NULL || *ev->fd != *_sock) {
     return OKV;
-  }
-  if (ev == NULL || ev->fd == NULL) {
-    return OKV;
-  }
-  if (_sock_epoll == NULL || _raw_sock == -1) {
-    return OKV;
-  }
-  if (*ev->fd != _raw_sock) {
-    return OKV; // not our socket
   }
 
-  if (_state == CONNECTING) {
-    if (ev->err || ev->hup) {
-      _fail("uwsgi: connect error");
+  if (ev->err || ev->hup || ev->rdhup) {
+    _error = "uwsgi: event error";
+    return ERR(Void, _error);
+  }
+  if (ev->out && _total_sent < _send_buf.size()) {
+    Result<ssize_t> written = _sock->sock_send(
+        reinterpret_cast<const char *>(&_send_buf[0]) + _total_sent,
+        _send_buf.size() - _total_sent);
+    if (!written.has_value() || written.value() < 0) {
+      _error = "uwsgi: write failed";
+      return ERR(Void, _error);
+    } else if (written.value() == 0) {
+      _error = "uwsgi: connection closed during send";
       return ERR(Void, _error);
     }
-    if (ev->out) {
-      int sock_err = 0;
-      socklen_t sock_err_len = sizeof(sock_err);
-      if (getsockopt(_raw_sock, SOL_SOCKET, SO_ERROR, &sock_err,
-                     &sock_err_len) == 0 &&
-          sock_err == 0) {
-        Result<Void> sw = _switch_to_sending();
-        if (!sw.has_value()) {
-          _fail(sw.error());
-          return ERR(Void, _error);
-        }
-      } else {
-        _fail("uwsgi: connect failed (SO_ERROR)");
-        return ERR(Void, _error);
-      }
-    }
-    // Already in SENDING after _switch_to_sending; fall through to try a
-    // first write if the same event also reported writability.
-  }
-
-  if (_state == SENDING) {
-    if (ev->err) {
-      _fail("uwsgi: socket error during send");
-      return ERR(Void, _error);
-    }
-    if (ev->hup || ev->rdhup) {
-      _fail("uwsgi: connection closed by peer during send");
-      return ERR(Void, _error);
-    }
-    if (ev->out && _total_sent < _send_buf.size()) {
-      ssize_t written = write(
-          _raw_sock,
-          reinterpret_cast<const char *>(&_send_buf[0]) + _total_sent,
-          _send_buf.size() - _total_sent);
-      if (written < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-          return OKV;
-        }
-        _fail("uwsgi: write failed");
-        return ERR(Void, _error);
-      } else if (written == 0) {
-        _fail("uwsgi: connection closed during send");
-        return ERR(Void, _error);
-      }
-      _total_sent += static_cast<size_t>(written);
-    }
-    if (_total_sent >= _send_buf.size()) {
-      Result<Void> sw = _switch_to_receiving();
-      if (!sw.has_value()) {
-        _fail(sw.error());
-        return ERR(Void, _error);
-      }
-    }
+    _total_sent += static_cast<size_t>(written.value());
     return OKV;
   }
-
-  if (_state == RECEIVING) {
-    if (ev->err && !ev->in && !ev->hup && !ev->rdhup) {
-      _fail("uwsgi: socket error during receive");
+  if (ev->in) {
+    char read_buf[4096];
+    Result<ssize_t> n = _sock->sock_recv(read_buf, sizeof(read_buf));
+    if (n.has_value() && n.value() > 0)
+      _output.append(read_buf, static_cast<size_t>(n.value()));
+    else if (!n.has_value() || n.value() < 0) {
+      _error = "uwsgi: recv error";
       return ERR(Void, _error);
-    }
-    if (ev->in || ev->rdhup || ev->hup) {
-      char read_buf[4096];
-      ssize_t n = read(_raw_sock, read_buf, sizeof(read_buf));
-      if (n > 0) {
-        _output.append(read_buf, static_cast<size_t>(n));
-        return OKV;
-      }
-      if (n < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-          return OKV;
-        }
-        _fail("uwsgi: read error receiving response");
-        return ERR(Void, _error);
-      }
+    } else
+      _complete = true;
 
-      // n == 0: EOF, server finished sending.
-      _cleanup_epoll();
-      Result<Void> p = _parse_response();
-      if (!p.has_value()) {
-        return ERR(Void, _error);
-      }
-      _state = COMPLETE;
-      return OKV;
-    }
     return OKV;
   }
-
-  return OKV;
 }
 
-// DEPRECATED: synchronous wrapper retained only so that legacy callers
-// compile during migration. Internally still performs an epoll_wait, so
-// it violates the single-epoll_wait constraint. New code must use
-// start() + handle_event() and let the main loop own epoll_wait().
-Result<Http::Response> UwsgiDelegate::execute(int timeout_ms, EPoll *epoll) {
-  (void)timeout_ms;
-  (void)epoll;
-  return ERR(Http::Response, "deprecated");
+Result<std::string> UwsgiDelegate::poll() const {
+  return !_complete ? ERR(std::string, "uwsgi execution not complete")
+                    : OK(std::string, _output);
 }
 
-Result<Http::Response> UwsgiDelegate::result() const {
-  if (_state == FAILED) {
-    return ERR(Http::Response, _error);
-  }
-  if (_state != COMPLETE || _response == NULL) {
-    return ERR(Http::Response, "uwsgi execution not complete");
-  }
-  return OK(Http::Response, *_response);
-}
-
-UwsgiDelegate::~UwsgiDelegate() {
-  _cleanup_epoll();
-  delete _response;
-  _response = NULL;
-  // env is a value member, destroyed automatically
-}
+UwsgiDelegate::~UwsgiDelegate() {}

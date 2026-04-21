@@ -24,6 +24,26 @@ Result<FileDescriptor> FileDescriptor::socket_new() {
   return OK(FileDescriptor, fd);
 }
 
+Result<std::pair<FileDescriptor, struct addrinfo *> >
+FileDescriptor::socket_client_new(std::string const &host,
+                                  std::string const &port) {
+  struct addrinfo hints, *res = NULL;
+  std::memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  int ai_res;
+  if ((ai_res = getaddrinfo(host.c_str(), port.c_str(), &hints, &res)) != 0)
+    return ERR_PAIR(FileDescriptor, struct addrinfo *, gai_strerror(ai_res));
+  int _sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  if (_sock < 0) {
+    freeaddrinfo(res);
+    return ERR_PAIR(FileDescriptor, struct addrinfo *, strerror(errno));
+  }
+  FileDescriptor sock;
+  sock._fd = _sock;
+  return OK_PAIR(FileDescriptor, struct addrinfo *, sock, res);
+}
+
 Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
   if (raw_fd < 0)
     return ERR(FileDescriptor, Errors::invalid_fd);
@@ -244,6 +264,12 @@ Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
   default:
     return ERR(FileDescriptor, "an unknown error occured during accept().");
   }
+}
+
+Result<Void> FileDescriptor::socket_connect(struct addrinfo *ad_info) {
+  if (connect(_fd, ad_info->ai_addr, ad_info->ai_addrlen) == 0)
+    return OKV;
+  return ERR(Void, strerror(errno));
 }
 
 Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) const {

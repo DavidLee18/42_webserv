@@ -3,6 +3,7 @@
 
 #include "http_1_1.h"
 #include "result.h"
+#include "server/Client.hpp"
 #include <list>
 #include <map>
 #include <string>
@@ -64,30 +65,29 @@ private:
 
 class UwsgiInput {
   std::vector<UwsgiMetaVar> mvars;
-  Http::Body req_body;
+  Request const &_req;
 
 private:
   UwsgiInput();
-  UwsgiInput(std::vector<UwsgiMetaVar>, Http::Body);
-  UwsgiInput(Http::Request const &);
+  UwsgiInput(std::vector<UwsgiMetaVar>, Request const &);
+  UwsgiInput(Request const &);
 
 public:
   class Parser {
     virtual void phantom() = 0;
 
   public:
-    static Result<UwsgiInput> parse(Http::Request const &);
+    static Result<UwsgiInput> parse(Request const &);
   };
 
   friend class Parser;
   friend class UwsgiDelegate;
 
-  UwsgiInput(const UwsgiInput &other)
-      : mvars(other.mvars), req_body(other.req_body) {}
+  UwsgiInput(const UwsgiInput &other) : mvars(other.mvars), _req(other._req) {}
   UwsgiInput &operator=(const UwsgiInput &other) {
     if (this != &other) {
       mvars = other.mvars;
-      req_body = other.req_body;
+      _req = other._req;
     }
     return *this;
   }
@@ -97,48 +97,35 @@ public:
 };
 
 class UwsgiDelegate {
-public:
-  enum State { NOT_STARTED, CONNECTING, SENDING, RECEIVING, COMPLETE, FAILED };
+  UwsgiInput _env;
+  unsigned short _port;
+  Request const &_req;
 
-private:
-  UwsgiInput env;
-  int _uwsgi_port;
-  Http::Request request;
-
-  State _state;
-  EPoll *_epoll;               // borrowed, not owned
-  int _raw_sock;               // raw socket fd; -1 when not registered
-  FileDescriptor *_sock_epoll; // non-null while registered in epoll
+  EPoll &_epoll; // borrowed, not owned
+  FileDescriptor *_sock;
   std::vector<unsigned char> _send_buf;
   size_t _total_sent;
   std::string _output;
-  Http::Response *_response; // built lazily on successful completion
   std::string _error;
+  bool _complete;
 
-  void _fail(const std::string &msg);
-  void _cleanup_epoll();
-  Result<Void> _switch_to_sending();
-  Result<Void> _switch_to_receiving();
-  Result<Void> _parse_response();
+  UwsgiDelegate(EPoll &, Request const &);
 
 public:
-  UwsgiDelegate(const Http::Request &req, int uwsgi_port);
+  Result<UwsgiDelegate> from_req(EPoll &, Request const &, unsigned short);
 
   // Phase 1: create the socket, issue a non-blocking connect to the uwsgi
   // server, and register the socket with the shared epoll. Does NOT call
   // epoll->wait().
-  Result<Void> start(EPoll *epoll);
+  Result<Void> register_();
 
   // Phase 2: process a single epoll event delivered by the main loop's
   // shared epoll_wait. Drives the connect -> send -> receive state
   // machine; performs only non-blocking IO.
   Result<Void> handle_event(const Event *ev);
 
-  bool is_done() const { return _state == COMPLETE || _state == FAILED; }
-  State state() const { return _state; }
-
-  // Retrieve the parsed HTTP response. Valid once is_done() is true.
-  Result<Http::Response> result() const;
+  // Retrieve the parsed HTTP response.
+  Result<std::string> poll() const;
 
   ~UwsgiDelegate();
 };

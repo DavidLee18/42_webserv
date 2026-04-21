@@ -18,6 +18,9 @@ public:
 
   static Result<FileDescriptor> socket_new();
 
+  static Result<std::pair<FileDescriptor, struct addrinfo *> >
+  socket_client_new(std::string const &, std::string const &);
+
   static Result<FileDescriptor> open_file(std::string const &);
 
   static Result<std::pair<FileDescriptor, FileDescriptor> > pipe();
@@ -35,6 +38,8 @@ public:
   Result<Void> socket_listen(unsigned short);
 
   Result<FileDescriptor> socket_accept(struct sockaddr *, socklen_t *) const;
+
+  Result<Void> socket_connect(struct addrinfo *);
 
   Result<ssize_t> sock_recv(void *, size_t) const;
 
