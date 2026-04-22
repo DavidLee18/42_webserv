@@ -1,0 +1,24 @@
+types =
+    html|htm -> text/html
+    css      -> text/css
+    js       -> application/javascript
+    json     -> application/json
+    jpg|jpeg -> image/jpeg
+    png      -> image/png
+    _        -> application/octet-stream
+
+:9999 =
+    [] +<= X-Content-Type-Options: "nosniff";
+
+    GET / <- /tmp/
+        ? index.html
+        ->{} 10MB
+        ! 404:/tmp/error_404.html
+        ! 500:/tmp/error_500.html
+
+    POST / <- /tmp/
+        ->{} 10MB
+        +> /tmp/webserv_uploads
+        ! 400:/tmp/error_400.html
+        ! 413:/tmp/error_413.html
+        ! 500:/tmp/error_500.html

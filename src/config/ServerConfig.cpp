@@ -307,6 +307,12 @@ std::string ServerConfig::get_valid_index_file(const std::string &line) {
     return ("");
 }
 
+std::string ServerConfig::parse_upload_dir(const std::string &line) {
+  if (line.empty())
+    return ("");
+  return (line);
+}
+
 int ServerConfig::parse_error_page_entry(std::string &line) {
   int key = 0;
   std::vector<std::string> key_and_value = utils::string_split(line, ":");
@@ -376,6 +382,7 @@ bool ServerConfig::apply_route_rule_entry(
       newRoute.path = key;
       newRoute.op = UNDEFINED;
       newRoute.max_body_KB = 1;
+      newRoute.upload_dir = "";
       routes.push_back(newRoute);
       // targetRouteIndex is already set to the correct value (old size, which
       // is the new index)
@@ -403,6 +410,11 @@ bool ServerConfig::apply_route_rule_entry(
       if (err_key == 0 || size != 2)
         return false;
       routes[targetRouteIndex].error_pages[err_key] = errPageLine;
+    } else if (rule[0] == "+>") {
+      std::string upload_path = parse_upload_dir(rule[1]);
+      if (size != 2 || upload_path == "")
+        return false;
+      routes[targetRouteIndex].upload_dir = upload_path;
     } else
       return false;
   }
