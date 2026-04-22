@@ -1,7 +1,6 @@
 #ifndef UWSGI_H
 #define UWSGI_H
 
-#include "http_1_1.h"
 #include "result.h"
 #include "server/Client.hpp"
 #include <list>

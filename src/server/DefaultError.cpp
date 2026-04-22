@@ -1,4 +1,5 @@
 #include "DefaultError.hpp"
+#include "Response.hpp"
 
 std::string DefaultError::bad_request() {
   return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta "

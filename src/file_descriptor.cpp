@@ -286,29 +286,26 @@ Result<ssize_t> FileDescriptor::pipe_read(void *buf, size_t size) const {
   return OK(ssize_t, res);
 }
 
-Result<Http::PartialString> FileDescriptor::try_read_to_end() const {
+Result<std::string> FileDescriptor::try_read_to_end() const {
   std::stringstream ss;
   char buf[BUFFER_SIZE];
 
   Result<ssize_t> bytes = this->sock_recv(buf, BUFFER_SIZE);
   while (bytes.error().empty() && bytes.value() > 0) {
     ssize_t bs;
-    TRY(Http::PartialString, ssize_t, bs, bytes)
+    TRY(std::string, ssize_t, bs, bytes)
     char *s = new char[static_cast<size_t>(bs + 1)];
     s = std::strncpy(s, buf, static_cast<size_t>(bs + 1));
     if (!(ss << s))
-      return ERR(Http::PartialString, "string concat failed");
+      return ERR(std::string, "string concat failed");
     delete[] s;
     bytes = this->sock_recv(buf, BUFFER_SIZE);
   }
   if (!bytes.error().empty())
-    return ERR(Http::PartialString, bytes.error());
-  char *s = new char[ss.str().length()];
-  s = std::strcpy(s, ss.str().c_str());
-  if (bytes.value() == 0) {
-    return OK(Http::PartialString, Http::PartialString::full(s));
-  }
-  return OK(Http::PartialString, Http::PartialString::partial(s));
+    return ERR(std::string, bytes.error());
+  if (bytes.value() == 0)
+    return OK(std::string, ss.str());
+  return OK(std::string, ss.str());
 }
 
 Result<Void> FileDescriptor::set_nonblocking() {

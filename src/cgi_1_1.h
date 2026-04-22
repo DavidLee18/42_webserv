@@ -2,7 +2,6 @@
 #define CGI_1_1_H
 
 #include "errors.h"
-#include "http_1_1.h"
 #include "result.h"
 #include "server/Client.hpp"
 #include <cstddef>
@@ -11,6 +10,7 @@
 #include <ostream>
 #include <string>
 #include <sys/types.h>
+#include <vector>
 
 class CgiInput;
 class EPoll;
@@ -164,7 +164,7 @@ public:
     std::list<std::string> *remote_host;
     std::string *remote_ident;
     std::string *remote_user;
-    Http::Method request_method;
+    Request::Method request_method;
     std::list<std::string> *script_name;
     ServerName *server_name;
     unsigned short server_port;
@@ -243,7 +243,7 @@ private:
   static CgiMetaVar remote_host(std::list<std::string>);
   static CgiMetaVar remote_ident(std::string);
   static CgiMetaVar remote_user(std::string);
-  static CgiMetaVar request_method(Http::Method);
+  static CgiMetaVar request_method(Request::Method);
   static CgiMetaVar script_name(std::list<std::string>);
   static CgiMetaVar server_name(ServerName);
   static CgiMetaVar server_port(unsigned short);

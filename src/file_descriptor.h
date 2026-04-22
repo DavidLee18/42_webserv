@@ -1,7 +1,6 @@
 #ifndef FILE_DESCRIPTOR_H
 #define FILE_DESCRIPTOR_H
 
-#include "http_1_1.h"
 #include "result.h"
 #include <sys/socket.h>
 
@@ -45,7 +44,7 @@ public:
 
   Result<ssize_t> pipe_read(void *, size_t) const;
 
-  Result<Http::PartialString> try_read_to_end() const;
+  Result<std::string> try_read_to_end() const;
 
   /**
    * @brief Sets the file descriptor to non-blocking mode.

@@ -6,7 +6,8 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     // init client socket
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
-    Result<FileDescriptor> client_result = server_fd->socket_accept((struct sockaddr*)&client_addr, &client_len);
+    Result<FileDescriptor> client_result =
+        server_fd->socket_accept((struct sockaddr *)&client_addr, &client_len);
     if (!client_result.has_value()) {
       const std::string &err = client_result.error();
       if (err == Errors::try_again)
@@ -83,11 +84,13 @@ void Server::client_read(const FileDescriptor *client_fd) {
     size_t content_length = 0;
     std::string header_lower = in_buffer.substr(0, header_end);
     for (size_t i = 0; i < header_lower.length(); ++i) {
-      header_lower[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(header_lower[i])));
+      header_lower[i] = static_cast<char>(
+          std::tolower(static_cast<unsigned char>(header_lower[i])));
     }
     size_t cl_pos = header_lower.find("content-length: ");
     if (cl_pos != std::string::npos) {
-      content_length = std::atoi(header_lower.c_str() + cl_pos + 16);
+      content_length =
+          static_cast<size_t>(std::atoi(header_lower.c_str() + cl_pos + 16));
     }
 
     // check body if body not full break to get more event
@@ -111,8 +114,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
       http = ServerResponse::cgi_response(&request,
                                           clients.at(client_fd).config, &epoll);
     else
-      http = ServerResponse::http_response(
-          &request, &clients.at(client_fd), mime_type, &sessions);
+      http = ServerResponse::http_response(&request, &clients.at(client_fd),
+                                           mime_type, &sessions);
 
     // read server response
     std::ostringstream server_response;
@@ -124,8 +127,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
         server_response << "Location: " << http.redir << "\r\n";
       std::cout << http.redir << std::endl;
       server_response << "Content-Type:" << http.mime_type << "\r\n";
-      if (!http.cookie.empty())
-      {
+      if (!http.cookie.empty()) {
         server_response << "Set-Cookie:" << http.cookie << "\r\n";
         std::cout << "cookie value: " << http.cookie << std::endl;
       }

@@ -510,7 +510,7 @@ CgiMetaVar CgiMetaVar::remote_user(std::string user) {
                     (CgiMetaVar::Val){.remote_user = new std::string(user)});
 }
 
-CgiMetaVar CgiMetaVar::request_method(Http::Method method) {
+CgiMetaVar CgiMetaVar::request_method(Request::Method method) {
   return CgiMetaVar(REQUEST_METHOD,
                     (CgiMetaVar::Val){.request_method = method});
 }
@@ -828,25 +828,25 @@ CgiMetaVar::Parser::parse_request_method(std::string raw) {
   std::string method = raw;
   std::transform(method.begin(), method.end(), method.begin(), to_upper);
 
-  Http::Method m;
+  Request::Method m;
   if (method == "GET")
-    m = Http::GET;
+    m = Request::GET;
   else if (method == "HEAD")
-    m = Http::HEAD;
+    m = Request::HEAD;
   else if (method == "OPTIONS")
-    m = Http::OPTIONS;
+    m = Request::OPTIONS;
   else if (method == "POST")
-    m = Http::POST;
+    m = Request::POST;
   else if (method == "DELETE")
-    m = Http::DELETE;
+    m = Request::DELETE;
   else if (method == "PUT")
-    m = Http::PUT;
+    m = Request::PUT;
   else if (method == "CONNECT")
-    m = Http::CONNECT;
+    m = Request::CONNECT;
   else if (method == "TRACE")
-    m = Http::TRACE;
+    m = Request::TRACE;
   else if (method == "PATCH")
-    m = Http::PATCH;
+    m = Request::PATCH;
   else
     return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
 
@@ -985,38 +985,38 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
   CgiInput input;
   input.req_body = req.get_body();
 
-  // Convert Request::Method to Http::Method for backwards compatibility
-  Http::Method h_method;
+  // Convert Request::Method to Request::Method for backwards compatibility
+  Request::Method h_method;
   switch (req.get_method()) {
   case Request::GET:
-    h_method = Http::GET;
+    h_method = Request::GET;
     break;
   case Request::HEAD:
-    h_method = Http::HEAD;
+    h_method = Request::HEAD;
     break;
   case Request::POST:
-    h_method = Http::POST;
+    h_method = Request::POST;
     break;
   case Request::PUT:
-    h_method = Http::PUT;
+    h_method = Request::PUT;
     break;
   case Request::DELETE:
-    h_method = Http::DELETE;
+    h_method = Request::DELETE;
     break;
   case Request::OPTIONS:
-    h_method = Http::OPTIONS;
+    h_method = Request::OPTIONS;
     break;
   case Request::CONNECT:
-    h_method = Http::CONNECT;
+    h_method = Request::CONNECT;
     break;
   case Request::TRACE:
-    h_method = Http::TRACE;
+    h_method = Request::TRACE;
     break;
   case Request::PATCH:
-    h_method = Http::PATCH;
+    h_method = Request::PATCH;
     break;
   default:
-    h_method = Http::GET;
+    h_method = Request::GET;
     break;
   }
 
@@ -1079,7 +1079,7 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
   }
 
   // Add REMOTE_ADDR (127.0.0.1 — actual client IP is not available from
-  // Http::Request)
+  // Request::Request)
   input.mvars.push_back(CgiMetaVar::remote_addr(127, 0, 0, 1));
 
   // Add REMOTE_HOST (same as REMOTE_ADDR for loopback connections)
@@ -1358,32 +1358,35 @@ char **CgiInput::to_envp() const {
     case CgiMetaVar::REQUEST_METHOD:
       env_str = "REQUEST_METHOD=";
       switch (var.get_val().request_method) {
-      case Http::GET:
+      case Request::GET:
         env_str += "GET";
         break;
-      case Http::HEAD:
+      case Request::HEAD:
         env_str += "HEAD";
         break;
-      case Http::POST:
+      case Request::POST:
         env_str += "POST";
         break;
-      case Http::PUT:
+      case Request::PUT:
         env_str += "PUT";
         break;
-      case Http::DELETE:
+      case Request::DELETE:
         env_str += "DELETE";
         break;
-      case Http::OPTIONS:
+      case Request::OPTIONS:
         env_str += "OPTIONS";
         break;
-      case Http::CONNECT:
+      case Request::CONNECT:
         env_str += "CONNECT";
         break;
-      case Http::TRACE:
+      case Request::TRACE:
         env_str += "TRACE";
         break;
-      case Http::PATCH:
+      case Request::PATCH:
         env_str += "PATCH";
+        break;
+      default:
+        env_str += "UNKNOWN";
         break;
       }
       break;

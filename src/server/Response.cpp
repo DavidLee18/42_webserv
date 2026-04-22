@@ -1,7 +1,7 @@
 #include "Response.hpp"
-#include "Session.hpp"
+#include "../ParsingUtils.hpp"
 #include "../cgi_1_1.h"
-#include "ParsingUtils.hpp"
+#include "Session.hpp"
 #include <errno.h>
 
 std::string get_string_from_map(const std::map<int, std::string> map, int key) {
@@ -109,7 +109,8 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
 Response ServerResponse::error_response(const ServerConfig *config,
                                         const RouteRule *rule, int err_code) {
   Response response;
-  std::string err_page = get_pwd() + get_string_from_map(rule->error_pages, err_code);
+  std::string err_page =
+      get_pwd() + get_string_from_map(rule->error_pages, err_code);
   std::cout << "error page: " << err_page << std::endl;
 
   if (err_page.empty())
@@ -144,8 +145,7 @@ Response ServerResponse::delete_method(Target target, Response response,
 Response ServerResponse::post_method(Target target, Response response,
                                      const ClientSession *client,
                                      const RouteRule *rule,
-                                     const Request *request,
-                                     Session *session) {
+                                     const Request *request, Session *session) {
   (void)target;
   const ServerConfig *config = client->config;
 
@@ -155,7 +155,8 @@ Response ServerResponse::post_method(Target target, Response response,
     std::string id = "";
     std::string pw = "";
 
-    std::string auth_target = get_pwd() +
+    std::string auth_target =
+        get_pwd() +
         config->get_rewritten_path(request->get_method(), rule->auth_info);
     std::cout << "\n" << auth_target << "\n" << std::endl;
     std::ifstream file(auth_target.c_str());
@@ -200,14 +201,17 @@ Response ServerResponse::post_method(Target target, Response response,
         response.redir = rule->index;
         response.mime_type = "text/html";
         response.body = "<html><body>Redirecting...</body></html>";
-        response.cookie = "session_id=" + session->create_session(id, client->ip) + "; Path=/; HttpOnly";
+        response.cookie =
+            "session_id=" + session->create_session(id, client->ip) +
+            "; Path=/; HttpOnly";
         return response;
       } else {
         std::cout << "Authentication FAILED for: " << id << std::endl;
 
         response.status_code = status_code_to_string(200);
         response.mime_type = "text/html";
-        // 로그인 실패 시 브라우저 자체 Alert 팝업을 띄우고 이전(로그인) 화면으로 다시 돌려보냅니다.
+        // 로그인 실패 시 브라우저 자체 Alert 팝업을 띄우고 이전(로그인)
+        // 화면으로 다시 돌려보냅니다.
         response.body = "<script>"
                         "alert('invalid id or password');"
                         "window.location.href='/login.html';"
@@ -221,10 +225,11 @@ Response ServerResponse::post_method(Target target, Response response,
   // Handle file uploads
   if (!rule->upload_dir.empty()) {
     std::string body = request->get_body();
-    const std::map<std::string, std::string>& headers = request->get_headers();
+    const std::map<std::string, std::string> &headers = request->get_headers();
 
     // Check Content-Type for multipart/form-data
-    std::map<std::string, std::string>::const_iterator content_type_it = headers.find("Content-Type");
+    std::map<std::string, std::string>::const_iterator content_type_it =
+        headers.find("Content-Type");
     if (content_type_it == headers.end())
       return error_response(config, rule, BAD_REQUEST);
 
@@ -250,7 +255,8 @@ Response ServerResponse::post_method(Target target, Response response,
     // Create upload directory if it doesn't exist
     std::string upload_path = get_pwd() + "/" + rule->upload_dir;
     if (mkdir(upload_path.c_str(), 0755) != 0 && errno != EEXIST) {
-      std::cout << "Failed to create upload directory: " << upload_path << std::endl;
+      std::cout << "Failed to create upload directory: " << upload_path
+                << std::endl;
       return error_response(config, rule, FORBIDDEN_ERR);
     }
 
@@ -261,7 +267,8 @@ Response ServerResponse::post_method(Target target, Response response,
 
     while (true) {
       std::string filename, fieldname, part_data;
-      std::size_t next_pos = parse_multipart_part(body, boundary, pos, filename, fieldname, part_data);
+      std::size_t next_pos = parse_multipart_part(body, boundary, pos, filename,
+                                                  fieldname, part_data);
 
       if (filename.empty() && fieldname.empty())
         break; // No more parts
@@ -271,13 +278,15 @@ Response ServerResponse::post_method(Target target, Response response,
         if (filename.find("..") != std::string::npos ||
             filename.find("/") != std::string::npos ||
             filename.find("\\") != std::string::npos) {
-          std::cout << "Rejected filename with path traversal: " << filename << std::endl;
+          std::cout << "Rejected filename with path traversal: " << filename
+                    << std::endl;
           error_msg = "Invalid filename";
           break;
         }
 
         std::string file_path = upload_path + "/" + filename;
-        std::cout << "Uploading file: " << file_path << " (size: " << part_data.length() << ")" << std::endl;
+        std::cout << "Uploading file: " << file_path
+                  << " (size: " << part_data.length() << ")" << std::endl;
         std::cout << "First 20 bytes (hex): ";
         for (size_t i = 0; i < std::min(size_t(20), part_data.length()); i++) {
           printf("%02x ", (unsigned char)part_data[i]);
@@ -287,12 +296,14 @@ Response ServerResponse::post_method(Target target, Response response,
         // Try to open file for writing
         std::ofstream outfile(file_path.c_str(), std::ios::binary);
         if (!outfile.is_open()) {
-          std::cout << "Failed to open file for writing: " << file_path << std::endl;
+          std::cout << "Failed to open file for writing: " << file_path
+                    << std::endl;
           return error_response(config, rule, FORBIDDEN_ERR);
         }
 
         // Write file data
-        outfile.write(part_data.c_str(), part_data.length());
+        outfile.write(part_data.c_str(),
+                      static_cast<std::streamsize>(part_data.length()));
         if (outfile.fail()) {
           std::cout << "Failed to write file: " << file_path << std::endl;
           outfile.close();
@@ -374,8 +385,7 @@ Response ServerResponse::get_method(Target target, Response response,
 
 Response ServerResponse::http_response(
     const Request *request, const ClientSession *client,
-    const std::map<std::string, std::string> mime_type,
-    Session *session) {
+    const std::map<std::string, std::string> mime_type, Session *session) {
   const ServerConfig *config = client->config;
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
@@ -384,18 +394,20 @@ Response ServerResponse::http_response(
 
   // [쿠키 검증 로직 추가]
   std::string session_id = request->get_cookie_value("session_id");
-  SessionData* user_session = NULL;
-  
+  SessionData *user_session = NULL;
+
   if (!session_id.empty()) {
     user_session = session->get_session(session_id);
   }
 
   if (user_session) {
-    std::cout << "[Authentication] Valid user session found! User ID: " << user_session->user_id << std::endl;
+    std::cout << "[Authentication] Valid user session found! User ID: "
+              << user_session->user_id << std::endl;
   } else {
     // 세션이 없는데 보호된 자원(예: DELETE 명령)을 요청하면 401 에러를 반환
     if (request->get_method() == Request::DELETE) {
-      std::cout << "[Authentication] Blocked DELETE request. No valid session." << std::endl;
+      std::cout << "[Authentication] Blocked DELETE request. No valid session."
+                << std::endl;
       return error_response(config, rule, UNAUTHORIZED);
     }
     std::cout << "[Authentication] No valid session. Guest user." << std::endl;
@@ -408,7 +420,8 @@ Response ServerResponse::http_response(
   if (request->get_method() == Request::DELETE) {
     return ServerResponse::delete_method(target, response, config, rule);
   } else if (request->get_method() == Request::POST) {
-    return ServerResponse::post_method(target, response, client, rule, request, session);
+    return ServerResponse::post_method(target, response, client, rule, request,
+                                       session);
   } else if (request->get_method() == Request::GET) {
     return ServerResponse::get_method(target, response, config, rule, request);
   } else {
@@ -421,6 +434,7 @@ Response ServerResponse::cgi_response(const Request *request,
                                       const ServerConfig *config,
                                       EPoll *epoll) {
   Response response;
+
   CgiDelegate cgi(*request, get_pwd() + request->get_path());
   Result<std::string> cgi_result =
       cgi.execute(config->get_server_response_time(), epoll);
@@ -573,11 +587,11 @@ std::string ServerResponse::extract_boundary(const std::string &content_type) {
 }
 
 std::size_t ServerResponse::parse_multipart_part(const std::string &body,
-                                                  const std::string &boundary,
-                                                  std::size_t start_pos,
-                                                  std::string &out_filename,
-                                                  std::string &out_fieldname,
-                                                  std::string &out_data) {
+                                                 const std::string &boundary,
+                                                 std::size_t start_pos,
+                                                 std::string &out_filename,
+                                                 std::string &out_fieldname,
+                                                 std::string &out_data) {
   out_filename = "";
   out_fieldname = "";
   out_data = "";
@@ -608,7 +622,8 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
     return std::string::npos;
 
   // Extract and parse headers
-  std::string headers_section = body.substr(part_start, header_end - part_start);
+  std::string headers_section =
+      body.substr(part_start, header_end - part_start);
 
   // Parse Content-Disposition header to extract name and filename
   size_t disp_pos = headers_section.find("Content-Disposition:");
@@ -617,7 +632,8 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
     if (line_end == std::string::npos)
       line_end = headers_section.length();
 
-    std::string disp_line = headers_section.substr(disp_pos, line_end - disp_pos);
+    std::string disp_line =
+        headers_section.substr(disp_pos, line_end - disp_pos);
 
     // Extract name="fieldname"
     size_t name_pos = disp_line.find("name=\"");
@@ -635,7 +651,8 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
       filename_pos += 10; // Length of 'filename="'
       size_t filename_end = disp_line.find('"', filename_pos);
       if (filename_end != std::string::npos) {
-        out_filename = disp_line.substr(filename_pos, filename_end - filename_pos);
+        out_filename =
+            disp_line.substr(filename_pos, filename_end - filename_pos);
       }
     }
   }
@@ -655,7 +672,8 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
     // Last part - take rest of body
     out_data = body.substr(body_start);
     // Remove trailing CRLF if present
-    if (out_data.length() >= 2 && out_data.substr(out_data.length() - 2) == "\r\n")
+    if (out_data.length() >= 2 &&
+        out_data.substr(out_data.length() - 2) == "\r\n")
       out_data = out_data.substr(0, out_data.length() - 2);
     else if (out_data.length() >= 1 && out_data[out_data.length() - 1] == '\n')
       out_data = out_data.substr(0, out_data.length() - 1);
@@ -664,7 +682,8 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
 
   // Extract data and trim trailing line ending
   out_data = body.substr(body_start, next_boundary - body_start);
-  if (out_data.length() >= 2 && out_data.substr(out_data.length() - 2) == "\r\n")
+  if (out_data.length() >= 2 &&
+      out_data.substr(out_data.length() - 2) == "\r\n")
     out_data = out_data.substr(0, out_data.length() - 2);
   else if (out_data.length() >= 1 && out_data[out_data.length() - 1] == '\n')
     out_data = out_data.substr(0, out_data.length() - 1);

@@ -7,11 +7,10 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 
-#include "config/WebserverConfig.hpp"
 #include "cgi_1_1.h"
+#include "config/WebserverConfig.hpp"
 #include "epoll_kqueue.h"
 #include "errors.h"
-#include "http_1_1.h"
 #include "json.h"
 #include "server/Client.hpp"
 #include "server/Server.hpp"
