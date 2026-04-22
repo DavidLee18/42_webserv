@@ -64,11 +64,10 @@ private:
 };
 
 class UwsgiInput {
-  std::vector<UwsgiMetaVar> mvars;
+  std::vector<UwsgiMetaVar> _mvars;
   Request const &_req;
 
 private:
-  UwsgiInput();
   UwsgiInput(std::vector<UwsgiMetaVar>, Request const &);
   UwsgiInput(Request const &);
 
@@ -83,11 +82,11 @@ public:
   friend class Parser;
   friend class UwsgiDelegate;
 
-  UwsgiInput(const UwsgiInput &other) : mvars(other.mvars), _req(other._req) {}
+  UwsgiInput(const UwsgiInput &other)
+      : _mvars(other._mvars), _req(other._req) {}
   UwsgiInput &operator=(const UwsgiInput &other) {
     if (this != &other) {
-      mvars = other.mvars;
-      _req = other._req;
+      _mvars = other._mvars;
     }
     return *this;
   }

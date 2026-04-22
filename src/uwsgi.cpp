@@ -17,14 +17,10 @@ UwsgiMetaVar UwsgiMetaVar::create(Name n, std::string v) {
   return UwsgiMetaVar(n, v);
 }
 
-UwsgiInput::UwsgiInput()
-    : mvars(), req_body(Request::Body::Empty, Request::Body::Value()) {}
+UwsgiInput::UwsgiInput(std::vector<UwsgiMetaVar> vars, Request const &req)
+    : _mvars(vars), _req(req) {}
 
-UwsgiInput::UwsgiInput(std::vector<UwsgiMetaVar> vars, Request::Body body)
-    : mvars(vars), req_body(body) {}
-
-UwsgiInput::UwsgiInput(Request::Request const &req)
-    : mvars(), req_body(req.body()) {}
+UwsgiInput::UwsgiInput(Request const &req) : _mvars(), _req(req) {}
 
 void UwsgiInput::add_mvar(std::string const &name, std::string const &value) {
   UwsgiMetaVar::Name var_name;
@@ -63,19 +59,19 @@ void UwsgiInput::add_mvar(std::string const &name, std::string const &value) {
     // For HTTP headers, store as "NAME=value" in the value field
     var_name = UwsgiMetaVar::HTTP_;
     std::string combined = name + "=" + value;
-    mvars.push_back(UwsgiMetaVar::create(var_name, combined));
+    _mvars.push_back(UwsgiMetaVar::create(var_name, combined));
     return;
   }
 
-  mvars.push_back(UwsgiMetaVar::create(var_name, value));
+  _mvars.push_back(UwsgiMetaVar::create(var_name, value));
 }
 
 char **UwsgiInput::to_envp() const {
-  size_t count = mvars.size();
+  size_t count = _mvars.size();
   char **envp = new char *[count + 1];
 
   for (size_t i = 0; i < count; i++) {
-    const UwsgiMetaVar &mvar = mvars[i];
+    const UwsgiMetaVar &mvar = _mvars[i];
     std::string name;
 
     switch (mvar.get_name()) {
@@ -155,8 +151,8 @@ char **UwsgiInput::to_envp() const {
 // them.
 std::map<std::string, std::string> UwsgiInput::to_map() const {
   std::map<std::string, std::string> result;
-  for (size_t i = 0; i < mvars.size(); ++i) {
-    const UwsgiMetaVar &mvar = mvars[i];
+  for (size_t i = 0; i < _mvars.size(); ++i) {
+    const UwsgiMetaVar &mvar = _mvars[i];
     std::string key;
     switch (mvar.get_name()) {
     case UwsgiMetaVar::REQUEST_METHOD:
@@ -293,13 +289,13 @@ Result<UwsgiInput> UwsgiInput::Parser::parse(Request const &req) {
 }
 
 UwsgiDelegate::UwsgiDelegate(EPoll &epoll, Request const &req)
-    : _env(), _port(0), _req(req), _epoll(epoll), _sock(NULL), _send_buf(),
+    : _env(req), _port(0), _req(req), _epoll(epoll), _sock(NULL), _send_buf(),
       _total_sent(0), _output(), _error() {}
 
 Result<UwsgiDelegate> UwsgiDelegate::from_req(EPoll &epoll, Request const &req,
                                               unsigned short port) {
   UwsgiDelegate del(epoll, req);
-  UwsgiInput input;
+  UwsgiInput input(req);
   TRY(UwsgiDelegate, UwsgiInput, input, UwsgiInput::Parser::parse(req))
   del._env = input;
   del._port = port;
@@ -418,6 +414,9 @@ Result<Void> UwsgiDelegate::handle_event(const Event *ev) {
 
     return OKV;
   }
+  _error = "uwsgi: unreachable error. if you see this you should rearrange the "
+           "code..";
+  return ERR(Void, _error);
 }
 
 Result<std::string> UwsgiDelegate::poll() const {
