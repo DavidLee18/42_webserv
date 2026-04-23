@@ -100,6 +100,9 @@ public:
   static Response cgi_response(const Request *request,
                                const ServerConfig *config, EPoll *epoll);
 
+  static Result<Void> register_cgi(const Request *request,
+                                   const ServerConfig *config, EPoll *epoll);
+
 private:
   /**
    * @enum Type
@@ -165,9 +168,11 @@ private:
                                          const std::string &req_uri, DIR *dir);
 
   /**
-   * @brief Extract boundary string from Content-Type header for multipart requests.
+   * @brief Extract boundary string from Content-Type header for multipart
+   * requests.
    * @param content_type The Content-Type header value
-   * @return The boundary string (without -- prefix), or empty string if not multipart
+   * @return The boundary string (without -- prefix), or empty string if not
+   * multipart
    */
   static std::string extract_boundary(const std::string &content_type);
 
@@ -176,29 +181,26 @@ private:
    * @param body The request body
    * @param boundary The boundary marker
    * @param start_pos Starting position in body to search from
-   * @param out_filename Reference to store extracted filename (empty if not a file field)
+   * @param out_filename Reference to store extracted filename (empty if not a
+   * file field)
    * @param out_fieldname Reference to store extracted field name
    * @param out_data Reference to store the part body data
    * @return Position of next part boundary, or string::npos if no more parts
    */
-  static std::size_t parse_multipart_part(const std::string &body,
-                                          const std::string &boundary,
-                                          std::size_t start_pos,
-                                          std::string &out_filename,
-                                          std::string &out_fieldname,
-                                          std::string &out_data);
+  static std::size_t
+  parse_multipart_part(const std::string &body, const std::string &boundary,
+                       std::size_t start_pos, std::string &out_filename,
+                       std::string &out_fieldname, std::string &out_data);
 
   static Response delete_method(Target target, Response response,
                                 const ServerConfig *config,
                                 const RouteRule *rule);
   static Response post_method(Target target, Response response,
                               const ClientSession *client,
-                              const RouteRule *rule,
-                              const Request *request,
+                              const RouteRule *rule, const Request *request,
                               Session *session);
   static Response get_method(Target target, Response response,
-                             const ServerConfig *config,
-                             const RouteRule *rule,
+                             const ServerConfig *config, const RouteRule *rule,
                              const Request *request);
 };
 

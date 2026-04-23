@@ -430,6 +430,17 @@ Response ServerResponse::http_response(
   return response;
 }
 
+Result<Void> ServerResponse::register_cgi(const Request *request,
+                                          const ServerConfig *config,
+                                          EPoll *epoll) {
+  if (rule == NULL)
+    return ERR(Void, "rule not found");
+  const std::vector<RouteRule_CGI> &cgi_rules = config->get_route_rule_cgi();
+  for (std::vector<RouteRule_CGI>::const_iterator it = cgi_rules.begin();
+       it != cgi_rules.end(); ++it) {
+  }
+}
+
 Response ServerResponse::cgi_response(const Request *request,
                                       const ServerConfig *config,
                                       EPoll *epoll) {
