@@ -16,7 +16,7 @@ private:
    * @var met
    * @brief 이 규칙이 적용되는 HTTP 요청 메서드를 저장하는 멤버 변수
    */
-  Http::Method met;
+  Request::Method met;
   /**
    * @var path
    * @brief 이 규칙이 적용되는 요청 경로를 저장하는 멤버 변수
@@ -93,6 +93,8 @@ public:
    */
   RouteRule_CGI(FileDescriptor &fd, const std::string &line);
 
+  const PathPattern get_path() const { return path; }
+  const Request::Method get_method () const { return met; }
   const std::string get_err() const { return err; }
   const std::string get_executable() const { return executable; }
   const std::map<std::string, std::string> get_env() const { return env; }
