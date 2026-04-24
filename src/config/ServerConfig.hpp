@@ -392,6 +392,8 @@ public:
    */
   RouteRule const *find_route(Request::Method method,
                               const std::string &path) const;
+  RouteRule_CGI const *find_route_cgi(Request::Method method,
+                              const std::string &path) const;
   /**
    * @brief method와 path에 해당하는 rewrite 결과 경로를 반환한다.
    * @param method 요청 HTTP 메서드
