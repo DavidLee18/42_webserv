@@ -567,6 +567,18 @@ RouteRule const *ServerConfig::find_route(Request::Method method,
   return NULL;
 }
 
+RouteRule_CGI const *ServerConfig::find_route_cgi(Request::Method method,
+                                          const std::string &path) const {
+  PathPattern pathPattern(path);
+
+  for (size_t i = 0; i < R_CGI.size(); ++i) {
+    if (R_CGI[i].get_method() == method && R_CGI[i].get_path().matches(pathPattern)) {
+      return &R_CGI[i];
+    }
+  }
+  return NULL;
+}
+
 std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
 
     os << data.to_string();

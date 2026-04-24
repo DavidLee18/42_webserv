@@ -94,6 +94,8 @@ public:
    */
   RouteRule_CGI(FileDescriptor &fd, const std::string &line);
 
+  const PathPattern get_path() const { return path; }
+  const Request::Method get_method () const { return met; }
   const std::string get_err() const { return err; }
   const std::string get_executable() const { return executable; }
   const std::map<std::string, std::string> get_env() const { return env; }
