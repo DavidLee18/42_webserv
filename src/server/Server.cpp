@@ -108,14 +108,23 @@ void Server::client_read(const FileDescriptor *client_fd) {
               << request.get_path() << " (Body: " << content_length << " bytes)"
               << std::endl;
 
+    if (ServerResponse::find_file_type(request.get_path()) == "cgi") {
+      Result<CgiDelegate> del_ = ServerResponse::register_cgi(
+          &request, clients.at(client_fd).config, &epoll);
+      if (!del_.has_value()) {
+        std::cerr << "CGI registration failed: " << del_.error() << std::endl;
+        return;
+      }
+      std::pair<std::map<const FileDescriptor *, CgiDelegate>::iterator, bool>
+          res = cgis.insert(std::make_pair(client_fd, del_.value()));
+      if (!res.second)
+        std::cerr << "[ERROR] CGI already registered for " << client_fd
+                  << std::endl;
+      return;
+    }
     // response generate
-    Response http;
-    if (ServerResponse::find_file_type(request.get_path()) == "cgi")
-      http = ServerResponse::cgi_response(&request,
-                                          clients.at(client_fd).config, &epoll);
-    else
-      http = ServerResponse::http_response(&request, &clients.at(client_fd),
-                                           mime_type, &sessions);
+    Response http = ServerResponse::http_response(
+        &request, &clients.at(client_fd), mime_type, &sessions);
 
     // read server response
     std::ostringstream server_response;
@@ -258,18 +267,25 @@ Result<Void> Server::start() {
       // 1. 서버 소켓(문지기)인 경우 (listeners map에 Key가 존재함)
       if (listeners.find(fd) != listeners.end()) {
         new_connection(fd);
-      }
-      // 2. 이미 연결된 클라이언트 소켓인 경우
-      else {
-        if (event->err || event->hup || event->rdhup) {
+      } else if (clients.find(fd) !=
+                 clients.end()) { // 2. 이미 연결된 클라이언트 소켓인 경우
+        if (event->err || event->hup || event->rdhup)
           disconnect(fd);
-        } else {
-          if (event->in)
-            client_read(fd);
-          if (event->out)
-            client_write(fd);
+        else if (event->in)
+          client_read(fd);
+        else if (event->out)
+          client_write(fd);
+      } else { // CGI
+        for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
+                 cgis.begin();
+             it != cgis.end(); ++it) {
+          Result<Void> res = it->second.handle_event(event);
+          if (!res.has_value())
+            std::cerr << "CGI event handling failure: " << res.error()
+                      << std::endl;
         }
       }
+
       ++events;
     }
   }

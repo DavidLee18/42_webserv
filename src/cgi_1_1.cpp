@@ -1455,10 +1455,18 @@ CgiDelegate::CgiDelegate(Request const &req, EPoll &ep)
       _stdout(NULL), _total_written(0), _output(), _completed(false) {}
 
 Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
-                                          const std::string &script_path) {
+                                          const RouteRule_CGI &rule) {
   CgiDelegate del(req, ep);
-  TRY(CgiDelegate, CgiInput, _env, CgiInput::Parser::parse(req))
-  del._script_path = script_path;
+  TRY(CgiDelegate, CgiInput, del._env, CgiInput::Parser::parse(req))
+  char pwd[PATH_MAX];
+  if (getcwd(pwd, sizeof(pwd)) == NULL)
+    return ERR(CgiDelegate, "getting PWD failed");
+  del._script_path = pwd + rule.get_path().to_string();
+  std::map<std::string, std::string> vars(rule.get_env());
+  for (std::map<std::string, std::string>::const_iterator it = vars.begin();
+       it != vars.end(); ++it) {
+    del._env.add_mvar(it->first, it->second);
+  }
   return OK(CgiDelegate, del);
 }
 

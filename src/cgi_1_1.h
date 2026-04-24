@@ -1,6 +1,7 @@
 #ifndef CGI_1_1_H
 #define CGI_1_1_H
 
+#include "config/RouteRule_CGI.hpp"
 #include "errors.h"
 #include "result.h"
 #include "server/Client.hpp"
@@ -293,7 +294,8 @@ class CgiDelegate {
   CgiDelegate(Request const &, EPoll &);
 
 public:
-  Result<CgiDelegate> from_req(Request const &, EPoll &, std::string const &);
+  static Result<CgiDelegate> from_req(Request const &, EPoll &,
+                                      RouteRule_CGI const &);
 
   // Phase 1: create pipes, fork, register the pipe fds with epoll.
   // After this returns OK, the main event loop will deliver events on the

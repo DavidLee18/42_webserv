@@ -6,6 +6,7 @@
  * @brief Defines the HTTP Response generation structures and classes.
  */
 
+#include "../cgi_1_1.h"
 #include "../config/ServerConfig.hpp"
 #include "Client.hpp"
 #include "DefaultError.hpp"
@@ -97,11 +98,9 @@ public:
                 const std::map<std::string, std::string> mime_type,
                 Session *session);
 
-  static Response cgi_response(const Request *request,
-                               const ServerConfig *config, EPoll *epoll);
-
-  static Result<Void> register_cgi(const Request *request,
-                                   const ServerConfig *config, EPoll *epoll);
+  static Result<CgiDelegate> register_cgi(const Request *request,
+                                          const ServerConfig *config,
+                                          EPoll *epoll);
 
 private:
   /**
