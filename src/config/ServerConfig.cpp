@@ -190,9 +190,10 @@ ServerConfig::get_pattern_candidates(const std::string &line) {
   return (temp);
 }
 
-std::vector<PathPattern> ServerConfig::expand_paths_with_pattern(
-    const std::vector<PathPattern> &paths,
-    const std::vector<std::string> &pattern, std::size_t index) {
+std::vector<PathPattern>
+ServerConfig::expand_paths_with_pattern(const std::vector<PathPattern> &paths,
+                                        const std::vector<std::string> &pattern,
+                                        std::size_t index) {
   std::vector<PathPattern> new_paths;
   std::string seg = paths[0].get_path()[index];
   std::string prefix = "";
@@ -220,7 +221,7 @@ ServerConfig::expand_path_pattern(const std::string &line) {
   PathPattern path(line);
   std::vector<PathPattern> paths;
   std::vector<std::string> temp = path.get_path();
-  
+
   paths.push_back(path);
   for (std::size_t i = 0; i < temp.size(); ++i) {
     if (is_path_pattern_segment(temp[i])) {
@@ -424,25 +425,25 @@ bool ServerConfig::apply_route_rule_entry(
 
 RuleOperator ServerConfig::parse_rule_operator(const std::string &indicator) {
   if (indicator == "<-")
-    return (SERVEFROM);
+    return (SERVE_FROM);
   else if (indicator == "->")
-    return (POINT);
+    return (UPLOAD_TO);
   else if (indicator == "<i-")
     return (AUTOINDEX);
   else if (indicator == "=300>")
-    return (MULTIPLECHOICES);
+    return (MULTIPLE_CHOICES);
   else if (indicator == "=301>")
     return (REDIRECT);
   else if (indicator == "=302>")
     return (FOUND);
   else if (indicator == "=303>")
-    return (SEEOTHER);
+    return (SEE_OTHER);
   else if (indicator == "=304>")
-    return (NOTMODIFIED);
+    return (NOT_MODIFIED);
   else if (indicator == "=307>")
-    return (TEMPORARYREDIRECT);
+    return (TEMPORARY_REDIRECT);
   else if (indicator == "=308>")
-    return (PERMANENTREDIRECT);
+    return (PERMANENT_REDIRECT);
   else
     return (UNDEFINED);
 }
@@ -475,11 +476,10 @@ bool ServerConfig::create_route_rules(
     const std::vector<Request::Method> &mets) {
   if (data.size() != 4)
     return (false);
-  
+
   RouteRule route;
   std::vector<PathPattern> path_url = expand_path_pattern(data[1]);
   PathPattern root_url(data[3]);
-
 
   for (size_t i = 0; i < mets.size(); ++i) {
     route.method = mets[i];
@@ -489,7 +489,7 @@ bool ServerConfig::create_route_rules(
     route.index = "";
     route.auth_info = "";
     route.max_body_KB = 1;
-    if (path_url.size() < 1 || root_url.get_path().size() < 1) 
+    if (path_url.size() < 1 || root_url.get_path().size() < 1)
       return (false);
 
     for (size_t j = 0; j < path_url.size(); ++j) {
@@ -567,12 +567,14 @@ RouteRule const *ServerConfig::find_route(Request::Method method,
   return NULL;
 }
 
-RouteRule_CGI const *ServerConfig::find_route_cgi(Request::Method method,
-                                          const std::string &path) const {
+RouteRule_CGI const *
+ServerConfig::find_route_cgi(Request::Method method,
+                             const std::string &path) const {
   PathPattern pathPattern(path);
 
   for (size_t i = 0; i < R_CGI.size(); ++i) {
-    if (R_CGI[i].get_method() == method && R_CGI[i].get_path().matches(pathPattern)) {
+    if (R_CGI[i].get_method() == method &&
+        R_CGI[i].get_path().matches(pathPattern)) {
       return &R_CGI[i];
     }
   }
@@ -581,29 +583,29 @@ RouteRule_CGI const *ServerConfig::find_route_cgi(Request::Method method,
 
 std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
 
-    os << data.to_string();
+  os << data.to_string();
   return (os);
 }
 
 static std::string what_RuleOperator(RuleOperator op) {
-  if (op == MULTIPLECHOICES)
-    return ("MULTIPLECHOICES (=300>)");
+  if (op == MULTIPLE_CHOICES)
+    return ("MULTIPLE_CHOICES (=300>)");
   else if (op == REDIRECT)
     return ("REDIRECT (=301>)");
   else if (op == FOUND)
     return ("FOUND (=302>)");
-  else if (op == SEEOTHER)
-    return ("SEEOTHER (=303>)");
-  else if (op == NOTMODIFIED)
-    return ("NOTMODIFIED (=304>)");
-  else if (op == TEMPORARYREDIRECT)
-    return ("TEMPORARYREDIRECT (=307>)");
-  else if (op == PERMANENTREDIRECT)
-    return ("PERMANENTREDIRECT (=308>)");
+  else if (op == SEE_OTHER)
+    return ("SEE_OTHER (=303>)");
+  else if (op == NOT_MODIFIED)
+    return ("NOT_MODIFIED (=304>)");
+  else if (op == TEMPORARY_REDIRECT)
+    return ("TEMPORARY_REDIRECT (=307>)");
+  else if (op == PERMANENT_REDIRECT)
+    return ("PERMANENT_REDIRECT (=308>)");
   else if (op == AUTOINDEX)
     return ("AUTOINDEX (<i-)");
-  else if (op == POINT)
-    return ("POINT (->)");
+  else if (op == UPLOAD_TO)
+    return ("UPLOAD_TO (->)");
   else
     return ("SERVEFROM (<-)");
 }
@@ -695,7 +697,6 @@ std::string normalize_slashes(const std::string &path) {
   return result;
 }
 
-
 std::string ServerConfig::get_rewritten_path(Request::Method method,
                                              const std::string &path) const {
   const RouteRule *route = find_route(method, path);
@@ -704,26 +705,3 @@ std::string ServerConfig::get_rewritten_path(Request::Method method,
   return normalize_slashes(route->path.rewrite_path(path, route->root));
   // return route->path.rewrite_path(path, route->root);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

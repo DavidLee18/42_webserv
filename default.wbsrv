@@ -27,7 +27,7 @@ uwsgi =
 
     GET /download/ <i- /spool/www/
 
-    GET /files/* -> $9000(AUTH_INFO="/spool/www/auth_info")
+    GET /files/*    $9000(AUTH_INFO="/spool/www/auth_info")
 
     GET *.(jpg|jpeg|gif) <- /spool/www/*
 
@@ -44,9 +44,9 @@ uwsgi =
         ! 413:/spool/www/error/413.html
         ! 500:/spool/www/error/500.html
 
-    POST /files/*/upload/ -> $upload.cgi(DIST_DIR="/spool/files", AUTH_INFO="/spool/www/auth_info")
+    POST /files/*/upload/    $upload.cgi(DIST_DIR="/spool/files", AUTH_INFO="/spool/www/auth_info")
 
-    DELETE /files/* -> $delete_file.cgi(AUTH_INFO="/spool/www/auth_info")
+    DELETE /files/*    $delete_file.cgi(AUTH_INFO="/spool/www/auth_info")
 
 
 
