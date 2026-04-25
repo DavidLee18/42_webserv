@@ -91,7 +91,7 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   int type = check_path_type(target.path + root);
   if (type == IS_DIR) {
     target.path += root;
-    if (rule->op == SERVEFROM && request->get_path() == "/")
+    if (rule->op == SERVE_FROM && request->get_path() == "/")
       target.path += rule->index;
   } else if (type == NOT_FOUND_ERR)
     target.path += get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
