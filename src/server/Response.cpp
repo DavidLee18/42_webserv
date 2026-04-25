@@ -389,6 +389,8 @@ Response ServerResponse::http_response(
   const ServerConfig *config = client->config;
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
+  if (rule == NULL)
+    return DefaultError::default_err_response(NOT_FOUND_ERR);
   Response response;
   Target target = resolve_target(rule, config, request);
 

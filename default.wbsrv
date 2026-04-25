@@ -16,11 +16,8 @@ uwsgi =
 	[] +<= X-Content-Type-Options: nosniff
 	[] +<= X-Frame-Options: DENY
 	[] +<= Referrer-Policy: no-referrer
-	[] +<= Content-Security-Policy: default-src 'self'
 
 	...30
-
-	GET /files/*    $9000(AUTH_INFO=/spool/www/auth_info)
 
 	GET /old_stuff/ =301> /new_stuff/
 
@@ -28,12 +25,10 @@ uwsgi =
 
 	GET /download/*/mp3/*.mp3 =301> /*/mp3/*
 
-	GET /files/*    $9000(AUTH_INFO=/spool/www/auth_info)
-
 	GET *.(jpg|jpeg|gif) <- /spool/www/*
 
 	GET * <- /spool/www/*
-		? login.html
+		? hello.html
 		@ auth_info
 		->{} 10MB
 		! 400:/spool/www/error/400.html
@@ -45,11 +40,11 @@ uwsgi =
 		! 413:/spool/www/error/413.html
 		! 500:/spool/www/error/500.html
 
-	POST /files/*/upload/    $upload.cgi(DIST_DIR=/spool/files)
+	POST *    $gen_html.cgi(DIST_DIR=/spool/files)
 		...10
 		AUTH_INFO=/spool/www/auth_info
 
-	DELETE /files/*    $delete_file.cgi(AUTH_INFO=/spool/www/auth_info)
+	DELETE *    $gen_html.cgi(AUTH_INFO=/spool/www/auth_info)
 
 
 
@@ -57,7 +52,6 @@ uwsgi =
 	[] +<= X-Content-Type-Options: nosniff
 	[] +<= X-Frame-Options: DENY
 	[] +<= Referrer-Policy: no-referrer
-	[] +<= Content-Security-Policy: default-src 'self'
 
 	...30
 

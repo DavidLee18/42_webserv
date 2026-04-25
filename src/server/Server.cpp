@@ -58,6 +58,7 @@ void Server::disconnect(const FileDescriptor *client_fd) {
 }
 
 void Server::client_read(const FileDescriptor *client_fd) {
+  bool peer_closed = false;
   while (true) { // repeat until nothing to read
     char buf[NETWORK_BUFFER_SIZE];
     Result<ssize_t> recv_res = client_fd->sock_recv(buf, sizeof(buf));
@@ -66,8 +67,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
     ssize_t bytes = recv_res.value();
     if (bytes == 0) { // (EOF)
-      disconnect(client_fd);
-      return;
+      peer_closed = true;
+      break;
     }
     clients.at(client_fd).in_buff.append(buf, static_cast<std::size_t>(bytes));
   }
@@ -87,10 +88,18 @@ void Server::client_read(const FileDescriptor *client_fd) {
       header_lower[i] = static_cast<char>(
           std::tolower(static_cast<unsigned char>(header_lower[i])));
     }
-    size_t cl_pos = header_lower.find("content-length: ");
+    size_t cl_pos = header_lower.find("content-length:");
     if (cl_pos != std::string::npos) {
-      content_length =
-          static_cast<size_t>(std::atoi(header_lower.c_str() + cl_pos + 16));
+      const char *str =
+          header_lower.c_str() + cl_pos + sizeof("content-length:");
+      while (std::isspace(static_cast<int>(*str)))
+        str++;
+      char *end;
+      content_length = std::strtoul(str, &end, 10);
+      if (str == end) {
+        std::cerr << "content-length parsing failed; aborting" << std::endl;
+        return;
+      }
     }
 
     // check body if body not full break to get more event
@@ -147,6 +156,11 @@ void Server::client_read(const FileDescriptor *client_fd) {
     clients.at(client_fd).out_buff += server_response.str();
 
     in_buffer.erase(0, total_request_len);
+  }
+
+  if (peer_closed && clients.find(client_fd) != clients.end() &&
+      clients.at(client_fd).out_buff.empty()) {
+    disconnect(client_fd);
   }
 }
 
@@ -239,7 +253,7 @@ Result<Void> Server::init() {
 }
 
 Result<Void> Server::start() {
-  system("open http://localhost:8080");
+  // system("open http://localhost:8080");
   std::cout << "Starting server loop..." << std::endl;
   while (true) {
     // Waiting for events using epoll
@@ -269,12 +283,15 @@ Result<Void> Server::start() {
         new_connection(fd);
       } else if (clients.find(fd) !=
                  clients.end()) { // 2. 이미 연결된 클라이언트 소켓인 경우
-        if (event->err || event->hup || event->rdhup)
-          disconnect(fd);
-        else if (event->in)
+        if (event->in)
           client_read(fd);
-        else if (event->out)
+        if (event->out)
           client_write(fd);
+        if (event->err || event->hup || event->rdhup) {
+          if (clients.find(fd) != clients.end() &&
+              clients.at(fd).out_buff.empty())
+            disconnect(fd);
+        }
       } else { // CGI
         for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
                  cgis.begin();
