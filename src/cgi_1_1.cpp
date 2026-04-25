@@ -235,6 +235,10 @@ EtcMetaVar &EtcMetaVar::operator=(const EtcMetaVar &other) {
   return *this;
 }
 
+EtcMetaVar::Type const &EtcMetaVar::get_type() const { return type; }
+std::string const &EtcMetaVar::get_name() const { return name; }
+std::string const &EtcMetaVar::get_value() const { return value; }
+
 CgiMetaVar::CgiMetaVar(CgiMetaVar::Name n, CgiMetaVar::Val v)
     : name(n), val(v) {}
 
@@ -1198,6 +1202,16 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
   }
 
   return OK(CgiInput, input);
+}
+
+Result<Void> CgiInput::add_mvar(std::string const &name,
+                                std::string const &val) {
+  Result<std::pair<CgiMetaVar, size_t> > res =
+      CgiMetaVar::Parser::parse(name, val);
+  if (!res.has_value())
+    return ERR(Void, "CgiMetaVar parse failed");
+  mvars.push_back(res.value().first);
+  return OKV;
 }
 
 char **CgiInput::to_envp() const {

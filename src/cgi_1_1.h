@@ -275,7 +275,7 @@ public:
 
   CgiInput(const CgiInput &);
   CgiInput &operator=(const CgiInput &);
-  void add_mvar(std::string const &, std::string const &);
+  Result<Void> add_mvar(std::string const &, std::string const &);
   char **to_envp() const;
 };
 
