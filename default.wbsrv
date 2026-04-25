@@ -1,73 +1,73 @@
 types =
-    html|htm -> text/html
-    css      -> text/css
-    js       -> application/javascript
-    json     -> application/json
-    jpg|jpeg -> image/jpeg
-    png      -> image/png
-    mp3      -> audio/mpeg
-    _        -> application/octet-stream
+	html|htm -> text/html
+	css      -> text/css
+	js       -> application/javascript
+	json     -> application/json
+	jpg|jpeg -> image/jpeg
+	png      -> image/png
+	mp3      -> audio/mpeg
+	_        -> application/octet-stream
 
 uwsgi =
-    /uwsgi/get_files.py:9000
+	/uwsgi/get_files.py:9000
 
 
 :8080 =
-    [] +<= X-Content-Type-Options: "nosniff";
+	[] +<= X-Content-Type-Options: "nosniff";
 
-    $add_csp_sha256.cgi
+	$add_csp_sha256.cgi
 
-    ...30
+	...30
 
-    GET /old_stuff/ =301> /new_stuff/
+	GET /files/* $9000(AUTH_INFO=/spool/www/auth_info)
 
-    GET /old_stuff/* =301> /new_stuff/*
+	GET /old_stuff/ =301> /new_stuff/
 
-    GET /download/*/mp3/*.mp3 =301> /*/mp3/*
+	GET /old_stuff/* =301> /new_stuff/*
 
-    GET /download/ <i- /spool/www/
+	GET /download/*/mp3/*.mp3 =301> /*/mp3/*
 
-    GET /files/* -> $9000(AUTH_INFO="/spool/www/auth_info")
+	GET /files/*    $9000(AUTH_INFO="/spool/www/auth_info")
 
-    GET *.(jpg|jpeg|gif) <- /spool/www/*
+	GET *.(jpg|jpeg|gif) <- /spool/www/*
 
-    GET * <- /spool/www/*
-        ? login.html
-        @ auth_info
-        ->{} 10MB
-        ! 400:/spool/www/error/400.html
-        ! 401:/spool/www/error/401.html
-        ! 403:/spool/www/error/403.html
-        ! 404:/spool/www/error/404.html
-        ! 405:/spool/www/error/405.html
-        ! 409:/spool/www/error/409.html
-        ! 413:/spool/www/error/413.html
-        ! 500:/spool/www/error/500.html
+	GET * <- /spool/www/*
+		? login.html
+		@ auth_info
+		->{} 10MB
+		! 400:/spool/www/error/400.html
+		! 401:/spool/www/error/401.html
+		! 403:/spool/www/error/403.html
+		! 404:/spool/www/error/404.html
+		! 405:/spool/www/error/405.html
+		! 409:/spool/www/error/409.html
+		! 413:/spool/www/error/413.html
+		! 500:/spool/www/error/500.html
 
-    POST /files/*/upload/ -> $upload.cgi(DIST_DIR="/spool/files", AUTH_INFO="/spool/www/auth_info")
+	POST /files/*/upload/    $upload.cgi(DIST_DIR="/spool/files")
+		...10
+		AUTH_INFO="/spool/www/auth_info"
 
-    DELETE /files/* -> $delete_file.cgi(AUTH_INFO="/spool/www/auth_info")
+	DELETE /files/*    $delete_file.cgi(AUTH_INFO="/spool/www/auth_info")
 
 
 
 :4040 =
-    [] +<= X-Content-Type-Options: "nosniff";
+	[] +<= X-Content-Type-Options: "nosniff";
 
-    $add_csp_sha256.cgi
+	$add_csp_sha256.cgi
 
-    ...30
+	...30
 
-    GET /old_stuff/* =301> /new_stuff/*
+	GET /old_stuff/* =301> /new_stuff/*
 
-    GET /download/*/mp3/* =301> /*/mp3/*
+	GET /download/*/mp3/* =301> /*/mp3/*
 
-    GET /download/ <i- /spool/www
+	GET /download/ <i- /spool/www
 
-    GET *.(jpg|jpeg|gif) <- /spool/www/*
+	GET *.(jpg|jpeg|gif) <- /spool/www/*
 
-    GET|POST|DELETE * <- /spool/www/*
-        ? index2.html
-        @ auth_info
-        ->{} 10MB
-
-
+	GET|POST|DELETE * <- /spool/www/*
+		? index2.html
+		@ auth_info
+		->{} 10MB

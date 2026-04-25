@@ -54,14 +54,11 @@ bool utils::match_indent_level(std::string line, size_t num) {
 
   if (line.empty())
     return (num == 0);
-  while (i < line.size() && (line[i] == ' ' || line[i] == '\t')) {
-    if (line[i] == ' ')
-      len += 1;
-    else
-      len += 4;
+  while (i < line.size() && line[i] == '\t') {
+    len++;
     i++;
   }
-  return (len == (num * 4));
+  return (len == num);
 }
 
 std::vector<std::string> utils::string_split(const std::string &line,
