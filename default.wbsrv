@@ -44,11 +44,11 @@ uwsgi =
 		! 413:/spool/www/error/413.html
 		! 500:/spool/www/error/500.html
 
-	POST /files/*/upload/    $upload.cgi(DIST_DIR="/spool/files")
+	POST /files/*/upload/    $upload.cgi(DIST_DIR=/spool/files)
 		...10
-		AUTH_INFO="/spool/www/auth_info"
+		AUTH_INFO=/spool/www/auth_info
 
-	DELETE /files/*    $delete_file.cgi(AUTH_INFO="/spool/www/auth_info")
+	DELETE /files/*    $delete_file.cgi(AUTH_INFO=/spool/www/auth_info)
 
 
 
