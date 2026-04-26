@@ -53,6 +53,7 @@ Result<Request *> Request::from_buff(std::string &buff) {
     return ERR(Request *,
                Errors::incomplete_header); // 헤더가 다 안 들어왔으면 다음 epoll
                                            // 이벤트 대기
+  size_t content_length = 0;
 
   // checking Content-Length
   std::string header_lower = buff.substr(0, header_end);
@@ -63,24 +64,24 @@ Result<Request *> Request::from_buff(std::string &buff) {
   const size_t cl_pos = header_lower.find("content-length:");
   const bool has_te =
       (header_lower.find("transfer-encoding:") != std::string::npos);
-  if (cl_pos == std::string::npos)
-    return ERR(Request *, Errors::malformed_header);
-  if (has_te)
+  if (cl_pos != std::string::npos && has_te)
     return ERR(Request *, Errors::malformed_header); // conforming to the RFC
-  const char *str =
-      header_lower.c_str() + cl_pos + std::strlen("content-length:");
-  while (*str == ' ' || *str == '\t')
-    str++;
-  if (*str == '-')
-    return ERR(Request *, Errors::malformed_header);
-  char *end;
-  const size_t content_length = std::strtoul(str, &end, 10);
-  while (*end == ' ' || *end == '\t')
-    ++end;
-  if (*end != '\r' && *end != '\n')
-    return ERR(Request *, Errors::malformed_header);
-  if (header_lower.find("content-length:", cl_pos + 1) != std::string::npos)
-    return ERR(Request *, Errors::malformed_header);
+  if (cl_pos != std::string::npos && !has_te) {
+    const char *str =
+        header_lower.c_str() + cl_pos + std::strlen("content-length:");
+    while (*str == ' ' || *str == '\t')
+      str++;
+    if (*str == '-')
+      return ERR(Request *, Errors::malformed_header);
+    char *end;
+    content_length = std::strtoul(str, &end, 10);
+    while (*end == ' ' || *end == '\t')
+      ++end;
+    if (*end != '\r' && *end != '\n')
+      return ERR(Request *, Errors::malformed_header);
+    if (header_lower.find("content-length:", cl_pos + 1) != std::string::npos)
+      return ERR(Request *, Errors::malformed_header);
+  }
 
   std::stringstream ss(buff);
   std::string line;
