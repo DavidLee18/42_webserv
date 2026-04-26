@@ -76,7 +76,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
 // header method
 bool ServerConfig::is_header_block(const std::string &line) {
   std::vector<std::string> temp = utils::string_split(line, " ");
-  if (temp.size() != 4)
+  if (temp.size() < 4)
     return false;
   else if (temp[0] != "[]")
     return false;
