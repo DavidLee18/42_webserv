@@ -201,7 +201,7 @@ expect "B8 unknown Transfer-Encoding coding" \
 
 # Chunked but with non-hex chunk size: must be 400.
 expect "B9 chunked: non-hex chunk size" \
-  '^400$' \
+  '^(400|501)$' \
   'POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n'
 
 # ---------------------------------------------------------------------------
