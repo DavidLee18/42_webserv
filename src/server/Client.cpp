@@ -62,7 +62,11 @@ Result<Request> Request::from_buff(std::string const &buff) {
         std::tolower(static_cast<unsigned char>(header_lower[i])));
   }
   const size_t cl_pos = header_lower.find("content-length:");
+  const bool has_te =
+      (header_lower.find("transfer-encoding:") != std::string::npos);
   if (cl_pos != std::string::npos) {
+    if (has_te)
+      return ERR(Request, Errors::malformed_header); // conforming to the RFC
     const char *str =
         header_lower.c_str() + cl_pos + std::strlen("content-length:");
     while (*str == ' ' || *str == '\t')
@@ -77,8 +81,7 @@ Result<Request> Request::from_buff(std::string const &buff) {
       return ERR(Request, Errors::malformed_header);
     if (header_lower.find("content-length:", cl_pos + 1) != std::string::npos)
       return ERR(Request, Errors::malformed_header);
-  } else
-    return ERR(Request, Errors::malformed_header);
+  }
 
   std::stringstream ss(buff);
   std::string line;
@@ -116,6 +119,10 @@ Result<Request> Request::from_buff(std::string const &buff) {
       req.method = PATCH;
     else
       return ERR(Request, Errors::bad_request);
+
+    if (cl_pos == std::string::npos && !has_te &&
+        (req.method == POST || req.method == PUT || req.method == PATCH))
+      return ERR(Request, Errors::malformed_header);
   }
 
   while (std::getline(ss, line) && line != "\r" && line != "") {

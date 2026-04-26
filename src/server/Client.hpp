@@ -152,8 +152,8 @@ private:
   std::string remnants; ///< remaining string to parse.
 
   Request()
-      : method(ERROR), path(), version(), header(), keep_alive(false), cookie(),
-        body(), remnants() {}
+      : method(ERROR), path(), version(), header(), keep_alive(false),
+        content_length(0), cookie(), body(), remnants() {}
 };
 
 #endif
