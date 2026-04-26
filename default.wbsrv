@@ -13,7 +13,11 @@ uwsgi =
 
 
 :8080 =
-	[] +<= X-Content-Type-Options: "nosniff";
+	[] +<= X-Content-Type-Options: "nosniff"
+
+	[] +<= Content-Security-Policy: default-src 'self';
+		object-src 'none'; script-src 'sha256-${$HASH($SCRIPT)}';
+		base-uri 'none'; frame-ancestors 'none'
 
 	$add_csp_sha256.cgi
 
@@ -30,6 +34,9 @@ uwsgi =
 	GET /download/ <i- /spool/www/
 
 	GET *.(jpg|jpeg|gif) <- /spool/www/*
+
+	POST /files/*/upload/    $upload.cgi(DIST_DIR="/spool/files")
+		AUTH_INFO="/spool/www/auth_info"
 
 	GET|POST|DELETE * <- /spool/www/*
 		? index2.html

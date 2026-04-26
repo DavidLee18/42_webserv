@@ -11,11 +11,11 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line) {
     return;
   }
   if (temp[0] == "GET")
-    met = Http::GET;
+    met = Request::GET;
   else if (temp[0] == "POST")
-    met = Http::POST;
+    met = Request::POST;
   else if (temp[0] == "DELETE")
-    met = Http::DELETE;
+    met = Request::DELETE;
   path = PathPattern(temp[1]);
   err = parse_cgi_block(fd, temp[2]);
 }
