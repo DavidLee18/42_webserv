@@ -32,6 +32,9 @@ public:
   const static std::string out_of_rng;
   const static std::string invalid_json;
   const static std::string stream_too_many;
+  const static std::string incomplete_header;
+  const static std::string malformed_header;
+  const static std::string bad_request;
 };
 
 #endif // ERRORS_H

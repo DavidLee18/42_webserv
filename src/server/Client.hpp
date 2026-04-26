@@ -3,24 +3,28 @@
 
 /**
  * @file Client.hpp
- * @brief Defines the ClientSession struct and Request class for handling client HTTP requests.
+ * @brief Defines the ClientSession struct and Request class for handling client
+ * HTTP requests.
  */
-
-#include <map>
+#include "../result.h"
 #include <cctype>
-#include <sstream>
-#include <string>
 #include <iostream>
+#include <map>
+#include <sstream>
 #include <stdlib.h>
+#include <string>
 
 /**
- * @brief Utility function to retrieve a value from a map of strings based on a key.
- * 
+ * @brief Utility function to retrieve a value from a map of strings based on a
+ * key.
+ *
  * @param map The map to search in.
  * @param key The key to look for.
- * @return std::string The value corresponding to the key, or an empty string if not found.
+ * @return std::string The value corresponding to the key, or an empty string if
+ * not found.
  */
-std::string get_string_from_map(const std::map<std::string, std::string> map, std::string key);
+std::string get_string_from_map(const std::map<std::string, std::string> map,
+                                std::string key);
 
 class ServerConfig;
 
@@ -32,7 +36,8 @@ struct ClientSession {
   std::string in_buff;  ///< Buffer for incoming data.
   std::string out_buff; ///< Buffer for outgoing data.
 
-  const ServerConfig *config; ///< Pointer to the server configuration for this session.
+  const ServerConfig
+      *config; ///< Pointer to the server configuration for this session.
   std::string cookie;
   std::string ip;
 
@@ -47,16 +52,6 @@ struct ClientSession {
  * @brief Parses and stores information from an HTTP request.
  */
 class Request {
-private:
-  std::string method;       ///< The HTTP method (e.g., "GET").
-  std::string path;         ///< The requested path (e.g., "/").
-  std::string version;      ///< The HTTP version (e.g., "HTTP/1.1").
-  std::map<std::string, std::string> header; ///< Parsed HTTP headers.
-  bool keep_alive;          ///< Connection keep-alive status.
-  std::string cookie;
-  std::string body;         ///< The request body, if any.
-  bool content_full;        ///< Flag indicating if the entire body has been received.
-
 public:
   /**
    * @enum Method
@@ -75,74 +70,90 @@ public:
     ERROR
   };
 
-  /**
-   * @brief Construct a new Request object by parsing an HTTP request string.
-   * 
-   * @param request The raw HTTP request string.
-   */
-  Request(std::string request);
+  static Result<Request> from_buff(std::string const &);
 
   /**
    * @brief Gets the value of the Connection header.
-   * 
+   *
    * @return const std::string Connection header value.
    */
   const std::string get_connection_string() const;
 
   /**
    * @brief Gets the requested HTTP method as an enum value.
-   * 
+   *
    * @return Request::Method The method enum.
    */
-  Request::Method get_method() const;
+  Request::Method get_method() const { return method; }
 
   /**
    * @brief Gets the requested HTTP method as a string.
-   * 
+   *
    * @return const std::string The method string.
    */
-  const std::string get_method_string() const { return method; };
+  std::string get_method_string() const;
 
   /**
    * @brief Gets the requested path.
-   * 
+   *
    * @return const std::string The requested path.
    */
-  const std::string get_path() const { return path; };
+  const std::string get_path() const { return path; }
 
   /**
    * @brief Gets client's cookie.
-   * 
-   * @return const std::string The client's cookie. Generate default cookie if none.
+   *
+   * @return const std::string The client's cookie. Generate default cookie if
+   * none.
    */
-  const std::string get_cookie() const { return cookie; };
+  const std::string get_cookie() const { return cookie; }
 
   /**
-   * @brief Parses the cookie string and returns the value of a specific cookie by name.
-   * 
+   * @brief Parses the cookie string and returns the value of a specific cookie
+   * by name.
+   *
    * @param name The name of the cookie to find (e.g., "session_id")
    * @return std::string The value of the cookie, or empty string if not found.
    */
-  std::string get_cookie_value(const std::string& name) const;
+  std::string get_cookie_value(const std::string &name) const;
 
   /**
    * @brief Sets client's cookie.
    */
-  void set_cookie(std::string value) { cookie = value; };
+  void set_cookie(std::string value) { cookie = value; }
 
   /**
    * @brief Gets the parsed HTTP headers.
-   * 
+   *
    * @return const std::map<std::string, std::string>& The headers map.
    */
-  const std::map<std::string, std::string>& get_headers() const { return header; }
+  const std::map<std::string, std::string> &get_headers() const {
+    return header;
+  }
 
   /**
    * @brief Gets the request body.
-   * 
+   *
    * @return const std::string& The request body.
    */
-  const std::string& get_body() const { return body; }
+  const std::string &get_body() const { return body; }
+
+  size_t get_content_length() const { return content_length; }
+
+private:
+  Method method;       ///< The HTTP method (e.g., "GET").
+  std::string path;    ///< The requested path (e.g., "/").
+  std::string version; ///< The HTTP version (e.g., "HTTP/1.1").
+  std::map<std::string, std::string> header; ///< Parsed HTTP headers.
+  bool keep_alive;                           ///< Connection keep-alive status.
+  size_t content_length;
+  std::string cookie;
+  std::string body;     ///< The request body, if any.
+  std::string remnants; ///< remaining string to parse.
+
+  Request()
+      : method(ERROR), path(), version(), header(), keep_alive(false), cookie(),
+        body(), remnants() {}
 };
 
 #endif

@@ -23,6 +23,24 @@ std::string get_string_from_map(const std::map<std::string, std::string> map,
     return "";
 }
 
+std::ostream &operator<<(std::ostream &os, Response const &resp) {
+  if (!resp.cgi.empty())
+    os << resp.cgi;
+  else {
+    os << "HTTP/1.1 " << resp.status_code << "\r\n";
+    if (!resp.redir.empty())
+      os << "Location: " << resp.redir << "\r\n";
+    os << "Content-Type:" << resp.mime_type << "\r\n";
+    if (!resp.cookie.empty()) {
+      os << "Set-Cookie:" << resp.cookie << "\r\n";
+    }
+    os << "Content-Length: " << resp.body.length() << "\r\n";
+    os << "Connection: " << resp.connection << "\r\n\r\n";
+    os << resp.body;
+  }
+  return os;
+}
+
 std::string ServerResponse::status_code_to_string(int status_code) {
   if (status_code == 200)
     return "200 OK";

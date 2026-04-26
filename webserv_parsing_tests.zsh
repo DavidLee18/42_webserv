@@ -89,11 +89,13 @@ except Exception: sys.exit(1)
 # $1 name   $2 expected-status regex   $3 raw request (with \r\n, \xHH escapes)
 expect() {
   local name=$1 expected=$2 raw=$3
-  local req resp code line
+  local resp code line
 
-  # printf %b interprets \r \n \xHH \0 -- exactly what we want for raw HTTP.
-  req=$(printf -- "%b" "$raw")
-  resp=$(printf -- "%s" "$req" | send_raw 2>/dev/null) || true
+  # IMPORTANT: pipe printf directly to send_raw. Capturing into a variable
+  # via $(...) would strip trailing newlines (POSIX command-substitution
+  # rule), corrupting any request that ends in \r\n\r\n -- which is most of
+  # them. The response capture is fine: a leading status line is preserved.
+  resp=$(printf -- "%b" "$raw" | send_raw 2>/dev/null) || true
 
   # Robust status extraction: find first line starting with "HTTP/".
   code="---"
@@ -112,8 +114,8 @@ expect() {
     FAILED+=("$name")
     (( FAIL++ ))
     if (( VERBOSE )); then
-      print -- "${C_DIM}--- request ---${C_OFF}"
-      print -r -- "$req" | sed 's/$/\\n/' | head -20
+      print -- "${C_DIM}--- request (escape form) ---${C_OFF}"
+      print -r -- "$raw"
       print -- "${C_DIM}--- response (first 400 bytes) ---${C_OFF}"
       print -r -- "${resp[1,400]}"
       print -- "${C_DIM}---------------${C_OFF}"
@@ -125,9 +127,8 @@ expect() {
 # Used for path-traversal: even if status is 200, the body must not leak
 # /etc/passwd content. $1 name, $2 needle, $3 raw request.
 expect_no_leak() {
-  local name=$1 needle=$2 raw=$3 req resp code line
-  req=$(printf -- "%b" "$raw")
-  resp=$(printf -- "%s" "$req" | send_raw 2>/dev/null) || true
+  local name=$1 needle=$2 raw=$3 resp code line
+  resp=$(printf -- "%b" "$raw" | send_raw 2>/dev/null) || true
   code="---"
   for line in ${(f)resp}; do
     if [[ $line == HTTP/* ]]; then

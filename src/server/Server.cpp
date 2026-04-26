@@ -1,5 +1,6 @@
 #include "Server.hpp"
 #include "../webserv.h"
+#include "Response.hpp"
 
 void Server::new_connection(const FileDescriptor *server_fd) {
   while (true) { // accept all clients until nothing to connect
@@ -76,53 +77,37 @@ void Server::client_read(const FileDescriptor *client_fd) {
   // HTTP parsing and response generate
   std::string &in_buffer = clients.at(client_fd).in_buff;
   while (!in_buffer.empty()) {
-    size_t header_end = in_buffer.find("\r\n\r\n");
-    if (header_end == std::string::npos) {
-      break; // 헤더가 다 안 들어왔으면 다음 epoll 이벤트 대기
-    }
+    Result<Request> req_ = Request::from_buff(in_buffer);
 
-    // checking Content-Length
-    size_t content_length = 0;
-    std::string header_lower = in_buffer.substr(0, header_end);
-    for (size_t i = 0; i < header_lower.length(); ++i) {
-      header_lower[i] = static_cast<char>(
-          std::tolower(static_cast<unsigned char>(header_lower[i])));
-    }
-    size_t cl_pos = header_lower.find("content-length:");
-    if (cl_pos != std::string::npos) {
-      const char *str =
-          header_lower.c_str() + cl_pos + std::strlen("content-length:");
-      while (std::isspace(static_cast<int>(*str)))
-        str++;
-      if (*str == '-') {
-        std::cerr
-            << "minus sign in the content-length is non-acceptable; aborting"
-            << std::endl;
-        return;
-      }
-      char *end;
-      content_length = std::strtoul(str, &end, 10);
-      while (*end == ' ' || *end == '\t')
-        ++end;
-      if (*end != '\r' && *end != '\n') {
-        std::cerr << "content-length parsing failed; aborting" << std::endl;
+    if (!req_.has_value()) {
+      std::cerr << "request parsing failed: " << req_.error() << std::endl;
+      if (req_.error() == Errors::incomplete_header)
+        break;
+      else if (req_.error() == Errors::malformed_header ||
+               req_.error() == Errors::bad_request) {
+        Response resp = DefaultError::default_err_response(BAD_REQUEST);
+        std::ostringstream oss;
+        oss << resp;
+        clients.at(client_fd).out_buff += oss.str();
+        client_write(client_fd); // when the response is generated freshly,
+                                 // likely EPOLLIN | EPOLLOUT
+
+        if (peer_closed && clients.find(client_fd) != clients.end() &&
+            clients.at(client_fd).out_buff.empty()) {
+          disconnect(client_fd);
+        }
+
         return;
       }
     }
 
-    // check body if body not full break to get more event
-    size_t total_request_len = header_end + 4 + content_length;
-    if (in_buffer.length() < total_request_len) {
-      break;
-    }
+    Request request = req_.value();
 
     // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
-    std::string request_str = in_buffer.substr(0, total_request_len);
-    Request request(request_str);
-
     std::cout << "\nclient ip: " << clients.at(client_fd).ip << std::endl;
     std::cout << "[Request] " << request.get_method_string() << " "
-              << request.get_path() << " (Body: " << content_length << " bytes)"
+              << request.get_path()
+              << " (Body: " << request.get_content_length() << " bytes)"
               << std::endl;
 
     if (ServerResponse::find_file_type(request.get_path()) == "cgi") {
@@ -145,25 +130,10 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
     // read server response
     std::ostringstream server_response;
-    if (!http.cgi.empty())
-      server_response << http.cgi;
-    else {
-      server_response << "HTTP/1.1 " << http.status_code << "\r\n";
-      if (!http.redir.empty())
-        server_response << "Location: " << http.redir << "\r\n";
-      std::cout << http.redir << std::endl;
-      server_response << "Content-Type:" << http.mime_type << "\r\n";
-      if (!http.cookie.empty()) {
-        server_response << "Set-Cookie:" << http.cookie << "\r\n";
-        std::cout << "cookie value: " << http.cookie << std::endl;
-      }
-      server_response << "Content-Length: " << http.body.length() << "\r\n";
-      server_response << "Connection: " << http.connection << "\r\n\r\n";
-      server_response << http.body;
-    }
+
     clients.at(client_fd).out_buff += server_response.str();
 
-    in_buffer.erase(0, total_request_len);
+    in_buffer.clear();
   }
 
   client_write(client_fd); // when the response is generated freshly, likely

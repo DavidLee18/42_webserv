@@ -1,25 +1,26 @@
 #include "Client.hpp"
+#include "../errors.h"
 
-Request::Method Request::get_method() const {
-  if (method == "GET")
-    return Request::GET;
-  else if (method == "HEAD")
-    return Request::HEAD;
-  else if (method == "OPTIONS")
-    return Request::OPTIONS;
-  else if (method == "POST")
-    return Request::POST;
-  else if (method == "DELETE")
-    return Request::DELETE;
-  else if (method == "PUT")
-    return Request::PUT;
-  else if (method == "CONNECT")
-    return Request::CONNECT;
-  else if (method == "TRACE")
-    return Request::TRACE;
-  else if (method == "PATCH")
-    return Request::PATCH;
-  return Request::ERROR;
+std::string Request::get_method_string() const {
+  if (method == GET)
+    return "GET";
+  else if (method == HEAD)
+    return "HEAD";
+  else if (method == OPTIONS)
+    return "OPTIONS";
+  else if (method == POST)
+    return "POST";
+  else if (method == DELETE)
+    return "DELETE";
+  else if (method == PUT)
+    return "PUT";
+  else if (method == CONNECT)
+    return "CONNECT";
+  else if (method == TRACE)
+    return "TRACE";
+  else if (method == PATCH)
+    return "PATCH";
+  return "";
 }
 
 const std::string Request::get_connection_string() const {
@@ -29,22 +30,57 @@ const std::string Request::get_connection_string() const {
     return "close";
 }
 
-std::string Request::get_cookie_value(const std::string& name) const {
-  if (cookie.empty()) return "";
+std::string Request::get_cookie_value(const std::string &name) const {
+  if (cookie.empty())
+    return "";
 
   std::string target = name + "=";
   size_t start = cookie.find(target);
-  if (start == std::string::npos) return "";
+  if (start == std::string::npos)
+    return "";
 
   start += target.length();
   size_t end = cookie.find(';', start);
-  if (end == std::string::npos) end = cookie.length();
+  if (end == std::string::npos)
+    end = cookie.length();
 
   return cookie.substr(start, end - start);
 }
 
-Request::Request(std::string request) {
-  std::stringstream ss(request);
+Result<Request> Request::from_buff(std::string const &buff) {
+  Request req;
+  const size_t header_end = buff.find("\r\n\r\n");
+  if (header_end == std::string::npos)
+    return ERR(Request,
+               Errors::incomplete_header); // 헤더가 다 안 들어왔으면 다음 epoll
+                                           // 이벤트 대기
+
+  // checking Content-Length
+  std::string header_lower = buff.substr(0, header_end);
+  for (size_t i = 0; i < header_lower.length(); ++i) {
+    header_lower[i] = static_cast<char>(
+        std::tolower(static_cast<unsigned char>(header_lower[i])));
+  }
+  const size_t cl_pos = header_lower.find("content-length:");
+  if (cl_pos != std::string::npos) {
+    const char *str =
+        header_lower.c_str() + cl_pos + std::strlen("content-length:");
+    while (*str == ' ' || *str == '\t')
+      str++;
+    if (*str == '-')
+      return ERR(Request, Errors::malformed_header);
+    char *end;
+    req.content_length = std::strtoul(str, &end, 10);
+    while (*end == ' ' || *end == '\t')
+      ++end;
+    if (*end != '\r' && *end != '\n')
+      return ERR(Request, Errors::malformed_header);
+    if (header_lower.find("content-length:", cl_pos + 1) != std::string::npos)
+      return ERR(Request, Errors::malformed_header);
+  } else
+    return ERR(Request, Errors::malformed_header);
+
+  std::stringstream ss(buff);
   std::string line;
 
   // 1. 첫 번째 줄(Request Line)만 읽기
@@ -53,47 +89,74 @@ Request::Request(std::string request) {
       line.erase(line.size() - 1);
 
     std::stringstream line_ss(line);
+    std::string method_str;
 
-    line_ss >> this->method;  // "GET"
-    line_ss >> this->path;    // "/"
-    line_ss >> this->version; // "HTTP/1.1"
+    line_ss >> method_str;  // "GET"
+    line_ss >> req.path;    // "/"
+    line_ss >> req.version; // "HTTP/1.1"
+    if (req.version != "HTTP/1.0" && req.version != "HTTP/1.1")
+      return ERR(Request, Errors::bad_request);
+    if (method_str == "GET")
+      req.method = GET;
+    else if (method_str == "HEAD")
+      req.method = HEAD;
+    else if (method_str == "OPTIONS")
+      req.method = OPTIONS;
+    else if (method_str == "POST")
+      req.method = POST;
+    else if (method_str == "DELETE")
+      req.method = DELETE;
+    else if (method_str == "PUT")
+      req.method = PUT;
+    else if (method_str == "CONNECT")
+      req.method = CONNECT;
+    else if (method_str == "TRACE")
+      req.method = TRACE;
+    else if (method_str == "PATCH")
+      req.method = PATCH;
+    else
+      return ERR(Request, Errors::bad_request);
   }
+
   while (std::getline(ss, line) && line != "\r" && line != "") {
     if (!line.empty() && line[line.size() - 1] == '\r')
       line.erase(line.size() - 1);
 
-    size_t colon_pos = line.find(':');
+    const size_t colon_pos = line.find(':');
     if (colon_pos != std::string::npos) {
       std::string key = line.substr(0, colon_pos);
       std::string value = line.substr(colon_pos + 1);
 
       // Value 앞쪽에 있는 공백 지워주기 (예: ": localhost" -> "localhost")
-      size_t first_non_space = value.find_first_not_of(" \t");
+      const size_t first_non_space = value.find_first_not_of(" \t");
       if (first_non_space != std::string::npos) {
         value = value.substr(first_non_space);
       } else {
         value = "";
       }
-      this->header[key] = value;
+      req.header[key] = value;
     }
   }
-  std::streampos pos = ss.tellg();
-  if (pos != std::streampos(-1)) {
-    this->body = request.substr(static_cast<size_t>(pos));
+
+  if (get_string_from_map(req.header, "Connection") == "keep-alive")
+    req.keep_alive = true;
+
+  req.cookie = get_string_from_map(req.header, "Cookie");
+
+  // check body if body not full break to get more event
+  const size_t total_request_len =
+      header_end + std::strlen("\r\n\r\n") + req.content_length;
+  if (buff.length() < total_request_len) {
+    req.remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
+    return OK(Request, req);
   }
 
-  if (get_string_from_map(header, "Connection") == "keep-alive")
-    keep_alive = true;
-  else
-    keep_alive = false;
+  const std::streampos pos = ss.tellg();
+  if (pos != std::streampos(-1))
+    req.body = buff.substr(static_cast<size_t>(pos));
 
-  cookie = get_string_from_map(header, "Cookie");
+  if (req.body.empty() || req.body.size() == req.content_length)
+    req.remnants = "";
 
-  content_full = true;
-  if (!body.empty())
-  {
-    int content_len = atoi(get_string_from_map(header, "Content-Length").c_str());
-    if (body.size() != static_cast<size_t>(content_len))
-      content_full = false;
-  }
+  return OK(Request, req);
 }

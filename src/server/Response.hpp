@@ -74,6 +74,8 @@ struct Response {
   std::string cgi;       ///< Generated CGI script.
 };
 
+std::ostream &operator<<(std::ostream &, Response const &);
+
 class Request;
 class ServerConfig;
 
