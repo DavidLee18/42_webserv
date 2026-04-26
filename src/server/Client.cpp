@@ -61,12 +61,19 @@ Result<Request *> Request::from_buff(std::string &buff) {
     header_lower[i] = static_cast<char>(
         std::tolower(static_cast<unsigned char>(header_lower[i])));
   }
+  const size_t host_pos = header_lower.find("host:");
+  if (host_pos == std::string::npos ||
+      header_lower.find("host:", host_pos + 1) != std::string::npos)
+    return ERR(Request *, Errors::bad_request);
   const size_t cl_pos = header_lower.find("content-length:");
-  const bool has_te =
-      (header_lower.find("transfer-encoding:") != std::string::npos);
-  if (cl_pos != std::string::npos && has_te)
+  const size_t te_pos = header_lower.find("transfer-encoding:");
+  if (cl_pos != std::string::npos && te_pos != std::string::npos)
     return ERR(Request *, Errors::malformed_header); // conforming to the RFC
-  if (cl_pos != std::string::npos && !has_te) {
+  if (te_pos != std::string::npos &&
+      (header_lower.find("transfer-encoding:chunked") != std::string::npos ||
+       header_lower.find("transfer-encoding: chunked")))
+    return ERR(Request *, Errors::not_implemented);
+  if (cl_pos != std::string::npos && te_pos == std::string::npos) {
     const char *str =
         header_lower.c_str() + cl_pos + std::strlen("content-length:");
     while (*str == ' ' || *str == '\t')
@@ -102,6 +109,8 @@ Result<Request *> Request::from_buff(std::string &buff) {
     line_ss >> req_version; // "HTTP/1.1"
     if (req_version != "HTTP/1.0" && req_version != "HTTP/1.1")
       return ERR(Request *, Errors::bad_request);
+    if (line.length() > 0x2000 || req_path.find('\0') != std::string::npos)
+      return ERR(Request *, Errors::bad_request);
     if (method_str == "GET")
       method = GET;
     else if (method_str == "HEAD")
@@ -123,7 +132,7 @@ Result<Request *> Request::from_buff(std::string &buff) {
     else
       return ERR(Request *, Errors::bad_request);
 
-    if (cl_pos == std::string::npos && !has_te &&
+    if (cl_pos == std::string::npos && te_pos == std::string::npos &&
         (method == POST || method == PUT || method == PATCH))
       return ERR(Request *, Errors::malformed_header);
   } else {
@@ -136,18 +145,33 @@ Result<Request *> Request::from_buff(std::string &buff) {
       line.erase(line.size() - 1);
 
     const size_t colon_pos = line.find(':');
-    if (colon_pos != std::string::npos) {
-      std::string key = line.substr(0, colon_pos);
-      std::string value = line.substr(colon_pos + 1);
+    if (line.length() > 0x2000 || line[0] == ' ' || line[0] == '\t' ||
+        colon_pos == std::string::npos || colon_pos == 0 ||
+        line[colon_pos - 1] == ' ' || line[colon_pos - 1] == '\t') {
+      delete req;
+      return ERR(Request *, Errors::bad_request);
+    }
+    std::string key = line.substr(0, colon_pos);
+    std::string value = line.substr(colon_pos + 1);
 
-      // Value 앞쪽에 있는 공백 지워주기 (예: ": localhost" -> "localhost")
-      const size_t first_non_space = value.find_first_not_of(" \t");
-      if (first_non_space != std::string::npos) {
-        value = value.substr(first_non_space);
-      } else {
-        value = "";
+    // Value 앞쪽에 있는 공백 지워주기 (예: ": localhost" -> "localhost")
+    const size_t first_non_space = value.find_first_not_of(" \t");
+    if (first_non_space != std::string::npos) {
+      value = value.substr(first_non_space);
+    } else {
+      value = "";
+    }
+    for (std::string::const_iterator it = value.begin(); it != value.end();
+         ++it) {
+      if (*it < 0x20 && *it != '\t') {
+        delete req;
+        return ERR(Request *, Errors::bad_request);
       }
-      req->header[key] = value;
+    }
+    req->header[key] = value;
+    if (req->header.size() > 100) {
+      delete req;
+      return ERR(Request *, Errors::bad_request);
     }
   }
 

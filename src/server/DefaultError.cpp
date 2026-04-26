@@ -75,6 +75,8 @@ std::string DefaultError::status_code_to_string(int status_code) {
     return "413 Payload Too Large";
   else if (status_code == 500)
     return "500 Internal Server Error";
+  else if (status_code == 501)
+    return "501 Not Implemented";
   return "500 Internal Server Error";
 }
 
@@ -94,7 +96,5 @@ Response DefaultError::default_err_response(int err_code) {
     response.body = server_error();
   else
     response.body = unknown_err();
-  response.mime_type = "text/html";
-  response.status_code = status_code_to_string(err_code);
   return response;
 }

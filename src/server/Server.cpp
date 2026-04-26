@@ -1,5 +1,6 @@
 #include "Server.hpp"
 #include "../webserv.h"
+#include "DefaultError.hpp"
 #include "Response.hpp"
 #include <cstddef>
 
@@ -88,6 +89,20 @@ void Server::client_read(const FileDescriptor *client_fd) {
         else if (req_.error() == Errors::malformed_header ||
                  req_.error() == Errors::bad_request) {
           Response resp = DefaultError::default_err_response(BAD_REQUEST);
+          std::ostringstream oss;
+          oss << resp;
+          clients.at(client_fd).out_buff += oss.str();
+          client_write(client_fd); // when the response is generated freshly,
+                                   // likely EPOLLIN | EPOLLOUT
+
+          if (peer_closed && clients.find(client_fd) != clients.end() &&
+              clients.at(client_fd).out_buff.empty()) {
+            disconnect(client_fd);
+          }
+
+          return;
+        } else if (req_.error() == Errors::not_implemented) {
+          Response resp = DefaultError::default_err_response(NOT_IMPLEMENTED);
           std::ostringstream oss;
           oss << resp;
           clients.at(client_fd).out_buff += oss.str();
