@@ -54,7 +54,7 @@ enum RuleOperator {
    */
   AUTOINDEX,
   /**
-   * @brief 현재 경로를 기준으로 연결하는 규칙을 나타낸다.
+   * @brief 특정 경로로 업로드하는 규칙을 나타낸다.
    */
   UPLOAD_TO,
   /**
