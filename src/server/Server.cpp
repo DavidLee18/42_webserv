@@ -1,6 +1,7 @@
 #include "Server.hpp"
 #include "../webserv.h"
 #include "Response.hpp"
+#include <cstddef>
 
 void Server::new_connection(const FileDescriptor *server_fd) {
   while (true) { // accept all clients until nothing to connect
@@ -76,13 +77,13 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
   // HTTP parsing and response generate
   std::string &in_buffer = clients.at(client_fd).in_buff;
-  while (!in_buffer.empty()) {
-    Result<Request> req_ = Request::from_buff(in_buffer);
+  if (!in_buffer.empty() && clients.at(client_fd).req == NULL) {
+    Result<Request *> req_ = Request::from_buff(in_buffer);
 
     if (!req_.has_value()) {
       std::cerr << "request parsing failed: " << req_.error() << std::endl;
       if (req_.error() == Errors::incomplete_header)
-        break;
+        return;
       else if (req_.error() == Errors::malformed_header ||
                req_.error() == Errors::bad_request) {
         Response resp = DefaultError::default_err_response(BAD_REQUEST);
@@ -101,18 +102,22 @@ void Server::client_read(const FileDescriptor *client_fd) {
       }
     }
 
-    Request request = req_.value();
+    clients.at(client_fd).req = req_.value();
+
+    if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
+      return;
 
     // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
     std::cout << "\nclient ip: " << clients.at(client_fd).ip << std::endl;
-    std::cout << "[Request] " << request.get_method_string() << " "
-              << request.get_path()
-              << " (Body: " << request.get_content_length() << " bytes)"
-              << std::endl;
+    std::cout << "[Request] " << clients.at(client_fd).req->get_method_string()
+              << " " << clients.at(client_fd).req->get_path()
+              << " (Body: " << clients.at(client_fd).req->get_content_length()
+              << " bytes)" << std::endl;
 
-    if (ServerResponse::find_file_type(request.get_path()) == "cgi") {
+    if (ServerResponse::find_file_type(clients.at(client_fd).req->get_path()) ==
+        "cgi") {
       Result<CgiDelegate> del_ = ServerResponse::register_cgi(
-          &request, clients.at(client_fd).config, &epoll);
+          clients.at(client_fd).req, clients.at(client_fd).config, &epoll);
       if (!del_.has_value()) {
         std::cerr << "CGI registration failed: " << del_.error() << std::endl;
         return;
@@ -125,15 +130,16 @@ void Server::client_read(const FileDescriptor *client_fd) {
       return;
     }
     // response generate
-    Response http = ServerResponse::http_response(
-        &request, &clients.at(client_fd), mime_type, &sessions);
+    Response http = ServerResponse::http_response(clients.at(client_fd).req,
+                                                  &clients.at(client_fd),
+                                                  mime_type, &sessions);
 
     // read server response
     std::ostringstream server_response;
 
     clients.at(client_fd).out_buff += server_response.str();
-
-    in_buffer.clear();
+  } else if (!in_buffer.empty() && clients.at(client_fd).req != NULL) {
+    clients.at(client_fd).req->continue_parsing(in_buffer);
   }
 
   client_write(client_fd); // when the response is generated freshly, likely

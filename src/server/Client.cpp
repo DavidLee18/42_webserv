@@ -47,11 +47,10 @@ std::string Request::get_cookie_value(const std::string &name) const {
   return cookie.substr(start, end - start);
 }
 
-Result<Request> Request::from_buff(std::string const &buff) {
-  Request req;
+Result<Request *> Request::from_buff(std::string &buff) {
   const size_t header_end = buff.find("\r\n\r\n");
   if (header_end == std::string::npos)
-    return ERR(Request,
+    return ERR(Request *,
                Errors::incomplete_header); // 헤더가 다 안 들어왔으면 다음 epoll
                                            // 이벤트 대기
 
@@ -64,28 +63,31 @@ Result<Request> Request::from_buff(std::string const &buff) {
   const size_t cl_pos = header_lower.find("content-length:");
   const bool has_te =
       (header_lower.find("transfer-encoding:") != std::string::npos);
-  if (cl_pos != std::string::npos) {
-    if (has_te)
-      return ERR(Request, Errors::malformed_header); // conforming to the RFC
-    const char *str =
-        header_lower.c_str() + cl_pos + std::strlen("content-length:");
-    while (*str == ' ' || *str == '\t')
-      str++;
-    if (*str == '-')
-      return ERR(Request, Errors::malformed_header);
-    char *end;
-    req.content_length = std::strtoul(str, &end, 10);
-    while (*end == ' ' || *end == '\t')
-      ++end;
-    if (*end != '\r' && *end != '\n')
-      return ERR(Request, Errors::malformed_header);
-    if (header_lower.find("content-length:", cl_pos + 1) != std::string::npos)
-      return ERR(Request, Errors::malformed_header);
-  }
+  if (cl_pos == std::string::npos)
+    return ERR(Request *, Errors::malformed_header);
+  if (has_te)
+    return ERR(Request *, Errors::malformed_header); // conforming to the RFC
+  const char *str =
+      header_lower.c_str() + cl_pos + std::strlen("content-length:");
+  while (*str == ' ' || *str == '\t')
+    str++;
+  if (*str == '-')
+    return ERR(Request *, Errors::malformed_header);
+  char *end;
+  const size_t content_length = std::strtoul(str, &end, 10);
+  while (*end == ' ' || *end == '\t')
+    ++end;
+  if (*end != '\r' && *end != '\n')
+    return ERR(Request *, Errors::malformed_header);
+  if (header_lower.find("content-length:", cl_pos + 1) != std::string::npos)
+    return ERR(Request *, Errors::malformed_header);
 
   std::stringstream ss(buff);
   std::string line;
 
+  Request::Method method;
+  std::string req_path;
+  std::string req_version;
   // 1. 첫 번째 줄(Request Line)만 읽기
   if (std::getline(ss, line)) {
     if (!line.empty() && line[line.size() - 1] == '\r')
@@ -95,35 +97,38 @@ Result<Request> Request::from_buff(std::string const &buff) {
     std::string method_str;
 
     line_ss >> method_str;  // "GET"
-    line_ss >> req.path;    // "/"
-    line_ss >> req.version; // "HTTP/1.1"
-    if (req.version != "HTTP/1.0" && req.version != "HTTP/1.1")
-      return ERR(Request, Errors::bad_request);
+    line_ss >> req_path;    // "/"
+    line_ss >> req_version; // "HTTP/1.1"
+    if (req_version != "HTTP/1.0" && req_version != "HTTP/1.1")
+      return ERR(Request *, Errors::bad_request);
     if (method_str == "GET")
-      req.method = GET;
+      method = GET;
     else if (method_str == "HEAD")
-      req.method = HEAD;
+      method = HEAD;
     else if (method_str == "OPTIONS")
-      req.method = OPTIONS;
+      method = OPTIONS;
     else if (method_str == "POST")
-      req.method = POST;
+      method = POST;
     else if (method_str == "DELETE")
-      req.method = DELETE;
+      method = DELETE;
     else if (method_str == "PUT")
-      req.method = PUT;
+      method = PUT;
     else if (method_str == "CONNECT")
-      req.method = CONNECT;
+      method = CONNECT;
     else if (method_str == "TRACE")
-      req.method = TRACE;
+      method = TRACE;
     else if (method_str == "PATCH")
-      req.method = PATCH;
+      method = PATCH;
     else
-      return ERR(Request, Errors::bad_request);
+      return ERR(Request *, Errors::bad_request);
 
     if (cl_pos == std::string::npos && !has_te &&
-        (req.method == POST || req.method == PUT || req.method == PATCH))
-      return ERR(Request, Errors::malformed_header);
+        (method == POST || method == PUT || method == PATCH))
+      return ERR(Request *, Errors::malformed_header);
+  } else {
+    return ERR(Request *, Errors::internal_server_error);
   }
+  Request *req = new Request(method, req_path, req_version, content_length);
 
   while (std::getline(ss, line) && line != "\r" && line != "") {
     if (!line.empty() && line[line.size() - 1] == '\r')
@@ -141,29 +146,47 @@ Result<Request> Request::from_buff(std::string const &buff) {
       } else {
         value = "";
       }
-      req.header[key] = value;
+      req->header[key] = value;
     }
   }
 
-  if (get_string_from_map(req.header, "Connection") == "keep-alive")
-    req.keep_alive = true;
+  if (get_string_from_map(req->header, "Connection") == "keep-alive")
+    req->keep_alive = true;
 
-  req.cookie = get_string_from_map(req.header, "Cookie");
+  req->cookie = get_string_from_map(req->header, "Cookie");
 
   // check body if body not full break to get more event
   const size_t total_request_len =
-      header_end + std::strlen("\r\n\r\n") + req.content_length;
+      header_end + std::strlen("\r\n\r\n") + req->content_length;
   if (buff.length() < total_request_len) {
-    req.remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
-    return OK(Request, req);
+    req->remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
+    buff.erase(0, total_request_len);
+    return OK(Request *, req);
   }
 
   const std::streampos pos = ss.tellg();
   if (pos != std::streampos(-1))
-    req.body = buff.substr(static_cast<size_t>(pos));
+    req->body = buff.substr(static_cast<size_t>(pos));
 
-  if (req.body.empty() || req.body.size() == req.content_length)
-    req.remnants = "";
+  if (req->body.empty() || req->body.size() == req->content_length)
+    req->remnants = "";
+  buff.erase(0, total_request_len);
+  return OK(Request *, req);
+}
 
-  return OK(Request, req);
+void Request::continue_parsing(std::string &buff) {
+  if (remnants.empty())
+    return;
+  else if (remnants.length() < content_length) {
+    if (remnants.length() + buff.length() >= content_length) {
+      size_t diff = content_length - remnants.length();
+      remnants += buff.substr(0, diff);
+      buff.erase(0, diff);
+      body = remnants;
+      remnants.clear();
+    } else {
+      remnants += buff;
+      buff.clear();
+    }
+  }
 }

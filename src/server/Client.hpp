@@ -27,6 +27,7 @@ std::string get_string_from_map(const std::map<std::string, std::string> map,
                                 std::string key);
 
 class ServerConfig;
+class Request;
 
 /**
  * @struct ClientSession
@@ -40,11 +41,12 @@ struct ClientSession {
       *config; ///< Pointer to the server configuration for this session.
   std::string cookie;
   std::string ip;
+  Request *req;
 
   /**
    * @brief Default constructor. Initializes config to NULL.
    */
-  ClientSession() : config(NULL) {}
+  ClientSession() : config(NULL), req(NULL) {}
 };
 
 /**
@@ -70,7 +72,7 @@ public:
     ERROR
   };
 
-  static Result<Request> from_buff(std::string const &);
+  static Result<Request *> from_buff(std::string &);
 
   /**
    * @brief Gets the value of the Connection header.
@@ -140,6 +142,10 @@ public:
 
   size_t get_content_length() const { return content_length; }
 
+  bool is_partial() const { return remnants.empty(); }
+
+  void continue_parsing(std::string &);
+
 private:
   Method method;       ///< The HTTP method (e.g., "GET").
   std::string path;    ///< The requested path (e.g., "/").
@@ -154,6 +160,10 @@ private:
   Request()
       : method(ERROR), path(), version(), header(), keep_alive(false),
         content_length(0), cookie(), body(), remnants() {}
+  Request(Method method, std::string const &path, std::string const &version,
+          size_t content_length)
+      : method(method), path(path), version(version),
+        content_length(content_length) {}
 };
 
 #endif

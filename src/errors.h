@@ -35,6 +35,7 @@ public:
   const static std::string incomplete_header;
   const static std::string malformed_header;
   const static std::string bad_request;
+  const static std::string internal_server_error;
 };
 
 #endif // ERRORS_H

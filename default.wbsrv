@@ -16,6 +16,7 @@ uwsgi =
 	[] +<= X-Content-Type-Options: nosniff
 	[] +<= X-Frame-Options: DENY
 	[] +<= Referrer-Policy: no-referrer
+	[] +<= Content-Security-Policy: default-src 'self'
 
 	...30
 
@@ -52,6 +53,7 @@ uwsgi =
 	[] +<= X-Content-Type-Options: nosniff
 	[] +<= X-Frame-Options: DENY
 	[] +<= Referrer-Policy: no-referrer
+	[] +<= Content-Security-Policy: default-src 'self'
 
 	...30
 

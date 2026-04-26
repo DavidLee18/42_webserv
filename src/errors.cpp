@@ -34,3 +34,4 @@ const std::string Errors::stream_too_many =
 const std::string Errors::incomplete_header = "incomplete header";
 const std::string Errors::malformed_header = "malformed header";
 const std::string Errors::bad_request = "bad request";
+const std::string Errors::internal_server_error = "internal server error";
