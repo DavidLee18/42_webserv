@@ -142,7 +142,7 @@ public:
 
   size_t get_content_length() const { return content_length; }
 
-  bool is_partial() const { return remnants.empty(); }
+  bool is_partial() const { return !remnants.empty(); }
 
   void continue_parsing(std::string &);
 
