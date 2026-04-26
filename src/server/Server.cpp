@@ -91,12 +91,18 @@ void Server::client_read(const FileDescriptor *client_fd) {
     size_t cl_pos = header_lower.find("content-length:");
     if (cl_pos != std::string::npos) {
       const char *str =
-          header_lower.c_str() + cl_pos + sizeof("content-length:");
+          header_lower.c_str() + cl_pos + std::strlen("content-length:");
       while (std::isspace(static_cast<int>(*str)))
         str++;
+      if (*str == '-') {
+        std::cerr
+            << "minus sign in the content-length is non-acceptable; aborting"
+            << std::endl;
+        return;
+      }
       char *end;
       content_length = std::strtoul(str, &end, 10);
-      if (str == end) {
+      if (*end != '\r' || *end != '\n') {
         std::cerr << "content-length parsing failed; aborting" << std::endl;
         return;
       }
@@ -157,6 +163,9 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
     in_buffer.erase(0, total_request_len);
   }
+
+  client_write(client_fd); // when the response is generated freshly, likely
+                           // EPOLLIN | EPOLLOUT
 
   if (peer_closed && clients.find(client_fd) != clients.end() &&
       clients.at(client_fd).out_buff.empty()) {
