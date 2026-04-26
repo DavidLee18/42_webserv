@@ -102,7 +102,9 @@ void Server::client_read(const FileDescriptor *client_fd) {
       }
       char *end;
       content_length = std::strtoul(str, &end, 10);
-      if (*end != '\r' || *end != '\n') {
+      while (*end == ' ' || *end == '\t')
+        ++end;
+      if (*end != '\r' && *end != '\n') {
         std::cerr << "content-length parsing failed; aborting" << std::endl;
         return;
       }
