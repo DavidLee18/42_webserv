@@ -3,6 +3,7 @@
 volatile sig_atomic_t g_receivedSignal = 0;
 
 int main(const int argc, char *argv[]) {
+  signal(SIGPIPE, SIG_IGN);
   (void)argc;
   if (argc != 2) {
     std::cerr << "Usage: webserv <config_file>" << std::endl;
@@ -34,7 +35,6 @@ int main(const int argc, char *argv[]) {
       std::cerr << "Server Error: " << server_result.error() << std::endl;
       return 1;
     }
-    
   }
   return 0;
 }

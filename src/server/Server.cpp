@@ -35,7 +35,7 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     client.ip = ip_str;
 
     // register client socket to EPoll
-    Event client_event(&client_fd, true, true, false, false, false, false);
+    Event client_event(&client_fd, true, true, true, false, false, false);
     Option client_option(true, false, false, false);
 
     Result<FileDescriptor *> add_result =
@@ -84,10 +84,12 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
       if (!req_.has_value()) {
         std::cerr << "request parsing failed: " << req_.error() << std::endl;
-        if (req_.error() == Errors::incomplete_header)
+        if (req_.error() == Errors::incomplete_header) {
+          if (peer_closed)
+            disconnect(client_fd);
           return;
-        else if (req_.error() == Errors::malformed_header ||
-                 req_.error() == Errors::bad_request) {
+        } else if (req_.error() == Errors::malformed_header ||
+                   req_.error() == Errors::bad_request) {
           Response resp = DefaultError::default_err_response(BAD_REQUEST);
           std::ostringstream oss;
           oss << resp;
@@ -121,7 +123,11 @@ void Server::client_read(const FileDescriptor *client_fd) {
       clients.at(client_fd).req = req_.value();
 
       if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
+      {
+        if (peer_closed)
+          disconnect(client_fd);
         return;
+      }
 
       // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
       std::cout << "\nclient ip: " << clients.at(client_fd).ip << std::endl;
@@ -345,9 +351,9 @@ Result<Void> Server::start() {
         if (event->out)
           client_write(fd);
         if (event->err || event->hup || event->rdhup) {
-          if (clients.find(fd) != clients.end() &&
-              clients.at(fd).out_buff.empty())
-            disconnect(fd);
+          if (clients.find(fd) != clients.end())
+            client_read(fd);
+          disconnect(fd);
         }
       } else { // CGI
         for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
