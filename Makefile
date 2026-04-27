@@ -1,7 +1,7 @@
 CXX				:= c++
 CXXFLAGS_COMMON	:= -Wall -Werror -Wextra -Wconversion -std=c++98
 CXXFLAGS		:= -O2 -foptimize-sibling-calls
-DEBUG_CXXFLAGS	:= -g3 -O0 #-fsanitize=address -fno-omit-frame-pointer
+DEBUG_CXXFLAGS	:= -g3 -O0 -fno-omit-frame-pointer -fno-inline
 NAME			:= webserv
 
 BUILD_DIR := build
@@ -69,7 +69,10 @@ $(UWSGI_BUILD_DIR)/%.o: $(UWSGI_SRC_DIR)/%.cpp
 	mkdir -p $(UWSGI_BUILD_DIR)
 	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -MMD -MP -c $< -o $@
 
+compile-commands:
+	bear -- make re
+
 -include $(DEPS)
 -include $(UWSGI_DEPS)
 
-.PHONY: all clean fclean re bonus rebo uwsgi cgi integration-test
+.PHONY: all clean fclean re bonus rebo uwsgi cgi integration-test compile-commands
