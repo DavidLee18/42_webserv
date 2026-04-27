@@ -15,6 +15,7 @@ Probabilities are evaluator-probing estimates, not RFC-strictness levels.
 | Area | State |
 |---|---|
 | Request-parsing hardening | **38/38** on `webserv_parsing_tests.zsh`. |
+| Mid-request disconnect (5.3) | **13/13** on `webserv_disconnect_tests.zsh`. fd-stable across 470 adversarial iterations. |
 | Standard HTTP security headers | Not started. |
 | CGI sandboxing | Not started. |
 | Content integrity (ETag / Last-Modified / Repr-Digest) | Not started. |
@@ -160,10 +161,11 @@ The single most-graded category. ~90% of crash marks live here.
 - [ ] **Pipelined burst** — single TCP segment with N back-to-back valid requests. Server should respond to each in order. (Currently handled by the `while (!in_buffer.empty())` loop.)
 
 ### 5.3 Mid-request disconnect
-- [ ] Disconnect during headers — fd closed, ClientSession reaped, no leak.
-- [ ] Disconnect during body — same.
-- [ ] Disconnect during response write — same; partial response not retried.
-- [ ] Disconnect during CGI execution — child killed, pipes closed, response dropped, no zombie.
+- [x] Disconnect during headers — fd closed, ClientSession reaped, no leak. (D1–D4)
+- [x] Disconnect during body — same. (D5–D8)
+- [x] Disconnect during response write — same; partial response not retried. (D9–D11)
+- [x] Disconnect during CGI execution — child killed, pipes closed, response dropped, no zombie. (D12)
+- [x] Mixed adversarial burst — random disconnect phase across 100 clients. (D13)
 
 ### 5.4 Long-running soundness
 - [ ] **24 h stability run** under steady 100 RPS — RSS stable, fd count stable, no slow leak.
