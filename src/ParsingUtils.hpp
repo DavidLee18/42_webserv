@@ -25,7 +25,7 @@ std::string trim_whitespace(const std::string &s);
  *
  * - 탭 1개 또는 공백 4개를 동일한 들여쓰기 1단계로 처리한다.
  */
-bool match_indent_level(std::string line, size_t num);
+bool match_indent_level(const std::string &line, size_t num);
 /**
  * @brief 문자열을 구분자를 기준으로 분리하는 함수
  * @param line 분리할 문자열
@@ -42,7 +42,7 @@ std::vector<std::string> string_split(const std::string &line,
  * @param allowed 추가로 허용할 문자 집합
  * @return 허용되지 않은 문자가 존재하면 true, 그렇지 않으면 false
  */
-bool has_invalid_char(const std::string &line, const std::string &chars);
+bool has_invalid_char(const std::string &line, const std::string &allowed);
 /**
  * @brief 문자열에서 특정 문자 또는 문자열의 출현 횟수를 계산한다.
  * @param line 검사할 문자열

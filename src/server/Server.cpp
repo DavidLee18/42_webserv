@@ -7,10 +7,11 @@
 void Server::new_connection(const FileDescriptor *server_fd) {
   while (true) { // accept all clients until nothing to connect
     // init client socket
-    struct sockaddr_in client_addr;
+    sockaddr_in client_addr = {};
     socklen_t client_len = sizeof(client_addr);
     Result<FileDescriptor> client_result =
-        server_fd->socket_accept((struct sockaddr *)&client_addr, &client_len);
+        server_fd->socket_accept(
+        reinterpret_cast<struct sockaddr *>(&client_addr), &client_len);
     if (!client_result.has_value()) {
       const std::string &err = client_result.error();
       if (err == Errors::try_again)
@@ -41,7 +42,7 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     Result<FileDescriptor *> add_result =
         epoll.add_fd(client_fd, client_event, client_option);
     if (add_result.has_value()) {
-      FileDescriptor *client_ptr = add_result.value();
+      const FileDescriptor *client_ptr = add_result.value();
       if (listeners.find(server_fd) != listeners.end()) {
         client.config = listeners.at(server_fd);
       }
@@ -239,7 +240,7 @@ void Server::client_write(const FileDescriptor *client_fd) {
       if (!send_res.has_value())
         break; // EWOULDBLOCK
 
-      ssize_t bytes = send_res.value();
+      const ssize_t bytes = send_res.value();
       if (bytes == 0)
         break;
 
@@ -285,7 +286,7 @@ Result<Void> Server::init() {
                 << std::endl;
 
     // Bind (associate IP and port)
-    struct in_addr addr;
+    in_addr addr = {};
     addr.s_addr = htonl(INADDR_ANY); // All IPs
     Result<Void> bind_result = server_fd.socket_bind(addr, port);
     if (!bind_result.has_value())

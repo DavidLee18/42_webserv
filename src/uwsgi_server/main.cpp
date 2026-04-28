@@ -4,7 +4,7 @@
 #include <iostream>
 #include <sys/stat.h>
 
-int main(int argc, char *argv[]) {
+int main(const int argc, char *argv[]) {
   if (argc < 2 || argc > 3) {
     std::cerr << "Usage: uwsgi_server <script.py> [port]" << std::endl;
     return 1;
@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
   const std::string script_path = argv[1];
 
   // Verify the script file exists before starting the server
-  struct stat st;
+  struct stat st = {};
   if (stat(script_path.c_str(), &st) != 0) {
     std::cerr << "Script not found: " << script_path << std::endl;
     return 1;

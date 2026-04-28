@@ -2,10 +2,11 @@
 #include "../ParsingUtils.hpp"
 #include "../cgi_1_1.h"
 #include "Session.hpp"
-#include <errno.h>
+#include <cerrno>
 
-std::string get_string_from_map(const std::map<int, std::string> map, int key) {
-  std::map<int, std::string>::const_iterator it = map.find(key);
+std::string get_string_from_map(const std::map<int, std::string>& map,
+                                const int key) {
+  const std::map<int, std::string>::const_iterator it = map.find(key);
 
   if (it != map.end())
     return it->second;
@@ -13,9 +14,9 @@ std::string get_string_from_map(const std::map<int, std::string> map, int key) {
     return "";
 }
 
-std::string get_string_from_map(const std::map<std::string, std::string> map,
-                                std::string key) {
-  std::map<std::string, std::string>::const_iterator it = map.find(key);
+std::string get_string_from_map(const std::map<std::string, std::string>& map,
+                                const std::string& key) {
+  const std::map<std::string, std::string>::const_iterator it = map.find(key);
 
   if (it != map.end())
     return it->second;
@@ -41,7 +42,82 @@ std::ostream &operator<<(std::ostream &os, Response const &resp) {
   return os;
 }
 
-std::string ServerResponse::status_code_to_string(int status_code) {
+std::string ServerResponse::find_file_type(const std::string &path) {
+  std::vector<std::string> file_type = utils::string_split(path, ".");
+
+  if (file_type.size() <= 1)
+    return "default";
+  return file_type.back();
+}
+
+Response ServerResponse::http_response(
+    const Request *request, const ClientSession *client,
+    const std::map<std::string, std::string>& mime_type, Session *session) {
+  const ServerConfig *config = client->config;
+  const RouteRule *rule =
+      config->find_route(request->get_method(), request->get_path());
+  if (rule == NULL)
+    return DefaultError::default_err_response(NOT_FOUND_ERR);
+  Response response;
+  response.keep_alive = false;
+  const Target target = resolve_target(rule, config, request);
+
+  // [쿠키 검증 로직 추가]
+  const std::string session_id = request->get_cookie_value("session_id");
+  const SessionData *user_session = NULL;
+
+  if (!session_id.empty()) {
+    user_session = session->get_session(session_id);
+  }
+
+  if (user_session) {
+    std::cout << "[Authentication] Valid user session found! User ID: "
+              << user_session->user_id << std::endl;
+  } else {
+    // 세션이 없는데 보호된 자원(예: DELETE 명령)을 요청하면 401 에러를 반환
+    if (request->get_method() == Request::DELETE) {
+      std::cout << "[Authentication] Blocked DELETE request. No valid session."
+                << std::endl;
+      return error_response(config, rule, UNAUTHORIZED);
+    }
+    std::cout << "[Authentication] No valid session. Guest user." << std::endl;
+  }
+
+  response.mime_type =
+      get_string_from_map(mime_type, find_file_type(target.path));
+  std::cout << "mime type: " << response.mime_type << std::endl;
+
+  if (request->get_method() == Request::DELETE) {
+    return ServerResponse::delete_method(target, response, config, rule);
+  } else if (request->get_method() == Request::POST) {
+    return ServerResponse::post_method(target, response, client, rule, request,
+                                       session);
+  } else if (request->get_method() == Request::GET) {
+    return ServerResponse::get_method(target, response, config, rule, request);
+  } else {
+    return error_response(config, rule, METHOD_NOT_ALLOWED);
+  }
+  return response;
+}
+
+Result<CgiDelegate> ServerResponse::register_cgi(const Request *request,
+                                                 const ServerConfig *config,
+                                                 EPoll *epoll) {
+  RouteRule_CGI const *rule =
+      config->find_route_cgi(request->get_method(), request->get_path());
+  if (rule == NULL)
+    return ERR(CgiDelegate, "rule not found");
+  const Result<CgiDelegate> del_ = CgiDelegate::from_req(*request, *epoll, *rule);
+  if (!del_.has_value())
+    return ERR(CgiDelegate, del_.error());
+  CgiDelegate del(del_.value());
+  const Result<Void> res = del.register_();
+  if (!res.has_value())
+    return ERR(CgiDelegate, res.error());
+  return OK(CgiDelegate, del);
+}
+
+std::string ServerResponse::status_code_to_string(const int status_code) {
   if (status_code == 200)
     return "200 OK";
   else if (status_code == 301)
@@ -61,16 +137,8 @@ std::string ServerResponse::status_code_to_string(int status_code) {
   return "500 Internal Server Error";
 }
 
-std::string ServerResponse::get_pwd() {
-  char buffer[1024];
-  if (getcwd(buffer, sizeof(buffer)) != NULL) {
-    return std::string(buffer);
-  }
-  return "";
-}
-
 int ServerResponse::check_path_type(const std::string &path) {
-  struct stat info;
+  struct stat info = {};
 
   if (stat(path.c_str(), &info) != 0)
     return NOT_FOUND_ERR;
@@ -83,14 +151,6 @@ int ServerResponse::check_path_type(const std::string &path) {
   return PATH_ERROR;
 }
 
-std::string ServerResponse::find_file_type(std::string path) {
-  std::vector<std::string> file_type = utils::string_split(path, ".");
-
-  if (file_type.size() <= 1)
-    return "default";
-  return file_type.back();
-}
-
 Target ServerResponse::resolve_target(const RouteRule *rule,
                                       const ServerConfig *config,
                                       const Request *request) {
@@ -100,13 +160,13 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
     return target;
   }
 
-  std::string root =
+  const std::string root =
       config->get_rewritten_path(request->get_method(), request->get_path());
 
   target.path = get_pwd();
   std::cout << "Root: " << root << std::endl;
   std::cout << "rule op: " << rule->op << std::endl;
-  int type = check_path_type(target.path + root);
+  const int type = check_path_type(target.path + root);
   if (type == IS_DIR) {
     target.path += root;
     if (rule->op == SERVE_FROM && request->get_path() == "/")
@@ -124,18 +184,26 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   return target;
 }
 
+std::string ServerResponse::get_pwd() {
+  char buffer[1024];
+  if (getcwd(buffer, sizeof(buffer)) != NULL) {
+    return std::string(buffer);
+  }
+  return "";
+}
+
 Response ServerResponse::error_response(const ServerConfig *config,
-                                        const RouteRule *rule, int err_code) {
+                                        const RouteRule *rule, int error_code) {
   Response response;
   std::string err_page =
-      get_pwd() + get_string_from_map(rule->error_pages, err_code);
+      get_pwd() + get_string_from_map(rule->error_pages, error_code);
   std::cout << "error page: " << err_page << std::endl;
 
   if (err_page.empty())
-    return DefaultError::default_err_response(err_code);
+    return DefaultError::default_err_response(error_code);
   (void)config;
   if (check_path_type(err_page) != IS_FILE)
-    return DefaultError::default_err_response(err_code);
+    return DefaultError::default_err_response(error_code);
   std::ifstream file(err_page.c_str());
   if (file.is_open()) {
     response.status_code = status_code_to_string(OK);
@@ -144,12 +212,215 @@ Response ServerResponse::error_response(const ServerConfig *config,
     response.body = ss.str();
     file.close();
   } else {
-    return DefaultError::default_err_response(err_code);
+    return DefaultError::default_err_response(error_code);
   }
   return response;
 }
 
-Response ServerResponse::delete_method(Target target, Response response,
+std::string ServerResponse::make_autoindex_page(const std::string &real_path,
+                                                const std::string &req_uri,
+                                                DIR *dir) {
+  std::ostringstream html;
+
+  // 1. HTML 기본 뼈대 및 모던 다크 테마 CSS 작성
+  html
+      << "<!DOCTYPE html>\n"
+      << "<html><head><meta charset=\"UTF-8\">\n"
+      << "<meta name=\"viewport\" content=\"width=device-width, "
+         "initial-scale=1.0\">\n"
+      << "<title>Index of " << req_uri << "</title>\n"
+      << "<style>\n"
+      << "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', "
+         "Roboto, Helvetica, Arial, sans-serif; background-color: #0d1117; "
+         "color: #c9d1d9; margin: 0; padding: 40px 20px; }\n"
+      << ".container { max-width: 800px; margin: 0 auto; background: #161b22; "
+         "border: 1px solid #30363d; border-radius: 12px; box-shadow: 0 8px "
+         "24px rgba(0,0,0,0.2); overflow: hidden; }\n"
+      << ".header { padding: 20px 24px; border-bottom: 1px solid #30363d; "
+         "background: #21262d; }\n"
+      << "h1 { margin: 0; font-size: 18px; font-weight: 600; word-break: "
+         "break-all; color: #8b949e; }\n"
+      << "h1 span { color: #e6edf3; }\n"
+      << ".list { list-style: none; padding: 0; margin: 0; }\n"
+      << ".item { border-bottom: 1px solid #21262d; }\n"
+      << ".item:last-child { border-bottom: none; }\n"
+      << ".link { display: flex; align-items: center; padding: 14px 24px; "
+         "text-decoration: none; color: #58a6ff; transition: all 0.2s ease; }\n"
+      << ".link:hover { background-color: #30363d; transform: translateX(4px); "
+         "}\n"
+      << ".icon { margin-right: 14px; font-size: 20px; width: 24px; "
+         "text-align: center; }\n"
+      << "</style></head><body>\n"
+      << "<div class=\"container\">\n"
+      << "  <div class=\"header\">\n"
+      << "    <h1>Index of <span>" << req_uri << "</span></h1>\n"
+      << "  </div>\n"
+      << "  <ul class=\"list\">\n";
+
+  dirent *entity;
+
+  // 2. 디렉토리 안의 파일들을 하나씩 읽기
+  while ((entity = readdir(dir)) != NULL) {
+    std::string name = entity->d_name;
+
+    // 현재 폴더(.)는 굳이 보여줄 필요가 없으니 스킵
+    if (name == ".")
+      continue;
+
+    // 절대 경로를 합쳐서 진짜 폴더인지 검사
+    std::string full_item_path = real_path + name;
+    const int type = check_path_type(full_item_path);
+
+    std::string icon = "📄"; // 기본 파일 아이콘
+
+    if (type == IS_DIR) {
+      name += "/";
+      icon = "📁"; // 폴더 아이콘
+    }
+
+    if (name == "../") {
+      icon = "🔙"; // 상위 폴더 아이콘
+    }
+
+    html << "    <li class=\"item\"><a href=\"" << name
+         << "\" class=\"link\">\n"
+         << "      <span class=\"icon\">" << icon << "</span>\n"
+         << "      <span>" << name << "</span>\n"
+         << "    </a></li>\n";
+  }
+
+  html << "  </ul>\n"
+       << "</div>\n"
+       << "</body></html>";
+
+  closedir(dir);
+
+  return html.str();
+}
+
+std::string ServerResponse::extract_boundary(const std::string &content_type) {
+  size_t boundary_pos = content_type.find("boundary=");
+  if (boundary_pos == std::string::npos)
+    return "";
+
+  boundary_pos += 9; // Length of "boundary="
+  size_t end_pos = content_type.find(';', boundary_pos);
+  if (end_pos == std::string::npos)
+    end_pos = content_type.find('\r', boundary_pos);
+  if (end_pos == std::string::npos)
+    end_pos = content_type.find('\n', boundary_pos);
+  if (end_pos == std::string::npos)
+    end_pos = content_type.length();
+
+  return content_type.substr(boundary_pos, end_pos - boundary_pos);
+}
+
+std::size_t ServerResponse::parse_multipart_part(const std::string &body,
+                                                 const std::string &boundary,
+                                                 const std::size_t start_pos,
+                                                 std::string &out_filename,
+                                                 std::string &out_fieldname,
+                                                 std::string &out_data) {
+  out_filename = "";
+  out_fieldname = "";
+  out_data = "";
+
+  // Find the start of this part (after boundary marker)
+  const std::string boundary_marker = "--" + boundary;
+  size_t part_start = body.find(boundary_marker, start_pos);
+
+  if (part_start == std::string::npos)
+    return std::string::npos;
+
+  // Skip past boundary and line ending
+  part_start += boundary_marker.length();
+  if (part_start < body.length() && body[part_start] == '\r')
+    part_start++;
+  if (part_start < body.length() && body[part_start] == '\n')
+    part_start++;
+
+  // Find end of headers (blank line: \r\n\r\n or \n\n)
+  size_t header_end = body.find("\r\n\r\n", part_start);
+  size_t skip_length = 4; // \r\n\r\n
+  if (header_end == std::string::npos) {
+    header_end = body.find("\n\n", part_start);
+    skip_length = 2; // \n\n
+  }
+
+  if (header_end == std::string::npos)
+    return std::string::npos;
+
+  // Extract and parse headers
+  std::string headers_section =
+      body.substr(part_start, header_end - part_start);
+
+  // Parse Content-Disposition header to extract name and filename
+  const size_t disp_pos = headers_section.find("Content-Disposition:");
+  if (disp_pos != std::string::npos) {
+    size_t line_end = headers_section.find('\n', disp_pos);
+    if (line_end == std::string::npos)
+      line_end = headers_section.length();
+
+    std::string disp_line =
+        headers_section.substr(disp_pos, line_end - disp_pos);
+
+    // Extract name="fieldname"
+    size_t name_pos = disp_line.find("name=\"");
+    if (name_pos != std::string::npos) {
+      name_pos += 6; // Length of 'name="'
+      const size_t name_end = disp_line.find('"', name_pos);
+      if (name_end != std::string::npos) {
+        out_fieldname = disp_line.substr(name_pos, name_end - name_pos);
+      }
+    }
+
+    // Extract filename="filename.txt"
+    size_t filename_pos = disp_line.find("filename=\"");
+    if (filename_pos != std::string::npos) {
+      filename_pos += 10; // Length of 'filename="'
+      const size_t filename_end = disp_line.find('"', filename_pos);
+      if (filename_end != std::string::npos) {
+        out_filename =
+            disp_line.substr(filename_pos, filename_end - filename_pos);
+      }
+    }
+  }
+
+  // Find start of part body (skip blank line)
+  const size_t body_start = header_end + skip_length;
+
+  // Find end of part body (next boundary)
+  size_t next_boundary = body.find("\r\n--" + boundary, body_start);
+  if (next_boundary == std::string::npos)
+    next_boundary = body.find("\n--" + boundary, body_start);
+
+  if (next_boundary == std::string::npos)
+    next_boundary = body.find("--" + boundary, body_start);
+
+  if (next_boundary == std::string::npos) {
+    // Last part - take rest of body
+    out_data = body.substr(body_start);
+    // Remove trailing CRLF if present
+    if (out_data.length() >= 2 &&
+        out_data.substr(out_data.length() - 2) == "\r\n")
+      out_data = out_data.substr(0, out_data.length() - 2);
+    else if (!out_data.empty() && out_data[out_data.length() - 1] == '\n')
+      out_data = out_data.substr(0, out_data.length() - 1);
+    return std::string::npos;
+  }
+
+  // Extract data and trim trailing line ending
+  out_data = body.substr(body_start, next_boundary - body_start);
+  if (out_data.length() >= 2 &&
+      out_data.substr(out_data.length() - 2) == "\r\n")
+    out_data = out_data.substr(0, out_data.length() - 2);
+  else if (!out_data.empty() && out_data[out_data.length() - 1] == '\n')
+    out_data = out_data.substr(0, out_data.length() - 1);
+
+  return next_boundary;
+}
+
+Response ServerResponse::delete_method(const Target& target, Response response,
                                        const ServerConfig *config,
                                        const RouteRule *rule) {
   if (unlink(target.path.c_str()) == 0) {
@@ -160,7 +431,7 @@ Response ServerResponse::delete_method(Target target, Response response,
   }
 }
 
-Response ServerResponse::post_method(Target target, Response response,
+Response ServerResponse::post_method(const Target& target, Response response,
                                      const ClientSession *client,
                                      const RouteRule *rule,
                                      const Request *request, Session *session) {
@@ -169,9 +440,7 @@ Response ServerResponse::post_method(Target target, Response response,
 
   // Handle login/authentication
   if (request->get_path() == "/login" || request->get_path() == "/login.html") {
-    std::string body = request->get_body();
-    std::string id = "";
-    std::string pw = "";
+    const std::string& body = request->get_body();
 
     std::string auth_target =
         get_pwd() +
@@ -179,6 +448,8 @@ Response ServerResponse::post_method(Target target, Response response,
     std::cout << "\n" << auth_target << "\n" << std::endl;
     std::ifstream file(auth_target.c_str());
     if (file.is_open()) {
+      std::string pw;
+      std::string id;
       std::map<std::string, std::string> auth_info;
       size_t id_pos = body.find("id=");
       if (id_pos != std::string::npos) {
@@ -242,7 +513,7 @@ Response ServerResponse::post_method(Target target, Response response,
 
   // Handle file uploads
   if (!rule->upload_dir.empty()) {
-    std::string body = request->get_body();
+    const std::string& body = request->get_body();
     const std::map<std::string, std::string> &headers = request->get_headers();
 
     // Check Content-Type for multipart/form-data
@@ -281,7 +552,7 @@ Response ServerResponse::post_method(Target target, Response response,
     // Parse multipart parts and save files
     std::size_t pos = 0;
     int files_uploaded = 0;
-    std::string error_msg = "";
+    std::string error_msg;
 
     while (true) {
       std::string filename, fieldname, part_data;
@@ -294,8 +565,8 @@ Response ServerResponse::post_method(Target target, Response response,
       if (!filename.empty()) {
         // Validate filename - reject path traversal attempts
         if (filename.find("..") != std::string::npos ||
-            filename.find("/") != std::string::npos ||
-            filename.find("\\") != std::string::npos) {
+            filename.find('/') != std::string::npos ||
+            filename.find('\\') != std::string::npos) {
           std::cout << "Rejected filename with path traversal: " << filename
                     << std::endl;
           error_msg = "Invalid filename";
@@ -306,8 +577,8 @@ Response ServerResponse::post_method(Target target, Response response,
         std::cout << "Uploading file: " << file_path
                   << " (size: " << part_data.length() << ")" << std::endl;
         std::cout << "First 20 bytes (hex): ";
-        for (size_t i = 0; i < std::min(size_t(20), part_data.length()); i++) {
-          printf("%02x ", (unsigned char)part_data[i]);
+        for (size_t i = 0; i < std::min(static_cast<size_t>(20), part_data.length()); i++) {
+          printf("%02x ", static_cast<unsigned char>(part_data[i]));
         }
         std::cout << std::endl;
 
@@ -384,7 +655,7 @@ Response ServerResponse::get_method(Target target, Response response,
     response.body = make_autoindex_page(target.path, request->get_path(), dir);
     response.status_code = status_code_to_string(target.type);
   } else {
-    if (check_path_type(target.path.c_str()) != IS_FILE)
+    if (check_path_type(target.path) != IS_FILE)
       return DefaultError::default_err_response(NOT_FOUND_ERR);
     std::ifstream file(target.path.c_str());
     if (file.is_open()) {
@@ -399,273 +670,4 @@ Response ServerResponse::get_method(Target target, Response response,
     }
   }
   return response;
-}
-
-Response ServerResponse::http_response(
-    const Request *request, const ClientSession *client,
-    const std::map<std::string, std::string> mime_type, Session *session) {
-  const ServerConfig *config = client->config;
-  const RouteRule *rule =
-      config->find_route(request->get_method(), request->get_path());
-  if (rule == NULL)
-    return DefaultError::default_err_response(NOT_FOUND_ERR);
-  Response response;
-  Target target = resolve_target(rule, config, request);
-
-  // [쿠키 검증 로직 추가]
-  std::string session_id = request->get_cookie_value("session_id");
-  SessionData *user_session = NULL;
-
-  if (!session_id.empty()) {
-    user_session = session->get_session(session_id);
-  }
-
-  if (user_session) {
-    std::cout << "[Authentication] Valid user session found! User ID: "
-              << user_session->user_id << std::endl;
-  } else {
-    // 세션이 없는데 보호된 자원(예: DELETE 명령)을 요청하면 401 에러를 반환
-    if (request->get_method() == Request::DELETE) {
-      std::cout << "[Authentication] Blocked DELETE request. No valid session."
-                << std::endl;
-      return error_response(config, rule, UNAUTHORIZED);
-    }
-    std::cout << "[Authentication] No valid session. Guest user." << std::endl;
-  }
-
-  response.mime_type =
-      get_string_from_map(mime_type, find_file_type(target.path));
-  std::cout << "mime type: " << response.mime_type << std::endl;
-
-  if (request->get_method() == Request::DELETE) {
-    return ServerResponse::delete_method(target, response, config, rule);
-  } else if (request->get_method() == Request::POST) {
-    return ServerResponse::post_method(target, response, client, rule, request,
-                                       session);
-  } else if (request->get_method() == Request::GET) {
-    return ServerResponse::get_method(target, response, config, rule, request);
-  } else {
-    return error_response(config, rule, METHOD_NOT_ALLOWED);
-  }
-  return response;
-}
-
-Result<CgiDelegate> ServerResponse::register_cgi(const Request *request,
-                                                 const ServerConfig *config,
-                                                 EPoll *epoll) {
-  RouteRule_CGI const *rule =
-      config->find_route_cgi(request->get_method(), request->get_path());
-  if (rule == NULL)
-    return ERR(CgiDelegate, "rule not found");
-  Result<CgiDelegate> del_ = CgiDelegate::from_req(*request, *epoll, *rule);
-  if (!del_.has_value())
-    return ERR(CgiDelegate, del_.error());
-  CgiDelegate del(del_.value());
-  Result<Void> res = del.register_();
-  if (!res.has_value())
-    return ERR(CgiDelegate, res.error());
-  return OK(CgiDelegate, del);
-}
-
-std::string ServerResponse::make_autoindex_page(const std::string &real_path,
-                                                const std::string &req_uri,
-                                                DIR *dir) {
-  std::ostringstream html;
-
-  // 1. HTML 기본 뼈대 및 모던 다크 테마 CSS 작성
-  html
-      << "<!DOCTYPE html>\n"
-      << "<html><head><meta charset=\"UTF-8\">\n"
-      << "<meta name=\"viewport\" content=\"width=device-width, "
-         "initial-scale=1.0\">\n"
-      << "<title>Index of " << req_uri << "</title>\n"
-      << "<style>\n"
-      << "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', "
-         "Roboto, Helvetica, Arial, sans-serif; background-color: #0d1117; "
-         "color: #c9d1d9; margin: 0; padding: 40px 20px; }\n"
-      << ".container { max-width: 800px; margin: 0 auto; background: #161b22; "
-         "border: 1px solid #30363d; border-radius: 12px; box-shadow: 0 8px "
-         "24px rgba(0,0,0,0.2); overflow: hidden; }\n"
-      << ".header { padding: 20px 24px; border-bottom: 1px solid #30363d; "
-         "background: #21262d; }\n"
-      << "h1 { margin: 0; font-size: 18px; font-weight: 600; word-break: "
-         "break-all; color: #8b949e; }\n"
-      << "h1 span { color: #e6edf3; }\n"
-      << ".list { list-style: none; padding: 0; margin: 0; }\n"
-      << ".item { border-bottom: 1px solid #21262d; }\n"
-      << ".item:last-child { border-bottom: none; }\n"
-      << ".link { display: flex; align-items: center; padding: 14px 24px; "
-         "text-decoration: none; color: #58a6ff; transition: all 0.2s ease; }\n"
-      << ".link:hover { background-color: #30363d; transform: translateX(4px); "
-         "}\n"
-      << ".icon { margin-right: 14px; font-size: 20px; width: 24px; "
-         "text-align: center; }\n"
-      << "</style></head><body>\n"
-      << "<div class=\"container\">\n"
-      << "  <div class=\"header\">\n"
-      << "    <h1>Index of <span>" << req_uri << "</span></h1>\n"
-      << "  </div>\n"
-      << "  <ul class=\"list\">\n";
-
-  struct dirent *entity;
-
-  // 2. 디렉토리 안의 파일들을 하나씩 읽기
-  while ((entity = readdir(dir)) != NULL) {
-    std::string name = entity->d_name;
-
-    // 현재 폴더(.)는 굳이 보여줄 필요가 없으니 스킵
-    if (name == ".")
-      continue;
-
-    // 절대 경로를 합쳐서 진짜 폴더인지 검사
-    std::string full_item_path = real_path + name;
-    int type = check_path_type(full_item_path);
-
-    std::string icon = "📄"; // 기본 파일 아이콘
-
-    if (type == IS_DIR) {
-      name += "/";
-      icon = "📁"; // 폴더 아이콘
-    }
-
-    if (name == "../") {
-      icon = "🔙"; // 상위 폴더 아이콘
-    }
-
-    html << "    <li class=\"item\"><a href=\"" << name
-         << "\" class=\"link\">\n"
-         << "      <span class=\"icon\">" << icon << "</span>\n"
-         << "      <span>" << name << "</span>\n"
-         << "    </a></li>\n";
-  }
-
-  html << "  </ul>\n"
-       << "</div>\n"
-       << "</body></html>";
-
-  closedir(dir);
-
-  return html.str();
-}
-
-std::string ServerResponse::extract_boundary(const std::string &content_type) {
-  size_t boundary_pos = content_type.find("boundary=");
-  if (boundary_pos == std::string::npos)
-    return "";
-
-  boundary_pos += 9; // Length of "boundary="
-  size_t end_pos = content_type.find(';', boundary_pos);
-  if (end_pos == std::string::npos)
-    end_pos = content_type.find('\r', boundary_pos);
-  if (end_pos == std::string::npos)
-    end_pos = content_type.find('\n', boundary_pos);
-  if (end_pos == std::string::npos)
-    end_pos = content_type.length();
-
-  return content_type.substr(boundary_pos, end_pos - boundary_pos);
-}
-
-std::size_t ServerResponse::parse_multipart_part(const std::string &body,
-                                                 const std::string &boundary,
-                                                 std::size_t start_pos,
-                                                 std::string &out_filename,
-                                                 std::string &out_fieldname,
-                                                 std::string &out_data) {
-  out_filename = "";
-  out_fieldname = "";
-  out_data = "";
-
-  // Find the start of this part (after boundary marker)
-  std::string boundary_marker = "--" + boundary;
-  size_t part_start = body.find(boundary_marker, start_pos);
-
-  if (part_start == std::string::npos)
-    return std::string::npos;
-
-  // Skip past boundary and line ending
-  part_start += boundary_marker.length();
-  if (part_start < body.length() && body[part_start] == '\r')
-    part_start++;
-  if (part_start < body.length() && body[part_start] == '\n')
-    part_start++;
-
-  // Find end of headers (blank line: \r\n\r\n or \n\n)
-  size_t header_end = body.find("\r\n\r\n", part_start);
-  size_t skip_length = 4; // \r\n\r\n
-  if (header_end == std::string::npos) {
-    header_end = body.find("\n\n", part_start);
-    skip_length = 2; // \n\n
-  }
-
-  if (header_end == std::string::npos)
-    return std::string::npos;
-
-  // Extract and parse headers
-  std::string headers_section =
-      body.substr(part_start, header_end - part_start);
-
-  // Parse Content-Disposition header to extract name and filename
-  size_t disp_pos = headers_section.find("Content-Disposition:");
-  if (disp_pos != std::string::npos) {
-    size_t line_end = headers_section.find('\n', disp_pos);
-    if (line_end == std::string::npos)
-      line_end = headers_section.length();
-
-    std::string disp_line =
-        headers_section.substr(disp_pos, line_end - disp_pos);
-
-    // Extract name="fieldname"
-    size_t name_pos = disp_line.find("name=\"");
-    if (name_pos != std::string::npos) {
-      name_pos += 6; // Length of 'name="'
-      size_t name_end = disp_line.find('"', name_pos);
-      if (name_end != std::string::npos) {
-        out_fieldname = disp_line.substr(name_pos, name_end - name_pos);
-      }
-    }
-
-    // Extract filename="filename.txt"
-    size_t filename_pos = disp_line.find("filename=\"");
-    if (filename_pos != std::string::npos) {
-      filename_pos += 10; // Length of 'filename="'
-      size_t filename_end = disp_line.find('"', filename_pos);
-      if (filename_end != std::string::npos) {
-        out_filename =
-            disp_line.substr(filename_pos, filename_end - filename_pos);
-      }
-    }
-  }
-
-  // Find start of part body (skip blank line)
-  size_t body_start = header_end + skip_length;
-
-  // Find end of part body (next boundary)
-  size_t next_boundary = body.find("\r\n--" + boundary, body_start);
-  if (next_boundary == std::string::npos)
-    next_boundary = body.find("\n--" + boundary, body_start);
-
-  if (next_boundary == std::string::npos)
-    next_boundary = body.find("--" + boundary, body_start);
-
-  if (next_boundary == std::string::npos) {
-    // Last part - take rest of body
-    out_data = body.substr(body_start);
-    // Remove trailing CRLF if present
-    if (out_data.length() >= 2 &&
-        out_data.substr(out_data.length() - 2) == "\r\n")
-      out_data = out_data.substr(0, out_data.length() - 2);
-    else if (out_data.length() >= 1 && out_data[out_data.length() - 1] == '\n')
-      out_data = out_data.substr(0, out_data.length() - 1);
-    return std::string::npos;
-  }
-
-  // Extract data and trim trailing line ending
-  out_data = body.substr(body_start, next_boundary - body_start);
-  if (out_data.length() >= 2 &&
-      out_data.substr(out_data.length() - 2) == "\r\n")
-    out_data = out_data.substr(0, out_data.length() - 2);
-  else if (out_data.length() >= 1 && out_data[out_data.length() - 1] == '\n')
-    out_data = out_data.substr(0, out_data.length() - 1);
-
-  return next_boundary;
 }

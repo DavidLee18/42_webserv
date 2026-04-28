@@ -29,7 +29,7 @@ public:
     // Storage is uninitialized, will be constructed via placement new if needed
   }
 
-  Optional(const T &val) : _has_value(true) { new (ptr()) T(val); }
+  explicit Optional(const T &val) : _has_value(true) { new (ptr()) T(val); }
 
   Optional(const Optional &other) : _has_value(other._has_value) {
     if (_has_value) {
@@ -119,15 +119,15 @@ public:
   if (!_result.error().empty()) {                                              \
     return ERR(t, _result.error());                                            \
   } else {                                                                     \
-    v = _result.value();                                                       \
+    ((v)) = _result.value();                                                       \
   }
 
 #define TRYF(t, rt, v, r, f)                                                   \
   Result<rt> _result = rt;                                                     \
   if (!_result.error().empty()) {                                              \
-    f return ERR(t, _result.error());                                          \
+    (f) return ERR(t, _result.error());                                          \
   } else {                                                                     \
-    v = _result.value();                                                       \
+    (v) = _result.value();                                                       \
   }
 
 struct Void {};

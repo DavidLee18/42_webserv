@@ -23,8 +23,8 @@
  * @return std::string The value corresponding to the key, or an empty string if
  * not found.
  */
-std::string get_string_from_map(const std::map<std::string, std::string> map,
-                                std::string key);
+std::string get_string_from_map(const std::map<std::string, std::string> &map,
+                                std::string const &key);
 
 class ServerConfig;
 class Request;
@@ -79,7 +79,7 @@ public:
    *
    * @return const std::string Connection header value.
    */
-  const std::string get_connection_string() const;
+  std::string get_connection_string() const;
 
   /**
    * @brief Gets the requested HTTP method as an enum value.
@@ -100,7 +100,7 @@ public:
    *
    * @return const std::string The requested path.
    */
-  const std::string get_path() const { return path; }
+  std::string get_path() const { return path; }
 
   /**
    * @brief Gets client's cookie.
@@ -108,7 +108,7 @@ public:
    * @return const std::string The client's cookie. Generate default cookie if
    * none.
    */
-  const std::string get_cookie() const { return cookie; }
+  std::string get_cookie() const { return cookie; }
 
   /**
    * @brief Parses the cookie string and returns the value of a specific cookie
@@ -122,7 +122,7 @@ public:
   /**
    * @brief Sets client's cookie.
    */
-  void set_cookie(std::string value) { cookie = value; }
+  void set_cookie(const std::string& value) { cookie = value; }
 
   /**
    * @brief Gets the parsed HTTP headers.
@@ -160,9 +160,8 @@ private:
   Request()
       : method(ERROR), path(), version(), header(), keep_alive(false),
         content_length(0), cookie(), body(), remnants() {}
-  Request(Method method, std::string const &path, std::string const &version,
-          size_t content_length)
-      : method(method), path(path), version(version),
+  Request(const Method method, std::string const &path, std::string const &version, const size_t content_length)
+      : method(method), path(path), version(version), keep_alive(false),
         content_length(content_length) {}
 };
 

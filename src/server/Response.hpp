@@ -86,19 +86,20 @@ class ServerConfig;
  */
 class ServerResponse {
 public:
-  static std::string find_file_type(std::string path);
+  static std::string find_file_type(const std::string &path);
   /**
    * @brief Generates an Response based on the client request and server
    * configuration.
    *
    * @param request Pointer to the parsed Request object.
-   * @param config Pointer to the ServerConfig for the target server.
+   * @param client
    * @param mime_type Map of file extension to MIME types.
+   * @param session
    * @return Response The fully formulated HTTP response components.
    */
   static Response
   http_response(const Request *request, const ClientSession *client,
-                const std::map<std::string, std::string> mime_type,
+                const std::map<std::string, std::string> &mime_type,
                 Session *session);
 
   static Result<CgiDelegate> register_cgi(const Request *request,
@@ -152,6 +153,8 @@ private:
   /**
    * @brief Gets the custom error file path corresponding to a status code.
    *
+   * @param config
+   * @param rule
    * @param error_code The HTTP error status code.
    * @return std::string Path to the configured error file.
    */
@@ -164,6 +167,7 @@ private:
    *
    * @param real_path The physical directory path on the local file system.
    * @param req_uri The request URI path used by the client.
+   * @param dir
    * @return std::string The HTML content representing the directory index.
    */
   static std::string make_autoindex_page(const std::string &real_path,
@@ -194,10 +198,10 @@ private:
                        std::size_t start_pos, std::string &out_filename,
                        std::string &out_fieldname, std::string &out_data);
 
-  static Response delete_method(Target target, Response response,
+  static Response delete_method(const Target &target, Response response,
                                 const ServerConfig *config,
                                 const RouteRule *rule);
-  static Response post_method(Target target, Response response,
+  static Response post_method(const Target &target, Response response,
                               const ClientSession *client,
                               const RouteRule *rule, const Request *request,
                               Session *session);

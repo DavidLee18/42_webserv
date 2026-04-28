@@ -12,7 +12,6 @@
  * 실행 제한 시간과 같은 CGI 처리에 필요한 정보를 함께 관리한다.
  */
 class RouteRule_CGI {
-private:
   /**
    * @var met
    * @brief 이 규칙이 적용되는 HTTP 요청 메서드를 저장하는 멤버 변수
@@ -57,7 +56,7 @@ private:
    *
    * - 숫자 문자열의 값은 0.05보다 크고 15.0 이하여야 한다.
    */
-  bool is_valid_timeout(const std::string &line);
+  static bool is_valid_timeout(const std::string &line);
   /**
    * @brief 검증된 timeout 문자열을 double 값으로 변환하는 함수
    * @param line 변환할 문자열
@@ -66,7 +65,7 @@ private:
    * - 입력 문자열은 is_valid_timeout(const std::string &line) 함수로
    * 유효성이 확인된 상태여야 한다.
    */
-  double parse_timeout_value(std::string &line);
+  static double parse_timeout_value(std::string &line);
   /**
    * @brief CGI 설정 블록을 파싱하여 실행 파일, 환경 변수, timeout 정보를
    * 저장하는 함수
@@ -79,10 +78,10 @@ private:
    * - 이후 들여쓰기 2단계의 하위 줄에서 timeout 또는 추가 환경 변수 정보를
    * 읽는다.
    */
-  std::string parse_cgi_block(FileDescriptor &fd, std::string line);
+  std::string parse_cgi_block(const FileDescriptor &fd, const std::string& line);
 
 public:
-  RouteRule_CGI() : executable(""), env(), timeout(-1), err("No parse") {};
+  RouteRule_CGI() : met(Request::ERROR), timeout(-1), err("No parse") {}
   /**
    * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
    * 생성자
@@ -92,13 +91,13 @@ public:
    * - 요청 메서드와 경로를 설정한 뒤, 하위 CGI 블록을 파싱하여
    * 실행 파일, 환경 변수, timeout 정보를 초기화한다.
    */
-  RouteRule_CGI(FileDescriptor &fd, const std::string &line);
+  RouteRule_CGI(const FileDescriptor &fd, const std::string &line);
 
-  const PathPattern get_path() const { return path; }
+  PathPattern get_path() const { return path; }
   Request::Method get_method () const { return met; }
-  const std::string get_err() const { return err; }
-  const std::string get_executable() const { return executable; }
-  const std::map<std::string, std::string> get_env() const { return env; }
+  std::string get_err() const { return err; }
+  std::string get_executable() const { return executable; }
+  std::map<std::string, std::string> get_env() const { return env; }
   double get_timeout() const { return timeout; }
 
   /**
@@ -122,7 +121,7 @@ public:
    * - 첫 번째 원소는 실행 가능한 파일 경로여야 하고,
    * 두 번째 원소는 포트 번호를 나타내는 숫자 문자열이어야 한다.
    */
-  static bool is_valid_uwsgi_config(std::vector<std::string> data);
+  static bool is_valid_uwsgi_config(const std::vector<std::string> &data);
   /**
    * @brief CGI 설정 한 줄의 기본 형식을 검사하는 함수
    * @param line 검사할 문자열
@@ -132,7 +131,7 @@ public:
    *
    * - 첫 번째 항목은 HTTP 메서드, 두 번째 항목은 공백이 없는 URL이어야 한다.
    */
-  static bool is_valid_cgi_config(std::string line);
+  static bool is_valid_cgi_config(const std::string &line);
   /**
    * @brief 문자열이 유효한 CGI 설정 형식인지 검사하는 함수
    * @param line 검사할 문자열
@@ -191,7 +190,7 @@ public:
    * 가져야 한다.
    */
   static std::string
-  parse_uwsgi_block(FileDescriptor &fd,
+  parse_uwsgi_block(const FileDescriptor &fd,
                     std::map<std::string, std::string> &uwsgi);
 };
 

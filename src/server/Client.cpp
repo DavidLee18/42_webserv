@@ -23,7 +23,7 @@ std::string Request::get_method_string() const {
   return "";
 }
 
-const std::string Request::get_connection_string() const {
+std::string Request::get_connection_string() const {
   if (keep_alive)
     return "keep-alive";
   else
@@ -34,7 +34,7 @@ std::string Request::get_cookie_value(const std::string &name) const {
   if (cookie.empty())
     return "";
 
-  std::string target = name + "=";
+  const std::string target = name + "=";
   size_t start = cookie.find(target);
   if (start == std::string::npos)
     return "";
@@ -140,7 +140,7 @@ Result<Request *> Request::from_buff(std::string &buff) {
   }
   Request *req = new Request(method, req_path, req_version, content_length);
 
-  while (std::getline(ss, line) && line != "\r" && line != "") {
+  while (std::getline(ss, line) && line != "\r" && !line.empty()) {
     if (!line.empty() && line[line.size() - 1] == '\r')
       line.erase(line.size() - 1);
 
@@ -204,7 +204,7 @@ void Request::continue_parsing(std::string &buff) {
     return;
   else if (remnants.length() < content_length) {
     if (remnants.length() + buff.length() >= content_length) {
-      size_t diff = content_length - remnants.length();
+      const size_t diff = content_length - remnants.length();
       remnants += buff.substr(0, diff);
       buff.erase(0, diff);
       body = remnants;

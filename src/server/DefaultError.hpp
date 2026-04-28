@@ -6,7 +6,6 @@
 struct Response;
 
 class DefaultError {
-private:
   virtual int phantom() = 0;
   static std::string bad_request();
   static std::string forbidden();

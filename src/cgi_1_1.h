@@ -26,12 +26,12 @@ public:
     CgiAuthOther,
   };
   explicit CgiAuthType(Type);
-  CgiAuthType(Type, std::string);
+  CgiAuthType(Type, std::string const &);
   CgiAuthType(const CgiAuthType &);
   CgiAuthType &operator=(const CgiAuthType &);
   ~CgiAuthType();
-  Type const &type();
-  std::string const *other();
+  Type const &type() const;
+  std::string const *other() const;
 
 private:
   Type _type;
@@ -56,9 +56,8 @@ public:
   ContentType(Type, std::string const &);
   ContentType(ContentType const &);
   ContentType &operator=(ContentType const &);
-  Result<Void> add_param(std::string, std::string);
+  Result<Void> add_param(const std::string &k, const std::string &v);
 
-public:
   Type type;
   std::string subtype;
   std::map<std::string, std::string> params;
@@ -70,11 +69,11 @@ class ServerName {
 public:
   class Parser {
     virtual void phantom() = 0;
-    static Result<std::pair<ServerName, size_t> > parse_host(std::string);
-    static Result<std::pair<ServerName, size_t> > parse_ipv4(std::string);
+    static Result<std::pair<ServerName, size_t> > parse_host(const std::string &raw);
+    static Result<std::pair<ServerName, size_t> > parse_ipv4(const std::string &raw);
 
   public:
-    static Result<std::pair<ServerName, size_t> > parse(std::string);
+    static Result<std::pair<ServerName, size_t> > parse(const std::string &raw);
   };
 
   enum Type {
@@ -87,7 +86,6 @@ public:
     unsigned char ipv4[4];
   };
 
-public:
   ServerName(ServerName const &);
   ServerName &operator=(ServerName const &);
   ~ServerName();
@@ -101,7 +99,7 @@ private:
 
   ServerName(Type, Val);
 
-  static ServerName host(std::list<std::string>);
+  static ServerName host(const std::list<std::string> &hostparts);
   static ServerName ipv4(unsigned char, unsigned char, unsigned char,
                          unsigned char);
 };
@@ -176,40 +174,39 @@ public:
 
   class Parser {
     virtual void phantom() = 0;
-    static Result<std::pair<CgiMetaVar, size_t> > parse_auth_type(std::string);
+    static Result<std::pair<CgiMetaVar, size_t> > parse_auth_type(const std::string&);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_content_length(std::string);
+        parse_content_length(const std::string &raw);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_content_type(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_gateway_interface(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> > parse_path_info(std::string);
+        parse_gateway_interface(const std::string&);
+    static Result<std::pair<CgiMetaVar, size_t> > parse_path_info(const std::string &);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_path_translated(std::string);
+        parse_path_translated(const std::string&);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_query_string(std::string);
+        parse_query_string(const std::string&);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_addr(std::string);
+        parse_remote_addr(const std::string&);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_host(std::string);
+        parse_remote_host(const std::string &raw);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_ident(std::string);
+        parse_remote_ident(const std::string &raw);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_user(std::string);
+        parse_remote_user(const std::string&);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_request_method(std::string);
+        parse_request_method(const std::string&);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_script_name(std::string);
+        parse_script_name(const std::string &);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_server_name(std::string);
+        parse_server_name(const std::string &raw);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_server_port(std::string);
+        parse_server_port(const std::string &raw);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_server_protocol(std::string);
+        parse_server_protocol(const std::string &raw);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_server_software(std::string);
-    static Result<std::pair<CgiMetaVar, size_t> > parse_custom_var(std::string,
-                                                                   std::string);
+        parse_server_software(const std::string &raw);
+    static Result<std::pair<CgiMetaVar, size_t> > parse_custom_var(const std::string &name, const std::string &value);
 
   public:
     static Result<std::pair<CgiMetaVar, size_t> > parse(std::string const &,
@@ -218,7 +215,6 @@ public:
 
   friend class CgiInput;
 
-public:
   CgiMetaVar(CgiMetaVar const &);
   CgiMetaVar &operator=(CgiMetaVar const &);
   ~CgiMetaVar();
@@ -232,35 +228,34 @@ private:
 
   CgiMetaVar(Name, Val);
 
-  static CgiMetaVar auth_type(CgiAuthType);
+  static CgiMetaVar auth_type(const CgiAuthType&);
   static CgiMetaVar content_length(unsigned int);
   static CgiMetaVar content_type(const ContentType &);
   static CgiMetaVar gateway_interface(GatewayInterface);
-  static CgiMetaVar path_info(std::list<std::string>);
-  static CgiMetaVar path_translated(std::string);
-  static CgiMetaVar query_string(std::map<std::string, std::string>);
+  static CgiMetaVar path_info(const std::list<std::string>&);
+  static CgiMetaVar path_translated(const std::string&);
+  static CgiMetaVar query_string(const std::map<std::string, std::string>&);
   static CgiMetaVar remote_addr(unsigned char, unsigned char, unsigned char,
                                 unsigned char);
-  static CgiMetaVar remote_host(std::list<std::string>);
-  static CgiMetaVar remote_ident(std::string);
-  static CgiMetaVar remote_user(std::string);
+  static CgiMetaVar remote_host(const std::list<std::string>&);
+  static CgiMetaVar remote_ident(const std::string&);
+  static CgiMetaVar remote_user(const std::string&);
   static CgiMetaVar request_method(Request::Method);
-  static CgiMetaVar script_name(std::list<std::string>);
-  static CgiMetaVar server_name(ServerName);
+  static CgiMetaVar script_name(const std::list<std::string>&);
+  static CgiMetaVar server_name(const ServerName&);
   static CgiMetaVar server_port(unsigned short);
   static CgiMetaVar server_protocol(ServerProtocol);
   static CgiMetaVar server_software(ServerSoftware);
-  static CgiMetaVar custom_var(EtcMetaVar::Type, std::string, std::string);
+  static CgiMetaVar custom_var(EtcMetaVar::Type, const std::string&, const std::string&);
 };
 
 class CgiInput {
   std::vector<CgiMetaVar> mvars;
   std::string req_body;
 
-private:
   CgiInput();
-  CgiInput(std::vector<CgiMetaVar> const &, std::string);
-  CgiInput(Request const &);
+  CgiInput(std::vector<CgiMetaVar> const &, const std::string&);
+  explicit CgiInput(Request const &);
 
 public:
   class Parser {
@@ -307,7 +302,7 @@ public:
   // the CGI fails, in which case is_done() also becomes true.
   Result<Void> handle_event(const Event *);
 
-  Result<std::string> poll();
+  Result<std::string> poll() const;
 
   ~CgiDelegate();
 };

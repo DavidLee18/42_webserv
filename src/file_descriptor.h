@@ -32,13 +32,13 @@ public:
 
   ~FileDescriptor();
 
-  Result<Void> socket_bind(struct in_addr, unsigned short);
+  Result<Void> socket_bind(struct in_addr, unsigned short) const;
 
   Result<Void> socket_listen(unsigned short);
 
-  Result<FileDescriptor> socket_accept(struct sockaddr *, socklen_t *) const;
+  Result<FileDescriptor> socket_accept(sockaddr *, socklen_t *) const;
 
-  Result<Void> socket_connect(struct addrinfo *);
+  Result<Void> socket_connect(const addrinfo *) const;
 
   Result<ssize_t> sock_recv(void *, size_t) const;
 
@@ -83,7 +83,7 @@ public:
 
   Result<ssize_t> pipe_write(const void *, size_t) const;
 
-  Result<std::string> read_file_line();
+  Result<std::string> read_file_line() const;
 
   Result<Void> dup2stdin();
 

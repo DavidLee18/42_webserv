@@ -2,7 +2,7 @@
 
 
 bool PathPattern::wildcard_match(const std::string &pattern,
-                                 const std::string &target) const {
+                                 const std::string &target) {
   std::size_t p = 0;
   std::size_t t = 0;
 
@@ -40,8 +40,8 @@ bool PathPattern::wildcard_match(const std::string &pattern,
 }
 
 bool PathPattern::matches(const PathPattern &other) const {
-  std::string pattern = this->to_string();
-  std::string target = other.to_string();
+  const std::string pattern = this->to_string();
+  const std::string target = other.to_string();
 
   // std::cout << "\n\nmatches pattern: " << pattern << std::endl;
   // std::cout << "matches target: " << target << std::endl;
@@ -90,7 +90,7 @@ static std::size_t count_wildcards(const std::string &str) {
 }
 
 std::string PathPattern::extract_relative_path(const std::string &pattern,
-                                               const std::string &target) const {
+                                               const std::string &target) {
   if (pattern == "*") {
     if (target == "/")
       return "/";
@@ -112,11 +112,11 @@ std::string PathPattern::extract_relative_path(const std::string &pattern,
     return "";
   }
 
-  std::size_t first_star = pattern.find('*');
-  std::size_t last_star = pattern.rfind('*');
+  const std::size_t first_star = pattern.find('*');
+  const std::size_t last_star = pattern.rfind('*');
 
-  std::string prefix = pattern.substr(0, first_star);
-  std::string suffix = pattern.substr(last_star + 1);
+  const std::string prefix = pattern.substr(0, first_star);
+  const std::string suffix = pattern.substr(last_star + 1);
 
   if (!prefix.empty()) {
     if (target.find(prefix) != 0)
@@ -130,8 +130,8 @@ std::string PathPattern::extract_relative_path(const std::string &pattern,
       return "";
   }
 
-  std::size_t start = prefix.size();
-  std::size_t end = target.size() - suffix.size();
+  const std::size_t start = prefix.size();
+  const std::size_t end = target.size() - suffix.size();
 
   if (end < start)
     return "";
@@ -147,7 +147,7 @@ std::string PathPattern::extract_relative_path(const std::string &pattern,
 
 bool PathPattern::extract_wildcards(const std::string &pattern,
                                     const std::string &target,
-                                    std::vector<std::string> &wildcards) const {
+                                    std::vector<std::string> &wildcards) {
   wildcards.clear();
 
   // 특수 케이스: pattern == "*"
@@ -171,8 +171,8 @@ bool PathPattern::extract_wildcards(const std::string &pattern,
   }
   parts.push_back(current);
 
-  bool starts_with_star = !pattern.empty() && pattern[0] == '*';
-  bool ends_with_star = !pattern.empty() && pattern[pattern.size() - 1] == '*';
+  const bool starts_with_star = !pattern.empty() && pattern[0] == '*';
+  const bool ends_with_star = !pattern.empty() && pattern[pattern.size() - 1] == '*';
 
   std::size_t pos = 0;
   std::size_t first_literal = 0;
@@ -190,7 +190,7 @@ bool PathPattern::extract_wildcards(const std::string &pattern,
     if (parts[i].empty())
       continue;
 
-    std::size_t found = target.find(parts[i], pos);
+    const std::size_t found = target.find(parts[i], pos);
     if (found == std::string::npos)
       return false;
     if (found == pos)
@@ -208,7 +208,7 @@ bool PathPattern::extract_wildcards(const std::string &pattern,
     if (target.substr(target.size() - last.size()) != last)
       return false;
 
-    std::size_t end_pos = target.size() - last.size();
+    const std::size_t end_pos = target.size() - last.size();
     if (end_pos < pos)
       return false;
     if (end_pos == pos)
@@ -226,7 +226,7 @@ bool PathPattern::extract_wildcards(const std::string &pattern,
 
 std::string PathPattern::apply_wildcards(
     const std::string &to_pattern,
-    const std::vector<std::string> &wildcards) const {
+    const std::vector<std::string> &wildcards) {
   std::string result;
   std::size_t wild_index = 0;
 
@@ -256,27 +256,27 @@ std::string PathPattern::apply_wildcards(
 
 std::string PathPattern::rewrite_path(const PathPattern &request_path,
                                       const PathPattern &to_pattern) const {
-  std::string from = this->to_string();
-  std::string target = request_path.to_string();
+  const std::string from = this->to_string();
+  const std::string target = request_path.to_string();
   std::string dest = to_pattern.to_string();
 
-  // from과 dest에 있는 wildcard 수 확인 
-  std::size_t from_wc = count_wildcards(from);
-  std::size_t dest_wc = count_wildcards(dest);
+  // from과 dest에 있는 wildcard 수 확인
+  const std::size_t from_wc = count_wildcards(from);
+  const std::size_t dest_wc = count_wildcards(dest);
 
   // from에 wildcard가 존재할 때
   if (from_wc > 0) {
     // dest의 구조가 '/'이 있으면서 wildcard가 한개만 존재하는 지 확인
     // 이런 경우는 보통 실제 파일 경로 root에 request를 붙이는 용도라고 본다.
-    bool looks_like_root_mapping =
+    const bool looks_like_root_mapping =
         !dest.empty() && dest.find('/') != std::string::npos && dest_wc == 1;
     // root 매핑은 먼저 처리 또는
     // destination 쪽 wildcard가 1개면 relative path 사용
-    bool use_relative_mapping = (looks_like_root_mapping || dest_wc == 1);
+    const bool use_relative_mapping = (looks_like_root_mapping || dest_wc == 1);
 
     if (use_relative_mapping) {
       // from을 기준으로 target의 wildcard원소들을 추출
-      std::string relative = extract_relative_path(from, target);
+      const std::string relative = extract_relative_path(from, target);
       if (relative.empty() && target != from)
         return "";
 
@@ -305,8 +305,9 @@ std::string PathPattern::rewrite_path(const PathPattern &request_path,
     if (target.find(from) != 0)
       return "";
 
-    // from에서 뒤 부부만 추출 ex) from = /download/, target = /download/file.txt, suffix = file.txt
-    std::string suffix = target.substr(from.size());
+    // from에서 뒤 부부만 추출 ex) from = /download/, target =
+    // /download/file.txt, suffix = file.txt
+    const std::string suffix = target.substr(from.size());
 
     // '/'가 중복으로 붙지 않게 new path를 생성후 반한.
     if (!dest.empty() && dest[dest.size() - 1] == '/')

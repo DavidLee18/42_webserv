@@ -1,7 +1,7 @@
 #include "webserv.h"
 
 Result<FileDescriptor> FileDescriptor::socket_new() {
-  int sock = socket(AF_INET, SOCK_STREAM, 0);
+  const int sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
     switch (errno) {
     case EACCES:
@@ -24,27 +24,26 @@ Result<FileDescriptor> FileDescriptor::socket_new() {
   return OK(FileDescriptor, fd);
 }
 
-Result<std::pair<FileDescriptor, struct addrinfo *> >
+Result<std::pair<FileDescriptor, addrinfo *> >
 FileDescriptor::socket_client_new(std::string const &host,
                                   std::string const &port) {
-  struct addrinfo hints, *res = NULL;
-  std::memset(&hints, 0, sizeof(hints));
+  addrinfo hints = {}, *res = NULL;
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
   int ai_res;
   if ((ai_res = getaddrinfo(host.c_str(), port.c_str(), &hints, &res)) != 0)
-    return ERR_PAIR(FileDescriptor, struct addrinfo *, gai_strerror(ai_res));
-  int _sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    return ERR_PAIR(FileDescriptor, addrinfo *, gai_strerror(ai_res));
+  const int _sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
   if (_sock < 0) {
     freeaddrinfo(res);
-    return ERR_PAIR(FileDescriptor, struct addrinfo *, strerror(errno));
+    return ERR_PAIR(FileDescriptor, addrinfo *, strerror(errno));
   }
   FileDescriptor sock;
   sock._fd = _sock;
-  return OK_PAIR(FileDescriptor, struct addrinfo *, sock, res);
+  return OK_PAIR(FileDescriptor, addrinfo *, sock, res);
 }
 
-Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
+Result<FileDescriptor> FileDescriptor::from_raw(const int raw_fd) {
   if (raw_fd < 0)
     return ERR(FileDescriptor, Errors::invalid_fd);
   FileDescriptor fd;
@@ -54,8 +53,8 @@ Result<FileDescriptor> FileDescriptor::from_raw(int raw_fd) {
 
 Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
   // Extract just the filename (basename) to prevent directory traversal.
-  std::string::size_type slash_pos = path.rfind('/');
-  std::string filename =
+  const std::string::size_type slash_pos = path.rfind('/');
+  const std::string filename =
       (slash_pos == std::string::npos) ? path : path.substr(slash_pos + 1);
 
   // Only allow files with the ".wbsrv" extension.
@@ -72,10 +71,10 @@ Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
   if (getcwd(cwd_buf, sizeof(cwd_buf)) == NULL) {
     return ERR(FileDescriptor, "cannot retrieve current working directory");
   }
-  std::string safe_path = std::string(cwd_buf) + "/" + filename;
+  const std::string safe_path = std::string(cwd_buf) + "/" + filename;
 
   // Use lstat to inspect the path without following symlinks.
-  struct stat st;
+  struct stat st = {};
   if (lstat(safe_path.c_str(), &st) != 0) {
     // Path does not exist or is otherwise invalid.
     return ERR(FileDescriptor,
@@ -91,7 +90,7 @@ Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
   }
 
   // O_NOFOLLOW provides defense-in-depth against TOCTOU races with symlinks.
-  int _fd = open(safe_path.c_str(), O_RDONLY | O_NOFOLLOW);
+  const int _fd = open(safe_path.c_str(), O_RDONLY | O_NOFOLLOW);
   if (_fd < 0)
     return ERR(FileDescriptor, "failed to open the config file");
 
@@ -173,10 +172,9 @@ FileDescriptor::~FileDescriptor() {
     ::close(_fd);
 }
 
-Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
-                                         unsigned short port) {
-  sockaddr_in _addr;
-  std::memset(&_addr, 0, sizeof(_addr));
+Result<Void> FileDescriptor::socket_bind(const in_addr addr,
+                                         const unsigned short port) const {
+  sockaddr_in _addr = {};
   _addr.sin_family = AF_INET;
   _addr.sin_addr = addr;
   _addr.sin_port = htons(port);
@@ -211,7 +209,7 @@ Result<Void> FileDescriptor::socket_bind(struct in_addr addr,
   return OKV;
 }
 
-Result<Void> FileDescriptor::socket_listen(unsigned short backlog) {
+Result<Void> FileDescriptor::socket_listen(const unsigned short backlog) {
   if (listen(_fd, backlog) < 0) {
     switch (errno) {
     case EADDRINUSE:
@@ -226,9 +224,9 @@ Result<Void> FileDescriptor::socket_listen(unsigned short backlog) {
   return OKV;
 }
 
-Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
+Result<FileDescriptor> FileDescriptor::socket_accept(sockaddr *addr,
                                                      socklen_t *len) const {
-  int fd = accept(_fd, addr, len);
+  const int fd = accept(_fd, addr, len);
   if (fd >= 0) {
     FileDescriptor fd_;
     fd_._fd = fd;
@@ -266,21 +264,21 @@ Result<FileDescriptor> FileDescriptor::socket_accept(struct sockaddr *addr,
   }
 }
 
-Result<Void> FileDescriptor::socket_connect(struct addrinfo *ad_info) {
+Result<Void> FileDescriptor::socket_connect(const addrinfo *ad_info) const {
   if (connect(_fd, ad_info->ai_addr, ad_info->ai_addrlen) == 0)
     return OKV;
   return ERR(Void, strerror(errno));
 }
 
-Result<ssize_t> FileDescriptor::sock_recv(void *buf, size_t size) const {
-  ssize_t res = recv(_fd, buf, size, 0);
+Result<ssize_t> FileDescriptor::sock_recv(void *buf, const size_t size) const {
+  const ssize_t res = recv(_fd, buf, size, 0);
   if (res < 0)
     return ERR(ssize_t, "`recv` failed: ");
   return OK(ssize_t, res);
 }
 
-Result<ssize_t> FileDescriptor::pipe_read(void *buf, size_t size) const {
-  ssize_t res = read(_fd, buf, size);
+Result<ssize_t> FileDescriptor::pipe_read(void *buf, const size_t size) const {
+  const ssize_t res = read(_fd, buf, size);
   if (res < 0)
     return ERR(ssize_t, "`read` failed");
   return OK(ssize_t, res);
@@ -309,7 +307,7 @@ Result<std::string> FileDescriptor::try_read_to_end() const {
 }
 
 Result<Void> FileDescriptor::set_nonblocking() {
-  int flags = fcntl(_fd, F_GETFL, 0);
+  const int flags = fcntl(_fd, F_GETFL, 0);
   if (flags < 0) {
     return ERR(Void, "Failed to get file descriptor flags");
   }
@@ -319,30 +317,33 @@ Result<Void> FileDescriptor::set_nonblocking() {
   return OKV;
 }
 
-Result<Void> FileDescriptor::set_socket_option(int level, int optname,
+Result<Void> FileDescriptor::set_socket_option(const int level,
+                                               const int optname,
                                                const void *optval,
-                                               socklen_t optlen) {
+                                               const socklen_t optlen) {
   if (setsockopt(_fd, level, optname, optval, optlen) < 0) {
     return ERR(Void, "Failed to set socket option");
   }
   return OKV;
 }
 
-Result<ssize_t> FileDescriptor::sock_send(const void *buf, size_t size) const {
-  ssize_t res = send(_fd, buf, size, 0);
+Result<ssize_t> FileDescriptor::sock_send(const void *buf,
+                                          const size_t size) const {
+  const ssize_t res = send(_fd, buf, size, 0);
   if (res < 0)
     return ERR(ssize_t, "send failed");
   return OK(ssize_t, res);
 }
 
-Result<ssize_t> FileDescriptor::pipe_write(void const *buf, size_t size) const {
-  ssize_t res = write(_fd, buf, size);
+Result<ssize_t> FileDescriptor::pipe_write(void const *buf,
+                                           const size_t size) const {
+  const ssize_t res = write(_fd, buf, size);
   if (res < 0)
     return ERR(ssize_t, "write to pipe failed");
   return OK(ssize_t, res);
 }
 
-Result<std::string> FileDescriptor::read_file_line() {
+Result<std::string> FileDescriptor::read_file_line() const {
   if (fp == NULL)
     return ERR(std::string, "FILE not initialized");
   std::string res;

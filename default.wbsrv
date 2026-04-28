@@ -28,6 +28,8 @@ uwsgi =
 
 	GET *.(jpg|jpeg|gif) <- /spool/www/*
 
+	GET|POST|DELETE /cgi-bin/* <- /spool/www/cgi-bin/*
+
 	GET * <- /spool/www/*
 		? hello.html
 		@ auth_info

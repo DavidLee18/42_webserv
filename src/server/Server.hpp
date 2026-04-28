@@ -41,7 +41,6 @@ class ServerConfig;
  * to the respective ClientSession handlers.
  */
 class Server {
-private:
   /**
    * @brief The core polling event queue instance.
    *
@@ -116,15 +115,10 @@ public:
    *
    * @param config Reference to the populated WebserverConfig object.
    */
-  Server(const WebserverConfig &config)
+  explicit Server(const WebserverConfig &config)
       : config(config), mime_type(config.get_type_map()) {
     mime_type["default"] = config.get_default_mime();
-  };
-
-  /**
-   * @brief Destroys the Server object.
-   */
-  ~Server() {};
+  }
 
   /**
    * @brief Initializes server state, binding sockets and registering them to

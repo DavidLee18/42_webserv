@@ -13,11 +13,11 @@ UwsgiMetaVar &UwsgiMetaVar::operator=(const UwsgiMetaVar &other) {
 
 UwsgiMetaVar::~UwsgiMetaVar() {}
 
-UwsgiMetaVar UwsgiMetaVar::create(Name n, std::string v) {
+UwsgiMetaVar UwsgiMetaVar::create(const Name n, const std::string& v) {
   return UwsgiMetaVar(n, v);
 }
 
-UwsgiInput::UwsgiInput(std::vector<UwsgiMetaVar> vars, Request const &req)
+UwsgiInput::UwsgiInput(const std::vector<UwsgiMetaVar>& vars, Request const &req)
     : _mvars(vars), _req(req) {}
 
 UwsgiInput::UwsgiInput(Request const &req) : _mvars(), _req(req) {}
@@ -58,7 +58,7 @@ void UwsgiInput::add_mvar(std::string const &name, std::string const &value) {
   } else {
     // For HTTP headers, store as "NAME=value" in the value field
     var_name = UwsgiMetaVar::HTTP_;
-    std::string combined = name + "=" + value;
+    const std::string combined = name + "=" + value;
     _mvars.push_back(UwsgiMetaVar::create(var_name, combined));
     return;
   }
@@ -67,7 +67,7 @@ void UwsgiInput::add_mvar(std::string const &name, std::string const &value) {
 }
 
 char **UwsgiInput::to_envp() const {
-  size_t count = _mvars.size();
+  const size_t count = _mvars.size();
   char **envp = new char *[count + 1];
 
   for (size_t i = 0; i < count; i++) {
@@ -188,7 +188,7 @@ std::map<std::string, std::string> UwsgiInput::to_map() const {
     case UwsgiMetaVar::HTTP_: {
       // value already contains "HTTP_HEADER_NAME=value"
       const std::string &combined = mvar.get_value();
-      size_t eq = combined.find('=');
+      const size_t eq = combined.find('=');
       if (eq != std::string::npos)
         result[combined.substr(0, eq)] = combined.substr(eq + 1);
       continue;
@@ -248,7 +248,7 @@ Result<UwsgiInput> UwsgiInput::Parser::parse(Request const &req) {
   std::string path_str = path;
 
   std::string query_str;
-  size_t query_pos = path.find('?');
+  const size_t query_pos = path.find('?');
   if (query_pos != std::string::npos) {
     query_str = path.substr(query_pos + 1);
     // Update path info to not include query string
@@ -289,11 +289,11 @@ Result<UwsgiInput> UwsgiInput::Parser::parse(Request const &req) {
 }
 
 UwsgiDelegate::UwsgiDelegate(EPoll &epoll, Request const &req)
-    : _env(req), _port(0), _req(req), _epoll(epoll), _sock(NULL), _send_buf(),
-      _total_sent(0), _output(), _error() {}
+    : _env(req), _port(0), _req(req), _epoll(epoll), _sock(NULL),
+      _total_sent(0), _complete(false) {}
 
 Result<UwsgiDelegate> UwsgiDelegate::from_req(EPoll &epoll, Request const &req,
-                                              unsigned short port) {
+                                              const unsigned short port) {
   UwsgiDelegate del(epoll, req);
   UwsgiInput input(req);
   TRY(UwsgiDelegate, UwsgiInput, input, UwsgiInput::Parser::parse(req))
@@ -348,8 +348,8 @@ Result<Void> UwsgiDelegate::register_() {
 
   std::ostringstream oss;
   oss << _port;
-  struct addrinfo *ad_info = NULL;
-  Result<std::pair<FileDescriptor, struct addrinfo *> > client_res =
+  addrinfo *ad_info = NULL;
+  Result<std::pair<FileDescriptor, addrinfo *> > client_res =
       FileDescriptor::socket_client_new("127.0.0.1", oss.str());
   if (client_res.has_value()) {
     _sock = const_cast<FileDescriptor *>(&client_res.value().first);
@@ -362,7 +362,8 @@ Result<Void> UwsgiDelegate::register_() {
     return ERR(Void, _error);
   }
 
-  _sock->socket_connect(ad_info);
+  Void conn_res;
+  TRY(Void, Void, conn_res, _sock->socket_connect(ad_info))
 
   // Monitor for writability (connect completion) and errors.
   Result<FileDescriptor *> add_res =
@@ -388,7 +389,7 @@ Result<Void> UwsgiDelegate::handle_event(const Event *ev) {
     return ERR(Void, _error);
   }
   if (ev->out && _total_sent < _send_buf.size()) {
-    Result<ssize_t> written = _sock->sock_send(
+    const Result<ssize_t> written = _sock->sock_send(
         reinterpret_cast<const char *>(&_send_buf[0]) + _total_sent,
         _send_buf.size() - _total_sent);
     if (!written.has_value() || written.value() < 0) {
@@ -403,7 +404,7 @@ Result<Void> UwsgiDelegate::handle_event(const Event *ev) {
   }
   if (ev->in) {
     char read_buf[4096];
-    Result<ssize_t> n = _sock->sock_recv(read_buf, sizeof(read_buf));
+    const Result<ssize_t> n = _sock->sock_recv(read_buf, sizeof(read_buf));
     if (n.has_value() && n.value() > 0)
       _output.append(read_buf, static_cast<size_t>(n.value()));
     else if (!n.has_value() || n.value() < 0) {

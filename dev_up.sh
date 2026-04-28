@@ -3,7 +3,7 @@ set -e
 
 CONTAINER=webserv-run
 IMAGE=webserv-dev:arm64
-PORTS=(8080 8081)  # adjust to your config
+PORTS=(4040 8080)  # adjust to your config
 
 if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
   if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then

@@ -58,7 +58,7 @@ std::string DefaultError::unknown_err() {
          "main</a>\n<br>\n</body>\n</html>";
 }
 
-std::string DefaultError::status_code_to_string(int status_code) {
+std::string DefaultError::status_code_to_string(const int status_code) {
   if (status_code == 200)
     return "200 OK";
   else if (status_code == 301)
@@ -80,12 +80,13 @@ std::string DefaultError::status_code_to_string(int status_code) {
   return "500 Internal Server Error";
 }
 
-Response DefaultError::default_err_response(int err_code) {
+Response DefaultError::default_err_response(const int err_code) {
   Response response;
 
   response.version = "HTTP/1.1";
   response.mime_type = "text/html";
   response.status_code = status_code_to_string(err_code);
+  response.keep_alive = false;
   if (err_code == BAD_REQUEST)
     response.body = bad_request();
   else if (err_code == FORBIDDEN_ERR)
