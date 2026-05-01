@@ -40,6 +40,10 @@ public:
   
   // 일정 시간(timeout_seconds) 동안 활동이 없는 좀비 세션을 삭제
   void clean_expired_sessions(int timeout_seconds);
+
+  // 세션 정보 반환 (JSON 형식으로 사용 가능)
+  bool get_session_info(const std::string& session_id, int timeout_seconds,
+                        std::string& user_id, int& elapsed_seconds, int& remaining_seconds);
 };
 
 #endif
