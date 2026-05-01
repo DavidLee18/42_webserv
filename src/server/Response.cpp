@@ -36,7 +36,9 @@ std::ostream &operator<<(std::ostream &os, Response const &resp) {
       os << "Set-Cookie:" << resp.cookie << "\r\n";
     }
     os << "Content-Length: " << resp.body.length() << "\r\n";
-    os << "Connection: " << resp.connection << "\r\n\r\n";
+    if (!resp.connection.empty()) {
+      os << "Connection: " << resp.connection << "\r\n\r\n";
+    }
     os << resp.body;
   }
   return os;
@@ -56,10 +58,9 @@ Response ServerResponse::http_response(
   const ServerConfig *config = client->config;
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
-  if (rule == NULL)
-    return DefaultError::default_err_response(NOT_FOUND_ERR);
   Response response;
-  response.keep_alive = false;
+  if (rule == NULL)
+    response = DefaultError::default_err_response(NOT_FOUND_ERR);
   const Target target = resolve_target(rule, config, request);
 
   // [쿠키 검증 로직 추가]
@@ -78,25 +79,40 @@ Response ServerResponse::http_response(
     if (request->get_method() == Request::DELETE) {
       std::cout << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
-      return error_response(config, rule, UNAUTHORIZED);
+      response = error_response(config, rule, UNAUTHORIZED);
     }
     std::cout << "[Authentication] No valid session. Guest user." << std::endl;
   }
+
+  switch (request->get_method()) {
+  case Request::DELETE:
+    response = ServerResponse::delete_method(target, response, config, rule);
+    break;
+  case Request::POST:
+    response = ServerResponse::post_method(target, response, client, rule, request,
+                                     session);
+    break;
+  case Request::GET:
+    response = ServerResponse::get_method(target, response, config, rule, request);
+    break;
+  default:
+    response = error_response(config, rule, METHOD_NOT_ALLOWED);
+    break;
+  }
+
+  response.keep_alive = false;
 
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
   std::cout << "mime type: " << response.mime_type << std::endl;
 
-  if (request->get_method() == Request::DELETE) {
-    return ServerResponse::delete_method(target, response, config, rule);
-  } else if (request->get_method() == Request::POST) {
-    return ServerResponse::post_method(target, response, client, rule, request,
-                                       session);
-  } else if (request->get_method() == Request::GET) {
-    return ServerResponse::get_method(target, response, config, rule, request);
-  } else {
-    return error_response(config, rule, METHOD_NOT_ALLOWED);
-  }
+  if (request->get_connection_string() == "keep-alive")
+    response.connection = "keep-alive";
+  else if (request->get_connection_string() == "close")
+    response.connection = "close";
+  else
+    response.connection.clear();
+
   return response;
 }
 

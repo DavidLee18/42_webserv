@@ -41,6 +41,7 @@ integration-test: all
 cgi: $(CGI_NAME)
 
 $(CGI_NAME): $(CGI_SRC)
+	mkdir -p spool/www/cgi-bin/
 	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(CGI_NAME) $(CGI_SRC)
 
 $(NAME): $(OBJS)
@@ -53,7 +54,7 @@ $(BUILD_DIR)/%.o: %.cpp
 clean:
 	rm -rf $(BUILD_DIR)
 
-fclean:	clean
+fclean:	clean cgiclean
 	rm -f $(NAME)
 	rm -f $(UWSGI_NAME)
 	rm -f $(CGI_NAME)

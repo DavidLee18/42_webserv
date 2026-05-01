@@ -24,10 +24,7 @@ std::string Request::get_method_string() const {
 }
 
 std::string Request::get_connection_string() const {
-  if (keep_alive)
-    return "keep-alive";
-  else
-    return "close";
+  return connection;
 }
 
 std::string Request::get_cookie_value(const std::string &name) const {
@@ -175,8 +172,7 @@ Result<Request *> Request::from_buff(std::string &buff) {
     }
   }
 
-  if (get_string_from_map(req->header, "Connection") == "keep-alive")
-    req->keep_alive = true;
+  req->connection = get_string_from_map(req->header, "Connection");
 
   req->cookie = get_string_from_map(req->header, "Cookie");
 

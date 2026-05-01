@@ -151,18 +151,17 @@ private:
   std::string path;    ///< The requested path (e.g., "/").
   std::string version; ///< The HTTP version (e.g., "HTTP/1.1").
   std::map<std::string, std::string> header; ///< Parsed HTTP headers.
-  bool keep_alive;                           ///< Connection keep-alive status.
   size_t content_length;
+  std::string connection; ///< The value of the Connection header.
   std::string cookie;
   std::string body;     ///< The request body, if any.
   std::string remnants; ///< remaining string to parse.
 
   Request()
-      : method(ERROR), path(), version(), header(), keep_alive(false),
-        content_length(0), cookie(), body(), remnants() {}
+      : method(ERROR), path(), version(), header(), content_length(0), connection(), cookie(), body(), remnants() {}
   Request(const Method method, std::string const &path, std::string const &version, const size_t content_length)
-      : method(method), path(path), version(version), keep_alive(false),
-        content_length(content_length) {}
+      : method(method), path(path), version(version),
+        content_length(content_length), connection() {}
 };
 
 #endif
