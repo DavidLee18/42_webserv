@@ -93,6 +93,38 @@ Response ServerResponse::http_response(
       get_string_from_map(mime_type, find_file_type(target.path));
   std::cout << "mime type: " << response.mime_type << std::endl;
 
+  // Special API endpoint for session info
+  if (request->get_path() == "/api/session-info") {
+    if (request->get_method() == Request::GET) {
+      response.mime_type = "application/json";
+      response.status_code = status_code_to_string(OK);
+
+      if (session_id.empty()) {
+        response.body = "{\"logged_in\":false,\"message\":\"No active session\"}";
+      } else {
+        std::string user_id;
+        int elapsed_seconds = 0;
+        int remaining_seconds = 0;
+        const int timeout_seconds = 300; // 5 minutes from config
+
+        if (session->get_session_info(session_id, timeout_seconds, user_id,
+                                       elapsed_seconds, remaining_seconds)) {
+          std::ostringstream json;
+          json << "{\"logged_in\":true,\"user_id\":\"" << user_id
+               << "\",\"elapsed_seconds\":" << elapsed_seconds
+               << ",\"remaining_seconds\":" << remaining_seconds
+               << ",\"timeout_seconds\":" << timeout_seconds << "}";
+          response.body = json.str();
+        } else {
+          response.body = "{\"logged_in\":false,\"message\":\"Session expired\"}";
+        }
+      }
+      return response;
+    } else {
+      return error_response(config, rule, METHOD_NOT_ALLOWED);
+    }
+  }
+
   if (request->get_method() == Request::DELETE) {
     return ServerResponse::delete_method(target, response, config, rule);
   } else if (request->get_method() == Request::POST) {

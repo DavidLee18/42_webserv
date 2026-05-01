@@ -292,54 +292,60 @@
 
     <script>
         const SESSION_TIMEOUT_SECONDS = 300; // 5 minutes from config ...300
+        let sessionData = null;
 
         async function fetchSessionInfo() {
             try {
-                const cookies = document.cookie.split(';');
-                const sessionCookie = cookies.find(c => c.trim().startsWith('session_id='));
+                const response = await fetch('/api/session-info');
+                const data = await response.json();
 
-                if (!sessionCookie) {
+                if (!data.logged_in) {
                     showError('No active session. Please log in first.');
                     return;
                 }
 
-                const sessionId = sessionCookie.split('=')[1].trim();
-
-                // Since we don't have a dedicated API endpoint yet,
-                // we'll simulate the data from the browser side
-                // In production, this should fetch from /api/session-info
-                display(sessionId);
+                sessionData = data;
+                displaySession(data);
             } catch (error) {
                 showError('Error fetching session information: ' + error.message);
             }
         }
 
-        function display(sessionId) {
+        function displaySession(data) {
             showContent();
 
-            // Display session ID and simulate time tracking
-            document.getElementById('userId').textContent = 'Anonymous (Session: ' + sessionId.substring(0, 8) + '...)';
+            document.getElementById('userId').textContent = data.user_id || 'Unknown';
+
+            const createdTime = new Date();
+            createdTime.setSeconds(createdTime.getSeconds() - data.elapsed_seconds);
+            document.getElementById('loginTime').textContent = createdTime.toLocaleTimeString();
 
             const now = new Date();
             document.getElementById('lastActivity').textContent = now.toLocaleTimeString();
 
             // Start real-time countdown
-            updateTimer();
-            setInterval(updateTimer, 1000);
+            updateTimer(data);
+            setInterval(() => updateTimer(data), 1000);
         }
 
-        function updateTimer() {
-            // This is a client-side simulation
-            // In production, server should provide actual remaining time
-            const remainingSeconds = SESSION_TIMEOUT_SECONDS - (Math.floor(Date.now() / 1000) % SESSION_TIMEOUT_SECONDS);
+        function updateTimer(data) {
+            const remainingSeconds = Math.max(0, data.remaining_seconds -
+                (Math.floor(Date.now() / 1000) - Math.floor(Date.now() / 1000)));
 
-            const minutes = Math.floor(remainingSeconds / 60);
-            const seconds = remainingSeconds % 60;
+            // Since we don't have millisecond precision, use remaining_seconds directly
+            // and decrement locally
+            let localRemaining = Math.max(0, data.remaining_seconds - Math.floor(Date.now() / 1000) + Math.floor(Date.now() / 1000));
+
+            // Better approach: fetch fresh data periodically
+            const displayRemaining = Math.max(0, data.remaining_seconds - (Math.floor(Date.now() / 1000) - Math.floor(data.elapsed_seconds)));
+
+            const minutes = Math.floor(Math.max(0, displayRemaining) / 60);
+            const seconds = Math.max(0, displayRemaining) % 60;
 
             document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
             document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
 
-            const percentage = (remainingSeconds / SESSION_TIMEOUT_SECONDS) * 100;
+            const percentage = (Math.max(0, displayRemaining) / data.timeout_seconds) * 100;
             const progressFill = document.getElementById('progressFill');
             const progressText = document.getElementById('progressText');
 
@@ -351,13 +357,13 @@
             const secondsBox = document.getElementById('secondsBox');
             const status = document.getElementById('status');
 
-            if (remainingSeconds <= 30) {
+            if (displayRemaining <= 30) {
                 progressFill.className = 'progress-fill danger';
                 minutesBox.className = 'timer-box danger';
                 secondsBox.className = 'timer-box danger';
                 status.className = 'status expired';
                 status.textContent = '⚠ Session Expiring Soon';
-            } else if (remainingSeconds <= 60) {
+            } else if (displayRemaining <= 60) {
                 progressFill.className = 'progress-fill warning';
                 minutesBox.className = 'timer-box warning';
                 secondsBox.className = 'timer-box warning';
