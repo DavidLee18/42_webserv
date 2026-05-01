@@ -4,7 +4,6 @@ volatile sig_atomic_t g_receivedSignal = 0;
 
 int main(const int argc, char *argv[]) {
   signal(SIGPIPE, SIG_IGN);
-  (void)argc;
   if (argc != 2) {
     std::cerr << "Usage: webserv <config_file>" << std::endl;
     return 1;

@@ -65,13 +65,13 @@ struct StatusInfo {
 struct Response {
   std::string version;      ///< HTTP version (e.g., "HTTP/1.1").
   std::string status_code;  ///< HTTP status code and reason (e.g., "200 OK").
+  size_t content_length;    ///< Content-Length header value.
   std::string content_type; ///< Content-Type header.
   std::string connection;   ///< Connection header.
   std::string cookie;       ///< Cookies.
   std::string body;         ///< The response body payload.
   std::string mime_type; ///< The determined MIME type of the response payload.
   std::string redir;     ///< Redirect location, if applicable.
-  bool keep_alive;       ///< Connection keep-alive status.
   std::string cgi;       ///< Generated CGI script.
 };
 

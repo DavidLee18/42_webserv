@@ -31,15 +31,15 @@ std::ostream &operator<<(std::ostream &os, Response const &resp) {
     os << "HTTP/1.1 " << resp.status_code << "\r\n";
     if (!resp.redir.empty())
       os << "Location: " << resp.redir << "\r\n";
-    os << "Content-Type:" << resp.mime_type << "\r\n";
-    if (!resp.cookie.empty()) {
+    if (!resp.mime_type.empty())
+      os << "Content-Type:" << resp.mime_type << "\r\n";
+    if (!resp.cookie.empty())
       os << "Set-Cookie:" << resp.cookie << "\r\n";
-    }
-    os << "Content-Length: " << resp.body.length() << "\r\n";
-    if (!resp.connection.empty()) {
+    os << "Content-Length: " << resp.content_length << "\r\n";
+    if (!resp.connection.empty())
       os << "Connection: " << resp.connection << "\r\n\r\n";
-    }
-    os << resp.body;
+    if (!resp.body.empty())
+      os << resp.body;
   }
   return os;
 }
@@ -87,20 +87,27 @@ Response ServerResponse::http_response(
   switch (request->get_method()) {
   case Request::DELETE:
     response = ServerResponse::delete_method(target, response, config, rule);
+    response.content_length = response.body.length();
     break;
   case Request::POST:
     response = ServerResponse::post_method(target, response, client, rule, request,
                                      session);
+    response.content_length = response.body.length();
     break;
   case Request::GET:
     response = ServerResponse::get_method(target, response, config, rule, request);
+    response.content_length = response.body.length();
+    break;
+  case Request::HEAD:
+    response = ServerResponse::get_method(target, response, config, rule, request);
+    response.body.clear();
+    response.content_length = 0;
     break;
   default:
     response = error_response(config, rule, METHOD_NOT_ALLOWED);
+    response.content_length = response.body.length();
     break;
   }
-
-  response.keep_alive = false;
 
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
