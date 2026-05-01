@@ -31,25 +31,29 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (!parse_types_block(file))
         return false;
     } else if (WebserverConfig::is_server_config_header(line)) {
-      if (!parse_server_config_entry(file, line))
+      if (!parse_server_config_entry(file, line)) // 수정해야함
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
-      err_meg = RouteRule_CGI::parse_uwsgi_block(file, this->uwsgi);
+      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi); // 수정해야함
       if (err_meg != "")
         return false;
     } else if (line[0] == '!') {
-      err_meg = apply_default_err_page_entry(line);
+      err_meg = apply_default_err_page_entry(line); // 수정해야함
       if (err_meg != "")
         return false;
     } else {
-      err_meg = "Invalid line Error: " + line;
+      err_meg = "on [" + line + "]: Invalid configuration format (the line does not correspond to a valid grammar rule at indentation level 0).";
       return false;
     }
   }
-  if (this->type_map.empty() || this->default_mime.length() == 0) {
-    err_meg = "Required type configuration is missing";
+  if (type_map.empty()) {
+    err_meg = "Missing types declaration (the 'types' block is not defined at indentation level 0, so no MIME type mapping rules can be processed).";
     return false;
-  }
+  } else if (serverconfig_map.empty()) {
+    err_meg = "";
+    return false;
+  } else if (uwsgi.empty())
+    return false;
   return true;
 }
 
