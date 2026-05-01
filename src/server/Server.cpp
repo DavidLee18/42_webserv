@@ -3,6 +3,8 @@
 #include "DefaultError.hpp"
 #include "Response.hpp"
 #include <cstddef>
+#include <ctime>
+#include <vector>
 
 void Server::new_connection(const FileDescriptor *server_fd) {
   while (true) { // accept all clients until nothing to connect
@@ -31,6 +33,7 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     }
 
     ClientSession client;
+    client.last_activity_time = time(NULL);
     char ip_str[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN);
     client.ip = ip_str;
@@ -62,6 +65,7 @@ void Server::disconnect(const FileDescriptor *client_fd) {
 }
 
 void Server::client_read(const FileDescriptor *client_fd) {
+  clients.at(client_fd).last_activity_time = time(NULL);
   bool peer_closed = false;
   while (true) { // repeat until nothing to read
     char buf[NETWORK_BUFFER_SIZE];
@@ -92,6 +96,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
         } else if (req_.error() == Errors::malformed_header ||
                    req_.error() == Errors::bad_request) {
           Response resp = DefaultError::default_err_response(BAD_REQUEST);
+          resp.headers = clients.at(client_fd).config->get_header();
           std::ostringstream oss;
           oss << resp;
           clients.at(client_fd).out_buff += oss.str();
@@ -106,6 +111,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
           return;
         } else if (req_.error() == Errors::not_implemented) {
           Response resp = DefaultError::default_err_response(NOT_IMPLEMENTED);
+          resp.headers = clients.at(client_fd).config->get_header();
           std::ostringstream oss;
           oss << resp;
           clients.at(client_fd).out_buff += oss.str();
@@ -232,6 +238,7 @@ void Server::client_write(const FileDescriptor *client_fd) {
   if (clients.find(client_fd) == clients.end())
     return;
 
+  clients.at(client_fd).last_activity_time = time(NULL);
   std::string &write_buffer = clients.at(client_fd).out_buff;
   if (!write_buffer.empty()) {
     while (true) { // ET 모드이므로 보낼 수 있는 만큼 다 보냄
@@ -320,8 +327,52 @@ Result<Void> Server::start() {
   // system("open http://localhost:8080");
   std::cout << "Starting server loop..." << std::endl;
   while (true) {
+    // Check for client timeouts and calculate epoll timeout
+    time_t now = time(NULL);
+    int epoll_timeout = -1; // Default: wait indefinitely
+
+    // Collect clients to disconnect (avoid modifying map during iteration)
+    std::vector<const FileDescriptor *> clients_to_disconnect;
+
+    for (std::map<const FileDescriptor *, ClientSession>::iterator it = clients.begin();
+         it != clients.end(); ++it) {
+      const FileDescriptor *client_fd = it->first;
+      ClientSession &session = it->second;
+
+      if (session.config == NULL)
+        continue;
+
+      int timeout_sec = session.config->get_server_response_time();
+      if (timeout_sec > 0) {
+        time_t elapsed = now - session.last_activity_time;
+        if (elapsed >= static_cast<time_t>(timeout_sec)) {
+          // Client has timed out
+          clients_to_disconnect.push_back(client_fd);
+        } else {
+          // Calculate remaining time until this client times out
+          int remaining = timeout_sec - static_cast<int>(elapsed);
+          if (epoll_timeout == -1 || remaining < epoll_timeout) {
+            epoll_timeout = remaining * 1000; // Convert to milliseconds
+          }
+        }
+      }
+    }
+
+    // Disconnect timed-out clients
+    for (size_t i = 0; i < clients_to_disconnect.size(); ++i) {
+      disconnect(clients_to_disconnect[i]);
+    }
+
+    // Clean expired sessions (use the first server's timeout as default)
+    if (clients.begin() != clients.end()) {
+      int session_timeout = clients.begin()->second.config->get_server_response_time();
+      if (session_timeout > 0) {
+        sessions.clean_expired_sessions(session_timeout);
+      }
+    }
+
     // Waiting for events using epoll
-    Result<Events> events_result = epoll.wait(-1);
+    Result<Events> events_result = epoll.wait(epoll_timeout);
     if (!events_result.has_value()) {
       if (events_result.error() == Errors::interrupted)
         continue;

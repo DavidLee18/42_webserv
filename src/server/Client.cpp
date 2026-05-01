@@ -48,19 +48,29 @@ Result<Request *> Request::from_buff(std::string &buff) {
   const size_t header_end = buff.find("\r\n\r\n");
   if (header_end == std::string::npos)
     return ERR(Request *,
-               Errors::incomplete_header); // 헤더가 다 안 들어왔으면 다음 epoll
-                                           // 이벤트 대기
+               Errors::incomplete_header);
   size_t content_length = 0;
 
-  // checking Content-Length
   std::string header_lower = buff.substr(0, header_end);
   for (size_t i = 0; i < header_lower.length(); ++i) {
     header_lower[i] = static_cast<char>(
         std::tolower(static_cast<unsigned char>(header_lower[i])));
   }
   const size_t host_pos = header_lower.find("host:");
-  if (host_pos == std::string::npos ||
-      header_lower.find("host:", host_pos + 1) != std::string::npos)
+  // Check if there's only ONE host header (not counting it as a substring)
+  // We look for it as a header name, which must be preceded by \r\n or be at start
+  size_t second_host_pos = std::string::npos;
+  size_t search_from = host_pos + 5; // Skip the found "host:" itself
+  while ((second_host_pos = header_lower.find("host:", search_from)) != std::string::npos) {
+    // Check if this "host:" is at the beginning of a line (preceded by \r\n)
+    if (second_host_pos >= 2 && header_lower[second_host_pos - 2] == '\r' &&
+        header_lower[second_host_pos - 1] == '\n') {
+      break; // Found a second host header
+    }
+    search_from = second_host_pos + 5;
+  }
+
+  if (host_pos == std::string::npos || second_host_pos != std::string::npos)
     return ERR(Request *, Errors::bad_request);
   const size_t cl_pos = header_lower.find("content-length:");
   const size_t te_pos = header_lower.find("transfer-encoding:");
@@ -68,7 +78,7 @@ Result<Request *> Request::from_buff(std::string &buff) {
     return ERR(Request *, Errors::malformed_header); // conforming to the RFC
   if (te_pos != std::string::npos &&
       (header_lower.find("transfer-encoding:chunked") != std::string::npos ||
-       header_lower.find("transfer-encoding: chunked")))
+       header_lower.find("transfer-encoding: chunked") != std::string::npos))
     return ERR(Request *, Errors::not_implemented);
   if (cl_pos != std::string::npos && te_pos == std::string::npos) {
     const char *str =

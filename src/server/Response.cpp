@@ -31,18 +31,22 @@ std::ostream &operator<<(std::ostream &os, Response const &resp) {
     os << "HTTP/1.1 " << resp.status_code << "\r\n";
     if (!resp.redir.empty())
       os << "Location: " << resp.redir << "\r\n";
-    if (!resp.mime_type.empty())
-      os << "Content-Type:" << resp.mime_type << "\r\n";
-    if (!resp.cookie.empty())
+    os << "Content-Type:" << resp.mime_type << "\r\n";
+    if (!resp.cookie.empty()) {
       os << "Set-Cookie:" << resp.cookie << "\r\n";
+    }
+    for (std::map<std::string, std::string>::const_iterator it = resp.headers.begin();
+         it != resp.headers.end(); ++it) {
+      os << it->first << ": " << it->second << "\r\n";
+    }
     os << "Content-Length: " << resp.content_length << "\r\n";
-    if (!resp.connection.empty())
-      os << "Connection: " << resp.connection << "\r\n\r\n";
+    os << "Connection: " << resp.connection << "\r\n\r\n";
     if (!resp.body.empty())
       os << resp.body;
   }
   return os;
 }
+
 
 std::string ServerResponse::find_file_type(const std::string &path) {
   std::vector<std::string> file_type = utils::string_split(path, ".");
@@ -61,6 +65,7 @@ Response ServerResponse::http_response(
   Response response;
   if (rule == NULL)
     response = DefaultError::default_err_response(NOT_FOUND_ERR);
+  response.headers = config->get_header();
   const Target target = resolve_target(rule, config, request);
 
   // [쿠키 검증 로직 추가]
@@ -80,8 +85,9 @@ Response ServerResponse::http_response(
       std::cout << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
       response = error_response(config, rule, UNAUTHORIZED);
+    } else {
+      std::cout << "[Authentication] No valid session. Guest user." << std::endl;
     }
-    std::cout << "[Authentication] No valid session. Guest user." << std::endl;
   }
 
   switch (request->get_method()) {
@@ -120,6 +126,48 @@ Response ServerResponse::http_response(
   else
     response.connection.clear();
 
+  // Special API endpoint for session info
+  if (request->get_path() == "/api/session-info") {
+    if (request->get_method() == Request::GET) {
+      response.mime_type = "application/json";
+      response.status_code = status_code_to_string(OK);
+
+      if (session_id.empty()) {
+        response.body = "{\"logged_in\":false,\"message\":\"No active session\"}";
+      } else {
+        std::string user_id;
+        int elapsed_seconds = 0;
+        int remaining_seconds = 0;
+        const int timeout_seconds = 300; // 5 minutes from config
+
+        if (session->get_session_info(session_id, timeout_seconds, user_id,
+                                       elapsed_seconds, remaining_seconds)) {
+          std::ostringstream json;
+          json << "{\"logged_in\":true,\"user_id\":\"" << user_id
+               << "\",\"elapsed_seconds\":" << elapsed_seconds
+               << ",\"remaining_seconds\":" << remaining_seconds
+               << ",\"timeout_seconds\":" << timeout_seconds << "}";
+          response.body = json.str();
+        } else {
+          response.body = "{\"logged_in\":false,\"message\":\"Session expired\"}";
+        }
+      }
+      return response;
+    } else {
+      return error_response(config, rule, METHOD_NOT_ALLOWED);
+    }
+  }
+
+  if (request->get_method() == Request::DELETE) {
+    return ServerResponse::delete_method(target, response, config, rule);
+  } else if (request->get_method() == Request::POST) {
+    return ServerResponse::post_method(target, response, client, rule, request,
+                                       session);
+  } else if (request->get_method() == Request::GET) {
+    return ServerResponse::get_method(target, response, config, rule, request);
+  } else {
+    return error_response(config, rule, METHOD_NOT_ALLOWED);
+  }
   return response;
 }
 
@@ -224,12 +272,12 @@ Response ServerResponse::error_response(const ServerConfig *config,
 
   if (err_page.empty())
     return DefaultError::default_err_response(error_code);
-  (void)config;
   if (check_path_type(err_page) != IS_FILE)
     return DefaultError::default_err_response(error_code);
   std::ifstream file(err_page.c_str());
   if (file.is_open()) {
-    response.status_code = status_code_to_string(OK);
+    response.status_code = status_code_to_string(error_code);
+    response.headers = config->get_header();
     std::ostringstream ss;
     ss << file.rdbuf();
     response.body = ss.str();
@@ -679,7 +727,7 @@ Response ServerResponse::get_method(Target target, Response response,
     response.status_code = status_code_to_string(target.type);
   } else {
     if (check_path_type(target.path) != IS_FILE)
-      return DefaultError::default_err_response(NOT_FOUND_ERR);
+      return error_response(config, rule, NOT_FOUND_ERR);
     std::ifstream file(target.path.c_str());
     if (file.is_open()) {
       std::ostringstream ss;
@@ -689,7 +737,7 @@ Response ServerResponse::get_method(Target target, Response response,
       response.status_code = status_code_to_string(target.type);
       file.close();
     } else {
-      return DefaultError::default_err_response(NOT_FOUND_ERR);
+      return error_response(config, rule, NOT_FOUND_ERR);
     }
   }
   return response;
