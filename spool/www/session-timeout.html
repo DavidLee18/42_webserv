@@ -179,10 +179,6 @@
                     <span class="info-label">Session Timeout:</span>
                     <span class="info-value" id="timeout">-</span>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">Remaining Time:</span>
-                    <span class="info-value" id="remaining">-</span>
-                </div>
             </div>
 
             <div class="button-group">
@@ -219,14 +215,7 @@
             document.getElementById('loginTime').textContent = createdTime.toLocaleString();
 
             const timeoutMinutes = Math.floor(data.timeout_seconds / 60);
-            const timeoutSeconds = data.timeout_seconds % 60;
-            document.getElementById('timeout').textContent =
-                timeoutMinutes > 0 ? timeoutMinutes + ' minutes' : 'Less than 1 minute';
-
-            const remainingMinutes = Math.floor(data.remaining_seconds / 60);
-            const remainingSeconds = data.remaining_seconds % 60;
-            document.getElementById('remaining').textContent =
-                remainingMinutes + 'm ' + remainingSeconds + 's';
+            document.getElementById('timeout').textContent = timeoutMinutes + ' minutes';
         }
 
         function showError(message) {
