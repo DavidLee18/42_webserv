@@ -363,6 +363,14 @@ Result<Void> Server::start() {
       disconnect(clients_to_disconnect[i]);
     }
 
+    // Clean expired sessions (use the first server's timeout as default)
+    if (clients.begin() != clients.end()) {
+      int session_timeout = clients.begin()->second.config->get_server_response_time();
+      if (session_timeout > 0) {
+        sessions.clean_expired_sessions(session_timeout);
+      }
+    }
+
     // Waiting for events using epoll
     Result<Events> events_result = epoll.wait(epoll_timeout);
     if (!events_result.has_value()) {
