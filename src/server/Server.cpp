@@ -92,6 +92,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
         } else if (req_.error() == Errors::malformed_header ||
                    req_.error() == Errors::bad_request) {
           Response resp = DefaultError::default_err_response(BAD_REQUEST);
+          resp.headers = clients.at(client_fd).config->get_header();
           std::ostringstream oss;
           oss << resp;
           clients.at(client_fd).out_buff += oss.str();
@@ -106,6 +107,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
           return;
         } else if (req_.error() == Errors::not_implemented) {
           Response resp = DefaultError::default_err_response(NOT_IMPLEMENTED);
+          resp.headers = clients.at(client_fd).config->get_header();
           std::ostringstream oss;
           oss << resp;
           clients.at(client_fd).out_buff += oss.str();

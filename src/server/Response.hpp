@@ -73,6 +73,7 @@ struct Response {
   std::string redir;     ///< Redirect location, if applicable.
   bool keep_alive;       ///< Connection keep-alive status.
   std::string cgi;       ///< Generated CGI script.
+  std::map<std::string, std::string> headers; ///< Additional response headers from config.
 };
 
 std::ostream &operator<<(std::ostream &, Response const &);

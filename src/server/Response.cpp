@@ -35,12 +35,17 @@ std::ostream &operator<<(std::ostream &os, Response const &resp) {
     if (!resp.cookie.empty()) {
       os << "Set-Cookie:" << resp.cookie << "\r\n";
     }
+    for (std::map<std::string, std::string>::const_iterator it = resp.headers.begin();
+         it != resp.headers.end(); ++it) {
+      os << it->first << ": " << it->second << "\r\n";
+    }
     os << "Content-Length: " << resp.body.length() << "\r\n";
     os << "Connection: " << resp.connection << "\r\n\r\n";
     os << resp.body;
   }
   return os;
 }
+
 
 std::string ServerResponse::find_file_type(const std::string &path) {
   std::vector<std::string> file_type = utils::string_split(path, ".");
@@ -60,6 +65,7 @@ Response ServerResponse::http_response(
     return DefaultError::default_err_response(NOT_FOUND_ERR);
   Response response;
   response.keep_alive = false;
+  response.headers = config->get_header();
   const Target target = resolve_target(rule, config, request);
 
   // [쿠키 검증 로직 추가]
@@ -201,12 +207,12 @@ Response ServerResponse::error_response(const ServerConfig *config,
 
   if (err_page.empty())
     return DefaultError::default_err_response(error_code);
-  (void)config;
   if (check_path_type(err_page) != IS_FILE)
     return DefaultError::default_err_response(error_code);
   std::ifstream file(err_page.c_str());
   if (file.is_open()) {
     response.status_code = status_code_to_string(OK);
+    response.headers = config->get_header();
     std::ostringstream ss;
     ss << file.rdbuf();
     response.body = ss.str();
