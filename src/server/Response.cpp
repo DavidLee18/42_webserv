@@ -244,7 +244,7 @@ Response ServerResponse::error_response(const ServerConfig *config,
     return DefaultError::default_err_response(error_code);
   std::ifstream file(err_page.c_str());
   if (file.is_open()) {
-    response.status_code = status_code_to_string(OK);
+    response.status_code = status_code_to_string(error_code);
     response.headers = config->get_header();
     std::ostringstream ss;
     ss << file.rdbuf();
@@ -695,7 +695,7 @@ Response ServerResponse::get_method(Target target, Response response,
     response.status_code = status_code_to_string(target.type);
   } else {
     if (check_path_type(target.path) != IS_FILE)
-      return DefaultError::default_err_response(NOT_FOUND_ERR);
+      return error_response(config, rule, NOT_FOUND_ERR);
     std::ifstream file(target.path.c_str());
     if (file.is_open()) {
       std::ostringstream ss;
@@ -705,7 +705,7 @@ Response ServerResponse::get_method(Target target, Response response,
       response.status_code = status_code_to_string(target.type);
       file.close();
     } else {
-      return DefaultError::default_err_response(NOT_FOUND_ERR);
+      return error_response(config, rule, NOT_FOUND_ERR);
     }
   }
   return response;
