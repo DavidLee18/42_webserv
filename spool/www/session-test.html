@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Timeout Testing Guide</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 30px 20px;
+            background: #f5f5f5;
+        }
+
+        h1 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #764ba2;
+            margin-top: 30px;
+        }
+
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #d32f2f;
+        }
+
+        .step {
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .step-number {
+            background: #667eea;
+            color: white;
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 10px 5px 10px 0;
+        }
+
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .button-group {
+            margin: 20px 0;
+        }
+
+        a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            border-left: 4px solid #667eea;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .feature-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4caf50;
+            font-weight: bold;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 Session Timeout Testing Guide</h1>
+
+    <div class="section">
+        <h2>Overview</h2>
+        <p>The webserver implements <strong>two-level timeout</strong>:</p>
+        <ul class="feature-list">
+            <li><strong>Socket Timeout:</strong> Disconnects idle clients after 30 seconds</li>
+            <li><strong>Session Timeout:</strong> Invalidates idle authenticated sessions after 30 seconds</li>
+        </ul>
+        <p style="margin-top: 15px;">This guide demonstrates how to test the session timeout functionality with a real-time visualization.</p>
+    </div>
+
+    <div class="section">
+        <h2>Method 1: Quick Visual Test (No Setup Required)</h2>
+
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Open the Session Monitor</strong>
+            <p style="margin-top: 10px;">
+                <a href="/session-info.html" target="_blank">Click here to open Session Timeout Monitor</a>
+            </p>
+            <p style="margin-top: 10px;">This page will:</p>
+            <ul style="margin-left: 20px;">
+                <li>Display a 30-second countdown timer</li>
+                <li>Show a visual progress bar</li>
+                <li>Change colors as time runs out (green → orange → red)</li>
+                <li>Track when the session expires</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Watch the timeout in real-time</strong>
+            <p style="margin-top: 10px;">The countdown will show you:</p>
+            <ul style="margin-left: 20px;">
+                <li>Elapsed time since page load</li>
+                <li>Remaining time before session expires</li>
+                <li>Real-time visual progress (updates 10x per second)</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <span class="step-number">3</span>
+            <strong>Verify timeout behavior</strong>
+            <ul style="margin-left: 20px;">
+                <li>After <strong>30 seconds</strong>, the timer shows "00:00"</li>
+                <li>The progress bar turns red and displays "SESSION EXPIRING"</li>
+                <li>Status changes to "Session Expired"</li>
+                <li>Refresh the page to start a new session</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Method 2: Programmatic Test (Using curl)</h2>
+
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Start the webserver</strong>
+            <pre>./webserv siyoung.wbsrv</pre>
+        </div>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Create a session by making a login request</strong>
+            <pre>curl -i -X POST http://localhost:8080/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=test&password=test"</pre>
+            <p style="margin-top: 10px;">Look for the <code>Set-Cookie: session_id=...</code> header in the response.</p>
+        </div>
+
+        <div class="step">
+            <span class="step-number">3</span>
+            <strong>Monitor server logs</strong>
+            <p style="margin-top: 10px;">The server will periodically clean up expired sessions:</p>
+            <ul style="margin-left: 20px;">
+                <li>Each event loop iteration calls <code>clean_expired_sessions()</code></li>
+                <li>Sessions older than 30 seconds are automatically removed</li>
+                <li>No log output by default (silent cleanup)</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <span class="step-number">4</span>
+            <strong>Verify by accessing protected routes</strong>
+            <pre># Within 30 seconds (should work)
+curl -i -H "Cookie: session_id=YOUR_SESSION_ID" \
+  http://localhost:8080/storage/
+
+# After 30 seconds (should fail with 401)
+sleep 35
+curl -i -H "Cookie: session_id=YOUR_SESSION_ID" \
+  http://localhost:8080/storage/</pre>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Implementation Details</h2>
+
+        <h3>How Session Timeout Works</h3>
+        <pre>1. Client creates session → session_id cookie issued
+2. Each access → last_access timestamp updated
+3. Server loop → clean_expired_sessions() called every iteration
+4. Sessions idle >30s → automatically deleted
+5. Next access with expired session_id → 401 Unauthorized</pre>
+
+        <h3>Configuration</h3>
+        <p>Timeout value comes from <code>siyoung.wbsrv</code> config:</p>
+        <pre>:8080 =
+    ...30            # 30 seconds server response timeout
+    GET /storage/ <- /spool/www/storage/
+        @ auth_info  # Requires valid session</pre>
+
+        <h3>Code Location</h3>
+        <ul style="margin-left: 20px;">
+            <li><code>src/server/Session.hpp</code> - Session data structure and timeout logic</li>
+            <li><code>src/server/Session.cpp</code> - <code>clean_expired_sessions()</code> implementation</li>
+            <li><code>src/server/Server.cpp</code> - Server loop calls cleanup (line ~365)</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Testing Checklist</h2>
+        <ul class="feature-list">
+            <li>Open /session-info.html and watch the 30-second countdown</li>
+            <li>Refresh page before timeout → new 30-second countdown starts</li>
+            <li>Wait 30+ seconds without interaction → session expires and shows "expired"</li>
+            <li>Try accessing protected routes after timeout → should be denied</li>
+            <li>Socket disconnects after 30 seconds of inactivity (check with nc or telnet)</li>
+        </ul>
+    </div>
+
+    <div class="info-box">
+        <strong>💡 Tip:</strong> The session-info page uses browser localStorage, so login time persists even if you refresh. This accurately simulates a real session where the server tracks activity independently.
+    </div>
+
+    <div class="warning-box">
+        <strong>⚠️ Note:</strong> Both socket and session timeouts use the same 30-second value from config. In production, you might want different values (e.g., 30s socket timeout, 15m session timeout).
+    </div>
+
+    <div class="section" style="text-align: center; margin-top: 40px;">
+        <h2>Ready to test?</h2>
+        <div class="button-group">
+            <button onclick="window.open('/session-info.html', '_blank'); return false;">
+                → Open Session Monitor
+            </button>
+        </div>
+        <p style="margin-top: 20px; color: #999; font-size: 14px;">
+            Open in a new tab to see real-time timeout visualization
+        </p>
+    </div>
+</body>
+</html>
