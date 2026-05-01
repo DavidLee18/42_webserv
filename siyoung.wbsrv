@@ -17,7 +17,7 @@ uwsgi =
 
 	$add_csp_sha256.cgi
 
-	...30
+	...300
 
 	GET /old_stuff/ =301> /new_stuff/
 
