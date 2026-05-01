@@ -28,10 +28,10 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
     end_flag = 0;
     line = utils::remove_char(temp.value(), '\n');
     if (line[line.length() - 1] == ' ' || line[line.length() - 1] == '\t') {
-      err_line = "Invalid line Error: " + utils::trim_whitespace(line);
+      err_line = "Invalid line Error: [" + utils::trim_whitespace(line) + "]";
       return false;
     }
-    if (utils::match_indent_level(line, 1)) {
+    if (utils::return_indent_level(line) == 1) {
       line = utils::trim_whitespace(line);
       if (is_header_block(line)) {
         if (!parse_header_entry(fd, line)) {
@@ -109,7 +109,7 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
       break;
     }
     temp = utils::remove_char(fd_line.value(), '\n');
-    if (!utils::match_indent_level(temp, 2) || temp[temp.length() - 1] == ' ' ||
+    if (utils::return_indent_level(temp) != 2 || temp[temp.length() - 1] == ' ' ||
         temp[temp.length() - 1] == '\t') {
       err_line = "Error: \"" + temp + "\" Indentation or space error";
       return false;
@@ -529,7 +529,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
     }
     line = utils::remove_char(temp.value(), '\n');
     err_line = line;
-    if (utils::match_indent_level(line, 2) == false)
+    if (utils::return_indent_level(line) != 2)
       return (false);
     else if (apply_route_rule_entry(mets, method_line_data[1], line))
       continue;

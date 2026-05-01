@@ -36,7 +36,7 @@ std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
     else if (temp.value() == "\n" || temp.value() == "")
       return "";
     file_line = utils::remove_char(temp.value(), '\n');
-    if (utils::match_indent_level(file_line, 2) == false ||
+    if (utils::return_indent_level(file_line) != 2 ||
         (file_line.empty() || file_line[file_line.length() - 1] == ' ' ||
          file_line[file_line.length() - 1] == '\t'))
       return "Error: \"" + file_line + "\" Indentation or space error";
@@ -195,7 +195,7 @@ RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
     else if (temp.value() == "\n" || temp.value() == "")
       return "";
     line = utils::remove_char(temp.value(), '\n');
-    if (utils::match_indent_level(line, 1) == false ||
+    if (utils::return_indent_level(line) != 1 ||
         (line.empty() || line[line.length() - 1] == ' ' ||
          line[line.length() - 1] == '\t'))
       return "Error: \"" + line + "\" Indentation or space error";

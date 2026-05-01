@@ -13,18 +13,20 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
 
   while (true) {
     Result<std::string> temp = file.read_file_line();
-    if (temp.error() != "" || !utils::match_indent_level(temp.value(), 0)) {
+    if (temp.error() != "") {
       err_meg = "FileDescriptor Error: " + temp.error();
-      if (temp.error() == "")
-        err_meg =
-            "Invalid line Error: " +
-            utils::trim_whitespace(utils::remove_char(temp.value(), '\n'));
       return false;
     } else if (temp.value() == "")
       break;
     else if (temp.value() == "\n")
       continue;
+    
     line = utils::remove_char(temp.value(), '\n');
+    err_meg = utils::get_indent_whitespace_error(line, 0);
+    if (err_meg != "")
+      return false;
+    line = utils::trim_whitespace(line);
+  
     if (line == "types =" || line == "types=") {
       if (!parse_types_block(file))
         return false;
@@ -80,19 +82,30 @@ std::string WebserverConfig::apply_default_err_page_entry(const std::string &lin
 std::vector<std::string>
 WebserverConfig::parse_type_keys(const std::string &key) {
   int number_of_key = 0;
-  std::string temp = utils::trim_whitespace(key);
+  std::string temp = key;
   std::vector<std::string> key_data;
 
-  if (temp.empty() || utils::has_space(temp) ||
-      utils::has_invalid_char(temp, "_|"))
+  if (utils::has_invalid_char(temp, "_|")) {
+    err_meg += temp + "]: Invalid character in extension part of header (only '|' and '_' are allowed as special characters within the extension, the extension contains disallowed characters).";
     return (key_data);
+  }
   key_data = utils::string_split(temp, "|");
   number_of_key = utils::count_occurrences(temp, "|") + 1;
-  if (key_data.size() != static_cast<std::size_t>(number_of_key))
+  if (key_data.size() != static_cast<std::size_t>(number_of_key)) {
+    std::ostringstream key_num;
+    std::ostringstream num;
+
+    key_num << key_data.size();
+    num << number_of_key;
+
+    err_meg += temp + "]: Mismatch between expected and actual number of extension items (expected count: number of extensions must equal the number of '|' separators plus one, expected items: " + num.str() + ", actual items: " + key_num.str() +").";
     return (std::vector<std::string>());
+  }
   for (std::size_t i = 0; i < key_data.size(); ++i) {
-    if (type_map.find(key_data[i]) != type_map.end())
+    if (type_map.find(key_data[i]) != type_map.end()) {
+      err_meg += temp + "]: Duplicate extensions detected (the same extension was registered more than once, violating the rule that the same extension cannot be registered multiple times).";
       return (std::vector<std::string>());
+    }
   }
   return (key_data);
 }
@@ -100,53 +113,70 @@ WebserverConfig::parse_type_keys(const std::string &key) {
 bool WebserverConfig::is_valid_mime_type(const std::string &value) {
   std::vector<std::string> value_data;
 
-  if (value.empty())
-    return (false);
-  char last = value[value.length() - 1];
-  if (!std::isalnum(static_cast<unsigned char>(last)))
-    return (false);
-  std::string temp = utils::trim_whitespace(value);
-  if (temp.empty() || utils::has_space(temp) ||
-      utils::has_invalid_char(temp, "/-"))
-    return (false);
-  for (std::size_t i = 1; i < temp.size(); ++i) {
-    if (temp[i] == '-' && temp[i - 1] == '-')
-      return (false);
+  if (utils::has_invalid_char(value, "/-")) {
+    err_meg += value + "]: Invalid character in MIME type part of header (only '/' and '_' are allowed as special characters within the MIME type, the MIME type contains disallowed characters).";
+    return false;
+  } else if (value[0] == '-') {
+    err_meg += value + "]: Invalid MIME type format (the type part of the MIME type must not start with '-', as it violates the rule that the type/subtype structure must start with a valid type name).";
+    return false;
+  } else if (value[0] == '/') {
+    err_meg += value + "]: Invalid MIME type format (MIME type must not start with '/', as it violates the required 'type/subtype' structure).";
+    return false;
   }
-  value_data = utils::string_split(temp, "/");
-  if (value_data.size() != 2 || utils::count_occurrences(temp, "/") != 1)
-    return (false);
-  std::string type = value_data[0];
-  std::string subtype = value_data[1];
-  if (type.empty() || subtype.empty())
-    return (false);
-  for (std::size_t i = 0; i < temp.size(); ++i) {
-    if (temp[i] == '-') {
-      if (i == 0 || i == temp.size() - 1)
-        return (false);
-      if (!std::isalnum(static_cast<unsigned char>(temp[i - 1])) ||
-          !std::isalnum(static_cast<unsigned char>(temp[i + 1])))
-        return (false);
+  for (std::size_t i = 1; i < value.size(); ++i) {
+    if (value[i] == '-' && value[i - 1] == '-') {
+      err_meg += value + "]: Invalid MIME type format (consecutive '-' characters are not allowed in the MIME type, as they violate the naming rules for a valid type/subtype structure).";
+      return false;
     }
   }
-  return (true);
+  value_data = utils::string_split(value, "/");
+  if (value_data.size() != 2) {
+    err_meg += value + "]: Invalid MIME type format (the value does not follow the required 'type/subtype' structure).";
+    return false;
+  } else if (utils::count_occurrences(value, "/") != 1) {
+    err_meg += value + "]: Invalid MIME type format (multiple '/' characters are not allowed; a valid MIME type must contain exactly one '/' separating type and subtype).";
+    return false;
+  }
+
+  for (std::size_t i = 0; i < value.size(); ++i) {
+    if (value[i] == '-') {
+      if (i == value.size() - 1) {
+        err_meg += value + "]: Invalid MIME type format (the type part of the MIME type must not end with '-', as it violates the rule that the type/subtype structure must start with a valid type name).";
+        return false;
+      }
+      if (!std::isalnum(static_cast<unsigned char>(value[i - 1])) ||
+          !std::isalnum(static_cast<unsigned char>(value[i + 1]))) {
+            err_meg += value + "]: Invalid MIME type format (the type part must consist only of letters and digits; hyphens, whitespace, underscores, and other special characters are not allowed).";
+            return false;
+          }
+    }
+  }
+  return true;
 }
 
 bool WebserverConfig::parse_type_mapping(const std::string &line,
                                          std::vector<std::string> &keys_out,
                                          std::string &value_out) {
-  if (utils::count_occurrences(line, "->") != 1)
-    return (false);
+  if (utils::count_occurrences(line, "->") != 1) {
+    err_meg = "on [\t" + line + "]: Missing '->' in header (violates the rule requiring the 'extension -> MIME type' format, so the mapping between extension and MIME type cannot be determined).";
+    return false;
+  }
   std::vector<std::string> type_data = utils::string_split(line, "->");
-  if (type_data.size() != 2)
-    return (false);
+  if (type_data.size() != 2) {
+    err_meg = "on [\t" + line + "]: Too many elements in header (violates the 'extension -> MIME type' format by including extra tokens beyond the required two components).";
+    return false;
+  }
+
+  err_meg = "on [\t" + line + "], [";
   std::vector<std::string> keys =
-      WebserverConfig::parse_type_keys(type_data[0]);
-  if (keys.empty() || !is_valid_mime_type(type_data[1]))
-    return (false);
+      WebserverConfig::parse_type_keys(utils::trim_whitespace(type_data[0])); 
+  if (keys.empty() || !is_valid_mime_type(utils::trim_whitespace(type_data[1])))
+    return false;
+  err_meg = "";
+
   keys_out = keys;
   value_out = utils::trim_whitespace(type_data[1]);
-  return (true);
+  return true;
 }
 
 bool WebserverConfig::parse_types_block(FileDescriptor &file) {
@@ -159,27 +189,23 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
     if (temp.error() != "") {
       err_meg = "FileDescriptor Error: " + temp.error();
       return (false);
-    }
-    if (temp.value() == "\n" || temp.value() == "")
+    } else if (temp.value() == "\n" || temp.value() == "")
       break;
-    std::string raw = utils::remove_char(temp.value(), '\n');
-    if (!utils::match_indent_level(temp.value(), 1) ||
-        (!raw.empty() &&
-         (raw[raw.length() - 1] == ' ' || raw[raw.length() - 1] == '\t'))) {
-      err_meg = "Type syntax Error: " +
-                utils::trim_whitespace(utils::remove_char(temp.value(), '\n'));
-      return (false);
-    }
+
     line = utils::remove_char(temp.value(), '\n');
-    if (!parse_type_mapping(line, keys, value)) {
-      err_meg = "Type syntax Error: " + line;
-      return (false);
-    }
+    err_meg = utils::get_indent_whitespace_error(line, 1);
+    if (err_meg != "")
+      return false;
+    line = utils::trim_whitespace(line);
+
+    if (!parse_type_mapping(line, keys, value))
+      return false;
+    
     for (std::size_t i = 0; i < keys.size(); ++i) {
       const std::string &k = keys[i];
       if (k == "_") {
         if (!default_mime.empty()) {
-          err_meg = "Type syntax Error: duplicate default MIME type";
+          err_meg = "on [\t" + line + "], [" + value + "]: Duplicate default MIME type detected (the default MIME type '_' must be defined only once; multiple declarations are not allowed).";
           return false;
         }
         default_mime = value;
@@ -188,7 +214,11 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
       type_map[k] = value;
     }
   }
-  return (true);
+  if (default_mime.empty()) {
+    err_meg = "Missing default MIME type definition (the '_' entry must be defined exactly once as the default MIME type).";
+    return false;
+  }
+  return true;
 }
 
 // ServerConfig method

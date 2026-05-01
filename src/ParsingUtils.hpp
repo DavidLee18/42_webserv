@@ -57,5 +57,9 @@ int count_occurrences(const std::string &line, const std::string &delim);
  * @return ch가 제거된 문자열
  */
 std::string remove_char(std::string s, char ch);
+std::size_t return_indent_level(std::string line);
+bool has_leading_space(const std::string& str);
+bool has_trailing_space(const std::string& str);
+std::string get_indent_whitespace_error(const std::string& line, size_t level);
 } // namespace utils
 #endif

@@ -142,7 +142,7 @@ private:
    * 
    * - type과 subtype은 비어 있을 수 없다.
    */
-  static bool is_valid_mime_type(const std::string &value);
+  bool is_valid_mime_type(const std::string &value);
   /**
    * @brief 문자열이 server 블록 시작 줄의 형식에 맞는지 검사하는 함수
    * @param line 검사할 문자열
