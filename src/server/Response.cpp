@@ -85,8 +85,9 @@ Response ServerResponse::http_response(
       std::cout << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
       return error_response(config, rule, UNAUTHORIZED);
+    } else {
+      std::cout << "[Authentication] No valid session. Guest user." << std::endl;
     }
-    std::cout << "[Authentication] No valid session. Guest user." << std::endl;
   }
 
   response.mime_type =
