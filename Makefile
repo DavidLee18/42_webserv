@@ -72,6 +72,9 @@ $(UWSGI_BUILD_DIR)/%.o: $(UWSGI_SRC_DIR)/%.cpp
 compile-commands:
 	bear -- make re
 
+cgiclean:
+	rm -rf spool/www/cgi-bin/
+
 -include $(DEPS)
 -include $(UWSGI_DEPS)
 
