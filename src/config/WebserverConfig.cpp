@@ -5,26 +5,24 @@ WebserverConfig::WebserverConfig(FileDescriptor &file) {
   if (!this->file_parsing(file)) {
     return;
   }
-  return;
-}
+  }
 
 bool WebserverConfig::file_parsing(FileDescriptor &file) {
-  std::string line;
 
-  while (true) {
+    while (true) {
     Result<std::string> temp = file.read_file_line();
-    if (temp.error() != "" || !utils::match_indent_level(temp.value(), 0)) {
+    if (!temp.error().empty() || !utils::match_indent_level(temp.value(), 0)) {
       err_meg = "FileDescriptor Error: " + temp.error();
-      if (temp.error() == "")
+      if (temp.error().empty())
         err_meg =
             "Invalid line Error: " +
             utils::trim_whitespace(utils::remove_char(temp.value(), '\n'));
       return false;
-    } else if (temp.value() == "")
+    } else if (temp.value().empty())
       break;
     else if (temp.value() == "\n")
       continue;
-    line = utils::remove_char(temp.value(), '\n');
+    std::string line = utils::remove_char(temp.value(), '\n');
     if (line == "types =" || line == "types=") {
       if (!parse_types_block(file))
         return false;
@@ -33,18 +31,18 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
       err_meg = RouteRule_CGI::parse_uwsgi_block(file, this->uwsgi);
-      if (err_meg != "")
+      if (!err_meg.empty())
         return false;
     } else if (line[0] == '!') {
       err_meg = apply_default_err_page_entry(line);
-      if (err_meg != "")
+      if (!err_meg.empty())
         return false;
     } else {
       err_meg = "Invalid line Error: " + line;
       return false;
     }
   }
-  if (this->type_map.empty() || this->default_mime.length() == 0) {
+  if (this->type_map.empty() || this->default_mime.empty()) {
     err_meg = "Required type configuration is missing";
     return false;
   }
@@ -63,12 +61,12 @@ std::string WebserverConfig::apply_default_err_page_entry(const std::string &lin
       return "Error: \"" + line + "\" Syntax error";
     default_err_page.err_page[split[0]] = split[1];
   } else if (split[1][0] == '$') {
-    std::string err_line;
     std::string executable;
     std::map<std::string, std::string> env;
 
-    err_line = RouteRule_CGI::parse_executable(split[1], executable, env);
-    if (err_line != "")
+    std::string err_line =
+        RouteRule_CGI::parse_executable(split[1], executable, env);
+    if (!err_line.empty())
       return err_line;
     default_err_page.err_cgi[executable] = env;
   } else 
@@ -80,7 +78,7 @@ std::string WebserverConfig::apply_default_err_page_entry(const std::string &lin
 std::vector<std::string>
 WebserverConfig::parse_type_keys(const std::string &key) {
   int number_of_key = 0;
-  std::string temp = utils::trim_whitespace(key);
+  const std::string temp = utils::trim_whitespace(key);
   std::vector<std::string> key_data;
 
   if (temp.empty() || utils::has_space(temp) ||
@@ -98,14 +96,13 @@ WebserverConfig::parse_type_keys(const std::string &key) {
 }
 
 bool WebserverConfig::is_valid_mime_type(const std::string &value) {
-  std::vector<std::string> value_data;
 
   if (value.empty())
     return (false);
-  char last = value[value.length() - 1];
+  const char last = value[value.length() - 1];
   if (!std::isalnum(static_cast<unsigned char>(last)))
     return (false);
-  std::string temp = utils::trim_whitespace(value);
+  const std::string temp = utils::trim_whitespace(value);
   if (temp.empty() || utils::has_space(temp) ||
       utils::has_invalid_char(temp, "/-"))
     return (false);
@@ -113,11 +110,11 @@ bool WebserverConfig::is_valid_mime_type(const std::string &value) {
     if (temp[i] == '-' && temp[i - 1] == '-')
       return (false);
   }
-  value_data = utils::string_split(temp, "/");
+  const std::vector<std::string> value_data = utils::string_split(temp, "/");
   if (value_data.size() != 2 || utils::count_occurrences(temp, "/") != 1)
     return (false);
-  std::string type = value_data[0];
-  std::string subtype = value_data[1];
+  const std::string& type = value_data[0];
+  const std::string& subtype = value_data[1];
   if (type.empty() || subtype.empty())
     return (false);
   for (std::size_t i = 0; i < temp.size(); ++i) {
@@ -137,10 +134,10 @@ bool WebserverConfig::parse_type_mapping(const std::string &line,
                                          std::string &value_out) {
   if (utils::count_occurrences(line, "->") != 1)
     return (false);
-  std::vector<std::string> type_data = utils::string_split(line, "->");
+  const std::vector<std::string> type_data = utils::string_split(line, "->");
   if (type_data.size() != 2)
     return (false);
-  std::vector<std::string> keys =
+  const std::vector<std::string> keys =
       WebserverConfig::parse_type_keys(type_data[0]);
   if (keys.empty() || !is_valid_mime_type(type_data[1]))
     return (false);
@@ -149,18 +146,17 @@ bool WebserverConfig::parse_type_mapping(const std::string &line,
   return (true);
 }
 
-bool WebserverConfig::parse_types_block(FileDescriptor &file) {
-  std::string line;
+bool WebserverConfig::parse_types_block(const FileDescriptor &file) {
   std::string value;
   std::vector<std::string> keys;
 
   while (true) {
     Result<std::string> temp = file.read_file_line();
-    if (temp.error() != "") {
+    if (!temp.error().empty()) {
       err_meg = "FileDescriptor Error: " + temp.error();
       return (false);
     }
-    if (temp.value() == "\n" || temp.value() == "")
+    if (temp.value() == "\n" || temp.value().empty())
       break;
     std::string raw = utils::remove_char(temp.value(), '\n');
     if (!utils::match_indent_level(temp.value(), 1) ||
@@ -170,7 +166,7 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
                 utils::trim_whitespace(utils::remove_char(temp.value(), '\n'));
       return (false);
     }
-    line = utils::remove_char(temp.value(), '\n');
+    std::string line = utils::remove_char(temp.value(), '\n');
     if (!parse_type_mapping(line, keys, value)) {
       err_meg = "Type syntax Error: " + line;
       return (false);
@@ -216,12 +212,11 @@ bool WebserverConfig::is_server_config_header(const std::string &line) {
 
 bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
                                                 const std::string &line) {
-  unsigned int key;
-  std::string temp(line);
-  ServerConfig config(file);
+  const std::string& temp(line);
+  const ServerConfig config(file);
 
-  key = WebserverConfig::parse_server_port(temp);
-  if (config.geterr_line() != "") {
+  const unsigned int key = WebserverConfig::parse_server_port(temp);
+  if (!config.geterr_line().empty()) {
     err_meg = temp + " " + config.geterr_line();
     return (false);
   }
@@ -235,7 +230,7 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
 
 unsigned int WebserverConfig::parse_server_port(const std::string &key) {
   std::size_t i = 1;
-  std::size_t start = i;
+  const std::size_t start = i;
 
   while (i < key.size() && std::isdigit(static_cast<unsigned char>(key[i])))
     ++i;
@@ -247,12 +242,10 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.get_type_map();
   const std::map<std::string, std::string> &uw = data.get_uwsgi();
   const DefaultErrPage &d_e = data.get_default_err_page();
-  std::map<std::string, std::string>::const_iterator ty_it;
-  std::map<std::string, std::string>::const_iterator uw_it;
 
   os << "========================================================" << std::endl;
   os << "<<Type_map>>\n" << std::endl;
-  for (ty_it = ty.begin(); ty_it != ty.end(); ++ty_it) {
+  for (std::map<std::string, std::string>::const_iterator ty_it = ty.begin(); ty_it != ty.end(); ++ty_it) {
     os << "Type key: " << ty_it->first << ", Type value: " << ty_it->second
        << std::endl;
   }
@@ -261,7 +254,7 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   os << "\n\n\n========================================================"
      << std::endl;
   os << "<<Uwsgi>>\n" << std::endl;
-  for (uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
+  for (std::map<std::string, std::string>::const_iterator uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
     os << "Uwsgi key: " << uw_it->first << ", Uwsgi value: " << uw_it->second
        << std::endl;
   }
@@ -270,17 +263,15 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
      << std::endl;
   
   os << "<<DefaultErrPage>>\n" << std::endl;
-  
-  std::map<std::string, std::string>::const_iterator er_it;
-  CGI::const_iterator cgi_it;
-  
+
   os << "\nerr_page\n" << std::endl;
-  for (er_it = d_e.err_page.begin(); er_it != d_e.err_page.end(); ++er_it) {
+  for (std::map<std::string, std::string>::const_iterator er_it =
+           d_e.err_page.begin(); er_it != d_e.err_page.end(); ++er_it) {
     os << "\terr_page key: " << er_it->first << ", err_page value: " << er_it->second
       << std::endl;
   }
   os << "\nerr_cgi\n" << std::endl;
-  for (cgi_it = d_e.err_cgi.begin(); cgi_it != d_e.err_cgi.end(); ++cgi_it) {
+  for (CGI::const_iterator cgi_it = d_e.err_cgi.begin(); cgi_it != d_e.err_cgi.end(); ++cgi_it) {
     os << "\terr_cgi executable: " << cgi_it->first;
     if (cgi_it->second.empty())
       os << "\n\terr_cgi env: empty\n";
@@ -299,9 +290,9 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
      << std::endl;
   const std::map<unsigned int, ServerConfig> &Server_map =
       data.get_serverconfig_map();
-  std::map<unsigned int, ServerConfig>::const_iterator Server_map_it;
   os << "<<Server_map>>" << std::endl;
-  for (Server_map_it = Server_map.begin(); Server_map_it != Server_map.end();
+  for (std::map<unsigned int, ServerConfig>::const_iterator Server_map_it =
+           Server_map.begin(); Server_map_it != Server_map.end();
        ++Server_map_it) {
     os << "\nServer key: " << Server_map_it->first << std::endl;
     os << Server_map_it->second;

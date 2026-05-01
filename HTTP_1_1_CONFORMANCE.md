@@ -126,13 +126,13 @@ Header: value1
 
 ### Important Issues (Limit Functionality)
 ✅ All important issues fixed:
-3. ✅ HTTP version format validation (Line 116-146)
-4. ✅ Header value whitespace trimming (Line 255-256)
-5. ❌ Multi-line headers NOT supported (deprecated in RFC 7230)
+1. ✅ HTTP version format validation (Line 116-146)
+2. ✅ Header value whitespace trimming (Line 255-256)
+3. ❌ Multi-line headers NOT supported (deprecated in RFC 7230)
 
 ### Minor Issues (Edge Cases)
-6. ⚠️ Request-URI validation (Line 62-64) - Basic validation only
-7. ✅ Message body parsing (Line 327-413) - Implemented for JSON, form-urlencoded, HTML
+1. ⚠️ Request-URI validation (Line 62-64) - Basic validation only
+2. ✅ Message body parsing (Line 327-413) - Implemented for JSON, form-urlencoded, HTML
 
 ## Recommendation
 

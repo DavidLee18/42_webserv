@@ -55,7 +55,7 @@ std::string Session::create_session(const std::string& user_id, const std::strin
 }
 
 SessionData* Session::get_session(const std::string& session_id) {
-    std::map<std::string, SessionData>::iterator it = data.find(session_id);
+  const std::map<std::string, SessionData>::iterator it = data.find(session_id);
     if (it != data.end()) {
         it->second.last_access = std::time(NULL); // 갱신
         return &(it->second);
@@ -67,12 +67,12 @@ void Session::delete_session(const std::string& session_id) {
     data.erase(session_id);
 }
 
-void Session::clean_expired_sessions(int timeout_seconds) {
-    time_t now = std::time(NULL);
+void Session::clean_expired_sessions(const int timeout_seconds) {
+  const time_t now = std::time(NULL);
     std::map<std::string, SessionData>::iterator it = data.begin();
     while (it != data.end()) {
         if (now - it->second.last_access > timeout_seconds) {
-            std::map<std::string, SessionData>::iterator to_erase = it;
+        const std::map<std::string, SessionData>::iterator to_erase = it;
             ++it;
             data.erase(to_erase);
         } else {

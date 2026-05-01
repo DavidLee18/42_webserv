@@ -9,7 +9,7 @@
  * 타입
  *
  * - 바깥 map은 CGI 항목을 구분하는 키를 사용한다.
- * 
+ *
  * - 내부 map은 메타변수 이름을 키로, 그 값을 값으로 저장한다.
  */
 typedef std::map<std::string, std::map<std::string, std::string> > CGI;
@@ -24,7 +24,7 @@ enum RuleOperator {
   /**
    * @brief 300 Multiple Choices 상태 코드를 나타낸다.
    */
-  MULTIPLECHOICES,
+  MULTIPLE_CHOICES,
   /**
    * @brief 301 Moved Permanently 리다이렉트를 나타낸다.
    */
@@ -36,31 +36,31 @@ enum RuleOperator {
   /**
    * @brief 303 See Other 리다이렉트를 나타낸다.
    */
-  SEEOTHER,
+  SEE_OTHER,
   /**
    * @brief 304 Not Modified 상태 코드를 나타낸다.
    */
-  NOTMODIFIED,
+  NOT_MODIFIED,
   /**
    * @brief 307 Temporary Redirect 리다이렉트를 나타낸다.
    */
-  TEMPORARYREDIRECT,
+  TEMPORARY_REDIRECT,
   /**
    * @brief 308 Permanent Redirect 리다이렉트를 나타낸다.
    */
-  PERMANENTREDIRECT,
+  PERMANENT_REDIRECT,
   /**
    * @brief 디렉토리의 autoindex 동작을 나타낸다.
    */
   AUTOINDEX,
   /**
-   * @brief 현재 경로를 기준으로 연결하는 규칙을 나타낸다.
+   * @brief 특정 경로로 업로드하는 규칙을 나타낸다.
    */
-  POINT,
+  UPLOAD_TO,
   /**
    * @brief 특정 경로로부터 파일을 제공하는 규칙을 나타낸다.
    */
-  SERVEFROM,
+  SERVE_FROM,
   /**
    * @brief 정의되지 않은 연산자 상태를 나타낸다.
    */
@@ -72,7 +72,7 @@ enum RuleOperator {
  * @brief 설정 파일에 정의된 경로 처리 규칙과 하위 설정 정보를 저장하는 구조체
  *
  * - 상위 규칙에는 요청 메서드, 경로 패턴, 처리 연산자 및 대상 경로가 포함된다.
- * 
+ *
  * - 하위 설정에는 index, auth, body size, error page 등의 추가 정보가 포함될 수
  * 있다.
  */
@@ -131,8 +131,8 @@ struct RouteRule {
    * @var error_pages
    * @brief HTTP 상태 코드별 오류 페이지 경로를 저장하는 멤버 변수
    *
-   * - 상태 코드를 키로 하고, 해당 상태 코드에 대응하는 오류 페이지 경로를 값으로
-   * 저장한다.
+   * - 상태 코드를 키로 하고, 해당 상태 코드에 대응하는 오류 페이지 경로를
+   * 값으로 저장한다.
    */
   std::map<int, std::string> error_pages;
 };
@@ -142,11 +142,10 @@ struct RouteRule {
  * @brief 설정 파일에서 파싱한 서버 설정 정보를 저장하는 클래스
  *
  * - 서버 공통 설정과 라우팅 규칙, CGI 설정, 파싱 상태 정보를 포함된다.
- * 
+ *
  * - 하나의 서버 설정 단위를 표현한다.
  */
 class ServerConfig {
-private:
   /**
    * @var header
    * @brief server 블록의 header 정보를 저장하는 멤버 변수
@@ -190,7 +189,7 @@ private:
    *
    * - server 블록 내부의 header, CGI 설정, 응답 시간, RouteRule, RouteRule_CGI
    * 항목을 순차적으로 읽어 각 멤버 변수에 저장한다.
-   * 
+   *
    * - 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
    */
   bool parse_server_block(FileDescriptor &fd);
@@ -199,7 +198,7 @@ private:
    * @param line 검사할 문자열
    * @return header 설정 시작 줄이면 true, 그렇지 않으면 false
    */
-  bool is_header_block(const std::string &line);
+  static bool is_header_block(const std::string &line);
   /**
    * @brief header 항목을 파싱하여 key와 value를 header 맵에 저장하는 함수
    * @param fd 설정 파일을 읽기 위한 FileDescriptor
@@ -208,13 +207,13 @@ private:
    *
    * - line은 is_header_block(const std::string &line) 함수로
    * 사전에 검증된 문자열이어야 한다.
-   * 
+   *
    * - 값이 ';'로 끝나면 다음 들여쓰기 2단계 줄들을 이어 읽어
    * 하나의 값으로 처리한다.
-   * 
+   *
    * - 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
    */
-  bool parse_header_entry(FileDescriptor &fd, const std::string &line);
+  bool parse_header_entry(const FileDescriptor &fd, const std::string &line);
   /**
    * @brief 문자열이 server response time 문법과 범위 조건에 맞는지 검사하는
    * 함수
@@ -222,17 +221,17 @@ private:
    * @return 문법과 범위 조건에 맞으면 true, 그렇지 않으면 false
    *
    * - 입력 문자열은 "...<숫자 문자열>" 형식을 따라야 한다.
-   * 
+   *
    * - 숫자 값은 1 이상 900 이하여야 한다.
    */
-  bool is_valid_server_response_time(const std::string &line);
+  static bool is_valid_server_response_time(const std::string &line);
   /**
    * @brief 검증된 server response time 문자열에서 숫자 값을 추출하여
    * server_response_time에 저장하는 함수
    * @param line 파싱할 문자열
    *
-   * - 입력 문자열은 is_valid_server_response_time(const std::string &line) 함수로
-   * 사전에 검증된 문자열이어야 한다.
+   * - 입력 문자열은 is_valid_server_response_time(const std::string &line)
+   * 함수로 사전에 검증된 문자열이어야 한다.
    */
   void parse_server_response_time(std::string line);
   /**
@@ -241,16 +240,16 @@ private:
    * @return 유효한 패턴 요소이면 true, 그렇지 않으면 false
    *
    * - 괄호 안에는 '|'로 구분된 두 개 이상의 확장자 후보가 있어야 한다.
-   * 
+   *
    * - 각 후보는 영숫자로만 구성되어야 한다.
    */
-  bool is_path_pattern_segment(const std::string &line);
+  static bool is_path_pattern_segment(const std::string &line);
   /**
    * @brief "*.(a|b|...)" 형식의 패턴 요소에서 괄호 안 후보 목록을 추출하는 함수
    * @param line 추출할 패턴 문자열
    * @return '|'를 기준으로 분리된 후보 문자열 목록
    */
-  std::vector<std::string> get_pattern_candidates(const std::string &line);
+  static std::vector<std::string> get_pattern_candidates(const std::string &line);
   /**
    * @brief 기존 경로 조합의 특정 위치에 패턴 후보들을 적용하여 모든 조합을
    * 생성하는 함수
@@ -262,7 +261,7 @@ private:
    * - 원래 경로 요소의 prefix와 suffix는 유지하고,
    * 가운데 패턴 후보 부분만 교체하여 새 경로들을 생성한다.
    */
-  std::vector<PathPattern>
+  static std::vector<PathPattern>
   expand_paths_with_pattern(const std::vector<PathPattern> &paths,
                             const std::vector<std::string> &pattern,
                             std::size_t index);
@@ -273,21 +272,20 @@ private:
    * @return 확장된 경로 조합 목록
    *
    * - 경로는 '/'를 기준으로 분리된다.
-   * 
+   *
    * - 패턴 요소가 포함된 경우 가능한 모든 조합으로 확장된다.
    */
-  std::vector<PathPattern>
-  expand_path_pattern(const std::string &line);
+  static std::vector<PathPattern> expand_path_pattern(const std::string &line);
   /**
    * @brief URL 패턴 문자열에서 경로 요소별 '*' 사용 규칙을 검사하는 함수
    * @param url 검사할 URL 패턴 문자열
    * @return 모든 경로 요소가 규칙을 만족하면 true, 그렇지 않으면 false
    *
    * - '*' 문자는 같은 경로 요소 안에서 두 번 이상 사용할 수 없다.
-   * 
+   *
    * - '/'를 만나면 다음 경로 요소에 대한 검사를 새로 시작한다.
    */
-  bool has_valid_wildcard_usage(const std::string &url);
+  static bool has_valid_wildcard_usage(const std::string &url);
   /**
    * @brief 문자열이 유효한 index 파일명이면 그 값을 반환하는 함수
    * @param line 검사할 문자열
@@ -295,17 +293,17 @@ private:
    *
    * - 현재는 .html 또는 .htm 확장자만 유효한 index 파일로 허용한다.
    */
-  std::string get_valid_index_file(const std::string &line);
+  static std::string get_valid_index_file(const std::string &line);
   /**
    * @brief 오류 페이지 설정 문자열에서 상태 코드와 경로를 분리하는 함수
    * @param line 파싱할 문자열
    * @return 파싱에 성공하면 상태 코드, 실패하면 0
    *
    * - 입력 문자열은 "<상태코드>:<경로>" 형식이어야 한다.
-   * 
+   *
    * - 성공 시 line에는 오류 페이지 경로만 남는다.
    */
-  int parse_error_page_entry(std::string &line);
+  static int parse_error_page_entry(std::string &line);
   /**
    * @brief 최대 요청 바디 크기 문자열을 KB 단위 정수 값으로 변환하는 함수
    * @param line 파싱할 문자열
@@ -315,7 +313,7 @@ private:
    *
    * - MB와 MiB는 각각 1000배, 1024배로 변환한다.
    */
-  int parse_max_body_size(std::string line);
+  static int parse_max_body_size(std::string line);
   /**
    * @brief 업로드 디렉토리 경로 문자열을 검증하고 반환하는 함수
    * @param line 파싱할 문자열
@@ -323,17 +321,17 @@ private:
    *
    * - 입력 문자열이 비어 있지 않으면 유효한 것으로 간주한다.
    */
-  std::string parse_upload_dir(const std::string &line);
+  static std::string parse_upload_dir(const std::string &line);
   /**
    * @brief 문자열이 RouteRule 시작 줄 형식에 맞는지 검사하는 함수
    * @param line 검사할 문자열
    * @return RouteRule 시작 줄 형식이면 true, 그렇지 않으면 false
    *
    * - 문자열은 "<Method> <URL> <Operator> <URL>" 형식이어야 한다.
-   * 
+   *
    * - Method에는 GET, POST, DELETE를 '|'로 구분하여 하나 이상 지정할 수 있다.
    */
-  bool matches_route_rule_syntax(const std::string &line);
+  static bool matches_route_rule_syntax(const std::string &line);
   /**
    * @brief path 패턴과 root 패턴의 와일드카드 위치가 호환되는지 검사하는 함수
    * @param path 검사할 path 패턴
@@ -342,7 +340,7 @@ private:
    *
    * - path에 포함된 와일드카드가 root에서도 대응되는 위치를 가져야 한다.
    */
-  bool has_compatible_wildcards(const PathPattern &path,
+  static bool has_compatible_wildcards(const PathPattern &path,
                                 const PathPattern &root);
   /**
    * @brief RouteRule 블록을 파싱하여 규칙 정보를 저장하는 함수
@@ -352,11 +350,11 @@ private:
    *
    * - 시작 줄에서 HTTP 메서드와 경로 정보를 추출한 뒤,
    * 들여쓰기 2단계의 하위 줄들을 읽어 각 규칙 항목을 파싱한다.
-   * 
+   *
    * - 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
    */
   bool parse_route_rule_block(const std::string &method_line,
-                              FileDescriptor &fd);
+                              const FileDescriptor &fd);
   /**
    * @brief RouteRule 시작 줄 정보를 바탕으로 route 규칙들을 생성하는 함수
    * @param data "<Method> <URL> <Operator> <URL>" 형식의 RouteRule 시작 줄을
@@ -365,7 +363,7 @@ private:
    * @return 생성에 성공하면 true, 실패하면 false
    *
    * - URL 패턴을 확장하여 각 메서드와 경로 조합에 대한 RouteRule을 생성한다.
-   * 
+   *
    * - 연산자 종류에 따라 root 또는 redirect_target을 설정한다.
    */
   bool create_route_rules(const std::vector<std::string> &data,
@@ -378,8 +376,9 @@ private:
    * @param line 파싱할 하위 규칙 문자열
    * @return 파싱에 성공하면 true, 실패하면 false
    *
-   * - 동일한 메서드와 경로를 가진 RouteRule이 이미 존재하면 해당 객체를 갱신한다.
-   * 
+   * - 동일한 메서드와 경로를 가진 RouteRule이 이미 존재하면 해당 객체를
+   * 갱신한다.
+   *
    * - 존재하지 않으면 새 RouteRule을 생성한 뒤 규칙을 적용한다.
    */
   bool apply_route_rule_entry(const std::vector<Request::Method> &mets,
@@ -390,10 +389,10 @@ private:
    * @param indicator 변환할 연산자 문자열
    * @return 변환된 RuleOperator 값, 유효하지 않으면 UNDEFINED
    */
-  RuleOperator parse_rule_operator(const std::string &indicator);
+  static RuleOperator parse_rule_operator(const std::string &indicator);
 
 public:
-  ServerConfig(FileDescriptor &);
+  explicit ServerConfig(FileDescriptor &);
   ServerConfig()
       : header(), server_response_time(-1), routes(), err_line(), end_flag(0) {}
   /**
@@ -407,6 +406,8 @@ public:
    */
   RouteRule const *find_route(Request::Method method,
                               const std::string &path) const;
+  RouteRule_CGI const *find_route_cgi(Request::Method method,
+                                      const std::string &path) const;
   /**
    * @brief method와 path에 해당하는 rewrite 결과 경로를 반환한다.
    * @param method 요청 HTTP 메서드
@@ -419,17 +420,14 @@ public:
   std::string get_rewritten_path(Request::Method method,
                                  const std::string &path) const;
 
-  const std::map<std::string, std::string> &get_header(void) const {
+  const std::map<std::string, std::string> &get_header() const {
     return header;
   }
-  const std::string &geterr_line(void) const { return err_line; }
-  const std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
-  const CGI get_serve_cgi() const { return S_CGI; }
-  const std::vector<RouteRule> &get_routes(void) const { return routes; }
-  int get_server_response_time(void) const {
-    return server_response_time;
-  }
-
+  const std::string &geterr_line() const { return err_line; }
+  std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
+  CGI get_serve_cgi() const { return S_CGI; }
+  const std::vector<RouteRule> &get_routes() const { return routes; }
+  int get_server_response_time() const { return server_response_time; }
 };
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data);

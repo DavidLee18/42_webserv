@@ -20,7 +20,7 @@ bool utils::has_invalid_char(const std::string &line,
                              const std::string &allowed) {
 
   for (std::size_t i = 0; i < line.size(); ++i) {
-    unsigned char c = static_cast<unsigned char>(line[i]);
+    const unsigned char c = static_cast<unsigned char>(line[i]);
     if (std::isalnum(c))
       continue;
     if (allowed.find(static_cast<char>(c)) != std::string::npos)
@@ -31,7 +31,7 @@ bool utils::has_invalid_char(const std::string &line,
 }
 
 bool utils::has_space(const std::string &line) {
-  std::size_t pos = line.find(' ');
+  const std::size_t pos = line.find(' ');
 
   if (pos == std::string::npos)
     return (false);
@@ -39,8 +39,8 @@ bool utils::has_space(const std::string &line) {
 }
 
 std::string utils::trim_whitespace(const std::string &s) {
-  std::size_t start = s.find_first_not_of(" \t");
-  std::size_t end = s.find_last_not_of(" \t");
+  const std::size_t start = s.find_first_not_of(" \t");
+  const std::size_t end = s.find_last_not_of(" \t");
 
   if (start == std::string::npos)
     return "";
@@ -48,20 +48,17 @@ std::string utils::trim_whitespace(const std::string &s) {
   return s.substr(start, end - start + 1);
 }
 
-bool utils::match_indent_level(std::string line, size_t num) {
+bool utils::match_indent_level(const std::string &line, const size_t num) {
   size_t len = 0;
   size_t i = 0;
 
   if (line.empty())
     return (num == 0);
-  while (i < line.size() && (line[i] == ' ' || line[i] == '\t')) {
-    if (line[i] == ' ')
-      len += 1;
-    else
-      len += 4;
+  while (i < line.size() && line[i] == '\t') {
+    len++;
     i++;
   }
-  return (len == (num * 4));
+  return (len == num);
 }
 
 std::vector<std::string> utils::string_split(const std::string &line,
@@ -71,7 +68,7 @@ std::vector<std::string> utils::string_split(const std::string &line,
   std::size_t end;
 
   while ((end = line.find(delim, start)) != std::string::npos &&
-         delim.length() != 0) {
+         !delim.empty()) {
     if (end > start)
       tokens.push_back(line.substr(start, end - start));
     start = end + delim.size();
@@ -82,7 +79,7 @@ std::vector<std::string> utils::string_split(const std::string &line,
   return tokens;
 }
 
-std::string utils::remove_char(std::string s, char ch) {
+std::string utils::remove_char(std::string s, const char ch) {
   s.erase(std::remove(s.begin(), s.end(), ch), s.end());
 
   return (s);

@@ -1,6 +1,7 @@
 #ifndef ROUTERULE_CGI_HPP
 #define ROUTERULE_CGI_HPP
 
+#include "../file_descriptor.h"
 #include "PathPattern.hpp"
 
 /**
@@ -11,12 +12,11 @@
  * 실행 제한 시간과 같은 CGI 처리에 필요한 정보를 함께 관리한다.
  */
 class RouteRule_CGI {
-private:
   /**
    * @var met
    * @brief 이 규칙이 적용되는 HTTP 요청 메서드를 저장하는 멤버 변수
    */
-  Http::Method met;
+  Request::Method met;
   /**
    * @var path
    * @brief 이 규칙이 적용되는 요청 경로를 저장하는 멤버 변수
@@ -53,10 +53,10 @@ private:
    * @return timeout 문법과 값 범위에 맞으면 true, 그렇지 않으면 false
    *
    * - 문법은 "...<숫자 문자열>" 형식이다.
-   * 
+   *
    * - 숫자 문자열의 값은 0.05보다 크고 15.0 이하여야 한다.
    */
-  bool is_valid_timeout(const std::string &line);
+  static bool is_valid_timeout(const std::string &line);
   /**
    * @brief 검증된 timeout 문자열을 double 값으로 변환하는 함수
    * @param line 변환할 문자열
@@ -65,7 +65,7 @@ private:
    * - 입력 문자열은 is_valid_timeout(const std::string &line) 함수로
    * 유효성이 확인된 상태여야 한다.
    */
-  double parse_timeout_value(std::string &line);
+  static double parse_timeout_value(std::string &line);
   /**
    * @brief CGI 설정 블록을 파싱하여 실행 파일, 환경 변수, timeout 정보를
    * 저장하는 함수
@@ -74,14 +74,14 @@ private:
    * @return 성공하면 빈 문자열, 실패하면 오류 메시지
    *
    * - 첫 줄에서는 실행 파일 경로와 선택적인 환경 변수 정보를 파싱한다.
-   * 
+   *
    * - 이후 들여쓰기 2단계의 하위 줄에서 timeout 또는 추가 환경 변수 정보를
    * 읽는다.
    */
-  std::string parse_cgi_block(FileDescriptor &fd, std::string line);
+  std::string parse_cgi_block(const FileDescriptor &fd, const std::string& line);
 
 public:
-  RouteRule_CGI() : executable(""), env(), timeout(-1), err("No parse"){};
+  RouteRule_CGI() : met(Request::ERROR), timeout(-1), err("No parse") {}
   /**
    * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
    * 생성자
@@ -91,11 +91,13 @@ public:
    * - 요청 메서드와 경로를 설정한 뒤, 하위 CGI 블록을 파싱하여
    * 실행 파일, 환경 변수, timeout 정보를 초기화한다.
    */
-  RouteRule_CGI(FileDescriptor &fd, const std::string &line);
+  RouteRule_CGI(const FileDescriptor &fd, const std::string &line);
 
-  const std::string get_err() const { return err; }
-  const std::string get_executable() const { return executable; }
-  const std::map<std::string, std::string> get_env() const { return env; }
+  PathPattern get_path() const { return path; }
+  Request::Method get_method () const { return met; }
+  std::string get_err() const { return err; }
+  std::string get_executable() const { return executable; }
+  std::map<std::string, std::string> get_env() const { return env; }
   double get_timeout() const { return timeout; }
 
   /**
@@ -105,7 +107,7 @@ public:
    *
    * - 문자열은 비어 있을 수 없으며,
    * 첫 번째 문자는 대문자 또는 '_'이어야 한다.
-   * 
+   *
    * - 나머지 문자는 대문자, 숫자, '_'만 허용한다.
    */
   static bool is_valid_env_key(const std::string &key);
@@ -115,28 +117,28 @@ public:
    * @return 유효한 uwsgi 설정 값이면 true, 그렇지 않으면 false
    *
    * - 입력 벡터의 크기는 2여야 한다.
-   * 
+   *
    * - 첫 번째 원소는 실행 가능한 파일 경로여야 하고,
    * 두 번째 원소는 포트 번호를 나타내는 숫자 문자열이어야 한다.
    */
-  static bool is_valid_uwsgi_config(std::vector<std::string> data);
+  static bool is_valid_uwsgi_config(const std::vector<std::string> &data);
   /**
    * @brief CGI 설정 한 줄의 기본 형식을 검사하는 함수
    * @param line 검사할 문자열
    * @return 기본 형식이 유효하면 true, 그렇지 않으면 false
    *
    * - 입력 문자열은 공백 기준으로 세 개의 항목으로 나뉘어야 한다.
-   * 
+   *
    * - 첫 번째 항목은 HTTP 메서드, 두 번째 항목은 공백이 없는 URL이어야 한다.
    */
-  static bool is_valid_cgi_config(std::string line);
+  static bool is_valid_cgi_config(const std::string &line);
   /**
    * @brief 문자열이 유효한 CGI 설정 형식인지 검사하는 함수
    * @param line 검사할 문자열
    * @return 유효한 CGI 설정 형식이면 true, 그렇지 않으면 false
    *
    * - 입력 문자열은 '$'로 시작해야 하며 공백을 포함할 수 없다.
-   * 
+   *
    * - "$<숫자 문자열>" 또는 "$<확장자가 .cgi인 실행 파일>" 뒤에
    * 선택적으로 "(키=값)" 형식의 문자열이 올 수 있다.
    */
@@ -183,12 +185,12 @@ public:
    * @return 성공하면 빈 문자열, 실패하면 오류 메시지
    *
    * - 빈 줄 또는 파일 끝을 만나면 파싱을 종료한다.
-   * 
+   *
    * - 각 항목은 유효한 uwsgi 설정 형식을 따라야 하며, 실행 파일은 .py 확장자를
    * 가져야 한다.
    */
   static std::string
-  parse_uwsgi_block(FileDescriptor &fd,
+  parse_uwsgi_block(const FileDescriptor &fd,
                     std::map<std::string, std::string> &uwsgi);
 };
 

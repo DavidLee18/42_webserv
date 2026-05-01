@@ -1,39 +1,38 @@
 #include "RouteRule_CGI.hpp"
 
-RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line) {
+RouteRule_CGI::RouteRule_CGI(const FileDescriptor &fd, const std::string &line) {
   err = "";
   timeout = 3;
 
-  std::vector<std::string> temp = utils::string_split(line, " ");
+  const std::vector<std::string> temp = utils::string_split(line, " ");
 
   if (temp.size() != 3) {
     err = "Error: Invalid CGI config syntax";
     return;
   }
   if (temp[0] == "GET")
-    met = Http::GET;
+    met = Request::GET;
   else if (temp[0] == "POST")
-    met = Http::POST;
+    met = Request::POST;
   else if (temp[0] == "DELETE")
-    met = Http::DELETE;
+    met = Request::DELETE;
   path = PathPattern(temp[1]);
   err = parse_cgi_block(fd, temp[2]);
 }
 
-std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
-                                           std::string line) {
-  std::string err_msg = "";
+std::string RouteRule_CGI::parse_cgi_block(const FileDescriptor &fd,
+                                           const std::string& line) {
   std::string file_line = utils::remove_char(line, '$');
 
-  err_msg =
+  std::string err_msg =
       RouteRule_CGI::parse_executable(file_line, this->executable, this->env);
-  if (err_msg != "")
+  if (!err_msg.empty())
     return err_msg;
   while (true) {
     Result<std::string> temp = fd.read_file_line();
-    if (temp.error() != "")
+    if (!temp.error().empty())
       return "FileDescriptor Error: " + temp.error();
-    else if (temp.value() == "\n" || temp.value() == "")
+    else if (temp.value() == "\n" || temp.value().empty())
       return "";
     file_line = utils::remove_char(temp.value(), '\n');
     if (utils::match_indent_level(file_line, 2) == false ||
@@ -43,11 +42,11 @@ std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
     file_line = utils::trim_whitespace(file_line);
     if (is_valid_timeout(file_line))
       timeout = parse_timeout_value(file_line);
-    else if (std::string::npos != file_line.find("="))
+    else if (std::string::npos != file_line.find('='))
       err_msg = RouteRule_CGI::parse_env_entry(file_line, this->env);
     else
       err_msg = "Error: \"" + file_line + "\" Syntax error";
-    if (err_msg != "")
+    if (!err_msg.empty())
       return err_msg;
   }
 }
@@ -70,19 +69,19 @@ bool RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
   if (line.empty() || line[0] != '$' || utils::has_space(line))
     return false;
   std::size_t i = 1;
-  std::size_t pos = line.find(".cgi", i);
+  const std::size_t pos = line.find(".cgi", i);
   if (pos != std::string::npos) {
-    std::size_t exec_end = pos + 4;
+    const std::size_t exec_end = pos + 4;
 
     if (exec_end < line.length() && line[exec_end] != '(')
       return false;
-    std::string exec_path = line.substr(1, exec_end - 1);
+    const std::string exec_path = line.substr(1, exec_end - 1);
     if (exec_path.empty() || !RouteRule_CGI::is_executable_file(exec_path))
       return false;
 
     i = exec_end;
   } else {
-    std::size_t start = i;
+    const std::size_t start = i;
 
     while (i < line.length() && line[i] != '(') {
       if (!std::isdigit(static_cast<unsigned char>(line[i])))
@@ -98,8 +97,8 @@ bool RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
   if (line[i] != '(')
     return false;
 
-  std::size_t equals = line.find('=', i + 1);
-  std::size_t end = line.find(')', i + 1);
+  const std::size_t equals = line.find('=', i + 1);
+  const std::size_t end = line.find(')', i + 1);
 
   if (equals == std::string::npos || end == std::string::npos)
     return false;
@@ -158,7 +157,7 @@ bool RouteRule_CGI::is_valid_env_key(const std::string &key) {
 std::string
 RouteRule_CGI::parse_env_entry(const std::string &line,
                                std::map<std::string, std::string> &env) {
-  std::vector<std::string> key_and_value = utils::string_split(line, "=");
+  const std::vector<std::string> key_and_value = utils::string_split(line, "=");
   if (key_and_value.size() != 2)
     return "Error: \"" + line + "\" Invalid environment variable syntax";
   if (!RouteRule_CGI::is_valid_env_key(key_and_value[0]))
@@ -170,7 +169,8 @@ RouteRule_CGI::parse_env_entry(const std::string &line,
   return "";
 }
 
-bool RouteRule_CGI::is_valid_uwsgi_config(std::vector<std::string> data) {
+bool RouteRule_CGI::is_valid_uwsgi_config(
+    const std::vector<std::string> &data) {
   if (data.size() != 2)
     return false;
   if (!RouteRule_CGI::is_executable_file(data[0]))
@@ -183,24 +183,22 @@ bool RouteRule_CGI::is_valid_uwsgi_config(std::vector<std::string> data) {
 }
 
 std::string
-RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
+RouteRule_CGI::parse_uwsgi_block(const FileDescriptor &fd,
                                  std::map<std::string, std::string> &uwsgi) {
-  std::vector<std::string> value_and_key;
-  std::string line = "";
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
-    if (temp.error() != "")
+    if (!temp.error().empty())
       return "FileDescriptor Error: " + temp.error();
-    else if (temp.value() == "\n" || temp.value() == "")
+    else if (temp.value() == "\n" || temp.value().empty())
       return "";
-    line = utils::remove_char(temp.value(), '\n');
+    std::string line = utils::remove_char(temp.value(), '\n');
     if (utils::match_indent_level(line, 1) == false ||
         (line.empty() || line[line.length() - 1] == ' ' ||
          line[line.length() - 1] == '\t'))
       return "Error: \"" + line + "\" Indentation or space error";
     line = utils::trim_whitespace(line);
-    value_and_key = utils::string_split(line, ":");
+    std::vector<std::string> value_and_key = utils::string_split(line, ":");
     if (!RouteRule_CGI::is_valid_uwsgi_config(value_and_key))
       return "Error: \"" + line + "\" uwsgi syntax error";
     if (value_and_key[0].length() < 3 ||
@@ -214,8 +212,8 @@ RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
   }
 }
 
-bool RouteRule_CGI::is_valid_cgi_config(std::string line) {
-  std::vector<std::string> split_line = utils::string_split(line, " ");
+bool RouteRule_CGI::is_valid_cgi_config(const std::string& line) {
+  const std::vector<std::string> split_line = utils::string_split(line, " ");
   if (split_line.size() != 3)
     return false;
   if (split_line[0] != "POST" && split_line[0] != "GET" &&
@@ -228,11 +226,10 @@ bool RouteRule_CGI::is_valid_cgi_config(std::string line) {
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
   std::map<std::string, std::string> env = data.get_env();
-  std::map<std::string, std::string>::const_iterator env_it;
 
   os << "\nExecutable: " << data.get_executable() << "\n";
   os << "\n\tEnv\n";
-  for (env_it = env.begin(); env_it != env.end(); ++env_it) {
+  for (std::map<std::string, std::string>::const_iterator env_it = env.begin(); env_it != env.end(); ++env_it) {
     os << "\tEnv key: " << env_it->first << ", Env value: " << env_it->second
        << "\n";
   }
@@ -244,17 +241,17 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
 std::string
 RouteRule_CGI::parse_executable(const std::string &line,
                                 std::string &executable,
-                                std::map<std::string, std::string> &map) {
-  std::string err_msg = "";
+                                std::map<std::string, std::string> &env) {
+  std::string err_msg;
 
   std::string file_line = utils::remove_char(line, '$');
-  std::size_t start = file_line.find('(');
+  const std::size_t start = file_line.find('(');
   if (std::string::npos != start) {
-    std::size_t end = file_line.find(')');
+    const std::size_t end = file_line.find(')');
     executable = file_line.substr(0, start);
-    std::string env = file_line.substr(start + 1, end - start - 1);
-    err_msg = RouteRule_CGI::parse_env_entry(env, map);
-    if (err_msg != "")
+    const std::string _env = file_line.substr(start + 1, end - start - 1);
+    err_msg = RouteRule_CGI::parse_env_entry(_env, env);
+    if (!err_msg.empty())
       return err_msg;
   } else
     executable = file_line;

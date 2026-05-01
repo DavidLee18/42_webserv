@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <vector>
 
-UwsgiClient::UwsgiClient(const std::string &host, int port)
+UwsgiClient::UwsgiClient(const std::string &host, const int port)
     : _host(host), _port(port) {}
 
 // Build uwsgi vars block: repeated [key_len: 2B LE][key][val_len: 2B LE][val]
@@ -22,12 +22,12 @@ build_vars_block(const std::map<std::string, std::string> &vars) {
     const std::string &key = it->first;
     const std::string &val = it->second;
 
-    unsigned short key_len = static_cast<unsigned short>(key.size());
+    const unsigned short key_len = static_cast<unsigned short>(key.size());
     block.push_back(static_cast<unsigned char>(key_len & 0xFF));
     block.push_back(static_cast<unsigned char>((key_len >> 8) & 0xFF));
     block.insert(block.end(), key.begin(), key.end());
 
-    unsigned short val_len = static_cast<unsigned short>(val.size());
+    const unsigned short val_len = static_cast<unsigned short>(val.size());
     block.push_back(static_cast<unsigned char>(val_len & 0xFF));
     block.push_back(static_cast<unsigned char>((val_len >> 8) & 0xFF));
     block.insert(block.end(), val.begin(), val.end());
@@ -35,11 +35,11 @@ build_vars_block(const std::map<std::string, std::string> &vars) {
   return block;
 }
 
-static bool write_all(int fd, const void *buf, size_t len) {
-  const char *p = reinterpret_cast<const char *>(buf);
+static bool write_all(const int fd, const void *buf, const size_t len) {
+  const char *p = static_cast<const char *>(buf);
   size_t written = 0;
   while (written < len) {
-    ssize_t n = write(fd, p + written, len - written);
+    const ssize_t n = write(fd, p + written, len - written);
     if (n <= 0)
       return false;
     written += static_cast<size_t>(n);
@@ -50,13 +50,13 @@ static bool write_all(int fd, const void *buf, size_t len) {
 Result<std::string>
 UwsgiClient::send(const std::map<std::string, std::string> &vars,
                   const std::string &body) const {
-  std::vector<unsigned char> vars_block = build_vars_block(vars);
+  const std::vector<unsigned char> vars_block = build_vars_block(vars);
 
   if (vars_block.size() > static_cast<size_t>(USHRT_MAX))
     return ERR(std::string, "uwsgi vars block exceeds 64 KiB limit");
 
   // 4-byte uwsgi header: [modifier1=0][datasize: 2B LE][modifier2=0]
-  unsigned short datasize = static_cast<unsigned short>(vars_block.size());
+  const unsigned short datasize = static_cast<unsigned short>(vars_block.size());
   unsigned char header[4];
   header[0] = 0; // modifier1: WSGI/Python
   header[1] = static_cast<unsigned char>(datasize & 0xFF);
@@ -64,8 +64,7 @@ UwsgiClient::send(const std::map<std::string, std::string> &vars,
   header[3] = 0; // modifier2
 
   // Resolve and connect
-  struct addrinfo hints, *res = NULL;
-  std::memset(&hints, 0, sizeof(hints));
+  addrinfo hints = {}, *res = NULL;
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
 
@@ -74,7 +73,7 @@ UwsgiClient::send(const std::map<std::string, std::string> &vars,
   if (getaddrinfo(_host.c_str(), port_ss.str().c_str(), &hints, &res) != 0)
     return ERR(std::string, "uwsgi: failed to resolve server address");
 
-  int sock_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  const int sock_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
   if (sock_fd < 0) {
     freeaddrinfo(res);
     return ERR(std::string, "uwsgi: failed to create socket");
@@ -102,7 +101,7 @@ UwsgiClient::send(const std::map<std::string, std::string> &vars,
   std::string response;
   char buf[4096];
   while (true) {
-    ssize_t n = read(sock_fd, buf, sizeof(buf));
+    const ssize_t n = read(sock_fd, buf, sizeof(buf));
     if (n > 0) {
       response.append(buf, static_cast<size_t>(n));
     } else if (n == 0) {

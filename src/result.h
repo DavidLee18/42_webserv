@@ -29,7 +29,7 @@ public:
     // Storage is uninitialized, will be constructed via placement new if needed
   }
 
-  Optional(const T &val) : _has_value(true) { new (ptr()) T(val); }
+  explicit Optional(const T &val) : _has_value(true) { new (ptr()) T(val); }
 
   Optional(const Optional &other) : _has_value(other._has_value) {
     if (_has_value) {
@@ -114,18 +114,20 @@ public:
 
 #define ERR(t, e) (Result<t>(e))
 
-#define TRY(t, vt, v, r)                                                       \
-  if (!(r).error().empty()) {                                                  \
-    return ERR(t, (r).error());                                                \
+#define TRY(t, rt, v, r)                                                       \
+  Result<rt> _result = r;                                                      \
+  if (!_result.error().empty()) {                                              \
+    return ERR(t, _result.error());                                            \
   } else {                                                                     \
-    v = (r).value();                                                           \
+    ((v)) = _result.value();                                                       \
   }
 
-#define TRYF(t, vt, v, r, f)                                                   \
-  if (!(r).error().empty()) {                                                  \
-    f return ERR(t, (r).error());                                              \
+#define TRYF(t, rt, v, r, f)                                                   \
+  Result<rt> _result = rt;                                                     \
+  if (!_result.error().empty()) {                                              \
+    (f) return ERR(t, _result.error());                                          \
   } else {                                                                     \
-    v = (r).value();                                                           \
+    (v) = _result.value();                                                       \
   }
 
 struct Void {};

@@ -1,7 +1,7 @@
 #include "webserv.h"
 
 Result<Events> Events::init(const std::list<FileDescriptor> &all_events,
-                            size_t size, const epoll_event *events) {
+                            const size_t size, const epoll_event *events) {
   Events es;
   es._len = size;
   es._curr = 0;
@@ -19,7 +19,7 @@ Result<Events> Events::init(const std::list<FileDescriptor> &all_events,
       operator delete((void *)es._events);
       return ERR(Events, Errors::not_found);
     }
-    new ((void *)(es._events + i)) Event(fd, (events[i].events & EPOLLIN) != 0,
+    new (static_cast<void *>(es._events + i)) Event(fd, (events[i].events & EPOLLIN) != 0,
                                          (events[i].events & EPOLLOUT) != 0,
                                          (events[i].events & EPOLLRDHUP) != 0,
                                          (events[i].events & EPOLLPRI) != 0,
@@ -53,8 +53,8 @@ Result<const Event *> Events::operator*() const {
   return OK(const Event *, evp);
 }
 
-Result<EPoll> EPoll::create(unsigned short sz) {
-  int fd = epoll_create(static_cast<int>(sz));
+Result<EPoll> EPoll::create(const unsigned short sz) {
+  const int fd = epoll_create(static_cast<int>(sz));
   if (fd < 0) {
     switch (errno) {
     case EINVAL:
@@ -70,16 +70,16 @@ Result<EPoll> EPoll::create(unsigned short sz) {
   }
   EPoll ep;
   ep._size = sz;
-  Result<FileDescriptor> rfdesc = FileDescriptor::from_raw(fd);
+  const Result<FileDescriptor> rfdesc = FileDescriptor::from_raw(fd);
   if (!rfdesc.error().empty()) {
     return ERR(EPoll, rfdesc.error());
   }
-  FileDescriptor fdesc = rfdesc.value();
+  const FileDescriptor& fdesc = rfdesc.value();
   ep._fd = fdesc;
   return OK(EPoll, ep);
 }
 
-Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
+Result<FileDescriptor *> EPoll::add_fd(const FileDescriptor& fd, const Event &ev,
                                        const Option &op) {
   epoll_event event = {};
   if (ev.in)
@@ -127,8 +127,8 @@ Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, const Event &ev,
   return OK(FileDescriptor *, &_events.back());
 }
 
-Result<Void> EPoll::modify_fd(FileDescriptor &fd, const Event &ev,
-                              const Option &op) {
+Result<Void> EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,
+                              const Option &op) const {
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -170,7 +170,7 @@ Result<Void> EPoll::modify_fd(FileDescriptor &fd, const Event &ev,
 
 Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
   epoll_event event = {};
-  int raw = fd._fd;
+  const int raw = fd._fd;
   event.data.fd = raw;
   if (epoll_ctl(_fd._fd, EPOLL_CTL_DEL, raw, &event) == -1) {
     switch (errno) {
@@ -196,9 +196,9 @@ Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
   return OKV;
 }
 
-Result<Events> EPoll::wait(const int timeout_ms) {
-  struct epoll_event *events = new struct epoll_event[_size];
-  int n = epoll_wait(_fd._fd, events, _size, timeout_ms);
+Result<Events> EPoll::wait(const int timeout_ms) const {
+  epoll_event *events = new struct epoll_event[_size];
+  const int n = epoll_wait(_fd._fd, events, _size, timeout_ms);
   if (n == -1) {
     delete[] events;
     if (errno == EINTR)

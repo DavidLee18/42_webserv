@@ -19,18 +19,15 @@ struct SessionData
  * @brief Session class to generate uuid and save data.
  */
 class Session {
-private:
   /**
    * @brief Map tying session IDs to their specific session data.
    * Key: Session ID. Value: Session data.
    */
   std::map<std::string, SessionData> data;
 
-  std::string generate_session_id();
+  static std::string generate_session_id();
 
 public:
-  Session() {};
-  ~Session() {};
 
   // 세션을 생성하고, 생성된 고유 Session ID를 반환
   std::string create_session(const std::string& user_id, const std::string& client_ip);

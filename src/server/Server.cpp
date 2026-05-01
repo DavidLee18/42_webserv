@@ -1,12 +1,17 @@
 #include "Server.hpp"
 #include "../webserv.h"
+#include "DefaultError.hpp"
+#include "Response.hpp"
+#include <cstddef>
 
 void Server::new_connection(const FileDescriptor *server_fd) {
   while (true) { // accept all clients until nothing to connect
     // init client socket
-    struct sockaddr_in client_addr;
+    sockaddr_in client_addr = {};
     socklen_t client_len = sizeof(client_addr);
-    Result<FileDescriptor> client_result = server_fd->socket_accept((struct sockaddr*)&client_addr, &client_len);
+    Result<FileDescriptor> client_result =
+        server_fd->socket_accept(
+        reinterpret_cast<struct sockaddr *>(&client_addr), &client_len);
     if (!client_result.has_value()) {
       const std::string &err = client_result.error();
       if (err == Errors::try_again)
@@ -31,13 +36,13 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     client.ip = ip_str;
 
     // register client socket to EPoll
-    Event client_event(&client_fd, true, true, false, false, false, false);
+    Event client_event(&client_fd, true, true, true, false, false, false);
     Option client_option(true, false, false, false);
 
     Result<FileDescriptor *> add_result =
         epoll.add_fd(client_fd, client_event, client_option);
     if (add_result.has_value()) {
-      FileDescriptor *client_ptr = add_result.value();
+      const FileDescriptor *client_ptr = add_result.value();
       if (listeners.find(server_fd) != listeners.end()) {
         client.config = listeners.at(server_fd);
       }
@@ -57,6 +62,7 @@ void Server::disconnect(const FileDescriptor *client_fd) {
 }
 
 void Server::client_read(const FileDescriptor *client_fd) {
+  bool peer_closed = false;
   while (true) { // repeat until nothing to read
     char buf[NETWORK_BUFFER_SIZE];
     Result<ssize_t> recv_res = client_fd->sock_recv(buf, sizeof(buf));
@@ -65,8 +71,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
     ssize_t bytes = recv_res.value();
     if (bytes == 0) { // (EOF)
-      disconnect(client_fd);
-      return;
+      peer_closed = true;
+      break;
     }
     clients.at(client_fd).in_buff.append(buf, static_cast<std::size_t>(bytes));
   }
@@ -74,68 +80,151 @@ void Server::client_read(const FileDescriptor *client_fd) {
   // HTTP parsing and response generate
   std::string &in_buffer = clients.at(client_fd).in_buff;
   while (!in_buffer.empty()) {
-    size_t header_end = in_buffer.find("\r\n\r\n");
-    if (header_end == std::string::npos) {
-      break; // 헤더가 다 안 들어왔으면 다음 epoll 이벤트 대기
-    }
+    if (clients.at(client_fd).req == NULL) {
+      Result<Request *> req_ = Request::from_buff(in_buffer);
 
-    // checking Content-Length
-    size_t content_length = 0;
-    std::string header_lower = in_buffer.substr(0, header_end);
-    for (size_t i = 0; i < header_lower.length(); ++i) {
-      header_lower[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(header_lower[i])));
-    }
-    size_t cl_pos = header_lower.find("content-length: ");
-    if (cl_pos != std::string::npos) {
-      content_length = std::atoi(header_lower.c_str() + cl_pos + 16);
-    }
+      if (!req_.has_value()) {
+        std::cerr << "request parsing failed: " << req_.error() << std::endl;
+        if (req_.error() == Errors::incomplete_header) {
+          if (peer_closed)
+            disconnect(client_fd);
+          return;
+        } else if (req_.error() == Errors::malformed_header ||
+                   req_.error() == Errors::bad_request) {
+          Response resp = DefaultError::default_err_response(BAD_REQUEST);
+          std::ostringstream oss;
+          oss << resp;
+          clients.at(client_fd).out_buff += oss.str();
+          client_write(client_fd); // when the response is generated freshly,
+                                   // likely EPOLLIN | EPOLLOUT
 
-    // check body if body not full break to get more event
-    size_t total_request_len = header_end + 4 + content_length;
-    if (in_buffer.length() < total_request_len) {
-      break;
-    }
+          if (peer_closed && clients.find(client_fd) != clients.end() &&
+              clients.at(client_fd).out_buff.empty()) {
+            disconnect(client_fd);
+          }
 
-    // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
-    std::string request_str = in_buffer.substr(0, total_request_len);
-    Request request(request_str);
+          return;
+        } else if (req_.error() == Errors::not_implemented) {
+          Response resp = DefaultError::default_err_response(NOT_IMPLEMENTED);
+          std::ostringstream oss;
+          oss << resp;
+          clients.at(client_fd).out_buff += oss.str();
+          client_write(client_fd); // when the response is generated freshly,
+                                   // likely EPOLLIN | EPOLLOUT
 
-    std::cout << "\nclient ip: " << clients.at(client_fd).ip << std::endl;
-    std::cout << "[Request] " << request.get_method_string() << " "
-              << request.get_path() << " (Body: " << content_length << " bytes)"
-              << std::endl;
+          if (peer_closed && clients.find(client_fd) != clients.end() &&
+              clients.at(client_fd).out_buff.empty()) {
+            disconnect(client_fd);
+          }
 
-    // response generate
-    Response http;
-    if (ServerResponse::find_file_type(request.get_path()) == "cgi")
-      http = ServerResponse::cgi_response(&request,
-                                          clients.at(client_fd).config, &epoll);
-    else
-      http = ServerResponse::http_response(
-          &request, &clients.at(client_fd), mime_type, &sessions);
-
-    // read server response
-    std::ostringstream server_response;
-    if (!http.cgi.empty())
-      server_response << http.cgi;
-    else {
-      server_response << "HTTP/1.1 " << http.status_code << "\r\n";
-      if (!http.redir.empty())
-        server_response << "Location: " << http.redir << "\r\n";
-      std::cout << http.redir << std::endl;
-      server_response << "Content-Type:" << http.mime_type << "\r\n";
-      if (!http.cookie.empty())
-      {
-        server_response << "Set-Cookie:" << http.cookie << "\r\n";
-        std::cout << "cookie value: " << http.cookie << std::endl;
+          return;
+        }
       }
-      server_response << "Content-Length: " << http.body.length() << "\r\n";
-      server_response << "Connection: " << http.connection << "\r\n\r\n";
-      server_response << http.body;
-    }
-    clients.at(client_fd).out_buff += server_response.str();
 
-    in_buffer.erase(0, total_request_len);
+      clients.at(client_fd).req = req_.value();
+
+      if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
+      {
+        if (peer_closed)
+          disconnect(client_fd);
+        return;
+      }
+
+      // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
+      std::cout << "\nclient ip: " << clients.at(client_fd).ip << std::endl;
+      std::cout << "[Request] "
+                << clients.at(client_fd).req->get_method_string() << " "
+                << clients.at(client_fd).req->get_path()
+                << " (Body: " << clients.at(client_fd).req->get_content_length()
+                << " bytes)" << std::endl;
+
+      if (ServerResponse::find_file_type(
+              clients.at(client_fd).req->get_path()) == "cgi") {
+        Result<CgiDelegate> del_ = ServerResponse::register_cgi(
+            clients.at(client_fd).req, clients.at(client_fd).config, &epoll);
+        if (!del_.has_value()) {
+          std::cerr << "CGI registration failed: " << del_.error() << std::endl;
+          delete clients.at(client_fd).req;
+          clients.at(client_fd).req = NULL;
+          return;
+        }
+        std::pair<std::map<const FileDescriptor *, CgiDelegate>::iterator, bool>
+            res = cgis.insert(std::make_pair(client_fd, del_.value()));
+        if (!res.second)
+          std::cerr << "[ERROR] CGI already registered for " << client_fd
+                    << std::endl;
+        delete clients.at(client_fd).req;
+        clients.at(client_fd).req = NULL;
+        return;
+      }
+      // response generate
+      Response http = ServerResponse::http_response(clients.at(client_fd).req,
+                                                    &clients.at(client_fd),
+                                                    mime_type, &sessions);
+
+      // read server response
+      std::ostringstream server_response;
+
+      server_response << http;
+
+      delete clients.at(client_fd).req;
+      clients.at(client_fd).req = NULL;
+
+      clients.at(client_fd).out_buff += server_response.str();
+    } else {
+      clients.at(client_fd).req->continue_parsing(in_buffer);
+      if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
+        return;
+
+      // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
+      std::cout << "\nclient ip: " << clients.at(client_fd).ip << std::endl;
+      std::cout << "[Request] "
+                << clients.at(client_fd).req->get_method_string() << " "
+                << clients.at(client_fd).req->get_path()
+                << " (Body: " << clients.at(client_fd).req->get_content_length()
+                << " bytes)" << std::endl;
+
+      if (ServerResponse::find_file_type(
+              clients.at(client_fd).req->get_path()) == "cgi") {
+        Result<CgiDelegate> del_ = ServerResponse::register_cgi(
+            clients.at(client_fd).req, clients.at(client_fd).config, &epoll);
+        if (!del_.has_value()) {
+          std::cerr << "CGI registration failed: " << del_.error() << std::endl;
+          delete clients.at(client_fd).req;
+          clients.at(client_fd).req = NULL;
+          return;
+        }
+        std::pair<std::map<const FileDescriptor *, CgiDelegate>::iterator, bool>
+            res = cgis.insert(std::make_pair(client_fd, del_.value()));
+        if (!res.second)
+          std::cerr << "[ERROR] CGI already registered for " << client_fd
+                    << std::endl;
+        delete clients.at(client_fd).req;
+        clients.at(client_fd).req = NULL;
+        return;
+      }
+      // response generate
+      Response http = ServerResponse::http_response(clients.at(client_fd).req,
+                                                    &clients.at(client_fd),
+                                                    mime_type, &sessions);
+
+      // read server response
+      std::ostringstream server_response;
+
+      server_response << http;
+
+      delete clients.at(client_fd).req;
+      clients.at(client_fd).req = NULL;
+
+      clients.at(client_fd).out_buff += server_response.str();
+    }
+  }
+  client_write(client_fd); // when the response is generated freshly, likely
+                           // EPOLLIN | EPOLLOUT
+
+  if (peer_closed && clients.find(client_fd) != clients.end() &&
+      clients.at(client_fd).out_buff.empty()) {
+    disconnect(client_fd);
   }
 }
 
@@ -151,7 +240,7 @@ void Server::client_write(const FileDescriptor *client_fd) {
       if (!send_res.has_value())
         break; // EWOULDBLOCK
 
-      ssize_t bytes = send_res.value();
+      const ssize_t bytes = send_res.value();
       if (bytes == 0)
         break;
 
@@ -197,7 +286,7 @@ Result<Void> Server::init() {
                 << std::endl;
 
     // Bind (associate IP and port)
-    struct in_addr addr;
+    in_addr addr = {};
     addr.s_addr = htonl(INADDR_ANY); // All IPs
     Result<Void> bind_result = server_fd.socket_bind(addr, port);
     if (!bind_result.has_value())
@@ -228,7 +317,7 @@ Result<Void> Server::init() {
 }
 
 Result<Void> Server::start() {
-  system("open http://localhost:8080");
+  // system("open http://localhost:8080");
   std::cout << "Starting server loop..." << std::endl;
   while (true) {
     // Waiting for events using epoll
@@ -256,18 +345,28 @@ Result<Void> Server::start() {
       // 1. 서버 소켓(문지기)인 경우 (listeners map에 Key가 존재함)
       if (listeners.find(fd) != listeners.end()) {
         new_connection(fd);
-      }
-      // 2. 이미 연결된 클라이언트 소켓인 경우
-      else {
+      } else if (clients.find(fd) !=
+                 clients.end()) { // 2. 이미 연결된 클라이언트 소켓인 경우
+        if (event->in)
+          client_read(fd);
+        if (event->out)
+          client_write(fd);
         if (event->err || event->hup || event->rdhup) {
-          disconnect(fd);
-        } else {
-          if (event->in)
+          if (clients.find(fd) != clients.end())
             client_read(fd);
-          if (event->out)
-            client_write(fd);
+          disconnect(fd);
+        }
+      } else { // CGI
+        for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
+                 cgis.begin();
+             it != cgis.end(); ++it) {
+          Result<Void> res = it->second.handle_event(event);
+          if (!res.has_value())
+            std::cerr << "CGI event handling failure: " << res.error()
+                      << std::endl;
         }
       }
+
       ++events;
     }
   }

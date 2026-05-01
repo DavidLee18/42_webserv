@@ -22,12 +22,12 @@ public:
   static Json null();
   static Json _bool(bool);
   static Json num(long double);
-  static Json str(std::string);
-  static Json arr(std::vector<Json>);
-  static Json obj(std::vector<std::pair<std::string, Json> >);
+  static Json str(const std::string&);
+  static Json arr(const std::vector<Json> &js);
+  static Json obj(const std::vector<std::pair<std::string, Json> > &m);
 
   Json() : _type(Null), _value((Value){._null = NULL}) {}
-  Json(Type ty, Value val) : _type(ty), _value(val) {}
+  Json(const Type ty, const Value val) : _type(ty), _value(val) {}
   Json(const Json &other);
   Json &operator=(const Json &other);
   ~Json() {
@@ -47,7 +47,7 @@ public:
   }
   const Type &type() const { return _type; }
   const Value &value() const { return _value; }
-  friend std::ostream &operator<<(std::ostream &os, Json &js);
+  friend std::ostream &operator<<(std::ostream &os, const Json &js);
 
   class Parser {
     virtual void phantom() = 0;
@@ -67,37 +67,37 @@ private:
   Value _value;
 };
 
-std::ostream &operator<<(std::ostream &, std::vector<Json> &);
-std::ostream &operator<<(std::ostream &, std::pair<std::string, Json> &);
+std::ostream &operator<<(std::ostream &, const std::vector<Json> &);
+std::ostream &operator<<(std::ostream &, const std::pair<std::string, Json> &);
 
 #define TRY_PARSE(f, r, rs, i, s)                                              \
-  Result<std::pair<Json, size_t> > r = f(s + i);                               \
-  if (r.error().empty()) {                                                     \
-    rs.push_back(r.value().first);                                             \
-    i += r.value().second;                                                     \
+  Result<std::pair<Json, size_t> > r = (f)((s) + (i));                               \
+  if ((r).error().empty()) {                                                     \
+    rs.push_back((r).value().first);                                             \
+    (i) += (r).value().second;                                                     \
     continue;                                                                  \
   }
 
 #define TRY_PARSE_NUM(r, rs, i, s, ed)                                         \
-  Result<std::pair<Json, size_t> > r = _num(s + i, ed);                        \
-  if (r.error().empty()) {                                                     \
-    rs.push_back(r.value().first);                                             \
-    i += r.value().second;                                                     \
+  Result<std::pair<Json, size_t> > r = _num((s) + (i), (ed));                        \
+  if ((r).error().empty()) {                                                     \
+    (rs).push_back((r).value().first);                                             \
+    (i) += (r).value().second;                                                     \
     continue;                                                                  \
   }
 
 #define TRY_PARSE_PAIR(f, k, r, rs, i, s)                                      \
-  Result<std::pair<Json, size_t> > r = f(s + i);                               \
-  if (r.error().empty()) {                                                     \
-    rs.push_back(make_pair(k, r.value().first));                               \
-    i += r.value().second;                                                     \
+  Result<std::pair<Json, size_t> > r = (f)((s) + (i));                               \
+  if ((r).error().empty()) {                                                     \
+    (rs).push_back(make_pair((k), (r).value().first));                               \
+    (i) += (r).value().second;                                                     \
     continue;                                                                  \
   }
 #define TRY_PARSE_PAIR_NUM(k, r, rs, i, s, ed)                                 \
-  Result<std::pair<Json, size_t> > r = _num(s + i, ed);                        \
-  if (r.error().empty()) {                                                     \
-    rs.push_back(std::pair<std::string, Json>(k, r.value().first));            \
-    i += r.value().second;                                                     \
+  Result<std::pair<Json, size_t> > r = _num((s) + (i), (ed));                        \
+  if ((r).error().empty()) {                                                     \
+    (rs).push_back(std::pair<std::string, Json>((k), (r).value().first));            \
+    (i) += (r).value().second;                                                     \
     continue;                                                                  \
   }
 

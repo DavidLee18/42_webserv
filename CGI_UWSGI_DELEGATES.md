@@ -35,9 +35,9 @@ public:
 CgiDelegate(const Http::Request &req, const std::string &script);
 ```
 
-| Parameter | Description |
-|-----------|-------------|
-| `req`     | The incoming HTTP/1.1 request to dispatch to the CGI script. |
+| Parameter | Description                                                                                                                            |
+|-----------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `req`     | The incoming HTTP/1.1 request to dispatch to the CGI script.                                                                           |
 | `script`  | Path to the CGI executable. Relative paths are resolved against the server process's working directory; absolute paths are used as-is. |
 
 The constructor calls `CgiInput::Parser::parse(req)` to build the CGI

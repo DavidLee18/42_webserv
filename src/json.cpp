@@ -1,6 +1,6 @@
 #include "webserv.h"
 
-Json::Json(const Json &other) : _type(other._type) {
+Json::Json(const Json &other) : _type(other._type), _value() {
   switch (other._type) {
   case Null:
     _value = (Value){._null = NULL};
@@ -70,19 +70,19 @@ Json &Json::operator=(const Json &other) {
 
 Json Json::null() { return Json(Null, (Value){._null = NULL}); }
 
-Json Json::_bool(bool b) { return Json(Bool, (Value){._bool = b}); }
+Json Json::_bool(const bool b) { return Json(Bool, (Value){._bool = b}); }
 
-Json Json::num(long double ld) { return Json(Num, (Value){.num = ld}); }
+Json Json::num(const long double ld) { return Json(Num, (Value){.num = ld}); }
 
-Json Json::str(std::string s) {
+Json Json::str(const std::string& s) {
   return Json(Str, (Value){._str = new std::string(s)});
 }
 
-Json Json::arr(std::vector<Json> js) {
+Json Json::arr(const std::vector<Json>& js) {
   return Json(Arr, (Value){.arr = new std::vector<Json>(js)});
 }
 
-Json Json::obj(std::vector<std::pair<std::string, Json> > m) {
+Json Json::obj(const std::vector<std::pair<std::string, Json> >& m) {
   return Json(
       Obj, (Value){.obj = new std::vector<std::pair<std::string, Json> >(m)});
 }
@@ -109,14 +109,15 @@ Result<std::pair<Json, size_t> > Json::Parser::_boolean(const char *raw) {
   return ERR_PAIR(Json, size_t, Errors::invalid_format);
 }
 
-Result<std::pair<Json, size_t> > Json::Parser::_num(const char *raw, char end) {
+Result<std::pair<Json, size_t> > Json::Parser::_num(const char *raw,
+                                                    const char end) {
   char *endptr;
   errno = 0;
-  long l = std::strtol(raw, &endptr, 10);
+  const long l = std::strtol(raw, &endptr, 10);
   if (endptr != raw && *endptr == end && errno != ERANGE)
     return OK_PAIR(Json, size_t, Json::num(static_cast<long double>(l)),
                    endptr - raw);
-  long double ld = std::strtold(raw, &endptr);
+  const long double ld = std::strtold(raw, &endptr);
   if (endptr == raw || *endptr != end)
     return ERR_PAIR(Json, size_t, Errors::invalid_format);
   if (errno == ERANGE)
@@ -133,7 +134,7 @@ Result<std::pair<Json, size_t> > Json::Parser::_str(const char *raw) {
   char *cs = new char[static_cast<size_t>(pos - raw)];
   cs = std::strncpy(cs, raw + 1, static_cast<size_t>(pos - raw - 1));
   cs[pos - raw - 1] = '\0';
-  std::string str(cs);
+  const std::string str(cs);
   delete[] cs;
   return OK_PAIR(Json, size_t, Json::str(str), pos - raw + 1);
 }
@@ -251,7 +252,7 @@ Result<std::pair<Json, size_t> > Json::Parser::parse(const char *raw,
   return ERR_PAIR(Json, size_t, Errors::invalid_json);
 }
 
-std::ostream &operator<<(std::ostream &os, Json &js) {
+std::ostream &operator<<(std::ostream &os, const Json &js) {
   switch (js._type) {
   case Json::Null:
     os << "null";
@@ -282,7 +283,7 @@ std::ostream &operator<<(std::ostream &os, Json &js) {
   return os;
 }
 
-std::ostream &operator<<(std::ostream &os, std::vector<Json> &jss) {
+std::ostream &operator<<(std::ostream &os, const std::vector<Json> &jss) {
   os << '[';
   for (size_t i = 0; i < jss.size(); i++) {
     if (i != 0) {
@@ -294,7 +295,8 @@ std::ostream &operator<<(std::ostream &os, std::vector<Json> &jss) {
   return os;
 }
 
-std::ostream &operator<<(std::ostream &os, std::pair<std::string, Json> &rec) {
+std::ostream &operator<<(std::ostream &os,
+                         const std::pair<std::string, Json> &rec) {
   os << '\"' << rec.first << "\": " << rec.second;
   return os;
 }

@@ -52,7 +52,7 @@ static bool is_allowed_wsgi_var(const std::string &key) {
   return false;
 }
 
-UwsgiServer::UwsgiServer(const std::string &script_path, int port)
+UwsgiServer::UwsgiServer(const std::string &script_path, const int port)
     : _script_path(script_path), _port(port), _server_fd(-1) {}
 
 UwsgiServer::~UwsgiServer() {
@@ -77,7 +77,7 @@ bool UwsgiServer::setup_socket() {
     return false;
   }
 
-  int optval = 1;
+  const int optval = 1;
   if (setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR, &optval,
                  static_cast<socklen_t>(sizeof(optval))) < 0) {
     std::cerr << "setsockopt() failed" << std::endl;
@@ -86,13 +86,12 @@ bool UwsgiServer::setup_socket() {
     return false;
   }
 
-  struct sockaddr_in addr;
-  std::memset(&addr, 0, sizeof(addr));
+  sockaddr_in addr = {};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = INADDR_ANY;
   addr.sin_port = htons(static_cast<unsigned short>(_port));
 
-  if (bind(_server_fd, reinterpret_cast<struct sockaddr *>(&addr),
+  if (bind(_server_fd, reinterpret_cast<sockaddr *>(&addr),
            sizeof(addr)) < 0) {
     std::cerr << "bind() failed" << std::endl;
     return false;
@@ -122,7 +121,7 @@ void UwsgiServer::run() {
     // Reap any previously timed-out children in a non-blocking way.
     int reap_status = 0;
     while (true) {
-      pid_t reaped = waitpid(-1, &reap_status, WNOHANG);
+      const pid_t reaped = waitpid(-1, &reap_status, WNOHANG);
       if (reaped > 0)
         continue;
       if (reaped == 0)
@@ -131,9 +130,9 @@ void UwsgiServer::run() {
         continue;
       break;
     }
-    struct sockaddr_in client_addr;
+    sockaddr_in client_addr = {};
     socklen_t client_len = sizeof(client_addr);
-    int client_fd =
+    const int client_fd =
         accept(_server_fd, reinterpret_cast<struct sockaddr *>(&client_addr),
                &client_len);
     if (client_fd < 0) {
@@ -153,11 +152,11 @@ void UwsgiServer::run() {
   }
 }
 
-bool UwsgiServer::read_all(int fd, void *buf, size_t len) {
+bool UwsgiServer::read_all(const int fd, void *buf, const size_t len) {
   size_t total = 0;
-  char *p = reinterpret_cast<char *>(buf);
+  char *p = static_cast<char *>(buf);
   while (total < len) {
-    ssize_t n = read(fd, p + total, len - total);
+    const ssize_t n = read(fd, p + total, len - total);
     if (n > 0) {
       total += static_cast<size_t>(n);
       continue;
@@ -176,7 +175,7 @@ bool UwsgiServer::parse_uwsgi_vars(const std::vector<unsigned char> &data,
     if (pos + 2 > data.size())
       return false;
 
-    unsigned short key_len = static_cast<unsigned short>(
+    const unsigned short key_len = static_cast<unsigned short>(
         static_cast<unsigned int>(data[pos]) |
         (static_cast<unsigned int>(data[pos + 1]) << 8));
     pos += 2;
@@ -188,14 +187,14 @@ bool UwsgiServer::parse_uwsgi_vars(const std::vector<unsigned char> &data,
 
     if (pos + 2 > data.size())
       return false;
-    unsigned short val_len = static_cast<unsigned short>(
+    const unsigned short val_len = static_cast<unsigned short>(
         static_cast<unsigned int>(data[pos]) |
         (static_cast<unsigned int>(data[pos + 1]) << 8));
     pos += 2;
 
     if (pos + val_len > data.size())
       return false;
-    std::string val(reinterpret_cast<const char *>(&data[pos]), val_len);
+    const std::string val(reinterpret_cast<const char *>(&data[pos]), val_len);
     pos += val_len;
 
     vars[key] = val;
@@ -220,7 +219,7 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
     return "";
   }
 
-  pid_t pid = fork();
+  const pid_t pid = fork();
   if (pid < 0) {
     std::cerr << "fork() failed" << std::endl;
     close(stdin_pipe[0]);
@@ -282,7 +281,7 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
   if (!body.empty()) {
     size_t written = 0;
     while (written < body.size()) {
-      ssize_t n =
+      const ssize_t n =
           write(stdin_pipe[1], body.c_str() + written, body.size() - written);
       if (n <= 0)
         break;
@@ -295,7 +294,7 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
   std::string response;
   char buf[4096];
   while (true) {
-    ssize_t n = read(stdout_pipe[0], buf, sizeof(buf));
+    const ssize_t n = read(stdout_pipe[0], buf, sizeof(buf));
     if (n <= 0)
       break;
     response.append(buf, static_cast<size_t>(n));
@@ -305,16 +304,16 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
   // Wait for the child with non-blocking waitpid(). Enforce the timeout and
   // avoid blocking waits even during forced termination.
   int wstatus = 0;
-  struct timeval tv;
+  timeval tv = {};
   gettimeofday(&tv, NULL);
-  long long deadline_ms =
+  const long long deadline_ms =
       static_cast<long long>(tv.tv_sec) * 1000LL +
       static_cast<long long>(tv.tv_usec) / 1000LL +
       static_cast<long long>(CHILD_TIMEOUT_SEC) * 1000LL;
   bool sent_sigkill = false;
   long long kill_deadline_ms = 0;
   while (true) {
-    pid_t waited = waitpid(pid, &wstatus, WNOHANG);
+    const pid_t waited = waitpid(pid, &wstatus, WNOHANG);
     if (waited == pid)
       break;
     if (waited == -1) {
@@ -324,7 +323,7 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
     }
 
     gettimeofday(&tv, NULL);
-    long long now_ms = static_cast<long long>(tv.tv_sec) * 1000LL +
+    const long long now_ms = static_cast<long long>(tv.tv_sec) * 1000LL +
                        static_cast<long long>(tv.tv_usec) / 1000LL;
     if (!sent_sigkill && now_ms >= deadline_ms) {
       kill(pid, SIGKILL);
@@ -339,20 +338,20 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
     }
 
     // Sleep up to 100 ms, but no more than the remaining timeout budget.
-    long long sleep_until_ms = sent_sigkill ? kill_deadline_ms : deadline_ms;
-    long long remaining_ms = sleep_until_ms - now_ms;
+    const long long sleep_until_ms = sent_sigkill ? kill_deadline_ms : deadline_ms;
+    const long long remaining_ms = sleep_until_ms - now_ms;
     if (remaining_ms <= 0) {
-      struct timespec ts_min;
+      timespec ts_min = {};
       ts_min.tv_sec = 0;
       ts_min.tv_nsec = WAITPID_MIN_SLEEP_MS * 1000000L;
       nanosleep(&ts_min, NULL);
       continue;
     }
-    long sleep_ms =
+    const long sleep_ms =
         (remaining_ms < static_cast<long long>(WAITPID_POLL_INTERVAL_MS))
             ? static_cast<long>(remaining_ms)
             : WAITPID_POLL_INTERVAL_MS;
-    struct timespec ts;
+    timespec ts = {};
     ts.tv_sec = 0;
     ts.tv_nsec = sleep_ms * 1000000L;
     nanosleep(&ts, NULL);
@@ -361,7 +360,7 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
   return response;
 }
 
-void UwsgiServer::send_error_response(int fd, int status,
+void UwsgiServer::send_error_response(const int fd, const int status,
                                       const std::string &reason) {
   std::ostringstream oss;
   oss << "HTTP/1.1 " << status << " " << reason << "\r\n"
@@ -373,14 +372,14 @@ void UwsgiServer::send_error_response(int fd, int status,
   const std::string response = oss.str();
   size_t sent = 0;
   while (sent < response.size()) {
-    ssize_t n = write(fd, response.c_str() + sent, response.size() - sent);
+    const ssize_t n = write(fd, response.c_str() + sent, response.size() - sent);
     if (n <= 0)
       break;
     sent += static_cast<size_t>(n);
   }
 }
 
-void UwsgiServer::handle_connection(int client_fd) {
+void UwsgiServer::handle_connection(const int client_fd) {
   // Read the 4-byte uwsgi header
   unsigned char header[4];
   if (!read_all(client_fd, header, sizeof(header))) {
@@ -388,8 +387,8 @@ void UwsgiServer::handle_connection(int client_fd) {
     return;
   }
 
-  unsigned char modifier1 = header[0];
-  unsigned short datasize =
+  const unsigned char modifier1 = header[0];
+  const unsigned short datasize =
       static_cast<unsigned short>(static_cast<unsigned int>(header[1]) |
                                   (static_cast<unsigned int>(header[2]) << 8));
   // header[3] is modifier2; reserved / unused here
@@ -419,12 +418,12 @@ void UwsgiServer::handle_connection(int client_fd) {
   // Validate that the value contains only digits and cap it at MAX_BODY_SIZE
   // to prevent allocation-based DoS attacks.
   std::string body;
-  std::map<std::string, std::string>::const_iterator cl_it =
+  const std::map<std::string, std::string>::const_iterator cl_it =
       vars.find("CONTENT_LENGTH");
   if (cl_it != vars.end() && !cl_it->second.empty()) {
     const std::string &cl_str = cl_it->second;
     char *endptr = NULL;
-    long content_length = std::strtol(cl_str.c_str(), &endptr, 10);
+    const long content_length = std::strtol(cl_str.c_str(), &endptr, 10);
     if (endptr == cl_str.c_str() || *endptr != '\0' || content_length < 0) {
       send_error_response(client_fd, 400, "Invalid Content-Length");
       return;
@@ -454,7 +453,7 @@ void UwsgiServer::handle_connection(int client_fd) {
   // Forward the response back to the caller
   size_t sent = 0;
   while (sent < response.size()) {
-    ssize_t n =
+    const ssize_t n =
         write(client_fd, response.c_str() + sent, response.size() - sent);
     if (n <= 0)
       break;

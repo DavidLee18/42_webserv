@@ -6,6 +6,7 @@
  * @brief Defines the HTTP Response generation structures and classes.
  */
 
+#include "../cgi_1_1.h"
 #include "../config/ServerConfig.hpp"
 #include "Client.hpp"
 #include "DefaultError.hpp"
@@ -34,7 +35,8 @@ enum StatusCode {
   METHOD_NOT_ALLOWED = 405,
   CONFLICT = 409,
   PAYLOAD_TOO_LARGE = 413,
-  INTERNAL_SERVER_ERR = 500
+  INTERNAL_SERVER_ERR = 500,
+  NOT_IMPLEMENTED = 501,
 };
 
 /**
@@ -73,6 +75,8 @@ struct Response {
   std::string cgi;       ///< Generated CGI script.
 };
 
+std::ostream &operator<<(std::ostream &, Response const &);
+
 class Request;
 class ServerConfig;
 
@@ -82,23 +86,25 @@ class ServerConfig;
  */
 class ServerResponse {
 public:
-  static std::string find_file_type(std::string path);
+  static std::string find_file_type(const std::string &path);
   /**
    * @brief Generates an Response based on the client request and server
    * configuration.
    *
    * @param request Pointer to the parsed Request object.
-   * @param config Pointer to the ServerConfig for the target server.
+   * @param client
    * @param mime_type Map of file extension to MIME types.
+   * @param session
    * @return Response The fully formulated HTTP response components.
    */
   static Response
   http_response(const Request *request, const ClientSession *client,
-                const std::map<std::string, std::string> mime_type,
+                const std::map<std::string, std::string> &mime_type,
                 Session *session);
 
-  static Response cgi_response(const Request *request,
-                               const ServerConfig *config, EPoll *epoll);
+  static Result<CgiDelegate> register_cgi(const Request *request,
+                                          const ServerConfig *config,
+                                          EPoll *epoll);
 
 private:
   /**
@@ -147,6 +153,8 @@ private:
   /**
    * @brief Gets the custom error file path corresponding to a status code.
    *
+   * @param config
+   * @param rule
    * @param error_code The HTTP error status code.
    * @return std::string Path to the configured error file.
    */
@@ -159,15 +167,18 @@ private:
    *
    * @param real_path The physical directory path on the local file system.
    * @param req_uri The request URI path used by the client.
+   * @param dir
    * @return std::string The HTML content representing the directory index.
    */
   static std::string make_autoindex_page(const std::string &real_path,
                                          const std::string &req_uri, DIR *dir);
 
   /**
-   * @brief Extract boundary string from Content-Type header for multipart requests.
+   * @brief Extract boundary string from Content-Type header for multipart
+   * requests.
    * @param content_type The Content-Type header value
-   * @return The boundary string (without -- prefix), or empty string if not multipart
+   * @return The boundary string (without -- prefix), or empty string if not
+   * multipart
    */
   static std::string extract_boundary(const std::string &content_type);
 
@@ -176,29 +187,26 @@ private:
    * @param body The request body
    * @param boundary The boundary marker
    * @param start_pos Starting position in body to search from
-   * @param out_filename Reference to store extracted filename (empty if not a file field)
+   * @param out_filename Reference to store extracted filename (empty if not a
+   * file field)
    * @param out_fieldname Reference to store extracted field name
    * @param out_data Reference to store the part body data
    * @return Position of next part boundary, or string::npos if no more parts
    */
-  static std::size_t parse_multipart_part(const std::string &body,
-                                          const std::string &boundary,
-                                          std::size_t start_pos,
-                                          std::string &out_filename,
-                                          std::string &out_fieldname,
-                                          std::string &out_data);
+  static std::size_t
+  parse_multipart_part(const std::string &body, const std::string &boundary,
+                       std::size_t start_pos, std::string &out_filename,
+                       std::string &out_fieldname, std::string &out_data);
 
-  static Response delete_method(Target target, Response response,
+  static Response delete_method(const Target &target, Response response,
                                 const ServerConfig *config,
                                 const RouteRule *rule);
-  static Response post_method(Target target, Response response,
+  static Response post_method(const Target &target, Response response,
                               const ClientSession *client,
-                              const RouteRule *rule,
-                              const Request *request,
+                              const RouteRule *rule, const Request *request,
                               Session *session);
   static Response get_method(Target target, Response response,
-                             const ServerConfig *config,
-                             const RouteRule *rule,
+                             const ServerConfig *config, const RouteRule *rule,
                              const Request *request);
 };
 

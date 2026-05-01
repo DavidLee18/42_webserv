@@ -1,67 +1,98 @@
 types =
-    html|htm -> text/html
-    css      -> text/css
-    js       -> application/javascript
-    json     -> application/json
-    jpg|jpeg -> image/jpeg
-    png      -> image/png
-    _        -> application/octet-stream
+	html|htm -> text/html
+	css      -> text/css
+	js       -> application/javascript
+	json     -> application/json
+	jpg|jpeg -> image/jpeg
+	png      -> image/png
+	mp3      -> audio/mpeg
+	_        -> application/octet-stream
 
 uwsgi =
-    /uwsgi/login.py:9000
-    /uwsgi/handle_additional_errors.py:9090
+	/uwsgi/get_files.py:9000
 
 
 :8080 =
-    [] +<= X-Content-Type-Options: "nosniff";
+	[] +<= X-Content-Type-Options: nosniff
+	[] +<= X-Frame-Options: DENY
+	[] +<= Referrer-Policy: no-referrer
+	[] +<= Content-Security-Policy: default-src 'self'
 
-    $add_csp_sha256.cgi
+	...30
 
-    ...30
+	GET /cgi-test/hello     $/spool/www/cgi-bin/hello.cgi
 
-    GET /old_stuff/ =301> /new_stuff/
+	GET /cgi-test/sleep     $/spool/www/cgi-bin/sleep.cgi
+		...5
 
-    GET /old_stuff/* =301> /new_stuff/*
+	GET /cgi-test/burncpu   $/spool/www/cgi-bin/burncpu.cgi
+		...5
 
-    GET /download/*/mp3/*.mp3 =301> /*/mp3/*
+    GET /cgi-test/memhog    $/spool/www/cgi-bin/memhog.cgi
+		...10
 
-    GET /download/ <i- /spool/www/
+	GET /cgi-test/fbomb     $/spool/www/cgi-bin/fbomb.cgi
+		...10
 
-    GET *.(jpg|jpeg|gif) <- /spool/www/*
+	GET /cgi-test/fdhog     $/spool/www/cgi-bin/fdhog.cgi
+		...10
 
-    GET|POST|DELETE * <- /spool/www/*
-        ? index.html
-        @ auth_info
-        ->{} 10MB
-        ! 400:/spool/www/error/400.html
-        ! 401:/spool/www/error/401.html
-        ! 403:/spool/www/error/403.html
-        ! 404:/spool/www/error/404.html
-        ! 405:/spool/www/error/405.html
-        ! 409:/spool/www/error/409.html
-        ! 413:/spool/www/error/413.html
-        ! 500:/spool/www/error/500.html
+	GET /cgi-test/envdump   $/spool/www/cgi-bin/envdump.cgi
+
+	GET /cgi-test/cwd       $/spool/www/cgi-bin/cwd.cgi
+
+	GET /cgi-test/fddump    $/spool/www/cgi-bin/fddump.cgi
+
+	POST /cgi-test/envdump-post   $/spool/www/cgi-bin/envdump.cgi
+
+	GET /old_stuff/ =301> /new_stuff/
+
+	GET /old_stuff/* =301> /new_stuff/*
+
+	GET /download/*/mp3/*.mp3 =301> /*/mp3/*
+
+	GET *.(jpg|jpeg|gif) <- /spool/www/*
+
+	GET|POST|DELETE /cgi-bin/* <- /spool/www/cgi-bin/*
+
+	GET * <- /spool/www/*
+		? hello.html
+		@ auth_info
+		->{} 10MB
+		! 400:/spool/www/error/400.html
+		! 401:/spool/www/error/401.html
+		! 403:/spool/www/error/403.html
+		! 404:/spool/www/error/404.html
+		! 405:/spool/www/error/405.html
+		! 409:/spool/www/error/409.html
+		! 413:/spool/www/error/413.html
+		! 500:/spool/www/error/500.html
+
+	POST *    $gen_html.cgi(DIST_DIR=/spool/files)
+		...10
+		AUTH_INFO=/spool/www/auth_info
+
+	DELETE *    $gen_html.cgi(AUTH_INFO=/spool/www/auth_info)
 
 
 
 :4040 =
-    [] +<= X-Content-Type-Options: "nosniff";
+	[] +<= X-Content-Type-Options: nosniff
+	[] +<= X-Frame-Options: DENY
+	[] +<= Referrer-Policy: no-referrer
+	[] +<= Content-Security-Policy: default-src 'self'
 
-    $add_csp_sha256.cgi
+	...30
 
-    ...30
+	GET /old_stuff/* =301> /new_stuff/*
 
-    GET /old_stuff/* =301> /new_stuff/*
+	GET /download/*/mp3/* =301> /*/mp3/*
 
-    GET /download/*/mp3/* =301> /*/mp3/*
+	GET /download/ <i- /spool/www
 
-    GET /download/ <i- /spool/www
+	GET *.(jpg|jpeg|gif) <- /spool/www/*
 
-    GET *.(jpg|jpeg|gif) <- /spool/www/*
-
-    GET|POST|DELETE * <- /spool/www/*
-        ? index2.html
-        @ auth_info
-        ->{} 10MB
-
-
+	GET|POST|DELETE * <- /spool/www/*
+		? index2.html
+		@ auth_info
+		->{} 10MB

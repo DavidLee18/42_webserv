@@ -1,16 +1,17 @@
 #ifndef UWSGI_H
 #define UWSGI_H
 
-#include "http_1_1.h"
 #include "result.h"
+#include "server/Client.hpp"
 #include <list>
 #include <map>
 #include <string>
 #include <vector>
 
-// Forward declarations
 class UwsgiInput;
 class EPoll;
+class Event;
+class FileDescriptor;
 
 class UwsgiMetaVar {
 public:
@@ -45,7 +46,6 @@ public:
 
   friend class UwsgiInput;
 
-public:
   UwsgiMetaVar(const UwsgiMetaVar &other);
   UwsgiMetaVar &operator=(const UwsgiMetaVar &other);
   ~UwsgiMetaVar();
@@ -57,36 +57,33 @@ private:
   Name name;
   std::string value;
 
-  UwsgiMetaVar(Name n, std::string v) : name(n), value(v) {}
-  static UwsgiMetaVar create(Name n, std::string v);
+  UwsgiMetaVar(const Name n, const std::string& v) : name(n), value(v) {}
+  static UwsgiMetaVar create(Name n, const std::string &v);
 };
 
 class UwsgiInput {
-  std::vector<UwsgiMetaVar> mvars;
-  Http::Body req_body;
+  std::vector<UwsgiMetaVar> _mvars;
+  Request const &_req;
 
-private:
-  UwsgiInput();
-  UwsgiInput(std::vector<UwsgiMetaVar>, Http::Body);
-  UwsgiInput(Http::Request const &);
+  UwsgiInput(std::vector<UwsgiMetaVar> const &, Request const &);
+  explicit UwsgiInput(Request const &);
 
 public:
   class Parser {
     virtual void phantom() = 0;
 
   public:
-    static Result<UwsgiInput> parse(Http::Request const &);
+    static Result<UwsgiInput> parse(Request const &);
   };
 
   friend class Parser;
   friend class UwsgiDelegate;
 
   UwsgiInput(const UwsgiInput &other)
-      : mvars(other.mvars), req_body(other.req_body) {}
+      : _mvars(other._mvars), _req(other._req) {}
   UwsgiInput &operator=(const UwsgiInput &other) {
     if (this != &other) {
-      mvars = other.mvars;
-      req_body = other.req_body;
+      _mvars = other._mvars;
     }
     return *this;
   }
@@ -96,13 +93,36 @@ public:
 };
 
 class UwsgiDelegate {
-  UwsgiInput env;
-  int _uwsgi_port;
-  Http::Request request;
+  UwsgiInput _env;
+  unsigned short _port;
+  Request const &_req;
+
+  EPoll &_epoll; // borrowed, not owned
+  FileDescriptor *_sock;
+  std::vector<unsigned char> _send_buf;
+  size_t _total_sent;
+  std::string _output;
+  std::string _error;
+  bool _complete;
+
+  UwsgiDelegate(EPoll &, Request const &);
 
 public:
-  UwsgiDelegate(const Http::Request &req, int uwsgi_port);
-  Result<Http::Response> execute(int timeout_ms, EPoll *epoll);
+  static Result<UwsgiDelegate> from_req(EPoll &, Request const &, unsigned short);
+
+  // Phase 1: create the socket, issue a non-blocking connect to the uwsgi
+  // server, and register the socket with the shared epoll. Does NOT call
+  // epoll->wait().
+  Result<Void> register_();
+
+  // Phase 2: process a single epoll event delivered by the main loop's
+  // shared epoll_wait. Drives the connect -> send -> receive state
+  // machine; performs only non-blocking IO.
+  Result<Void> handle_event(const Event *ev);
+
+  // Retrieve the parsed HTTP response.
+  Result<std::string> poll() const;
+
   ~UwsgiDelegate();
 };
 

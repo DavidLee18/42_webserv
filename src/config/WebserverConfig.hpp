@@ -41,7 +41,6 @@ struct DefaultErrPage
  * - 획득한 객체는 복사 또는 대입하여 사용할 수 있다.
  */
 class WebserverConfig {
-private:
   /**
    * @var err_meg
    * @brief 파싱 중 발생한 오류 메시지를 저장하는 멤버 변수
@@ -108,7 +107,7 @@ private:
    * 
    * - 그 외의 키는 type_map에 확장자별 MIME type으로 저장된다.
    */
-  bool parse_types_block(FileDescriptor &file);
+  bool parse_types_block(const FileDescriptor &file);
   /**
    * @brief "key1|key2->value" 형식의 type 매핑 문자열을 파싱하는 함수
    * @param line 파싱할 문자열
@@ -189,7 +188,7 @@ private:
    */
   std::string apply_default_err_page_entry(const std::string &line);
 
-  WebserverConfig(FileDescriptor &file);
+  explicit WebserverConfig(FileDescriptor &file);
 
 public:
   WebserverConfig &operator=(const WebserverConfig &other) {
@@ -203,17 +202,17 @@ public:
     return *this;
   }
 
-  const std::string &get_default_mime(void) const { return default_mime; }
-  const std::map<std::string, std::string> &get_uwsgi(void) const {
+  const std::string &get_default_mime() const { return default_mime; }
+  const std::map<std::string, std::string> &get_uwsgi() const {
     return uwsgi;
   }
-  const std::map<std::string, std::string> &get_type_map(void) const {
+  const std::map<std::string, std::string> &get_type_map() const {
     return type_map;
   }
-  const std::map<unsigned int, ServerConfig> &get_serverconfig_map(void) const {
+  const std::map<unsigned int, ServerConfig> &get_serverconfig_map() const {
     return serverconfig_map;
   }
-  const DefaultErrPage &get_default_err_page(void) const { return default_err_page; }
+  const DefaultErrPage &get_default_err_page() const { return default_err_page; }
   /**
    * @brief 설정 파일을 파싱한 결과를 Result<WebserverConfig> 형태로 반환하는
    * 함수
@@ -224,9 +223,9 @@ public:
    * 정적 함수 호출을 통해 획득할 수 있도록 제공한다.
    */
   static Result<WebserverConfig> parse(FileDescriptor &file) {
-    WebserverConfig temp(file);
+    const WebserverConfig temp(file);
     
-    if (temp.err_meg == "")
+    if (temp.err_meg.empty())
       return OK(WebserverConfig, temp);
     return ERR(WebserverConfig, temp.err_meg);
   }
