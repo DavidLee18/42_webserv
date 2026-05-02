@@ -51,7 +51,9 @@ std::ostream &operator<<(std::ostream &os, Response const &resp) {
       os << it->first << ": " << it->second << "\r\n";
     }
     os << "Content-Length: " << resp.body.length() << "\r\n";
-    os << "Connection: " << resp.connection << "\r\n\r\n";
+    if (!resp.connection.empty())
+      os << "Connection: " << resp.connection << "\r\n";
+    os << "\r\n";
     os << resp.body;
   }
   return os;
