@@ -128,7 +128,6 @@ void Server::client_read(const FileDescriptor *client_fd) {
       }
 
       clients.at(client_fd).req = req_.value();
-
       if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
       {
         if (peer_closed)

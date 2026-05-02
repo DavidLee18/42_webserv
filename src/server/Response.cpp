@@ -3,6 +3,7 @@
 #include "../cgi_1_1.h"
 #include "Session.hpp"
 #include <cerrno>
+#include <ctime>
 
 std::string get_string_from_map(const std::map<int, std::string>& map,
                                 const int key) {
@@ -24,11 +25,21 @@ std::string get_string_from_map(const std::map<std::string, std::string>& map,
     return "";
 }
 
+static std::string get_http_date() {
+  time_t now = std::time(NULL);
+  struct tm *timeinfo = std::gmtime(&now);
+  char buffer[100];
+  std::strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", timeinfo);
+  return std::string(buffer);
+}
+
 std::ostream &operator<<(std::ostream &os, Response const &resp) {
   if (!resp.cgi.empty())
     os << resp.cgi;
   else {
     os << "HTTP/1.1 " << resp.status_code << "\r\n";
+    os << "Date: " << get_http_date() << "\r\n";
+    os << "Server: webserv\r\n";
     if (!resp.redir.empty())
       os << "Location: " << resp.redir << "\r\n";
     os << "Content-Type:" << resp.mime_type << "\r\n";
@@ -106,7 +117,7 @@ Response ServerResponse::http_response(
         std::string user_id;
         int elapsed_seconds = 0;
         int remaining_seconds = 0;
-        const int timeout_seconds = 300; // 5 minutes from config
+        const int timeout_seconds = TIMEOUT_SECONDS;
 
         if (session->get_session_info(session_id, timeout_seconds, user_id,
                                        elapsed_seconds, remaining_seconds)) {
@@ -615,7 +626,6 @@ Response ServerResponse::post_method(const Target& target, Response response,
         std::string file_path = upload_path + "/" + filename;
         std::cout << "Uploading file: " << file_path
                   << " (size: " << part_data.length() << ")" << std::endl;
-        std::cout << "First 20 bytes (hex): ";
         for (size_t i = 0; i < std::min(static_cast<size_t>(20), part_data.length()); i++) {
           printf("%02x ", static_cast<unsigned char>(part_data[i]));
         }
