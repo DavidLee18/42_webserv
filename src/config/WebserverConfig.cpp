@@ -236,7 +236,7 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
     }
   }
   if (default_mime.empty()) {
-    err_meg = "Missing default MIME type definition (the '_' entry must be defined exactly once as the default MIME type).";
+    err_meg = "on [], []: Missing default MIME type definition (the '_' entry must be defined exactly once as the default MIME type).";
     return false;
   }
   return true;
@@ -273,11 +273,14 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
 
   key = WebserverConfig::parse_server_port(temp);
   if (config.get_err_meg() != "") {
-    err_meg = temp + " " + config.get_err_meg();
+    err_meg = config.get_err_meg();
     return (false);
   }
   if (serverconfig_map.find(key) != serverconfig_map.end()) {
-    err_meg = "Server block declared Error: " + line;
+    std::ostringstream oss;
+    oss << key;
+
+    err_meg = "on [\t" + line + "], [" + oss.str() + "]:Violates configuration rule (server block is declared more than once).";
     return (false);
   }
   serverconfig_map[key] = config;
