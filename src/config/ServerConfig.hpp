@@ -169,7 +169,7 @@ private:
    * @var err_line
    * @brief 파싱 중 오류가 발생한 설정 파일의 줄 정보를 저장하는 멤버 변수
    */
-  std::string err_line;
+  std::string err_meg;
   /**
    * @var end_flag
    * @brief server 블록 종료 판단을 위한 상태값을 저장하는 멤버 변수
@@ -380,7 +380,7 @@ private:
 public:
   ServerConfig(FileDescriptor &);
   ServerConfig()
-      : header(), server_response_time(-1), routes(), err_line(), end_flag(0) {}
+      : header(), server_response_time(-1), routes(), err_meg(), end_flag(0) {}
   /**
    * @brief Request method와 path에 일치하는 route를 찾는다.
    * @param method 요청 HTTP 메서드
@@ -409,7 +409,7 @@ public:
   const std::map<std::string, std::string> &get_header(void) const {
     return header;
   }
-  const std::string &geterr_line(void) const { return err_line; }
+  const std::string &get_err_meg(void) const { return err_meg; }
   const std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
   const CGI get_serve_cgi() const { return S_CGI; }
   const std::vector<RouteRule> &get_routes(void) const { return routes; }

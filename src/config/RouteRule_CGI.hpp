@@ -45,7 +45,7 @@ private:
    *
    * - 정상적으로 파싱이 성공했을 시 빈 문자열을 가지고 있다.
    */
-  std::string err;
+  std::string err_meg;
 
   /**
    * @brief 문자열이 timeout 문법과 값 범위에 맞는지 확인하는 함수
@@ -81,7 +81,7 @@ private:
   std::string parse_cgi_block(FileDescriptor &fd, std::string line);
 
 public:
-  RouteRule_CGI() : executable(""), env(), timeout(-1), err("No parse"){};
+  RouteRule_CGI() : executable(""), env(), timeout(-1), err_meg("No parse"){};
   /**
    * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
    * 생성자
@@ -95,7 +95,7 @@ public:
 
   const PathPattern get_path() const { return path; }
   Request::Method get_method () const { return met; }
-  const std::string get_err() const { return err; }
+  const std::string get_err_meg() const { return err_meg; }
   const std::string get_executable() const { return executable; }
   const std::map<std::string, std::string> get_env() const { return env; }
   double get_timeout() const { return timeout; }

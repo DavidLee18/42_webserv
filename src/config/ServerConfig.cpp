@@ -1,7 +1,7 @@
 #include "ServerConfig.hpp"
 
 ServerConfig::ServerConfig(FileDescriptor &file) {
-  err_line = "";
+  err_meg = "";
   server_response_time = 3;
   end_flag = 0;
   if (!parse_server_block(file)) {
@@ -16,7 +16,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
   while (true) {
     Result<std::string> temp = fd.read_file_line(); // 라인 세기 추가
     if (temp.error() != "") {
-      err_line = "FileDescriptor Error: " + temp.error();
+      err_meg = "FileDescriptor Error: " + temp.error();
       return false;
     } else if (temp.value() == "\n") {
       end_flag += 1;
@@ -28,24 +28,24 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
     end_flag = 0;
     line = utils::remove_char(temp.value(), '\n');
     if (line[line.length() - 1] == ' ' || line[line.length() - 1] == '\t') {
-      err_line = "Invalid line Error: [" + utils::trim_whitespace(line) + "]";
+      err_meg = "Invalid line Error: [" + utils::trim_whitespace(line) + "]";
       return false;
     }
     if (utils::return_indent_level(line) == 1) {
       line = utils::trim_whitespace(line);
       if (is_header_block(line)) {
         if (!parse_header_entry(fd, line)) {
-          err_line = "Header syntax Error: " + err_line;
+          err_meg = "Header syntax Error: " + err_meg;
           return false;
         }
       } else if (RouteRule_CGI::matches_cgi_syntax(line)) {
         std::string key;
         std::map<std::string, std::string> temp;
-        err_line = RouteRule_CGI::parse_executable(line, key, temp);
-        if (err_line != "")
+        err_meg = RouteRule_CGI::parse_executable(line, key, temp);
+        if (err_meg != "")
           return false;
         if (S_CGI.find(key) != S_CGI.end()) {
-          err_line = "Error: \"" + line + "\" duplicate key error";
+          err_meg = "Error: \"" + line + "\" duplicate key error";
           return false;
         }
         S_CGI[key] = temp;
@@ -53,18 +53,18 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
         parse_server_response_time(line);
       else if (matches_route_rule_syntax(line)) {
         if (!parse_route_rule_block(line, fd)) {
-          err_line = "RouteRule syntax Error: " + err_line;
+          err_meg = "RouteRule syntax Error: " + err_meg;
           return false;
         }
       } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
         RouteRule_CGI temp(fd, line);
-        if (temp.get_err() != "") {
-          err_line = temp.get_err();
+        if (temp.get_err_meg() != "") {
+          err_meg = temp.get_err_meg();
           return false;
         }
         R_CGI.push_back(temp);
       } else {
-        err_line = "Invalid line Error: " + utils::trim_whitespace(line);
+        err_meg = "Invalid line Error: " + utils::trim_whitespace(line);
         return false;
       }
     } else
@@ -94,7 +94,7 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
   std::string temp(line);
   std::vector<std::string> key_value = utils::string_split(temp, ":");
 
-  err_line = temp;
+  err_meg = temp;
   if (key_value.size() != 2)
     return false;
   std::string key = utils::string_split(key_value[0], " ")[2];
@@ -102,7 +102,7 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
   while (!temp.empty() && temp[temp.length() - 1] == ';') {
     Result<std::string> fd_line = fd.read_file_line(); // 라인 세기 추가
     if (fd_line.error() != "") {
-      err_line = "FileDescriptor Error: " + fd_line.error();
+      err_meg = "FileDescriptor Error: " + fd_line.error();
       return false;
     } else if (fd_line.value() == "\n" || fd_line.value() == "") {
       end_flag += 1;
@@ -111,12 +111,12 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
     temp = utils::remove_char(fd_line.value(), '\n');
     if (utils::return_indent_level(temp) != 2 || temp[temp.length() - 1] == ' ' ||
         temp[temp.length() - 1] == '\t') {
-      err_line = "Error: \"" + temp + "\" Indentation or space error";
+      err_meg = "Error: \"" + temp + "\" Indentation or space error";
       return false;
     }
     value += " " + utils::trim_whitespace(temp);
   }
-  err_line = "";
+  err_meg = "";
   header[key] = utils::remove_char(value, ';');
   return true;
 }
@@ -502,7 +502,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
   std::vector<std::string> method =
       utils::string_split(method_line_data[0], "|");
 
-  err_line = method_line;
+  err_meg = method_line;
   for (std::size_t i = 0; i < method.size(); ++i) {
     if (method[i] == "GET")
       mets.push_back(Request::GET);
@@ -520,7 +520,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
   while (true) {
     Result<std::string> temp = fd.read_file_line(); // 라인 세기 추가
     if (temp.error() != "") {
-      err_line = "FileDescriptor Error: " + temp.error();
+      err_meg = "FileDescriptor Error: " + temp.error();
       return false;
     }
     if (temp.value() == "\n" || temp.value() == "") {
@@ -528,7 +528,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
       break;
     }
     line = utils::remove_char(temp.value(), '\n');
-    err_line = line;
+    err_meg = line;
     if (utils::return_indent_level(line) != 2)
       return false;
     else if (apply_route_rule_entry(mets, method_line_data[1], line))
@@ -536,7 +536,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
     else
       return false;
   }
-  err_line = "";
+  err_meg = "";
   return true;
 }
 

@@ -1,13 +1,13 @@
 #include "RouteRule_CGI.hpp"
 
 RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line) {
-  err = "";
+  err_meg = "";
   timeout = 3;
 
   std::vector<std::string> temp = utils::string_split(line, " ");
 
   if (temp.size() != 3) {
-    err = "Error: Invalid CGI config syntax";
+    err_meg = "Error: Invalid CGI config syntax";
     return;
   }
   if (temp[0] == "GET")
@@ -17,7 +17,7 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line) {
   else if (temp[0] == "DELETE")
     met = Request::DELETE;
   path = PathPattern(temp[1]);
-  err = parse_cgi_block(fd, temp[2]);
+  err_meg = parse_cgi_block(fd, temp[2]);
 }
 
 std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,

@@ -272,8 +272,8 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   ServerConfig config(file);
 
   key = WebserverConfig::parse_server_port(temp);
-  if (config.geterr_line() != "") {
-    err_meg = temp + " " + config.geterr_line();
+  if (config.get_err_meg() != "") {
+    err_meg = temp + " " + config.get_err_meg();
     return (false);
   }
   if (serverconfig_map.find(key) != serverconfig_map.end()) {
