@@ -185,8 +185,11 @@ Result<Request *> Request::from_buff(std::string &buff) {
     }
   }
 
-  if (get_string_from_map(req->header, "Connection") == "keep-alive")
+  const std::string connection_header = get_string_from_map(req->header, "Connection");
+  if (connection_header == "keep-alive")
     req->keep_alive = true;
+  else if (connection_header == "close")
+    req->connection_close = true;
 
   req->cookie = get_string_from_map(req->header, "Cookie");
 

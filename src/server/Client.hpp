@@ -146,6 +146,10 @@ public:
 
   bool is_partial() const { return !remnants.empty(); }
 
+  bool has_keep_alive() const { return keep_alive; }
+
+  bool has_connection_close() const { return connection_close; }
+
   void continue_parsing(std::string &);
 
 private:
@@ -154,6 +158,7 @@ private:
   std::string version; ///< The HTTP version (e.g., "HTTP/1.1").
   std::map<std::string, std::string> header; ///< Parsed HTTP headers.
   bool keep_alive;                           ///< Connection keep-alive status.
+  bool connection_close;                     ///< Connection: close flag.
   size_t content_length;
   std::string cookie;
   std::string body;     ///< The request body, if any.
@@ -161,10 +166,10 @@ private:
 
   Request()
       : method(ERROR), path(), version(), header(), keep_alive(false),
-        content_length(0), cookie(), body(), remnants() {}
+        connection_close(false), content_length(0), cookie(), body(), remnants() {}
   Request(const Method method, std::string const &path, std::string const &version, const size_t content_length)
       : method(method), path(path), version(version), keep_alive(false),
-        content_length(content_length) {}
+        connection_close(false), content_length(content_length) {}
 };
 
 #endif

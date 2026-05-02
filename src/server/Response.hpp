@@ -72,6 +72,7 @@ struct Response {
   std::string mime_type; ///< The determined MIME type of the response payload.
   std::string redir;     ///< Redirect location, if applicable.
   bool keep_alive;       ///< Connection keep-alive status.
+  bool should_close;     ///< Whether to close connection after sending response.
   std::string cgi;       ///< Generated CGI script.
   std::map<std::string, std::string> headers; ///< Additional response headers from config.
 };

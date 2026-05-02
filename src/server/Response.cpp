@@ -76,6 +76,9 @@ Response ServerResponse::http_response(
     return DefaultError::default_err_response(NOT_FOUND_ERR);
   Response response;
   response.keep_alive = false;
+  response.should_close = request->has_connection_close();
+  if (request->has_connection_close())
+    response.connection = "close";
   response.headers = config->get_header();
   const Target target = resolve_target(rule, config, request);
 
