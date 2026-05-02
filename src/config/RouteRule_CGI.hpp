@@ -191,7 +191,7 @@ public:
    */
   static std::string
   parse_uwsgi_block(FileDescriptor &fd,
-                    std::map<std::string, std::string> &uwsgi);
+                    std::map<std::string, std::string> &uwsgi, std::size_t &count_line);
 };
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data);

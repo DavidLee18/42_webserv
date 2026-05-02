@@ -66,6 +66,7 @@ private:
    * 기본 에러 페이지 설정 객체이다.
    */
   std::map<int, std::string> default_err_page;
+  std::size_t count_line;
 
   /**
    * @brief 설정 파일의 최상위 항목들을 파싱하는 함수

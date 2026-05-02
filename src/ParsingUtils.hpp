@@ -4,6 +4,7 @@
 #include "server/Client.hpp"
 #include "file_descriptor.h"
 #include <cstdlib>
+#include <vector>
 
 namespace utils {
 /**

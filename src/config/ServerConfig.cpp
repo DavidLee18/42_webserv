@@ -14,7 +14,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
   std::string line;
 
   while (true) {
-    Result<std::string> temp = fd.read_file_line();
+    Result<std::string> temp = fd.read_file_line(); // 라인 세기 추가
     if (temp.error() != "") {
       err_line = "FileDescriptor Error: " + temp.error();
       return false;
@@ -100,7 +100,7 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
   std::string key = utils::string_split(key_value[0], " ")[2];
   std::string value = utils::trim_whitespace(key_value[1]);
   while (!temp.empty() && temp[temp.length() - 1] == ';') {
-    Result<std::string> fd_line = fd.read_file_line();
+    Result<std::string> fd_line = fd.read_file_line(); // 라인 세기 추가
     if (fd_line.error() != "") {
       err_line = "FileDescriptor Error: " + fd_line.error();
       return false;
@@ -518,7 +518,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
     return false;
 
   while (true) {
-    Result<std::string> temp = fd.read_file_line();
+    Result<std::string> temp = fd.read_file_line(); // 라인 세기 추가
     if (temp.error() != "") {
       err_line = "FileDescriptor Error: " + temp.error();
       return false;

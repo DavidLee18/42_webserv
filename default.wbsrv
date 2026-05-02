@@ -6,13 +6,13 @@ types =
 	jpg|jpeg -> image/jpeg
 	png      -> image/png
 	mp3      -> audio/mpeg
-	_        -> application/octet-stream
+	_       -> application/octet-stream
 
 uwsgi =
 	/uwsgi/get_files.py:9000
 
 
-! 404:/spool/www/error/204.html
+! 404:/spool/www/error/404.html
 
 :8080 =
 	[] +<= X-Content-Type-Options: nosniff

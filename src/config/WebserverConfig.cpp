@@ -3,7 +3,13 @@
 
 WebserverConfig::WebserverConfig(FileDescriptor &file) {
   err_meg = "";
-  if (!this->file_parsing(file)) {
+  count_line = 0;
+  if (!file_parsing(file)) {
+    std::ostringstream oss;
+    oss << count_line;
+
+    if (!std::isdigit(static_cast<unsigned char>(err_meg[0])))
+      err_meg = oss.str() + " " + err_meg;
     return;
   }
   return;
@@ -14,6 +20,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
 
   while (true) {
     Result<std::string> temp = file.read_file_line();
+    count_line++;
     if (temp.error() != "") {
       err_meg = "FileDescriptor Error: " + temp.error();
       return false;
@@ -35,7 +42,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (!parse_server_config_entry(file, line)) // 수정해야함 3
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
-      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi);
+      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi, count_line);
       if (err_meg != "")
         return false;
     } else if (line[0] == '!') {
@@ -48,10 +55,10 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     }
   }
   if (type_map.empty()) {
-    err_meg = "Required type block is missing (the 'types' block is not defined at indentation level 0, so no MIME type mapping rules can be processed).";
+    err_meg = "1 on [], []: Required type block is missing (the 'types' block is not defined at indentation level 0, so no MIME type mapping rules can be processed).";
     return false;
   } else if (serverconfig_map.empty()) {
-    err_meg = "Required server block is missing. (the Server block is mandatory but not present in the configuration).";
+    err_meg =  "1 on [], []: Required server block is missing. (the Server block is mandatory but not present in the configuration).";
     return false;
   }
   return true;
@@ -199,6 +206,7 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
 
   while (true) {
     Result<std::string> temp = file.read_file_line();
+    count_line++;
     if (temp.error() != "") {
       err_meg = "FileDescriptor Error: " + temp.error();
       return (false);

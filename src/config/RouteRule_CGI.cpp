@@ -30,7 +30,7 @@ std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
   if (err_msg != "")
     return err_msg;
   while (true) {
-    Result<std::string> temp = fd.read_file_line();
+    Result<std::string> temp = fd.read_file_line(); // 라인 세기 추가
     if (temp.error() != "")
       return "FileDescriptor Error: " + temp.error();
     else if (temp.value() == "\n" || temp.value() == "")
@@ -191,13 +191,14 @@ std::string RouteRule_CGI::is_valid_uwsgi_config(std::vector<std::string> data) 
 
 std::string
 RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
-                                 std::map<std::string, std::string> &uwsgi) {
+                                 std::map<std::string, std::string> &uwsgi, std::size_t &count_line) {
   std::vector<std::string> value_and_key;
   std::string line = "";
   std::string err = "";
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
+    count_line++;
     if (temp.error() != "")
       return "FileDescriptor Error: " + temp.error();
     else if (temp.value() == "\n" || temp.value() == "")
