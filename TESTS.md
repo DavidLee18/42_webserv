@@ -12,14 +12,14 @@ Probabilities are evaluator-probing estimates, not RFC-strictness levels.
 
 ## Status snapshot
 
-| Area | State |
-|---|---|
-| Request-parsing hardening | **38/38** on `webserv_parsing_tests.zsh`. |
-| Mid-request disconnect (5.3) | **13/13** on `webserv_disconnect_tests.zsh`. fd-stable across 470 adversarial iterations. |
-| Standard HTTP security headers | Not started. |
-| CGI sandboxing | Not started. |
-| Content integrity (ETag / Last-Modified / Repr-Digest) | Not started. |
-| Resilience under adversarial load | Not started. |
+| Area                                                   | State                                                                                                                   |
+|--------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| Request-parsing hardening                              | **38/38** on `webserv_parsing_tests.zsh`.                                                                               |
+| Mid-request disconnect (5.3)                           | **13/13** on `webserv_disconnect_tests.zsh`. fd-stable across 470 adversarial iterations.                               |
+| Standard HTTP security headers                         | **9/14** on `webserv_headers_tests.zsh` (H13 skipped pending `CGI_TEST_URL`). Four root causes diagnosed; awaiting fix. |
+| CGI sandboxing                                         | Not started.                                                                                                            |
+| Content integrity (ETag / Last-Modified / Repr-Digest) | Not started.                                                                                                            |
+| Resilience under adversarial load                      | Not started.                                                                                                            |
 
 ---
 
@@ -59,10 +59,10 @@ This is where real web servers get killed. Already largely covered by
 Costs ~5 lines of config (or constants), universally beneficial. Add to every
 non-CGI response.
 
-- [ ] `X-Content-Type-Options: nosniff` — disables MIME sniffing.
-- [ ] `X-Frame-Options: DENY` — clickjacking baseline.
-- [ ] `Referrer-Policy: no-referrer` — privacy default.
-- [ ] `Content-Security-Policy: default-src 'self'` — minimal viable CSP.
+- [x] `X-Content-Type-Options: nosniff` — disables MIME sniffing. (H1)
+- [x] `X-Frame-Options: DENY` — clickjacking baseline. (H2)
+- [x] `Referrer-Policy: no-referrer` — privacy default. (H3)
+- [x] `Content-Security-Policy: default-src 'self'` — minimal viable CSP. (H4)
 - [ ] `Strict-Transport-Security` — **omit** (no TLS context here).
 
 ### Acceptance test
@@ -72,10 +72,54 @@ curl -sI http://127.0.0.1:8080/ | grep -E '^(X-Content-Type-Options|X-Frame-Opti
 Expected: all four headers present.
 
 ### Edge cases to verify
-- [ ] CGI responses: do **not** double-emit if the CGI script already sets one.
-- [ ] Error responses (4xx/5xx) carry the headers too.
-- [ ] HEAD requests: headers identical to GET.
 
+- [ ] CGI responses: do **not** double-emit if the CGI script already sets one. (H13 — skipped pending `CGI_TEST_URL`)
+- [ ] Error responses (4xx/5xx) carry the headers too. (H5 — **fails**: see diagnosis 3 below)
+- [ ] HEAD requests: headers identical to GET. (H6 — **fails**: see diagnosis 4 below)
+
+### Header hygiene (additional harness coverage)
+
+- [x] H7 HEAD body empty; CL matches GET — passes tautologically (both unset); tightens once H10 fixed.
+- [x] H8 no header duplicated on root response.
+- [x] H9 Content-Type set on 2xx and 4xx.
+- [ ] H10 Content-Length matches actual body length — **fails**: connection refused (cascade from H6).
+- [ ] H11 Date header present and RFC 7231 IMF-fixdate parseable — **fails**: header absent.
+- [ ] H12 Server header present (informational) — **fails**: header absent.
+- [x] H14 no response-splitting / header injection.
+
+### Mid-test diagnoses (confidence in parentheses)
+
+1. **H11 / H12 (~99%)** — `operator<<(std::ostream&, Response const&)` in `src/server/Response.cpp` never emits `Date`
+   or `Server`. Insert both before the headers-map loop: `Date` via `gmtime` + locale-independent IMF-fixdate (
+   hand-rolled tables to avoid MUSL/Alpine locale drift); `Server: webserv` (no version digits, dodges the H12
+   version-leak warning).
+2. **Latent Content-Length bug (~95%)** — `struct Response::content_length` is uninitialised (no ctor, aggregate init
+   not used at construction sites). `operator<<` therefore writes a garbage CL on every non-CGI response. Fix in
+   `operator<<`: replace `resp.content_length` with `resp.body.length()`. Sidesteps every site that forgot to set the
+   field. CGI passthrough is unaffected (the `cgi.empty()` branch short-circuits).
+3. **H5 (~85%)** — `GET /__definitely_not_here_42__` returns 200 because a catch-all route resolves to the document
+   root; `ServerResponse::get_method` only calls `check_path_type` on the IS_FILE branch — the IS_DIR branch falls
+   through to index/autoindex unconditionally. Fix: `stat()` the post-rewrite path before the IS_DIR/IS_FILE switch and
+   return `error_response(..., NOT_FOUND_ERR)` if absent.
+4. **H6 / H10 (~80%, cascaded)** — `ServerConfig::parse_route_rule_block` accepts only `GET`, `POST`, `DELETE`; HEAD
+   requests never match a rule. `http_response` then reaches `error_response(config, NULL, METHOD_NOT_ALLOWED)`, which
+   is the suspected segfault site (NULL-rule deref unconfirmed; audit pending). Server death between H9 and H10 explains
+   the `Errno 111` connection-refused under H10. Fix in two parts: (a) accept HEAD as a synonym of GET in route
+   parsing — RFC 9110 §9.3.2 requires HEAD wherever GET is supported; (b) in `http_response`, dispatch HEAD through the
+   GET branch, then clear `response.body` at write-time whilst preserving the GET-equivalent Content-Length.
+
+### Order of attack
+
+1. CL → `body.length()` in `operator<<` (~5 min).
+2. Emit `Date` and `Server`; fix `Content-Type:` → `Content-Type: ` (single OWS) cosmetically (~10 min). Closes H11,
+   H12.
+3. HEAD as a first-class method in route parsing + dispatch (~30 min). Closes H6, H10, tightens H7.
+4. `stat()`-before-fallback in `get_method` IS_DIR branch (~20 min). Closes H5.
+5. Audit `error_response` for NULL-rule deref. Cheap defensive fix; the subject's "must not crash, ever" makes it
+   non-optional even after step 3.
+
+After all five, expected: 14/14 with H13 still skipped pending CGI URL configuration.
+ 
 ---
 
 ## 3. CGI sandboxing &nbsp; *(highest single-class crash risk in webserv)*
