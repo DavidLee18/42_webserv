@@ -56,13 +56,13 @@ std::string RouteRule_CGI::is_executable_file(const std::string &path) {
   // struct stat st;
 
   // if (stat(path.c_str(), &st) != 0)
-  //   return "Violates file existence rule (the specified path does not exist or cannot be accessed)";
+  //   return "Violates file existence rule (the specified path does not exist or cannot be accessed).";
 
   // if (!S_ISREG(st.st_mode))
-  //   return "Violates regular file rule (the given path is not a regular file)";
+  //   return "Violates regular file rule (the given path is not a regular file).";
 
   // if (access(path.c_str(), X_OK) != 0)
-  //   return "Violates executable permission rule (the file does not have execute permission)";
+  //   return "Violates executable permission rule (the file does not have execute permission).";
   (void)path;
   return "";
 }
@@ -173,19 +173,19 @@ RouteRule_CGI::parse_env_entry(const std::string &line,
 
 std::string RouteRule_CGI::is_valid_uwsgi_config(std::vector<std::string> data) {
   if (data.size() != 2)
-    return ": Invalid format(expected \"file_path:port\". The value must follow the required pattern with a Python file path and a numeric port separated by a colon.)";
+    return ": Invalid format(expected \"file_path:port\". The value must follow the required pattern with a Python file path and a numeric port separated by a colon.).";
   else if (RouteRule_CGI::is_executable_file(data[0]) != "")
     return  ", [" + data[0] + "]: " + RouteRule_CGI::is_executable_file(data[0]);
   
   for (std::size_t i = 0; i < data[1].size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(data[1][i])))
-    return ", [" + data[1] + "]: " + "Violates port numeric rule (the port must consist only of digits)";
+    return ", [" + data[1] + "]: " + "Violates port numeric rule (the port must consist only of digits).";
   }
 
   char* end;
   unsigned long port = std::strtoul(data[1].c_str(), &end, 10);
   if (port > 65535)
-    return ", [" + data[1] + "]: " + "Violates port range rule (port must be between 0 and 65535)";
+    return ", [" + data[1] + "]: " + "Violates port range rule (port must be between 0 and 65535).";
   return "";
 }
 
@@ -209,15 +209,26 @@ RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
       return err;
     line = utils::trim_whitespace(line);
 
+    std::vector<std::string> split = utils::string_split(line, " ");
+    if (split.size() != 1) {
+      for (std::size_t i = 1; i < split.size(); ++i)
+        err += " " + split[i]; 
+      return "on [\t" + line + "], [" + err + "]: Violates uwsgi entry rule (each line must contain exactly one configuration entry).";
+    } else if (utils::count_occurrences(line, ":") != 1) {
+      std::size_t pos = line.find(':');
+      pos = line.find(':', pos + 1);
+      return "on [\t" + line + "], [" + &line[pos] + "]: Violates uwsgi format rule (expected \"<file>:<port>\" without trailing ':' or extra delimiters).";
+    }
+
     value_and_key = utils::string_split(line, ":");
     err = RouteRule_CGI::is_valid_uwsgi_config(value_and_key);
     if (err != "")
       return  "on [\t" + line + "]" + err;
     if (value_and_key[0].length() < 3 ||
         value_and_key[0].substr(value_and_key[0].length() - 3) != ".py")
-      return "on [\t" + line + "], [" + value_and_key[0] + "]: Violates python file extension rule (the file must have a .py extension)";
+      return "on [\t" + line + "], [" + value_and_key[0] + "]: Violates python file extension rule (the file must have a .py extension).";
     if (uwsgi.find(value_and_key[1]) != uwsgi.end())
-      return "on [\t" + line + "], [" + value_and_key[1] + "]: Violates duplicate port rule (the port is already assigned to another file)";
+      return "on [\t" + line + "], [" + value_and_key[1] + "]: Violates duplicate port rule (the port is already assigned to another file).";
     else {
       uwsgi[value_and_key[1]] = value_and_key[0];
     }

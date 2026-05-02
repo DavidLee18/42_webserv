@@ -1,4 +1,5 @@
-#include "webserv.h"
+// #include "webserv.h"
+#include "WebserverConfig.hpp"
 
 WebserverConfig::WebserverConfig(FileDescriptor &file) {
   err_meg = "";
@@ -38,7 +39,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (err_meg != "")
         return false;
     } else if (line[0] == '!') {
-      err_meg = apply_default_err_page_entry(line); // 수정해야함2
+      err_meg = apply_default_err_page_entry(line, default_err_page);
       if (err_meg != "")
         return false;
     } else {
@@ -56,28 +57,37 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
   return true;
 }
 
-std::string WebserverConfig::apply_default_err_page_entry(const std::string &line)
+std::string WebserverConfig::apply_default_err_page_entry(const std::string &line, std::map<int, std::string> &err_map)
 {
   std::vector<std::string> split = utils::string_split(line, " ");
 
-  if (split.size() != 2)
-    return "Error: \"" + line + "\" Syntax error";
-  else if (split[1][0] != '$') {
+  if (split.size() != 2) {
+    if (split.size() == 1)
+      return "on [" + line + "], []: Violates default error page format (must be \"! <status>:<path>\").";
+    std::string res = "";
+    for (std::size_t i = 2; i < split.size(); ++i)
+      res += " " + split[i];
+    return "on [" + line + "], [" + res + "]: Violates default error page format (invalid format for \"! <status>:<path>\").";
+  } 
+    std::string path = split[1];
     split = utils::string_split(split[1], ":");
-    if (split.size() != 2)
-      return "Error: \"" + line + "\" Syntax error";
-    default_err_page.err_page[split[0]] = split[1];
-  } else if (split[1][0] == '$') {
-    std::string err_line;
-    std::string executable;
-    std::map<std::string, std::string> env;
+    if (split.size() != 2 || utils::count_occurrences(path, ":") != 1) {
+      std::size_t pos = line.find(':');
+      pos = line.find(':', pos + 1);
+      return "on [" + line + "], [" + &line[pos] + "]: Violates error page mapping rule (expected \"status:path\" with no trailing ':' or extra fields).";
+    }
+    for (std::size_t i = 0; i < split[0].size(); ++i) {
+      if (!std::isdigit(static_cast<unsigned char>(split[0][i])))
+        return "on [" + line + "], [" + split[0] + "]: Violates status format rule (status must consist only of digits).";
+    }
+    if (split[0][0] != '4' && split[0][0] != '5' && split[0].size() != 3)
+      return "on [" + line + "], [" + split[0] + "]: Violates status range rule (status must start with 4xx or 5xx).";
+    else if (utils::check_html_file(split[1]) != "")
+      return "on [" + line + "], [" + split[1] + "]: " + utils::check_html_file(split[1]);
+    char* end;
+    unsigned long num = std::strtoul(split[0].c_str(), &end, 10);
+    err_map[static_cast<int>(num)] = split[1];
 
-    err_line = RouteRule_CGI::parse_executable(split[1], executable, env);
-    if (err_line != "")
-      return err_line;
-    default_err_page.err_cgi[executable] = env;
-  } else 
-    return "Error: \"" + line + "\" Syntax error";
   return "";
 }
 
@@ -279,7 +289,7 @@ unsigned int WebserverConfig::parse_server_port(const std::string &key) {
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.get_type_map();
   const std::map<std::string, std::string> &uw = data.get_uwsgi();
-  const DefaultErrPage &d_e = data.get_default_err_page();
+  const std::map<int, std::string> &d_e = data.get_default_err_page();
   std::map<std::string, std::string>::const_iterator ty_it;
   std::map<std::string, std::string>::const_iterator uw_it;
 
@@ -304,28 +314,12 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   
   os << "<<DefaultErrPage>>\n" << std::endl;
   
-  std::map<std::string, std::string>::const_iterator er_it;
-  CGI::const_iterator cgi_it;
+  std::map<int, std::string>::const_iterator er_it;
   
-  os << "\nerr_page\n" << std::endl;
-  for (er_it = d_e.err_page.begin(); er_it != d_e.err_page.end(); ++er_it) {
+  os << "\nerr_page\n";
+  for (er_it = d_e.begin(); er_it != d_e.end(); ++er_it) {
     os << "\terr_page key: " << er_it->first << ", err_page value: " << er_it->second
       << std::endl;
-  }
-  os << "\nerr_cgi\n" << std::endl;
-  for (cgi_it = d_e.err_cgi.begin(); cgi_it != d_e.err_cgi.end(); ++cgi_it) {
-    os << "\terr_cgi executable: " << cgi_it->first;
-    if (cgi_it->second.empty())
-      os << "\n\terr_cgi env: empty\n";
-    else {
-      os << "\n\terr_cgi env\n";
-      std::map<std::string, std::string>::const_iterator temp;
-      for (temp = cgi_it->second.begin(); temp != cgi_it->second.end(); ++temp) {
-        os << "\terr_cgi env key: " << temp->first << ", err_cgi env value: " << temp->second
-          << std::endl;
-      }
-    }   
-    os << std::endl;
   }
   os << "========================================================" << std::endl;
   os << "\n\n\n========================================================"

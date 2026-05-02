@@ -399,10 +399,10 @@ bool ServerConfig::apply_route_rule_entry(
       routes[targetRouteIndex].max_body_KB = max;
     } else if (rule[0] == "!") {
       std::string errPageLine = rule[1]; // Make a copy to avoid modification
-      int err_key = parse_error_page_entry(errPageLine);
+      int err_key = parse_error_page_entry(errPageLine); // WebserverConfig::apply_default_err_page_entry 함수로 수정 해야함
       if (err_key == 0 || size != 2)
         return false;
-      routes[targetRouteIndex].error_pages[err_key] = errPageLine;
+      routes[targetRouteIndex].error_pages[err_key] = errPageLine; 
     } else
       return false;
   }
@@ -511,17 +511,17 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
     else if (method[i] == "DELETE")
       mets.push_back(Request::DELETE);
     else
-      return (false);
+      return false;
   }
 
   if (!create_route_rules(method_line_data, mets))
-    return (false);
+    return false;
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
     if (temp.error() != "") {
       err_line = "FileDescriptor Error: " + temp.error();
-      return (false);
+      return false;
     }
     if (temp.value() == "\n" || temp.value() == "") {
       end_flag += 1;
@@ -530,14 +530,14 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
     line = utils::remove_char(temp.value(), '\n');
     err_line = line;
     if (utils::return_indent_level(line) != 2)
-      return (false);
+      return false;
     else if (apply_route_rule_entry(mets, method_line_data[1], line))
       continue;
     else
-      return (false);
+      return false;
   }
   err_line = "";
-  return (true);
+  return true;
 }
 
 // Find a route that matches the given method and path

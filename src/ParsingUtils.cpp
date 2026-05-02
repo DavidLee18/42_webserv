@@ -145,3 +145,26 @@ std::string utils::get_indent_whitespace_error(const std::string& line, size_t l
   }
   return err_line;
 }
+
+std::string utils::check_html_file(const std::string &path)
+{
+    char cwd[4096];
+    getcwd(cwd, sizeof(cwd));
+
+    std::string real_path = std::string(cwd) + path;
+    struct stat st;
+
+    if (stat(real_path.c_str(), &st) != 0)
+        return "Invalid HTML file (file does not exist or cannot be accessed).";
+
+    if (!S_ISREG(st.st_mode))
+        return "Invalid HTML file (path is not a regular file).";
+
+    if (real_path.length() < 5 || real_path.substr(real_path.length() - 5) != ".html")
+        return "Invalid HTML file (file extension must be .html).";
+
+    if (access(real_path.c_str(), R_OK) != 0)
+        return "Invalid HTML file (no read permission).";
+
+    return "";
+}

@@ -62,5 +62,6 @@ std::size_t return_indent_level(std::string line);
 bool has_leading_space(const std::string& str);
 bool has_trailing_space(const std::string& str);
 std::string get_indent_whitespace_error(const std::string& line, size_t level);
+std::string check_html_file(const std::string &path);
 } // namespace utils
 #endif
