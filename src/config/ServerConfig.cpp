@@ -538,7 +538,9 @@ RouteRule const *ServerConfig::find_route(const Request::Method method,
 
   // Iterate through all routes to find a match
   for (size_t i = 0; i < routes.size(); ++i) {
-    if (routes[i].method == method && routes[i].path.matches(pathPattern)) {
+    if ((routes[i].method == method ||
+         (routes[i].method == Request::HEAD && method == Request::GET)) &&
+        routes[i].path.matches(pathPattern)) {
       return &routes[i];
     }
   }

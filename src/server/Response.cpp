@@ -63,8 +63,11 @@ Response ServerResponse::http_response(
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
   Response response;
-  if (rule == NULL)
+  if (rule == NULL) {
     response = DefaultError::default_err_response(NOT_FOUND_ERR);
+    response.headers = config->get_header();
+    return response;
+  }
   response.headers = config->get_header();
   const Target target = resolve_target(rule, config, request);
 
@@ -85,6 +88,8 @@ Response ServerResponse::http_response(
       std::cout << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
       response = error_response(config, rule, UNAUTHORIZED);
+      response.headers = config->get_header();
+      return response;
     } else {
       std::cout << "[Authentication] No valid session. Guest user." << std::endl;
     }
@@ -93,27 +98,24 @@ Response ServerResponse::http_response(
   switch (request->get_method()) {
   case Request::DELETE:
     response = ServerResponse::delete_method(target, response, config, rule);
-    response.content_length = response.body.length();
     break;
   case Request::POST:
     response = ServerResponse::post_method(target, response, client, rule, request,
                                      session);
-    response.content_length = response.body.length();
-    break;
-  case Request::GET:
-    response = ServerResponse::get_method(target, response, config, rule, request);
-    response.content_length = response.body.length();
     break;
   case Request::HEAD:
+  case Request::GET:
     response = ServerResponse::get_method(target, response, config, rule, request);
-    response.body.clear();
-    response.content_length = 0;
     break;
   default:
     response = error_response(config, rule, METHOD_NOT_ALLOWED);
-    response.content_length = response.body.length();
     break;
   }
+
+  response.headers = config->get_header();
+  response.content_length = response.body.length();
+  if (request->get_method() == Request::HEAD)
+    response.body.clear();
 
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
@@ -134,6 +136,7 @@ Response ServerResponse::http_response(
 
       if (session_id.empty()) {
         response.body = "{\"logged_in\":false,\"message\":\"No active session\"}";
+        return response;
       } else {
         std::string user_id;
         int elapsed_seconds = 0;
@@ -156,19 +159,9 @@ Response ServerResponse::http_response(
     } else {
       return error_response(config, rule, METHOD_NOT_ALLOWED);
     }
-  }
-
-  if (request->get_method() == Request::DELETE) {
-    return ServerResponse::delete_method(target, response, config, rule);
-  } else if (request->get_method() == Request::POST) {
-    return ServerResponse::post_method(target, response, client, rule, request,
-                                       session);
-  } else if (request->get_method() == Request::GET) {
-    return ServerResponse::get_method(target, response, config, rule, request);
   } else {
-    return error_response(config, rule, METHOD_NOT_ALLOWED);
+    return response;
   }
-  return response;
 }
 
 Result<CgiDelegate> ServerResponse::register_cgi(const Request *request,
@@ -265,7 +258,6 @@ std::string ServerResponse::get_pwd() {
 
 Response ServerResponse::error_response(const ServerConfig *config,
                                         const RouteRule *rule, int error_code) {
-  Response response;
   std::string err_page =
       get_pwd() + get_string_from_map(rule->error_pages, error_code);
   std::cout << "error page: " << err_page << std::endl;
@@ -276,16 +268,17 @@ Response ServerResponse::error_response(const ServerConfig *config,
     return DefaultError::default_err_response(error_code);
   std::ifstream file(err_page.c_str());
   if (file.is_open()) {
+    Response response;
     response.status_code = status_code_to_string(error_code);
     response.headers = config->get_header();
     std::ostringstream ss;
     ss << file.rdbuf();
     response.body = ss.str();
     file.close();
+    return response;
   } else {
     return DefaultError::default_err_response(error_code);
   }
-  return response;
 }
 
 std::string ServerResponse::make_autoindex_page(const std::string &real_path,

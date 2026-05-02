@@ -74,6 +74,11 @@ struct Response {
   std::string redir;     ///< Redirect location, if applicable.
   std::string cgi;       ///< Generated CGI script.
   std::map<std::string, std::string> headers; ///< Additional response headers from config.
+
+  Response()
+      : version(), status_code(), content_length(0), content_type(),
+        connection(), cookie(), body(), mime_type(), redir(), cgi(), headers() {
+  }
 };
 
 std::ostream &operator<<(std::ostream &, Response const &);

@@ -57,7 +57,6 @@ clean:
 fclean:	clean cgiclean
 	rm -f $(NAME)
 	rm -f $(UWSGI_NAME)
-	rm -f $(CGI_NAME)
 
 re:	fclean all
 
