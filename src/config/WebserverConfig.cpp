@@ -31,14 +31,14 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (!parse_types_block(file))
         return false;
     } else if (WebserverConfig::is_server_config_header(line)) {
-      if (!parse_server_config_entry(file, line)) // 수정해야함
+      if (!parse_server_config_entry(file, line)) // 수정해야함 3
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
-      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi); // 수정해야함
+      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi);
       if (err_meg != "")
         return false;
     } else if (line[0] == '!') {
-      err_meg = apply_default_err_page_entry(line); // 수정해야함
+      err_meg = apply_default_err_page_entry(line); // 수정해야함2
       if (err_meg != "")
         return false;
     } else {
@@ -47,13 +47,12 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     }
   }
   if (type_map.empty()) {
-    err_meg = "Missing types declaration (the 'types' block is not defined at indentation level 0, so no MIME type mapping rules can be processed).";
+    err_meg = "Required type block is missing (the 'types' block is not defined at indentation level 0, so no MIME type mapping rules can be processed).";
     return false;
   } else if (serverconfig_map.empty()) {
-    err_meg = "";
+    err_meg = "Required server block is missing. (the Server block is mandatory but not present in the configuration).";
     return false;
-  } else if (uwsgi.empty())
-    return false;
+  }
   return true;
 }
 

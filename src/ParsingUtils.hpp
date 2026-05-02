@@ -3,6 +3,7 @@
 
 #include "server/Client.hpp"
 #include "file_descriptor.h"
+#include <cstdlib>
 
 namespace utils {
 /**

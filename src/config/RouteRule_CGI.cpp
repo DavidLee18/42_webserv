@@ -52,18 +52,19 @@ std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
   }
 }
 
-bool RouteRule_CGI::is_executable_file(const std::string &path) {
+std::string RouteRule_CGI::is_executable_file(const std::string &path) {
   // struct stat st;
 
   // if (stat(path.c_str(), &st) != 0)
-  //   return false;
+  //   return "Violates file existence rule (the specified path does not exist or cannot be accessed)";
 
   // if (!S_ISREG(st.st_mode))
-  //   return false;
+  //   return "Violates regular file rule (the given path is not a regular file)";
 
-  // return access(path.c_str(), X_OK) == 0;
+  // if (access(path.c_str(), X_OK) != 0)
+  //   return "Violates executable permission rule (the file does not have execute permission)";
   (void)path;
-  return true;
+  return "";
 }
 
 bool RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
@@ -77,7 +78,7 @@ bool RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
     if (exec_end < line.length() && line[exec_end] != '(')
       return false;
     std::string exec_path = line.substr(1, exec_end - 1);
-    if (exec_path.empty() || !RouteRule_CGI::is_executable_file(exec_path))
+    if (exec_path.empty() || RouteRule_CGI::is_executable_file(exec_path) != "")
       return false;
 
     i = exec_end;
@@ -170,16 +171,22 @@ RouteRule_CGI::parse_env_entry(const std::string &line,
   return "";
 }
 
-bool RouteRule_CGI::is_valid_uwsgi_config(std::vector<std::string> data) {
+std::string RouteRule_CGI::is_valid_uwsgi_config(std::vector<std::string> data) {
   if (data.size() != 2)
-    return false;
-  if (!RouteRule_CGI::is_executable_file(data[0]))
-    return false;
+    return ": Invalid format(expected \"file_path:port\". The value must follow the required pattern with a Python file path and a numeric port separated by a colon.)";
+  else if (RouteRule_CGI::is_executable_file(data[0]) != "")
+    return  ", [" + data[0] + "]: " + RouteRule_CGI::is_executable_file(data[0]);
+  
   for (std::size_t i = 0; i < data[1].size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(data[1][i])))
-      return false;
+    return ", [" + data[1] + "]: " + "Violates port numeric rule (the port must consist only of digits)";
   }
-  return true;
+
+  char* end;
+  unsigned long port = std::strtoul(data[1].c_str(), &end, 10);
+  if (port > 65535)
+    return ", [" + data[1] + "]: " + "Violates port range rule (port must be between 0 and 65535)";
+  return "";
 }
 
 std::string
@@ -187,6 +194,7 @@ RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
                                  std::map<std::string, std::string> &uwsgi) {
   std::vector<std::string> value_and_key;
   std::string line = "";
+  std::string err = "";
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
@@ -194,20 +202,22 @@ RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
       return "FileDescriptor Error: " + temp.error();
     else if (temp.value() == "\n" || temp.value() == "")
       return "";
+    
     line = utils::remove_char(temp.value(), '\n');
-    if (utils::return_indent_level(line) != 1 ||
-        (line.empty() || line[line.length() - 1] == ' ' ||
-         line[line.length() - 1] == '\t'))
-      return "Error: \"" + line + "\" Indentation or space error";
+    err = utils::get_indent_whitespace_error(line, 1);
+    if (err != "")
+      return err;
     line = utils::trim_whitespace(line);
+
     value_and_key = utils::string_split(line, ":");
-    if (!RouteRule_CGI::is_valid_uwsgi_config(value_and_key))
-      return "Error: \"" + line + "\" uwsgi syntax error";
+    err = RouteRule_CGI::is_valid_uwsgi_config(value_and_key);
+    if (err != "")
+      return  "on [\t" + line + "]" + err;
     if (value_and_key[0].length() < 3 ||
         value_and_key[0].substr(value_and_key[0].length() - 3) != ".py")
-      return "Error: \"" + line + "\" It is not a .py file";
+      return "on [\t" + line + "], [" + value_and_key[0] + "]: Violates python file extension rule (the file must have a .py extension)";
     if (uwsgi.find(value_and_key[1]) != uwsgi.end())
-      return "Error: \"" + line + "\" uwsgi syntax error";
+      return "on [\t" + line + "], [" + value_and_key[1] + "]: Violates duplicate port rule (the port is already assigned to another file)";
     else {
       uwsgi[value_and_key[1]] = value_and_key[0];
     }

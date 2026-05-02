@@ -121,7 +121,7 @@ public:
    * - 첫 번째 원소는 실행 가능한 파일 경로여야 하고,
    * 두 번째 원소는 포트 번호를 나타내는 숫자 문자열이어야 한다.
    */
-  static bool is_valid_uwsgi_config(std::vector<std::string> data);
+  static std::string is_valid_uwsgi_config(std::vector<std::string> data);
   /**
    * @brief CGI 설정 한 줄의 기본 형식을 검사하는 함수
    * @param line 검사할 문자열
@@ -150,7 +150,7 @@ public:
    *
    * - 파일이 존재해야 하며, 일반 파일이어야 하고, 실행 권한이 있어야 한다.
    */
-  static bool is_executable_file(const std::string &path);
+  static std::string is_executable_file(const std::string &path);
   /**
    * @brief 환경 변수 한 줄을 파싱하여 env 맵에 추가하는 함수
    * @param line 파싱할 문자열
