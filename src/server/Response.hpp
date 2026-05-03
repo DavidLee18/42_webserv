@@ -212,14 +212,17 @@ private:
 
   static Response delete_method(const Target &target, Response response,
                                 const ServerConfig *config,
-                                const RouteRule *rule);
+                                const RouteRule *rule,
+                                std::map<std::string, std::string> mime_type);
   static Response post_method(const Target &target, Response response,
                               const ClientSession *client,
                               const RouteRule *rule, const Request *request,
-                              Session *session);
+                              Session *session,
+                              std::map<std::string, std::string> mime_type);
   static Response get_method(Target target, Response response,
                              const ServerConfig *config, const RouteRule *rule,
-                             const Request *request);
+                             const Request *request,
+                             std::map<std::string, std::string> mime_type);
 };
 
 #endif

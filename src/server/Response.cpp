@@ -123,7 +123,7 @@ Response ServerResponse::http_response(
     if (request->get_method() == Request::DELETE) {
       std::cout << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
-      return error_response(config, rule, UNAUTHORIZED);
+      return error_response(config, rule, UNAUTHORIZED, mime_type);
     } else {
       std::cout << "[Authentication] No valid session. Guest user." << std::endl;
     }
@@ -161,19 +161,19 @@ Response ServerResponse::http_response(
       }
       return response;
     } else {
-      return error_response(config, rule, METHOD_NOT_ALLOWED);
+      return error_response(config, rule, METHOD_NOT_ALLOWED, mime_type);
     }
   }
 
   if (request->get_method() == Request::DELETE) {
-    return ServerResponse::delete_method(target, response, config, rule);
+    return ServerResponse::delete_method(target, response, config, rule, mime_type);
   } else if (request->get_method() == Request::POST) {
     return ServerResponse::post_method(target, response, client, rule, request,
-                                       session);
+                                       session, mime_type);
   } else if (request->get_method() == Request::GET) {
-    return ServerResponse::get_method(target, response, config, rule, request);
+    return ServerResponse::get_method(target, response, config, rule, request, mime_type);
   } else {
-    return error_response(config, rule, METHOD_NOT_ALLOWED);
+    return error_response(config, rule, METHOD_NOT_ALLOWED, mime_type);
   }
   return response;
 }
@@ -290,9 +290,7 @@ Response ServerResponse::error_response(const ServerConfig *config,
   if (file.is_open()) {
     response.status_code = status_code_to_string(error_code);
     response.headers = config->get_header();
-    // Detect mime type from error page file extension
-    std::string file_ext = find_file_type(err_page);
-    response.mime_type = get_mime_type_for_extension(file_ext);
+    response.mime_type = get_string_from_map(mime_type, find_file_type(err_page));
     std::ostringstream ss;
     ss << file.rdbuf();
     response.body = ss.str();
@@ -508,19 +506,21 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
 
 Response ServerResponse::delete_method(const Target& target, Response response,
                                        const ServerConfig *config,
-                                       const RouteRule *rule) {
+                                       const RouteRule *rule,
+                                       std::map<std::string, std::string> mime_type) {
   if (unlink(target.path.c_str()) == 0) {
     response.status_code = "204 No Content";
     return response;
   } else {
-    return error_response(config, rule, FORBIDDEN_ERR); // 404, 500
+    return error_response(config, rule, FORBIDDEN_ERR, mime_type); // 404, 500
   }
 }
 
 Response ServerResponse::post_method(const Target& target, Response response,
                                      const ClientSession *client,
                                      const RouteRule *rule,
-                                     const Request *request, Session *session) {
+                                     const Request *request, Session *session,
+                                     std::map<std::string, std::string> mime_type) {
   (void)target;
   const ServerConfig *config = client->config;
 
@@ -594,7 +594,7 @@ Response ServerResponse::post_method(const Target& target, Response response,
         return response;
       }
     } else
-      return error_response(config, rule, NOT_FOUND_ERR);
+      return error_response(config, rule, NOT_FOUND_ERR, mime_type);
   }
 
   // Handle file uploads
@@ -606,24 +606,24 @@ Response ServerResponse::post_method(const Target& target, Response response,
     std::map<std::string, std::string>::const_iterator content_type_it =
         headers.find("Content-Type");
     if (content_type_it == headers.end())
-      return error_response(config, rule, BAD_REQUEST);
+      return error_response(config, rule, BAD_REQUEST, mime_type);
 
     std::string content_type = content_type_it->second;
     if (content_type.find("multipart/form-data") == std::string::npos)
-      return error_response(config, rule, BAD_REQUEST);
+      return error_response(config, rule, BAD_REQUEST, mime_type);
 
     // Check body size limit
     int max_body_KB = rule->max_body_KB;
     if (static_cast<int>(body.length()) > max_body_KB * 1024) {
       std::cout << "Upload rejected: body size " << body.length()
                 << " exceeds limit " << (max_body_KB * 1024) << std::endl;
-      return error_response(config, rule, PAYLOAD_TOO_LARGE);
+      return error_response(config, rule, PAYLOAD_TOO_LARGE, mime_type);
     }
 
     // Extract boundary
     std::string boundary = extract_boundary(content_type);
     if (boundary.empty())
-      return error_response(config, rule, BAD_REQUEST);
+      return error_response(config, rule, BAD_REQUEST, mime_type);
 
     std::cout << "Boundary: " << boundary << std::endl;
 
@@ -632,7 +632,7 @@ Response ServerResponse::post_method(const Target& target, Response response,
     if (mkdir(upload_path.c_str(), 0755) != 0 && errno != EEXIST) {
       std::cout << "Failed to create upload directory: " << upload_path
                 << std::endl;
-      return error_response(config, rule, FORBIDDEN_ERR);
+      return error_response(config, rule, FORBIDDEN_ERR, mime_type);
     }
 
     // Parse multipart parts and save files
@@ -672,7 +672,7 @@ Response ServerResponse::post_method(const Target& target, Response response,
         if (!outfile.is_open()) {
           std::cout << "Failed to open file for writing: " << file_path
                     << std::endl;
-          return error_response(config, rule, FORBIDDEN_ERR);
+          return error_response(config, rule, FORBIDDEN_ERR, mime_type);
         }
 
         // Write file data
@@ -681,7 +681,7 @@ Response ServerResponse::post_method(const Target& target, Response response,
         if (outfile.fail()) {
           std::cout << "Failed to write file: " << file_path << std::endl;
           outfile.close();
-          return error_response(config, rule, FORBIDDEN_ERR);
+          return error_response(config, rule, FORBIDDEN_ERR, mime_type);
         }
 
         outfile.close();
@@ -695,7 +695,7 @@ Response ServerResponse::post_method(const Target& target, Response response,
     }
 
     if (!error_msg.empty())
-      return error_response(config, rule, BAD_REQUEST);
+      return error_response(config, rule, BAD_REQUEST, mime_type);
 
     if (files_uploaded > 0) {
       response.status_code = status_code_to_string(OK);
@@ -712,18 +712,19 @@ Response ServerResponse::post_method(const Target& target, Response response,
     }
   }
 
-  return error_response(config, rule, FORBIDDEN_ERR);
+  return error_response(config, rule, FORBIDDEN_ERR, mime_type);
 }
 
 Response ServerResponse::get_method(Target target, Response response,
                                     const ServerConfig *config,
                                     const RouteRule *rule,
-                                    const Request *request) {
+                                    const Request *request,
+                                    std::map<std::string, std::string> mime_type) {
   // Handle error responses (NOT_FOUND_ERR, FORBIDDEN_ERR)
   if (target.type == NOT_FOUND_ERR)
-    return error_response(config, rule, NOT_FOUND_ERR);
+    return error_response(config, rule, NOT_FOUND_ERR, mime_type);
   if (target.type == FORBIDDEN_ERR)
-    return error_response(config, rule, FORBIDDEN_ERR);
+    return error_response(config, rule, FORBIDDEN_ERR, mime_type);
 
   if (rule->op == REDIRECT) {
     std::cout << "=== redirection ===" << std::endl;
@@ -736,10 +737,10 @@ Response ServerResponse::get_method(Target target, Response response,
   } else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     DIR *dir = opendir(target.path.c_str());
     if (dir == NULL) {
-      return error_response(
-          config, rule,
-          FORBIDDEN_ERR); // TODO: 폴더를 열 권한이 없거나 없으면 빈 문자열
-                          // 반환 (나중에 403처리)
+      if (errno == EACCES) // access denied
+        return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+      else if (errno == ENOENT) // no such directory
+        return error_response(config, rule, NOT_FOUND_ERR, mime_type);
     }
     target.type = OK;
     response.mime_type = "html";
@@ -747,7 +748,7 @@ Response ServerResponse::get_method(Target target, Response response,
     response.status_code = status_code_to_string(target.type);
   } else {
     if (check_path_type(target.path) != IS_FILE)
-      return error_response(config, rule, NOT_FOUND_ERR);
+      return error_response(config, rule, NOT_FOUND_ERR, mime_type);
     std::ifstream file(target.path.c_str());
     if (file.is_open()) {
       std::ostringstream ss;
@@ -757,7 +758,7 @@ Response ServerResponse::get_method(Target target, Response response,
       response.status_code = status_code_to_string(target.type);
       file.close();
     } else {
-      return error_response(config, rule, NOT_FOUND_ERR);
+      return error_response(config, rule, NOT_FOUND_ERR, mime_type);
     }
   }
   return response;
