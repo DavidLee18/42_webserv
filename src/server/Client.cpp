@@ -186,10 +186,11 @@ Result<Request *> Request::from_buff(std::string &buff) {
   }
 
   const std::string connection_header = get_string_from_map(req->header, "Connection");
-  if (connection_header == "keep-alive")
+  if (connection_header == "keep-alive" || connection_header == "")
     req->keep_alive = true;
   else if (connection_header == "close")
     req->connection_close = true;
+  // If empty (no Connection header), HTTP/1.1 defaults to keep-alive
 
   req->cookie = get_string_from_map(req->header, "Cookie");
 
