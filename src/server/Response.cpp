@@ -68,6 +68,28 @@ std::string ServerResponse::find_file_type(const std::string &path) {
   return file_type.back();
 }
 
+std::string ServerResponse::get_mime_type_for_extension(const std::string &ext) {
+  if (ext == "html" || ext == "htm")
+    return "text/html";
+  else if (ext == "json")
+    return "application/json";
+  else if (ext == "txt")
+    return "text/plain";
+  else if (ext == "xml")
+    return "application/xml";
+  else if (ext == "css")
+    return "text/css";
+  else if (ext == "js")
+    return "application/javascript";
+  else if (ext == "jpg" || ext == "jpeg")
+    return "image/jpeg";
+  else if (ext == "png")
+    return "image/png";
+  else if (ext == "gif")
+    return "image/gif";
+  return "text/html";  // default
+}
+
 Response ServerResponse::http_response(
     const Request *request, const ClientSession *client,
     const std::map<std::string, std::string>& mime_type, Session *session) {
@@ -267,7 +289,9 @@ Response ServerResponse::error_response(const ServerConfig *config,
   if (file.is_open()) {
     response.status_code = status_code_to_string(error_code);
     response.headers = config->get_header();
-    response.mime_type = "text/html";
+    // Detect mime type from error page file extension
+    std::string file_ext = find_file_type(err_page);
+    response.mime_type = get_mime_type_for_extension(file_ext);
     std::ostringstream ss;
     ss << file.rdbuf();
     response.body = ss.str();

@@ -89,6 +89,15 @@ class ServerConfig;
 class ServerResponse {
 public:
   static std::string find_file_type(const std::string &path);
+
+  /**
+   * @brief Determines MIME type based on file extension.
+   *
+   * @param ext File extension (without dot).
+   * @return MIME type string (defaults to "text/html" for unknown types).
+   */
+  static std::string get_mime_type_for_extension(const std::string &ext);
+
   /**
    * @brief Generates an Response based on the client request and server
    * configuration.
