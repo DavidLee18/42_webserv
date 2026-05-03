@@ -88,6 +88,7 @@ public:
   Result<Void> dup2stdin();
 
   Result<Void> dup2stdout();
+  Result<Void> close_on_exec();
 
   bool operator==(const int &other) const { return _fd == other; }
   bool operator==(const FileDescriptor &other) const {

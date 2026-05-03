@@ -32,6 +32,12 @@ void Server::new_connection(const FileDescriptor *server_fd) {
       continue;
     }
 
+    if (!client_fd.close_on_exec().has_value()) {
+      std::cerr << "ERROR: failed to set client socket to close-on-exec mode"
+                << std::endl;
+      continue;
+    }
+
     ClientSession client;
     client.last_activity_time = time(NULL);
     char ip_str[INET_ADDRSTRLEN];

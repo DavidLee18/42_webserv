@@ -84,3 +84,15 @@ std::string utils::remove_char(std::string s, const char ch) {
 
   return (s);
 }
+
+std::string utils::join(const std::vector<std::string> &elements,
+                        const std::string &delimiter) {
+  std::stringstream ss;
+  for (size_t i = 0; i < elements.size(); ++i) {
+    if (i != 0) {
+      ss << delimiter;
+    }
+    ss << elements[i];
+  }
+  return ss.str();
+}

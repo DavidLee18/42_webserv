@@ -1,5 +1,8 @@
 #include "RouteRule_CGI.hpp"
 
+#include <sys/stat.h>
+#include <unistd.h>
+
 RouteRule_CGI::RouteRule_CGI(const FileDescriptor &fd, const std::string &line) {
   err = "";
   timeout = 3;
@@ -52,17 +55,11 @@ std::string RouteRule_CGI::parse_cgi_block(const FileDescriptor &fd,
 }
 
 bool RouteRule_CGI::is_executable_file(const std::string &path) {
-  // struct stat st;
+  struct stat st = {};
 
-  // if (stat(path.c_str(), &st) != 0)
-  //   return false;
-
-  // if (!S_ISREG(st.st_mode))
-  //   return false;
-
-  // return access(path.c_str(), X_OK) == 0;
-  (void)path;
-  return true;
+  if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode))
+    return false;
+  return access(path.c_str(), X_OK) == 0;
 }
 
 bool RouteRule_CGI::matches_cgi_syntax(const std::string &line) {

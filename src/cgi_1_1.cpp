@@ -1453,7 +1453,7 @@ char **CgiInput::to_envp() const {
     }
 
     envp[i] = new char[env_str.length() + 1];
-    std::strncpy(envp[i], env_str.c_str(), env_str.size());
+    std::memcpy(envp[i], env_str.c_str(), env_str.length() + 1);
   }
 
   envp[mvars.size()] = NULL;
@@ -1484,6 +1484,22 @@ Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
   return OK(CgiDelegate, del);
 }
 
+CgiDelegate::CgiDelegate(const CgiDelegate &other)
+    : _env(other._env), _script_path(other._script_path), _req(other._req),
+      _epoll(other._epoll), _pid(other._pid), _stdin(other._stdin),
+      _stdout(other._stdout), _total_written(other._total_written),
+      _output(other._output), _completed(other._completed) {
+  const_cast<CgiDelegate &>(other)._env.mvars.clear();
+  const_cast<CgiDelegate &>(other)._env.req_body.clear();
+  const_cast<CgiDelegate &>(other)._script_path.clear();
+  const_cast<CgiDelegate &>(other)._pid = -1;
+  const_cast<CgiDelegate &>(other)._stdin = NULL;
+  const_cast<CgiDelegate &>(other)._stdout = NULL;
+  const_cast<CgiDelegate &>(other)._total_written = 0;
+  const_cast<CgiDelegate &>(other)._output.clear();
+  const_cast<CgiDelegate &>(other)._completed = false;
+}
+
 static const int kWaitpidPollIntervalUs = 1000;
 static const int kMaxReapWaitMs = 50;
 static const int kWaitpidReapAttempts =
@@ -1512,6 +1528,32 @@ static void terminate_child(const pid_t pid) {
   (void)waitpid_nohang(pid, NULL);
 }
 
+CgiDelegate &CgiDelegate::operator=(const CgiDelegate &other) {
+  if (this != &other) {
+    _env = other._env;
+    _script_path = other._script_path;
+    const_cast<Request &>(_req) = other._req;
+    _epoll = other._epoll;
+    _pid = other._pid;
+    _stdin = other._stdin;
+    _stdout = other._stdout;
+    _total_written = other._total_written;
+    _output = other._output;
+    _completed = other._completed;
+
+    const_cast<CgiDelegate &>(other)._env.mvars.clear();
+    const_cast<CgiDelegate &>(other)._env.req_body.clear();
+    const_cast<CgiDelegate &>(other)._script_path.clear();
+    const_cast<CgiDelegate &>(other)._pid = -1;
+    const_cast<CgiDelegate &>(other)._stdin = NULL;
+    const_cast<CgiDelegate &>(other)._stdout = NULL;
+    const_cast<CgiDelegate &>(other)._total_written = 0;
+    const_cast<CgiDelegate &>(other)._output.clear();
+    const_cast<CgiDelegate &>(other)._completed = false;
+  }
+  return *this;
+}
+
 // Phase 1: create pipes, fork the CGI process, and register the parent's
 // pipe ends with the shared epoll instance. No epoll_wait() is performed
 // here - the caller's main loop is the sole owner of epoll_wait() and
@@ -1527,12 +1569,32 @@ Result<Void> CgiDelegate::register_() {
 
   if (!stdin_pipe_res.has_value())
     return ERR(Void, "Failed to create stdin pipe");
+  if (!const_cast<FileDescriptor &>(stdin_pipe_res.value().first)
+           .close_on_exec()
+           .has_value()) {
+    {
+      FileDescriptor stdin0(stdin_pipe_res.value().first);
+      FileDescriptor stdin1(stdin_pipe_res.value().second);
+    }
+    return ERR(Void, "Failed to set stdin pipe to close-on-exec mode");
+  }
   if (!stdout_pipe_res.has_value()) {
     {
       FileDescriptor stdin0(stdin_pipe_res.value().first);
       FileDescriptor stdin1(stdin_pipe_res.value().second);
     }
     return ERR(Void, "Failed to create stdout pipe");
+  }
+  if (!const_cast<FileDescriptor &>(stdout_pipe_res.value().second)
+           .close_on_exec()
+           .has_value()) {
+    {
+      FileDescriptor stdin0(stdin_pipe_res.value().first);
+      FileDescriptor stdin1(stdin_pipe_res.value().second);
+      FileDescriptor stdout0(stdout_pipe_res.value().first);
+      FileDescriptor stdout1(stdout_pipe_res.value().second);
+    }
+    return ERR(Void, "Failed to set stdout pipe to close-on-exec mode");
   }
 
   pid_t pid = fork();
@@ -1576,6 +1638,12 @@ Result<Void> CgiDelegate::register_() {
     char *argv[2];
     argv[0] = const_cast<char *>(_script_path.c_str());
     argv[1] = NULL;
+
+    std::vector<std::string> paths = utils::string_split(_script_path, "/");
+    paths.pop_back();
+    std::string path = utils::join(paths, "/");
+
+    chdir(path.c_str());
 
     execve(_script_path.c_str(), argv, envp);
 
@@ -1698,8 +1766,8 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
     _epoll.del_fd(*_stdin);
     delete _stdin;
     _stdin = NULL;
+    return OKV;
   }
-  return OKV;
 
   // is_stdout
   if (ev->in || ev->hup || ev->rdhup) {

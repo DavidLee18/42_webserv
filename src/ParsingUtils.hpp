@@ -57,5 +57,8 @@ int count_occurrences(const std::string &line, const std::string &delim);
  * @return ch가 제거된 문자열
  */
 std::string remove_char(std::string s, char ch);
+
+std::string join(const std::vector<std::string> &elements,
+                 const std::string &delimiter);
 } // namespace utils
 #endif

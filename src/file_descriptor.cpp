@@ -384,3 +384,9 @@ bool operator==(const int &lhs, const FileDescriptor &rhs) {
 bool operator!=(const int &lhs, const FileDescriptor &rhs) {
   return !(lhs == rhs);
 }
+
+Result<Void> FileDescriptor::close_on_exec() {
+  if (fcntl(_fd, F_SETFD, FD_CLOEXEC) < 0)
+    return ERR(Void, "Failed to set close-on-exec flag");
+  return OKV;
+}
