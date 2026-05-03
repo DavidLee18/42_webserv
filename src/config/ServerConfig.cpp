@@ -4,6 +4,7 @@ ServerConfig::ServerConfig(FileDescriptor &file) {
   err_meg = "";
   server_response_time = 3;
   end_flag = 0;
+  count_line = 0;
   if (!parse_server_block(file)) {
     return;
   }
@@ -14,7 +15,8 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
   std::string line;
 
   while (true) {
-    Result<std::string> temp = fd.read_file_line(); // 라인 세기 추가
+    Result<std::string> temp = fd.read_file_line();
+    count_line++;
     if (temp.error() != "") {
       err_meg = "FileDescriptor Error: " + temp.error();
       return false;
@@ -26,49 +28,52 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
     } else if (temp.value() == "")
       break;
     end_flag = 0;
+
     line = utils::remove_char(temp.value(), '\n');
-    if (line[line.length() - 1] == ' ' || line[line.length() - 1] == '\t') {
-      err_meg = "Invalid line Error: [" + utils::trim_whitespace(line) + "]";
+    err_meg = utils::get_indent_whitespace_error(line, 1);
+    if (err_meg != "")
       return false;
-    }
-    if (utils::return_indent_level(line) == 1) {
-      line = utils::trim_whitespace(line);
-      if (is_header_block(line)) {
-        if (!parse_header_entry(fd, line)) {
-          err_meg = "Header syntax Error: " + err_meg;
-          return false;
-        }
-      } else if (RouteRule_CGI::matches_cgi_syntax(line)) {
-        std::string key;
-        std::map<std::string, std::string> temp;
-        err_meg = RouteRule_CGI::parse_executable(line, key, temp);
-        if (err_meg != "")
-          return false;
-        if (S_CGI.find(key) != S_CGI.end()) {
-          err_meg = "Error: \"" + line + "\" duplicate key error";
-          return false;
-        }
-        S_CGI[key] = temp;
-      } else if (is_valid_server_response_time(line))
-        parse_server_response_time(line);
-      else if (matches_route_rule_syntax(line)) {
-        if (!parse_route_rule_block(line, fd)) {
-          err_meg = "RouteRule syntax Error: " + err_meg;
-          return false;
-        }
-      } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
-        RouteRule_CGI temp(fd, line);
-        if (temp.get_err_meg() != "") {
-          err_meg = temp.get_err_meg();
-          return false;
-        }
-        R_CGI.push_back(temp);
-      } else {
-        err_meg = "Invalid line Error: " + utils::trim_whitespace(line);
+    line = utils::trim_whitespace(line);
+    
+    if (is_header_block(line)) {
+      if (!parse_header_entry(fd, line)) { // 수정해야 함
+        err_meg = "Header syntax Error: " + err_meg;
         return false;
       }
-    } else
+    } else if (RouteRule_CGI::matches_cgi_syntax(line)) {
+      std::string key;
+      std::map<std::string, std::string> temp;
+      err_meg = RouteRule_CGI::parse_executable(line, key, temp);
+      if (err_meg != "") {
+        err_meg = "on [\t" + line + err_meg;
+        return false;
+      }
+      if (S_CGI.find(key) != S_CGI.end()) {
+        err_meg = "on [\t" + line + "], [" + key + "]: The CGI server block configuration is duplicated. (CGI server block rule, each CGI path must be declared only once per server context, but the same CGI definition appears multiple times, causing a configuration conflict).";
+        return false;
+      }
+      S_CGI[key] = temp;
+    } else if (is_valid_server_response_time(line)) {
+      parse_server_response_time(line);
+      if (err_meg != "")
+        return false;
+    }
+    else if (matches_route_rule_syntax(line)) {
+      if (!parse_route_rule_block(line, fd)) { // 수정 중
+        return false;
+      }
+    } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
+      RouteRule_CGI temp(fd, line);
+      count_line += temp.get_count_line();
+      if (temp.get_err_meg() != "") {
+        err_meg = temp.get_err_meg();
+        return false;
+      }
+      R_CGI.push_back(temp);
+    } else {
+      err_meg = "on [\t" + line + "], []: The configuration line does not conform to the required server configuration syntax. (server configuration rule, each line must follow the defined config format specification, but the provided line does not match any valid syntax pattern).";
       return false;
+    }
   }
   return true;
 }
@@ -93,14 +98,24 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
                                       const std::string &line) {
   std::string temp(line);
   std::vector<std::string> key_value = utils::string_split(temp, ":");
-
-  err_meg = temp;
-  if (key_value.size() != 2)
+  std::string key;
+  
+  if (utils::count_occurrences(temp, ":") != 1) {
+    std::size_t pos = temp.find(":");
+    pos = temp.find(":", pos);
+    err_meg = "on [\t" + temp + "], [" + &temp[pos] + "]: The HTTP header contains an invalid format due to extra delimiter characters. (HTTP header structure, a header must follow the key: value format with only one : separator, but additional : characters are present, making parsing ambiguous and invalid).";
     return false;
-  std::string key = utils::string_split(key_value[0], " ")[2];
+  } else if (key_value.size() != 2) {
+    err_meg = "The HTTP header value is missing, so the request cannot be processed. (HTTP header structure, a key must have an associated value, but it is empty, making the header invalid).";
+    // if () 키가 없는 경우
+      err_meg = "The HTTP header key is missing, so the request cannot be processed. (HTTP header structure, a header must include a key to be identifiable, but the key is empty).";
+    return false;
+  }
+  key = utils::string_split(key_value[0], " ")[2];
   std::string value = utils::trim_whitespace(key_value[1]);
-  while (!temp.empty() && temp[temp.length() - 1] == ';') {
-    Result<std::string> fd_line = fd.read_file_line(); // 라인 세기 추가
+  while (temp[temp.length() - 1] == ';') {
+    Result<std::string> fd_line = fd.read_file_line();
+    count_line++;
     if (fd_line.error() != "") {
       err_meg = "FileDescriptor Error: " + fd_line.error();
       return false;
@@ -109,14 +124,11 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
       break;
     }
     temp = utils::remove_char(fd_line.value(), '\n');
-    if (utils::return_indent_level(temp) != 2 || temp[temp.length() - 1] == ' ' ||
-        temp[temp.length() - 1] == '\t') {
-      err_meg = "Error: \"" + temp + "\" Indentation or space error";
+    err_meg = utils::get_indent_whitespace_error(temp, 2);
+    if (err_meg != "")
       return false;
-    }
     value += " " + utils::trim_whitespace(temp);
   }
-  err_meg = "";
   header[key] = utils::remove_char(value, ';');
   return true;
 }
@@ -125,22 +137,24 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
 bool ServerConfig::is_valid_server_response_time(const std::string &line) {
   if (line.length() < 4 || line[0] != '.' || line[1] != '.' || line[2] != '.')
     return (false);
-  int data = 0;
-  for (size_t i = 3; i < line.length(); ++i) {
-    if (!std::isdigit(static_cast<unsigned char>(line[i])))
-      return (false);
-    data = data * 10 + (line[i] - '0');
-  }
-  if (data > 900 || 0 >= data)
-    return (false);
   return (true);
 }
 
 void ServerConfig::parse_server_response_time(std::string line) {
-  line.erase(0, 3);
-  std::stringstream ss;
-  ss << line;
-  ss >> server_response_time;
+  int data = 0;
+
+  for (size_t i = 3; i < line.length(); ++i) {
+    if (!std::isdigit(static_cast<unsigned char>(line[i]))) {
+      err_meg = "on [\t" + line + "], [" + &line[3] + "]: The response time configuration contains an invalid value type after the delimiter. (response time rule, the value after ... must consist only of numeric characters, but non-numeric characters are present, making it invalid for parsing).";
+      return ;
+    }
+    data = data * 10 + (line[i] - '0');
+  }
+  if (data > 900 || 0 >= data) {
+    err_meg = "on [\t" + line + "], [" + &line[3] + "]: The response time configuration is out of the allowed range. (response time rule, the value must be between 0 and 900 inclusive, but the provided value falls outside this range).";
+    return ;
+  }
+  server_response_time = data;
 }
 
 // RouteRule method
@@ -461,8 +475,6 @@ bool ServerConfig::has_compatible_wildcards(const PathPattern &path,
 bool ServerConfig::create_route_rules(
     const std::vector<std::string> &data,
     const std::vector<Request::Method> &mets) {
-  if (data.size() != 4)
-    return (false);
   
   RouteRule route;
   std::vector<PathPattern> path_url = expand_path_pattern(data[1]);
@@ -472,37 +484,38 @@ bool ServerConfig::create_route_rules(
   for (size_t i = 0; i < mets.size(); ++i) {
     route.method = mets[i];
     route.op = parse_rule_operator(data[2]);
-    if (route.op == UNDEFINED)
-      return (false);
+    if (route.op == UNDEFINED) {
+      err_meg = data[2] + "]: The route rule contains an undefined operator type. (route rule, the operator used in the rule is not registered in the supported operation set, so it cannot be interpreted within the routing logic).";
+      return false;
+    }
     route.index = "";
     route.auth_info = "";
     route.max_body_KB = 1;
-    if (path_url.size() < 1 || root_url.get_path().size() < 1) 
-      return (false);
 
     for (size_t j = 0; j < path_url.size(); ++j) {
       route.path = path_url[j];
       route.root = root_url;
-      if (!has_compatible_wildcards(route.path, route.root))
-        return (false);
+      if (!has_compatible_wildcards(route.path, route.root)) {
+        err_meg = route.path.to_string() + ", " + route.root.to_string() + "]: The route rule has a mismatch in wildcard usage around the operator. (route rule, the number of wildcard * occurrences in the left-hand and right-hand expressions must match, but the provided rule has inconsistent wildcard counts, making the mapping invalid).";
+        return false;
+      }
       if (route.op == REDIRECT)
         route.redirect_target = route.root;
       routes.push_back(route);
     }
   }
-  return (true);
+  return true;
 }
 
-bool ServerConfig::parse_route_rule_block(const std::string &method_line,
+bool ServerConfig::parse_route_rule_block(const std::string &route_line,
                                           FileDescriptor &fd) {
   std::string line;
   std::vector<Request::Method> mets;
-  std::vector<std::string> method_line_data =
-      utils::string_split(method_line, " ");
+  std::vector<std::string> route_line_data =
+      utils::string_split(route_line, " ");
   std::vector<std::string> method =
-      utils::string_split(method_line_data[0], "|");
+      utils::string_split(route_line_data[0], "|");
 
-  err_meg = method_line;
   for (std::size_t i = 0; i < method.size(); ++i) {
     if (method[i] == "GET")
       mets.push_back(Request::GET);
@@ -510,15 +523,16 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
       mets.push_back(Request::POST);
     else if (method[i] == "DELETE")
       mets.push_back(Request::DELETE);
-    else
-      return false;
   }
 
-  if (!create_route_rules(method_line_data, mets))
+  if (!create_route_rules(route_line_data, mets)) {
+    err_meg = "on [\t" + route_line + "], [" + err_meg;
     return false;
+  }
 
   while (true) {
-    Result<std::string> temp = fd.read_file_line(); // 라인 세기 추가
+    Result<std::string> temp = fd.read_file_line();
+    count_line++;
     if (temp.error() != "") {
       err_meg = "FileDescriptor Error: " + temp.error();
       return false;
@@ -527,14 +541,16 @@ bool ServerConfig::parse_route_rule_block(const std::string &method_line,
       end_flag += 1;
       break;
     }
+
     line = utils::remove_char(temp.value(), '\n');
-    err_meg = line;
-    if (utils::return_indent_level(line) != 2)
+    err_meg = utils::get_indent_whitespace_error(line, 2);
+    if (err_meg != "")
       return false;
-    else if (apply_route_rule_entry(mets, method_line_data[1], line))
+    else if (apply_route_rule_entry(mets, route_line_data[1], line)) { // 수정해야 함
+      if (err_meg != "")
+        return false;
       continue;
-    else
-      return false;
+    }
   }
   err_meg = "";
   return true;

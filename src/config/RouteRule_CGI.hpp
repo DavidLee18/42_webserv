@@ -46,6 +46,7 @@ private:
    * - 정상적으로 파싱이 성공했을 시 빈 문자열을 가지고 있다.
    */
   std::string err_meg;
+  std::size_t count_line;
 
   /**
    * @brief 문자열이 timeout 문법과 값 범위에 맞는지 확인하는 함수
@@ -65,7 +66,7 @@ private:
    * - 입력 문자열은 is_valid_timeout(const std::string &line) 함수로
    * 유효성이 확인된 상태여야 한다.
    */
-  double parse_timeout_value(std::string &line);
+  std::string parse_timeout_value(std::string &line);
   /**
    * @brief CGI 설정 블록을 파싱하여 실행 파일, 환경 변수, timeout 정보를
    * 저장하는 함수
@@ -93,11 +94,12 @@ public:
    */
   RouteRule_CGI(FileDescriptor &fd, const std::string &line);
 
-  const PathPattern get_path() const { return path; }
-  Request::Method get_method () const { return met; }
-  const std::string get_err_meg() const { return err_meg; }
-  const std::string get_executable() const { return executable; }
-  const std::map<std::string, std::string> get_env() const { return env; }
+  const PathPattern get_path(void) const { return path; }
+  Request::Method get_method (void) const { return met; }
+  const std::string get_err_meg(void) const { return err_meg; }
+  const std::string get_executable(void) const { return executable; }
+  const std::map<std::string, std::string> get_env(void) const { return env; }
+  std::size_t get_count_line(void) const { return count_line; }
   double get_timeout() const { return timeout; }
 
   /**

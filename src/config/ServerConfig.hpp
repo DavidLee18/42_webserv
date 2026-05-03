@@ -175,6 +175,7 @@ private:
    * @brief server 블록 종료 판단을 위한 상태값을 저장하는 멤버 변수
    */
   int end_flag;
+  std::size_t count_line;
 
   /**
    * @brief server 블록의 최상위 설정 항목들을 파싱하는 함수
@@ -413,6 +414,7 @@ public:
   const std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
   const CGI get_serve_cgi() const { return S_CGI; }
   const std::vector<RouteRule> &get_routes(void) const { return routes; }
+  std::size_t get_count_line(void) const { return count_line; }
   int get_server_response_time(void) const {
     return server_response_time;
   }

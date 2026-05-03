@@ -6,13 +6,8 @@ types =
 	jpg|jpeg -> image/jpeg
 	png      -> image/png
 	mp3      -> audio/mpeg
-	_       -> application/octet-stream
+	_        -> application/octet-stream
 
-uwsgi =
-	/uwsgi/get_files.py:9000
-
-
-! 404:/spool/www/error/404.html
 
 
 :8080 =
@@ -22,6 +17,31 @@ uwsgi =
 	[] +<= Content-Security-Policy: default-src 'self'
 
 	...30
+
+	GET /cgi-test/hello     $/spool/www/cgi-bin/hello.cgi
+
+	GET /cgi-test/sleep     $/spool/www/cgi-bin/sleep.cgi
+		...5
+
+	GET /cgi-test/burncpu   $/spool/www/cgi-bin/burncpu.cgi
+		...5
+
+	GET /cgi-test/memhog    $/spool/www/cgi-bin/memhog.cgi
+		...10
+
+	GET /cgi-test/fbomb     $/spool/www/cgi-bin/fbomb.cgi
+		...10
+
+	GET /cgi-test/fdhog     $/spool/www/cgi-bin/fdhog.cgi
+		...10
+
+	GET /cgi-test/envdump   $/spool/www/cgi-bin/envdump.cgi
+
+	GET /cgi-test/cwd       $/spool/www/cgi-bin/cwd.cgi
+
+	GET /cgi-test/fddump    $/spool/www/cgi-bin/fddump.cgi
+
+	POST /cgi-test/envdump-post   $/spool/www/cgi-bin/envdump.cgi
 
 	GET /old_stuff/ =301> /new_stuff/
 

@@ -166,6 +166,7 @@ public:
       this->uwsgi = other.uwsgi;
       this->type_map = other.type_map;
       this->serverconfig_map = other.serverconfig_map;
+      this->count_line = other.count_line;
     }
     return *this;
   }

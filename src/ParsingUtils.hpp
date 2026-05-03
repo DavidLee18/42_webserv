@@ -5,6 +5,8 @@
 #include "file_descriptor.h"
 #include <cstdlib>
 #include <vector>
+#include <unistd.h>
+#include <sys/stat.h>
 
 namespace utils {
 /**

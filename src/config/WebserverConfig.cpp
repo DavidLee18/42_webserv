@@ -39,7 +39,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (!parse_types_block(file))
         return false;
     } else if (WebserverConfig::is_server_config_header(line)) {
-      if (!parse_server_config_entry(file, line)) // 수정해야함 3
+      if (!parse_server_config_entry(file, line)) // 수정 중
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
       err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi, count_line);
@@ -269,11 +269,12 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
                                                 const std::string &line) {
   unsigned int key;
   std::string temp(line);
-  ServerConfig config(file);
+  ServerConfig sever(file);
 
   key = WebserverConfig::parse_server_port(temp);
-  if (config.get_err_meg() != "") {
-    err_meg = config.get_err_meg();
+  if (sever.get_err_meg() != "") {
+    err_meg = sever.get_err_meg();
+    count_line += sever.get_count_line();
     return (false);
   }
   if (serverconfig_map.find(key) != serverconfig_map.end()) {
@@ -283,7 +284,7 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
     err_meg = "on [\t" + line + "], [" + oss.str() + "]:Violates configuration rule (server block is declared more than once).";
     return (false);
   }
-  serverconfig_map[key] = config;
+  serverconfig_map[key] = sever;
   return (true);
 }
 
