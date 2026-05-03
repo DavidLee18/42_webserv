@@ -192,7 +192,7 @@ class ServerConfig {
    *
    * - 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
    */
-  bool parse_server_block(FileDescriptor &fd);
+  bool parse_server_block(const FileDescriptor &fd);
   /**
    * @brief 문자열이 "[] +<=" 형식의 header 설정 시작 줄인지 검사하는 함수
    * @param line 검사할 문자열

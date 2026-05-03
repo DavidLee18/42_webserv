@@ -8,9 +8,6 @@ types =
 	mp3      -> audio/mpeg
 	_        -> application/octet-stream
 
-uwsgi =
-	/uwsgi/get_files.py:9000
-
 
 :8080 =
 	[] +<= X-Content-Type-Options: nosniff
@@ -47,7 +44,7 @@ uwsgi =
 		...10
 		AUTH_INFO=/spool/www/auth_info
 
-	DELETE *    $gen_html.cgi(AUTH_INFO=/spool/www/auth_info)
+	DELETE *  $gen_html.cgi
 
 
 

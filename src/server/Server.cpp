@@ -430,29 +430,29 @@ Result<Void> Server::start() {
           disconnect(fd);
         }
       } else { // CGI
-        std::vector<const FileDescriptor *> completed_cgis;
+        std::vector<const FileDescriptor *> reap_cgis;
         for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
                  cgis.begin();
              it != cgis.end(); ++it) {
           Result<Void> res = it->second.handle_event(event);
-          if (!res.has_value())
+          if (!res.has_value()) {
             std::cerr << "CGI event handling failure: " << res.error()
                       << std::endl;
-          else {
+            // TODO: generate 502 Bad Gateway Response
+            reap_cgis.push_back(it->first);
+          } else {
             Result<std::string> output = it->second.poll();
             if (output.has_value()) {
               clients.at(it->first).out_buff += output.value();
               client_write(it->first);
-              disconnect(it->first);
-              completed_cgis.push_back(it->first);
+              reap_cgis.push_back(it->first);
             }
           }
         }
         for (std::vector<const FileDescriptor *>::iterator it =
-                 completed_cgis.begin();
-             it != completed_cgis.end(); ++it) {
+                 reap_cgis.begin();
+             it != reap_cgis.end(); ++it)
           cgis.erase(*it);
-        }
       }
     }
   }

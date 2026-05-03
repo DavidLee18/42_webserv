@@ -81,8 +81,9 @@ void Session::clean_expired_sessions(const int timeout_seconds) {
     }
 }
 
-bool Session::get_session_info(const std::string& session_id, int timeout_seconds,
-                                std::string& user_id, int& elapsed_seconds, int& remaining_seconds) {
+bool Session::get_session_info(const std::string &session_id,
+                               const int timeout_seconds, std::string &user_id,
+                               int &elapsed_seconds, int &remaining_seconds) {
   const std::map<std::string, SessionData>::iterator it = data.find(session_id);
   if (it == data.end())
     return false;

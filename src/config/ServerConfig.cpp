@@ -9,7 +9,7 @@ ServerConfig::ServerConfig(FileDescriptor &file) {
   }
   }
 
-bool ServerConfig::parse_server_block(FileDescriptor &fd) {
+bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
 
     while (true) {
     Result<std::string> temp = fd.read_file_line();

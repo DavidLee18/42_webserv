@@ -1617,9 +1617,7 @@ Result<Void> CgiDelegate::register_() {
     _stdout = NULL;
 
     char **envp = _env.to_envp();
-    char *argv[2];
-    argv[0] = const_cast<char *>(_script_path.c_str());
-    argv[1] = NULL;
+    char *argv[2] = {const_cast<char *>(_script_path.c_str()), NULL};
 
     size_t last_slash = _script_path.rfind('/');
     std::string path;
@@ -1751,7 +1749,8 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
     // is_stdout
     if (ev->in || ev->hup || ev->rdhup) {
       char buffer[4096];
-      Result<ssize_t> bytes_read = _stdout->pipe_read(buffer, sizeof(buffer));
+      const Result<ssize_t> bytes_read =
+          _stdout->pipe_read(buffer, sizeof(buffer));
       if (bytes_read.has_value() && bytes_read.value() > 0) {
         _output.append(buffer, static_cast<size_t>(bytes_read.value()));
         return OKV;

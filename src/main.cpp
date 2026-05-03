@@ -9,32 +9,17 @@ int main(const int argc, char *argv[]) {
     return 1;
   }
   Result<FileDescriptor> fd = FileDescriptor::open_file(argv[1]);
-  if (!fd.error().empty()) {
-    std::cerr << "file open failed: " << fd.error() << std::endl;
-    return 1;
-  }
+  PANIC(fd)
   const Result<WebserverConfig> result_config =
       WebserverConfig::parse(fd.value_mut());
-  if (!result_config.error().empty()) {
-    std::cerr << "config parsing failed: " << result_config.error()
-              << std::endl;
-    return 1;
-  } else {
-
-    // std::cout << result_config.value() << std::endl;
-    const WebserverConfig &config = result_config.value();
-    Server server(config);
-    const Result<Void> init_result = server.init();
-    if (!init_result.has_value()) {
-      std::cerr << "Server init failed: " << init_result.error() << std::endl;
-      return 1;
-    }
-    const Result<Void> server_result = server.start();
-    if (!server_result.has_value()) {
-      std::cerr << "Server Error: " << server_result.error() << std::endl;
-      return 1;
-    }
-  }
+  PANIC(result_config)
+  // std::cout << result_config.value() << std::endl;
+  const WebserverConfig &config = result_config.value();
+  Server server(config);
+  const Result<Void> init_result = server.init();
+  PANIC(init_result)
+  const Result<Void> server_result = server.start();
+  PANIC(server_result)
   return 0;
 }
 

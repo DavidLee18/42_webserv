@@ -71,11 +71,12 @@ Result<EPoll> EPoll::create(const unsigned short sz) {
   EPoll ep;
   ep._size = sz;
   const Result<FileDescriptor> rfdesc = FileDescriptor::from_raw(fd);
-  if (!rfdesc.error().empty()) {
+  if (!rfdesc.has_value())
     return ERR(EPoll, rfdesc.error());
-  }
   const FileDescriptor& fdesc = rfdesc.value();
   ep._fd = fdesc;
+  if (!ep._fd.close_on_exec().has_value())
+    return ERR(EPoll, "failed to set epoll to close-on-exec mode");
   return OK(EPoll, ep);
 }
 

@@ -26,8 +26,8 @@ std::string get_string_from_map(const std::map<std::string, std::string>& map,
 }
 
 static std::string get_http_date() {
-  time_t now = std::time(NULL);
-  struct tm *timeinfo = std::gmtime(&now);
+  const time_t now = std::time(NULL);
+  const struct tm *timeinfo = std::gmtime(&now);
   char buffer[100];
   std::strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", timeinfo);
   return std::string(buffer);
@@ -139,15 +139,17 @@ Response ServerResponse::http_response(
 
   switch (request->get_method()) {
   case Request::DELETE:
-    response = ServerResponse::delete_method(target, response, config, rule, mime_type);
+    response = ServerResponse::delete_method(target, response, config, rule,
+                                             mime_type);
     break;
   case Request::POST:
-    response = ServerResponse::post_method(target, response, client, rule, request,
-                                     session, mime_type);
+    response = ServerResponse::post_method(target, response, client, rule,
+                                           request, session, mime_type);
     break;
   case Request::HEAD:
   case Request::GET:
-    response = ServerResponse::get_method(target, response, config, rule, request, mime_type);
+    response = ServerResponse::get_method(target, response, config, rule,
+                                          request, mime_type);
     break;
   default:
     response = error_response(config, rule, METHOD_NOT_ALLOWED, mime_type);
@@ -304,7 +306,7 @@ std::string ServerResponse::get_pwd() {
 
 Response ServerResponse::error_response(const ServerConfig *config,
                                         const RouteRule *rule, int error_code,
-                                        std::map<std::string, std::string>mime_type) {
+    const std::map<std::string, std::string> &mime_type) {
   std::string err_page =
       get_pwd() + get_string_from_map(rule->error_pages, error_code);
   std::cout << "error page: " << err_page << std::endl;
@@ -535,7 +537,7 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
 Response ServerResponse::delete_method(const Target& target, Response response,
                                        const ServerConfig *config,
                                        const RouteRule *rule,
-                                       std::map<std::string, std::string> mime_type) {
+    const std::map<std::string, std::string> &mime_type) {
   if (unlink(target.path.c_str()) == 0) {
     response.status_code = "204 No Content";
     return response;
@@ -548,7 +550,7 @@ Response ServerResponse::post_method(const Target& target, Response response,
                                      const ClientSession *client,
                                      const RouteRule *rule,
                                      const Request *request, Session *session,
-                                     std::map<std::string, std::string> mime_type) {
+    const std::map<std::string, std::string> &mime_type) {
   (void)target;
   const ServerConfig *config = client->config;
 
@@ -687,7 +689,8 @@ Response ServerResponse::post_method(const Target& target, Response response,
           break;
         }
 
-        std::string file_path = upload_path + "/" + filename;
+        std::string file_path = upload_path + "/";
+        file_path += filename;
         std::cout << "Uploading file: " << file_path
                   << " (size: " << part_data.length() << ")" << std::endl;
         std::cout << "First 20 bytes (hex): ";
@@ -748,7 +751,7 @@ Response ServerResponse::get_method(Target target, Response response,
                                     const ServerConfig *config,
                                     const RouteRule *rule,
                                     const Request *request,
-                                    std::map<std::string, std::string> mime_type) {
+    const std::map<std::string, std::string> &mime_type) {
   // Handle error responses (NOT_FOUND_ERR, FORBIDDEN_ERR)
   if (target.type == NOT_FOUND_ERR)
     return error_response(config, rule, NOT_FOUND_ERR, mime_type);
