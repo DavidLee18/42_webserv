@@ -148,8 +148,6 @@ public:
 
   bool has_keep_alive() const { return keep_alive; }
 
-  bool has_connection_close() const { return connection_close; }
-
   void continue_parsing(std::string &);
 
 private:
@@ -157,19 +155,18 @@ private:
   std::string path;    ///< The requested path (e.g., "/").
   std::string version; ///< The HTTP version (e.g., "HTTP/1.1").
   std::map<std::string, std::string> header; ///< Parsed HTTP headers.
-  bool keep_alive;                           ///< Connection keep-alive status.
-  bool connection_close;                     ///< Connection: close flag.
+  bool keep_alive;                           ///< Connection keep-alive status (HTTP/1.1 default: true).
   size_t content_length;
   std::string cookie;
   std::string body;     ///< The request body, if any.
   std::string remnants; ///< remaining string to parse.
 
   Request()
-      : method(ERROR), path(), version(), header(), keep_alive(false),
-        connection_close(false), content_length(0), cookie(), body(), remnants() {}
+      : method(ERROR), path(), version(), header(), keep_alive(true),
+        content_length(0), cookie(), body(), remnants() {}
   Request(const Method method, std::string const &path, std::string const &version, const size_t content_length)
-      : method(method), path(path), version(version), keep_alive(false),
-        connection_close(false), content_length(content_length) {}
+      : method(method), path(path), version(version), keep_alive(true),
+        content_length(content_length) {}
 };
 
 #endif

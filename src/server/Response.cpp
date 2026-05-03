@@ -77,9 +77,8 @@ Response ServerResponse::http_response(
   if (rule == NULL)
     return DefaultError::default_err_response(NOT_FOUND_ERR);
   Response response;
-  response.keep_alive = false;
-  response.should_close = request->has_connection_close();
-  if (request->has_connection_close())
+  response.should_close = !request->has_keep_alive();
+  if (!request->has_keep_alive())
     response.connection = "close";
   else
     response.connection = "keep-alive";
