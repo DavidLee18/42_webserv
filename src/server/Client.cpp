@@ -24,7 +24,10 @@ std::string Request::get_method_string() const {
 }
 
 std::string Request::get_connection_string() const {
-  return connection;
+  if (keep_alive)
+    return "keep-alive";
+  else
+    return "close";
 }
 
 std::string Request::get_cookie_value(const std::string &name) const {
@@ -182,7 +185,13 @@ Result<Request *> Request::from_buff(std::string &buff) {
     }
   }
 
-  req->connection = get_string_from_map(req->header, "Connection");
+  std::string connection_header = get_string_from_map(req->header, "Connection");
+  // If empty (no Connection header), HTTP/1.1 defaults to keep-alive
+  if (connection_header.empty())
+    req->header["Connection"] = "keep-alive";
+  // keep_alive defaults to true; only set false if client explicitly requests close
+  if (connection_header == "close")
+    req->keep_alive = false;
 
   req->cookie = get_string_from_map(req->header, "Cookie");
 

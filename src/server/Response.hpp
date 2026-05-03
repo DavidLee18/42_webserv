@@ -72,6 +72,8 @@ struct Response {
   std::string body;         ///< The response body payload.
   std::string mime_type; ///< The determined MIME type of the response payload.
   std::string redir;     ///< Redirect location, if applicable.
+  bool keep_alive;       ///< Connection keep-alive status.
+  bool should_close;     ///< Whether to close connection after sending response.
   std::string cgi;       ///< Generated CGI script.
   std::map<std::string, std::string> headers; ///< Additional response headers from config.
 
@@ -93,6 +95,15 @@ class ServerConfig;
 class ServerResponse {
 public:
   static std::string find_file_type(const std::string &path);
+
+  /**
+   * @brief Determines MIME type based on file extension.
+   *
+   * @param ext File extension (without dot).
+   * @return MIME type string (defaults to "text/html" for unknown types).
+   */
+  static std::string get_mime_type_for_extension(const std::string &ext);
+
   /**
    * @brief Generates an Response based on the client request and server
    * configuration.
@@ -165,7 +176,8 @@ private:
    * @return std::string Path to the configured error file.
    */
   static Response error_response(const ServerConfig *config,
-                                 const RouteRule *rule, int error_code);
+                                 const RouteRule *rule, int error_code,
+                                 std::map<std::string, std::string>mime_type);
 
   /**
    * @brief Generates an HTML page listing the contents of a directory
@@ -206,14 +218,17 @@ private:
 
   static Response delete_method(const Target &target, Response response,
                                 const ServerConfig *config,
-                                const RouteRule *rule);
+                                const RouteRule *rule,
+                                std::map<std::string, std::string> mime_type);
   static Response post_method(const Target &target, Response response,
                               const ClientSession *client,
                               const RouteRule *rule, const Request *request,
-                              Session *session);
+                              Session *session,
+                              std::map<std::string, std::string> mime_type);
   static Response get_method(Target target, Response response,
                              const ServerConfig *config, const RouteRule *rule,
-                             const Request *request);
+                             const Request *request,
+                             std::map<std::string, std::string> mime_type);
 };
 
 #endif

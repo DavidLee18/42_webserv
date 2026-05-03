@@ -5,6 +5,8 @@
 #include <string>
 #include <map>
 
+#define TIMEOUT_SECONDS 300
+
 struct SessionData
 {
   std::string user_id;    ///< login user id

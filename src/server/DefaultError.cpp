@@ -86,7 +86,8 @@ Response DefaultError::default_err_response(const int err_code) {
   response.version = "HTTP/1.1";
   response.mime_type = "text/html";
   response.status_code = status_code_to_string(err_code);
-  response.connection = "close";
+  response.keep_alive = false;
+  response.connection = "keep-alive";
   if (err_code == BAD_REQUEST)
     response.body = bad_request();
   else if (err_code == FORBIDDEN_ERR)

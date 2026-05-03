@@ -134,7 +134,6 @@ void Server::client_read(const FileDescriptor *client_fd) {
       }
 
       clients.at(client_fd).req = req_.value();
-
       if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
       {
         if (peer_closed)
@@ -178,11 +177,22 @@ void Server::client_read(const FileDescriptor *client_fd) {
       std::ostringstream server_response;
 
       server_response << http;
+      std::cout << "http: " << http << std::endl;
 
       delete clients.at(client_fd).req;
       clients.at(client_fd).req = NULL;
 
       clients.at(client_fd).out_buff += server_response.str();
+
+      // If client sent "Connection: close", close after sending response
+      if (http.should_close) {
+        client_write(client_fd);
+        if (clients.find(client_fd) != clients.end() &&
+            clients.at(client_fd).out_buff.empty()) {
+          disconnect(client_fd);
+        }
+        return;
+      }
     } else {
       clients.at(client_fd).req->continue_parsing(in_buffer);
       if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
@@ -229,6 +239,16 @@ void Server::client_read(const FileDescriptor *client_fd) {
       clients.at(client_fd).req = NULL;
 
       clients.at(client_fd).out_buff += server_response.str();
+
+      // If client sent "Connection: close", close after sending response
+      if (http.should_close) {
+        client_write(client_fd);
+        if (clients.find(client_fd) != clients.end() &&
+            clients.at(client_fd).out_buff.empty()) {
+          disconnect(client_fd);
+        }
+        return;
+      }
     }
   }
   client_write(client_fd); // when the response is generated freshly, likely
