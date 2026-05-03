@@ -227,13 +227,17 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
     target.path += root;
     if (rule->op == SERVE_FROM && request->get_path() == "/")
       target.path += rule->index;
-  } else if (type == NOT_FOUND_ERR)
+    target.type = check_path_type(target.path);
+  } else if (type == NOT_FOUND_ERR) {
     target.path += get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
-  else if (type == FORBIDDEN_ERR)
+    target.type = NOT_FOUND_ERR;  // Keep error code, don't check path type
+  } else if (type == FORBIDDEN_ERR) {
     target.path += get_string_from_map(rule->error_pages, FORBIDDEN_ERR);
-  else
+    target.type = FORBIDDEN_ERR;  // Keep error code, don't check path type
+  } else {
     target.path += root;
-  target.type = check_path_type(target.path);
+    target.type = check_path_type(target.path);
+  }
 
   std::cout << "target path: " << target.path << std::endl;
   std::cout << "rule index: " << rule->index << std::endl;
@@ -689,6 +693,12 @@ Response ServerResponse::get_method(Target target, Response response,
                                     const ServerConfig *config,
                                     const RouteRule *rule,
                                     const Request *request) {
+  // Handle error responses (NOT_FOUND_ERR, FORBIDDEN_ERR)
+  if (target.type == NOT_FOUND_ERR)
+    return error_response(config, rule, NOT_FOUND_ERR);
+  if (target.type == FORBIDDEN_ERR)
+    return error_response(config, rule, FORBIDDEN_ERR);
+
   if (rule->op == REDIRECT) {
     std::cout << "=== redirection ===" << std::endl;
     target.type = MOVED_PERMANENTLY;
