@@ -267,6 +267,7 @@ Response ServerResponse::error_response(const ServerConfig *config,
   if (file.is_open()) {
     response.status_code = status_code_to_string(error_code);
     response.headers = config->get_header();
+    response.mime_type = "text/html";
     std::ostringstream ss;
     ss << file.rdbuf();
     response.body = ss.str();
