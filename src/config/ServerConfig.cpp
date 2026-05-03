@@ -339,17 +339,13 @@ int ServerConfig::parse_error_page_entry(std::string &line) {
 bool ServerConfig::apply_route_rule_entry(
     const std::vector<Request::Method> &mets, const std::string &key_data,
     const std::string &line) {
-  if (line.empty())
-    return false;
-  if (std::isspace(static_cast<unsigned char>(line[line.size() - 1])))
-    return false;
 
   std::vector<std::string> rule =
-      utils::string_split(utils::trim_whitespace(line), " ");
+      utils::string_split(line, " ");
   std::size_t size = rule.size();
   PathPattern key(key_data);
 
-  if (size < 2)
+  if (size != 2)
     return false;
 
   // Find or create routes for each method with this path pattern
@@ -399,22 +395,20 @@ bool ServerConfig::apply_route_rule_entry(
     // invalidation)
     if (rule[0] == "?") {
       std::string index = get_valid_index_file(rule[1]);
-      if (size != 2 || index == "")
+      if (index == "")
         return false;
       routes[targetRouteIndex].index = index;
     } else if (rule[0] == "@") {
-      if (size != 2)
-        return false;
       routes[targetRouteIndex].auth_info = rule[1];
     } else if (rule[0] == "->{}") {
       int max = parse_max_body_size(rule[1]);
-      if (max == -1 || size != 2)
+      if (max == -1)
         return false;
       routes[targetRouteIndex].max_body_KB = max;
     } else if (rule[0] == "!") {
       std::string errPageLine = rule[1]; // Make a copy to avoid modification
       int err_key = parse_error_page_entry(errPageLine); // WebserverConfig::apply_default_err_page_entry 함수로 수정 해야함
-      if (err_key == 0 || size != 2)
+      if (err_key == 0)
         return false;
       routes[targetRouteIndex].error_pages[err_key] = errPageLine; 
     } else
