@@ -290,13 +290,16 @@ Result<Void> Server::init() {
     if (!nb_result.has_value())
       return ERR(Void, "set nonblocking fail: " + nb_result.error());
 
+    Result<Void> close_on_exec_result = server_fd.close_on_exec();
+    if (!close_on_exec_result.has_value())
+      return ERR(Void, "close on exec fail: " + close_on_exec_result.error());
+
     // Port reusing option
     int opt = 1;
     Result<Void> reuseaddr_result = server_fd.set_socket_option(
         SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
     if (!reuseaddr_result.has_value())
-      std::cerr << "WARNING: SO_REUSEADDR failed: " << reuseaddr_result.error()
-                << std::endl;
+      return ERR(Void, "SO_REUSEADDR failed: " + reuseaddr_result.error());
 
     // Bind (associate IP and port)
     in_addr addr = {};
@@ -334,7 +337,7 @@ Result<Void> Server::start() {
   std::cout << "Starting server loop..." << std::endl;
   while (true) {
     // Check for client timeouts and calculate epoll timeout
-    time_t now = time(NULL);
+    const time_t now = time(NULL);
     int epoll_timeout = -1; // Default: wait indefinitely
 
     // Collect clients to disconnect (avoid modifying map during iteration)
@@ -343,38 +346,36 @@ Result<Void> Server::start() {
     for (std::map<const FileDescriptor *, ClientSession>::iterator it = clients.begin();
          it != clients.end(); ++it) {
       const FileDescriptor *client_fd = it->first;
-      ClientSession &session = it->second;
+      const ClientSession &session = it->second;
 
       if (session.config == NULL)
         continue;
 
-      int timeout_sec = session.config->get_server_response_time();
+      const int timeout_sec = session.config->get_server_response_time();
       if (timeout_sec > 0) {
-        time_t elapsed = now - session.last_activity_time;
-        if (elapsed >= static_cast<time_t>(timeout_sec)) {
+        const time_t elapsed = now - session.last_activity_time;
+        if (elapsed >= static_cast<time_t>(timeout_sec))
           // Client has timed out
           clients_to_disconnect.push_back(client_fd);
-        } else {
+        else {
           // Calculate remaining time until this client times out
-          int remaining = timeout_sec - static_cast<int>(elapsed);
-          if (epoll_timeout == -1 || remaining < epoll_timeout) {
+          const int remaining = timeout_sec - static_cast<int>(elapsed);
+          if (epoll_timeout == -1 || remaining < epoll_timeout)
             epoll_timeout = remaining * 1000; // Convert to milliseconds
-          }
         }
       }
     }
 
     // Disconnect timed-out clients
-    for (size_t i = 0; i < clients_to_disconnect.size(); ++i) {
+    for (size_t i = 0; i < clients_to_disconnect.size(); ++i)
       disconnect(clients_to_disconnect[i]);
-    }
 
     // Clean expired sessions (use the first server's timeout as default)
     if (clients.begin() != clients.end()) {
-      int session_timeout = clients.begin()->second.config->get_server_response_time();
-      if (session_timeout > 0) {
+      const int session_timeout =
+          clients.begin()->second.config->get_server_response_time();
+      if (session_timeout > 0)
         sessions.clean_expired_sessions(session_timeout);
-      }
     }
 
     // Waiting for events using epoll
@@ -382,19 +383,14 @@ Result<Void> Server::start() {
     if (!events_result.has_value()) {
       if (events_result.error() == Errors::interrupted)
         continue;
-      else {
-        std::cerr << "ERROR: " << events_result.error() << std::endl;
-        break;
-      }
+      std::cerr << "ERROR: " << events_result.error() << std::endl;
+      break;
     }
 
-    Events events = events_result.value();
-    while (!events.is_end()) {
+    for (Events events = events_result.value(); !events.is_end(); ++events) {
       Result<const Event *> ev_result = *events;
-      if (!ev_result.has_value()) {
-        ++events;
+      if (!ev_result.has_value())
         continue;
-      }
 
       const Event *event = ev_result.value();
       const FileDescriptor *fd = event->fd;
@@ -414,6 +410,7 @@ Result<Void> Server::start() {
           disconnect(fd);
         }
       } else { // CGI
+        std::vector<const FileDescriptor *> completed_cgis;
         for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
                  cgis.begin();
              it != cgis.end(); ++it) {
@@ -421,13 +418,25 @@ Result<Void> Server::start() {
           if (!res.has_value())
             std::cerr << "CGI event handling failure: " << res.error()
                       << std::endl;
+          else {
+            Result<std::string> output = it->second.poll();
+            if (output.has_value()) {
+              clients.at(it->first).out_buff += output.value();
+              client_write(it->first);
+              disconnect(it->first);
+              completed_cgis.push_back(it->first);
+            }
+          }
+        }
+        for (std::vector<const FileDescriptor *>::iterator it =
+                 completed_cgis.begin();
+             it != completed_cgis.end(); ++it) {
+          cgis.erase(*it);
         }
       }
-
-      ++events;
     }
   }
 
   clients.clear();
-  return OK(Void, Void());
+  return OKV;
 }

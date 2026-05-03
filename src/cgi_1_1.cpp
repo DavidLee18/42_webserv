@@ -1528,30 +1528,10 @@ static void terminate_child(const pid_t pid) {
   (void)waitpid_nohang(pid, NULL);
 }
 
-CgiDelegate &CgiDelegate::operator=(const CgiDelegate &other) {
-  if (this != &other) {
-    _env = other._env;
-    _script_path = other._script_path;
-    const_cast<Request &>(_req) = other._req;
-    _epoll = other._epoll;
-    _pid = other._pid;
-    _stdin = other._stdin;
-    _stdout = other._stdout;
-    _total_written = other._total_written;
-    _output = other._output;
-    _completed = other._completed;
-
-    const_cast<CgiDelegate &>(other)._env.mvars.clear();
-    const_cast<CgiDelegate &>(other)._env.req_body.clear();
-    const_cast<CgiDelegate &>(other)._script_path.clear();
-    const_cast<CgiDelegate &>(other)._pid = -1;
-    const_cast<CgiDelegate &>(other)._stdin = NULL;
-    const_cast<CgiDelegate &>(other)._stdout = NULL;
-    const_cast<CgiDelegate &>(other)._total_written = 0;
-    const_cast<CgiDelegate &>(other)._output.clear();
-    const_cast<CgiDelegate &>(other)._completed = false;
-  }
-  return *this;
+CgiDelegate &
+CgiDelegate::operator=(const CgiDelegate &other) throw(std::logic_error) {
+  (void)other;
+  throw std::logic_error("CgiDelegate assignment not allowed");
 }
 
 // Phase 1: create pipes, fork the CGI process, and register the parent's
@@ -1569,21 +1549,23 @@ Result<Void> CgiDelegate::register_() {
 
   if (!stdin_pipe_res.has_value())
     return ERR(Void, "Failed to create stdin pipe");
-  if (!const_cast<FileDescriptor &>(stdin_pipe_res.value().first)
-           .close_on_exec()
-           .has_value()) {
-    {
-      FileDescriptor stdin0(stdin_pipe_res.value().first);
-      FileDescriptor stdin1(stdin_pipe_res.value().second);
-    }
-    return ERR(Void, "Failed to set stdin pipe to close-on-exec mode");
-  }
   if (!stdout_pipe_res.has_value()) {
     {
       FileDescriptor stdin0(stdin_pipe_res.value().first);
       FileDescriptor stdin1(stdin_pipe_res.value().second);
     }
     return ERR(Void, "Failed to create stdout pipe");
+  }
+  if (!const_cast<FileDescriptor &>(stdin_pipe_res.value().first)
+           .close_on_exec()
+           .has_value()) {
+    {
+      FileDescriptor stdin0(stdin_pipe_res.value().first);
+      FileDescriptor stdin1(stdin_pipe_res.value().second);
+      FileDescriptor stdout0(stdout_pipe_res.value().first);
+      FileDescriptor stdout1(stdout_pipe_res.value().second);
+    }
+    return ERR(Void, "Failed to set stdin pipe to close-on-exec mode");
   }
   if (!const_cast<FileDescriptor &>(stdout_pipe_res.value().second)
            .close_on_exec()
@@ -1639,11 +1621,17 @@ Result<Void> CgiDelegate::register_() {
     argv[0] = const_cast<char *>(_script_path.c_str());
     argv[1] = NULL;
 
-    std::vector<std::string> paths = utils::string_split(_script_path, "/");
-    paths.pop_back();
-    std::string path = utils::join(paths, "/");
+    size_t last_slash = _script_path.rfind('/');
+    std::string path;
+    if (last_slash == std::string::npos)
+      path = getenv("PWD") ? getenv("PWD") + std::string("/") + path : "/";
+    else
+      path = _script_path.substr(0, last_slash + 1);
 
-    chdir(path.c_str());
+    if (chdir(path.c_str()) != 0) {
+      std::cerr << "Failed to change directory to: " << path << std::endl;
+      std::exit(1);
+    }
 
     execve(_script_path.c_str(), argv, envp);
 
@@ -1723,21 +1711,12 @@ Result<Void> CgiDelegate::register_() {
 // Caller is expected to filter events and only forward those belonging to
 // fds this delegate registered. Unknown events are ignored.
 Result<Void> CgiDelegate::handle_event(const Event *ev) {
-  if (ev == NULL || ev->fd == NULL) {
+  if (ev == NULL || ev->fd == NULL)
     return OKV;
-  }
-
-  const bool is_stdin = (_stdin != NULL && *ev->fd == *_stdin);
-  const bool is_stdout = (_stdout != NULL && *ev->fd == *_stdout);
-
-  if (!is_stdin && !is_stdout) {
-    return OKV; // not for us
-  }
-
-  if (is_stdin) {
+  if (_stdin != NULL && *ev->fd == *_stdin) {
     if (ev->err)
       return ERR(Void, "EPoll error on CGI stdin");
-    if (ev->hup || ev->rdhup) {
+    else if (ev->hup || ev->rdhup) {
       if (_total_written < _req.get_body().length())
         return ERR(Void,
                    "CGI process closed stdin before all data was written");
@@ -1747,67 +1726,69 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       _stdin = NULL;
       return OKV;
     }
-    if (ev->out && _total_written < _req.get_body().length()) {
-      const Result<ssize_t> written =
-          _stdin->pipe_write(_req.get_body().c_str() + _total_written,
-                             _req.get_body().length() - _total_written);
-      if (written.has_value() && written.value() > 0)
-        _total_written += static_cast<size_t>(written.value());
-      else if (written.has_value() && written.value() == 0)
-        return ERR(Void, "CGI process closed stdin prematurely");
-      else
-        return ERR(Void, "Failed to write to CGI stdin");
+    if (ev->out) {
+      if (_total_written < _req.get_body().length()) {
+        const Result<ssize_t> written =
+            _stdin->pipe_write(_req.get_body().c_str() + _total_written,
+                               _req.get_body().length() - _total_written);
+        if (written.has_value() && written.value() > 0)
+          _total_written += static_cast<size_t>(written.value());
+        else if (written.has_value() && written.value() == 0)
+          return ERR(Void, "CGI process closed stdin prematurely");
+        else
+          return ERR(Void, "Failed to write to CGI stdin");
+      } else {
+        // Done writing: drop stdin from epoll, which also closes the pipe,
+        // signalling EOF to the CGI script.
+        _epoll.del_fd(*_stdin);
+        delete _stdin;
+        _stdin = NULL;
+        return OKV;
+      }
     }
   }
+  if (_stdout != NULL && *ev->fd == *_stdout) {
+    // is_stdout
+    if (ev->in || ev->hup || ev->rdhup) {
+      char buffer[4096];
+      Result<ssize_t> bytes_read = _stdout->pipe_read(buffer, sizeof(buffer));
+      if (bytes_read.has_value() && bytes_read.value() > 0) {
+        _output.append(buffer, static_cast<size_t>(bytes_read.value()));
+        return OKV;
+      }
+      if (!bytes_read.has_value() || bytes_read.value() < 0)
+        return ERR(Void, "Failed to read from CGI stdout");
 
-  if (_total_written >= _req.get_body().length()) {
-    // Done writing: drop stdin from epoll, which also closes the pipe,
-    // signalling EOF to the CGI script.
-    _epoll.del_fd(*_stdin);
-    delete _stdin;
-    _stdin = NULL;
-    return OKV;
-  }
+      // bytes_read == 0: EOF, drain any remaining IO bookkeeping.
+      _epoll.del_fd(*_stdout);
+      delete _stdout;
+      _stdout = NULL;
+      if (_stdin != NULL) {
+        _epoll.del_fd(*_stdin);
+        delete _stdin;
+        _stdin = NULL;
+      }
+      _completed = true;
 
-  // is_stdout
-  if (ev->in || ev->hup || ev->rdhup) {
-    char buffer[4096];
-    Result<ssize_t> bytes_read = _stdout->pipe_read(buffer, sizeof(buffer));
-    if (bytes_read.has_value() && bytes_read.value() > 0) {
-      _output.append(buffer, static_cast<size_t>(bytes_read.value()));
+      int status = 0;
+      if (!waitpid_nohang(_pid, &status)) {
+        terminate_child(_pid);
+        _pid = -1;
+        return ERR(Void, "CGI child process did not exit cleanly");
+      }
+      _pid = -1;
+
+      if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        return ERR(Void, "CGI script failed");
+
       return OKV;
     }
-    if (!bytes_read.has_value() || bytes_read.value() < 0)
-      return ERR(Void, "Failed to read from CGI stdout");
 
-    // bytes_read == 0: EOF, drain any remaining IO bookkeeping.
-    _epoll.del_fd(*_stdout);
-    delete _stdout;
-    _stdout = NULL;
-    if (_stdin != NULL) {
-      _epoll.del_fd(*_stdin);
-      delete _stdin;
-      _stdin = NULL;
-    }
-    _completed = true;
-
-    int status = 0;
-    if (!waitpid_nohang(_pid, &status)) {
-      terminate_child(_pid);
-      _pid = -1;
-      return ERR(Void, "CGI child process did not exit cleanly");
-    }
-    _pid = -1;
-
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-      return ERR(Void, "CGI script failed");
-
+    if (ev->err)
+      return ERR(Void, "EPoll error on CGI stdout");
     return OKV;
-  }
-
-  if (ev->err)
-    return ERR(Void, "EPoll error on CGI stdout");
-  return OKV;
+  } else
+    return OKV; // not for us
 }
 
 Result<std::string> CgiDelegate::poll() const {

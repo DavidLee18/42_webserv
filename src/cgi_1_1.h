@@ -293,7 +293,7 @@ public:
                                       RouteRule_CGI const &);
 
   CgiDelegate(const CgiDelegate &);
-  CgiDelegate &operator=(const CgiDelegate &);
+  CgiDelegate &operator=(const CgiDelegate &) throw(std::logic_error);
 
   // Phase 1: create pipes, fork, register the pipe fds with epoll.
   // After this returns OK, the main event loop will deliver events on the
