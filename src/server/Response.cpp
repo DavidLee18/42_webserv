@@ -275,7 +275,8 @@ std::string ServerResponse::get_pwd() {
 }
 
 Response ServerResponse::error_response(const ServerConfig *config,
-                                        const RouteRule *rule, int error_code) {
+                                        const RouteRule *rule, int error_code,
+                                        std::map<std::string, std::string>mime_type) {
   Response response;
   std::string err_page =
       get_pwd() + get_string_from_map(rule->error_pages, error_code);

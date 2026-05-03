@@ -170,7 +170,8 @@ private:
    * @return std::string Path to the configured error file.
    */
   static Response error_response(const ServerConfig *config,
-                                 const RouteRule *rule, int error_code);
+                                 const RouteRule *rule, int error_code,
+                                 std::map<std::string, std::string>mime_type);
 
   /**
    * @brief Generates an HTML page listing the contents of a directory
