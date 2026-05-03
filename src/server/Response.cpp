@@ -81,6 +81,8 @@ Response ServerResponse::http_response(
   response.should_close = request->has_connection_close();
   if (request->has_connection_close())
     response.connection = "close";
+  else
+    response.connection = "keep-alive";
   response.headers = config->get_header();
   const Target target = resolve_target(rule, config, request);
 
