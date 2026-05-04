@@ -1,3 +1,4 @@
+#include "cgi_1_1.h"
 #include "webserv.h"
 
 CgiAuthType::CgiAuthType(const CgiAuthType::Type type)
@@ -1843,18 +1844,31 @@ Result<std::string> CgiDelegate::poll() const {
     return ERR(std::string, Errors::try_again);
   }
 }
-bool CgiDelegate::is_timeout() {
-  timespec now = {};
-  if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
-    return true;
-  }
-  if (static_cast<size_t>(now.tv_sec * 1000000000 + now.tv_nsec) >=
-      _timeout_ns + static_cast<size_t>(_start_time.tv_sec * 1000000000 +
-                                        _start_time.tv_nsec)) {
+
+bool CgiDelegate::check_timeout() {
+  if (remaining_ns() == 0) {
     _state = Failed;
     return true;
   }
   return false;
+}
+
+size_t CgiDelegate::remaining_ns() const {
+  timespec now = {};
+
+  if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+    return 0;
+  }
+  size_t now_ns = static_cast<size_t>(now.tv_sec * 1000000000 + now.tv_nsec);
+  size_t start_ns = static_cast<size_t>(_start_time.tv_sec * 1000000000 +
+                                        _start_time.tv_nsec);
+  if (now_ns == start_ns) {
+    return _timeout_ns;
+  } else if (now_ns >= start_ns + _timeout_ns) {
+    return 0;
+  } else {
+    return now_ns - start_ns;
+  }
 }
 
 CgiDelegate::~CgiDelegate() {

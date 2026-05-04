@@ -448,11 +448,21 @@ Result<Void> Server::start() {
 
     for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
              cgis.begin();
-         it != cgis.end(); ++it) {
+         it != cgis.end();) {
       CgiDelegate &cgi = it->second;
-      if (cgi.is_timeout()) {
-        epoll.del_fd(*it->first);
+      if (cgi.check_timeout()) {
+        std::ostringstream oss;
+        oss << DefaultError::default_err_response(Response::GATEWAY_TIMEOUT);
+        clients.at(it->first).out_buff = oss.str();
         cgis.erase(it++);
+      } else {
+        ++it;
+      }
+
+      const size_t cgi_remaining = cgi.remaining_ns() / 1000000; // milliseconds
+      if (epoll_timeout == -1 ||
+          cgi_remaining < static_cast<size_t>(epoll_timeout)) {
+        epoll_timeout = static_cast<long>(cgi_remaining);
       }
     }
 
