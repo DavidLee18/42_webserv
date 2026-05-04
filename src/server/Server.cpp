@@ -451,7 +451,7 @@ Result<Void> Server::start() {
          it != cgis.end(); ++it) {
       CgiDelegate &cgi = it->second;
       if (cgi.is_timeout()) {
-        disconnect(it->first);
+        epoll.del_fd(*it->first);
         cgis.erase(it++);
       }
     }
