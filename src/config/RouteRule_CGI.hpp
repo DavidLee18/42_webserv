@@ -47,7 +47,7 @@ private:
    */
   std::string err_meg;
   std::size_t count_line;
-
+  int worker_instance;
   /**
    * @brief 문자열이 timeout 문법과 값 범위에 맞는지 확인하는 함수
    * @param line 검사할 문자열
@@ -82,7 +82,7 @@ private:
   std::string parse_cgi_block(FileDescriptor &fd, std::string line);
 
 public:
-  RouteRule_CGI() : executable(""), env(), timeout(-1), err_meg("No parse"){};
+  RouteRule_CGI() : executable(""), env(), timeout(0.05), err_meg(""), worker_instance(0) {};
   /**
    * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
    * 생성자
@@ -100,6 +100,7 @@ public:
   const std::string get_executable(void) const { return executable; }
   const std::map<std::string, std::string> get_env(void) const { return env; }
   std::size_t get_count_line(void) const { return count_line; }
+  int get_worker_instance (void) const { return worker_instance; };
   double get_timeout() const { return timeout; }
 
   /**
@@ -180,7 +181,7 @@ public:
    */
   static std::string
   parse_uwsgi_block(FileDescriptor &fd,
-                    std::map<int, std::string> &uwsgi, std::size_t &count_line);
+                    std::map<int, RouteRule_CGI> &uwsgi, std::size_t &count_line);
 };
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data);

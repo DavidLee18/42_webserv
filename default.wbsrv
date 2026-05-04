@@ -9,6 +9,10 @@ types =
 	_        -> application/octet-stream
 
 
+uwsgi =
+	/uwsgi/get_files.py:9000
+	/uwsgi/get_files.py:9080
+
 
 :8080 =
 	[] +<= X-Content-Type-Options: nosniff

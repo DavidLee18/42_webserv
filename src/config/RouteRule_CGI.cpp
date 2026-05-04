@@ -202,7 +202,7 @@ std::string RouteRule_CGI::is_valid_uwsgi_config(std::vector<std::string> data) 
 
 std::string
 RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
-                                 std::map<int, std::string> &uwsgi, std::size_t &count_line) {
+                                 std::map<int, RouteRule_CGI> &uwsgi, std::size_t &count_line) {
   std::vector<std::string> value_and_key;
   std::string line = "";
   std::string err = "";
@@ -237,16 +237,20 @@ RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
     if (err != "")
       return  "on [\t" + line + "]" + err;
     else if (value_and_key[0].length() < 3 ||
-        value_and_key[0].substr(value_and_key[0].length() - 3) != ".py")
+        value_and_key[0].substr(value_and_key[0].length() - 3) != ".py") {
       return "on [\t" + line + "], [" + value_and_key[0] + "]: Violates python file extension rule (the file must have a .py extension).";
-      
-      char* end;
-      unsigned long num = std::strtoul(value_and_key[1].c_str(), &end, 10);
+      }
+    char* end;
+    unsigned long num = std::strtoul(value_and_key[1].c_str(), &end, 10);
 
-      if (uwsgi.find(static_cast<int>(num)) != uwsgi.end())
-        return "on [\t" + line + "], [" + value_and_key[1] + "]: Violates duplicate port rule (the port is already assigned to another file).";
-    else
-      uwsgi[static_cast<int>(num)] = value_and_key[0];
+    if (uwsgi.find(static_cast<int>(num)) != uwsgi.end())
+      return "on [\t" + line + "], [" + value_and_key[1] + "]: Violates duplicate port rule (the port is already assigned to another file).";
+    else if (*end != '\0')
+      return "[" + line + "], [" + value_and_key[1] + "]: The port value must contain only numeric characters (the port value syntax rule is violated because the provided value contains non-numeric characters or cannot be fully converted to a number).";
+    else if (num > 65535)
+      return "[" + line + "], [" + value_and_key[1] + "]: Violates port range rule (port must be between 0 and 65535).";
+    uwsgi[static_cast<int>(num)] = RouteRule_CGI(); // work_instance 파싱 관련
+    // 추가정보 파싱 부분 추가
   }
 }
 
@@ -273,6 +277,7 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
        << "\n";
   }
   os << "\n\tTimeout: " << data.get_timeout() << "\n";
+  os << "\n\tworker_instance: " << data.get_worker_instance() << "\n";
 
   return (os);
 }

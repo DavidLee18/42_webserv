@@ -269,10 +269,10 @@ unsigned int WebserverConfig::parse_server_port(const std::string &key) {
 
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.get_type_map();
-  const std::map<int, std::string> &uw = data.get_uwsgi();
+  const std::map<int, RouteRule_CGI> &uw = data.get_uwsgi();
   const std::map<int, std::string> &d_e = data.get_default_err_page();
   std::map<std::string, std::string>::const_iterator ty_it;
-  std::map<int, std::string>::const_iterator uw_it;
+  std::map<int, RouteRule_CGI>::const_iterator uw_it;
 
   os << "========================================================" << std::endl;
   os << "<<Type_map>>\n" << std::endl;
