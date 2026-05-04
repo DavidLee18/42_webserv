@@ -3,7 +3,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-RouteRule_CGI::RouteRule_CGI(const FileDescriptor &fd, const std::string &line) {
+RouteRule_CGI::RouteRule_CGI(const FileDescriptor &fd,
+                             const std::string &line) {
   err = "";
   timeout = 3;
 
@@ -24,7 +25,7 @@ RouteRule_CGI::RouteRule_CGI(const FileDescriptor &fd, const std::string &line) 
 }
 
 std::string RouteRule_CGI::parse_cgi_block(const FileDescriptor &fd,
-                                           const std::string& line) {
+                                           const std::string &line) {
   std::string file_line = utils::remove_char(line, '$');
 
   std::string err_msg =
@@ -209,7 +210,7 @@ RouteRule_CGI::parse_uwsgi_block(const FileDescriptor &fd,
   }
 }
 
-bool RouteRule_CGI::is_valid_cgi_config(const std::string& line) {
+bool RouteRule_CGI::is_valid_cgi_config(const std::string &line) {
   const std::vector<std::string> split_line = utils::string_split(line, " ");
   if (split_line.size() != 3)
     return false;
@@ -226,7 +227,8 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
 
   os << "\nExecutable: " << data.get_executable() << "\n";
   os << "\n\tEnv\n";
-  for (std::map<std::string, std::string>::const_iterator env_it = env.begin(); env_it != env.end(); ++env_it) {
+  for (std::map<std::string, std::string>::const_iterator env_it = env.begin();
+       env_it != env.end(); ++env_it) {
     os << "\tEnv key: " << env_it->first << ", Env value: " << env_it->second
        << "\n";
   }

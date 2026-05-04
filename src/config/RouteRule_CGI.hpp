@@ -78,7 +78,8 @@ class RouteRule_CGI {
    * - 이후 들여쓰기 2단계의 하위 줄에서 timeout 또는 추가 환경 변수 정보를
    * 읽는다.
    */
-  std::string parse_cgi_block(const FileDescriptor &fd, const std::string& line);
+  std::string parse_cgi_block(const FileDescriptor &fd,
+                              const std::string &line);
 
 public:
   RouteRule_CGI() : met(Request::ERROR), timeout(-1), err("No parse") {}
@@ -94,7 +95,7 @@ public:
   RouteRule_CGI(const FileDescriptor &fd, const std::string &line);
 
   PathPattern get_path() const { return path; }
-  Request::Method get_method () const { return met; }
+  Request::Method get_method() const { return met; }
   std::string get_err() const { return err; }
   std::string get_executable() const { return executable; }
   std::map<std::string, std::string> get_env() const { return env; }

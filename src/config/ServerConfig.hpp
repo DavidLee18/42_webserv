@@ -249,7 +249,8 @@ class ServerConfig {
    * @param line 추출할 패턴 문자열
    * @return '|'를 기준으로 분리된 후보 문자열 목록
    */
-  static std::vector<std::string> get_pattern_candidates(const std::string &line);
+  static std::vector<std::string>
+  get_pattern_candidates(const std::string &line);
   /**
    * @brief 기존 경로 조합의 특정 위치에 패턴 후보들을 적용하여 모든 조합을
    * 생성하는 함수
@@ -341,7 +342,7 @@ class ServerConfig {
    * - path에 포함된 와일드카드가 root에서도 대응되는 위치를 가져야 한다.
    */
   static bool has_compatible_wildcards(const PathPattern &path,
-                                const PathPattern &root);
+                                       const PathPattern &root);
   /**
    * @brief RouteRule 블록을 파싱하여 규칙 정보를 저장하는 함수
    * @param method_line RouteRule 블록의 시작 줄

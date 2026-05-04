@@ -73,9 +73,10 @@ struct Response {
   std::string mime_type; ///< The determined MIME type of the response payload.
   std::string redir;     ///< Redirect location, if applicable.
   bool keep_alive;       ///< Connection keep-alive status.
-  bool should_close;     ///< Whether to close connection after sending response.
-  std::string cgi;       ///< Generated CGI script.
-  std::map<std::string, std::string> headers; ///< Additional response headers from config.
+  bool should_close; ///< Whether to close connection after sending response.
+  std::string cgi;   ///< Generated CGI script.
+  std::map<std::string, std::string>
+      headers; ///< Additional response headers from config.
 
   Response()
       : version(), status_code(), content_length(0), content_type(),
@@ -217,10 +218,12 @@ private:
                        std::size_t start_pos, std::string &out_filename,
                        std::string &out_fieldname, std::string &out_data);
 
-  static Response delete_method(const Target &target, Response response,
+  static Response
+  delete_method(const Target &target, Response response,
                 const ServerConfig *config, const RouteRule *rule,
                 const std::map<std::string, std::string> &mime_type);
-  static Response post_method(const Target &target, Response response,
+  static Response
+  post_method(const Target &target, Response response,
               const ClientSession *client, const RouteRule *rule,
               const Request *request, Session *session,
               const std::map<std::string, std::string> &mime_type);

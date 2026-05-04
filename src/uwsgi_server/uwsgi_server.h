@@ -39,10 +39,11 @@ private:
   void handle_connection(int client_fd);
   static bool read_all(int fd, void *buf, size_t len);
   static bool parse_uwsgi_vars(const std::vector<unsigned char> &data,
-                        std::map<std::string, std::string> &vars);
+                               std::map<std::string, std::string> &vars);
   std::string execute_wsgi(const std::map<std::string, std::string> &vars,
                            const std::string &body);
-  static void send_error_response(int fd, int status, const std::string &reason);
+  static void send_error_response(int fd, int status,
+                                  const std::string &reason);
 
   // Non-copyable
   UwsgiServer(const UwsgiServer &);

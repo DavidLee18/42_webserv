@@ -119,15 +119,15 @@ public:
   if (!_result.error().empty()) {                                              \
     return ERR(t, _result.error());                                            \
   } else {                                                                     \
-    ((v)) = _result.value();                                                       \
+    ((v)) = _result.value();                                                   \
   }
 
 #define TRYF(t, rt, v, r, f)                                                   \
   Result<rt> _result = rt;                                                     \
   if (!_result.error().empty()) {                                              \
-    (f) return ERR(t, _result.error());                                          \
+    (f) return ERR(t, _result.error());                                        \
   } else {                                                                     \
-    (v) = _result.value();                                                       \
+    (v) = _result.value();                                                     \
   }
 
 struct Void {};

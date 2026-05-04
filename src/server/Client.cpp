@@ -50,8 +50,7 @@ std::string Request::get_cookie_value(const std::string &name) const {
 Result<Request *> Request::from_buff(std::string &buff) {
   const size_t header_end = buff.find("\r\n\r\n");
   if (header_end == std::string::npos)
-    return ERR(Request *,
-               Errors::incomplete_header);
+    return ERR(Request *, Errors::incomplete_header);
   size_t content_length = 0;
 
   std::string header_lower = buff.substr(0, header_end);
@@ -61,10 +60,12 @@ Result<Request *> Request::from_buff(std::string &buff) {
   }
   const size_t host_pos = header_lower.find("host:");
   // Check if there's only ONE host header (not counting it as a substring)
-  // We look for it as a header name, which must be preceded by \r\n or be at start
+  // We look for it as a header name, which must be preceded by \r\n or be at
+  // start
   size_t second_host_pos = std::string::npos;
   size_t search_from = host_pos + 5; // Skip the found "host:" itself
-  while ((second_host_pos = header_lower.find("host:", search_from)) != std::string::npos) {
+  while ((second_host_pos = header_lower.find("host:", search_from)) !=
+         std::string::npos) {
     // Check if this "host:" is at the beginning of a line (preceded by \r\n)
     if (second_host_pos >= 2 && header_lower[second_host_pos - 2] == '\r' &&
         header_lower[second_host_pos - 1] == '\n') {
@@ -185,11 +186,13 @@ Result<Request *> Request::from_buff(std::string &buff) {
     }
   }
 
-  std::string connection_header = get_string_from_map(req->header, "Connection");
+  std::string connection_header =
+      get_string_from_map(req->header, "Connection");
   // If empty (no Connection header), HTTP/1.1 defaults to keep-alive
   if (connection_header.empty())
     req->header["Connection"] = "keep-alive";
-  // keep_alive defaults to true; only set false if client explicitly requests close
+  // keep_alive defaults to true; only set false if client explicitly requests
+  // close
   if (connection_header == "close")
     req->keep_alive = false;
 

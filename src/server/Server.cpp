@@ -11,8 +11,7 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     // init client socket
     sockaddr_in client_addr = {};
     socklen_t client_len = sizeof(client_addr);
-    Result<FileDescriptor> client_result =
-        server_fd->socket_accept(
+    Result<FileDescriptor> client_result = server_fd->socket_accept(
         reinterpret_cast<struct sockaddr *>(&client_addr), &client_len);
     if (!client_result.has_value()) {
       const std::string &err = client_result.error();
@@ -363,7 +362,8 @@ Result<Void> Server::start() {
     // Collect clients to disconnect (avoid modifying map during iteration)
     std::vector<const FileDescriptor *> clients_to_disconnect;
 
-    for (std::map<const FileDescriptor *, ClientSession>::iterator it = clients.begin();
+    for (std::map<const FileDescriptor *, ClientSession>::iterator it =
+             clients.begin();
          it != clients.end(); ++it) {
       const FileDescriptor *client_fd = it->first;
       const ClientSession &session = it->second;

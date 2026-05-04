@@ -5,11 +5,11 @@ WebserverConfig::WebserverConfig(FileDescriptor &file) {
   if (!this->file_parsing(file)) {
     return;
   }
-  }
+}
 
 bool WebserverConfig::file_parsing(FileDescriptor &file) {
 
-    while (true) {
+  while (true) {
     Result<std::string> temp = file.read_file_line();
     if (!temp.error().empty() || !utils::match_indent_level(temp.value(), 0)) {
       err_meg = "FileDescriptor Error: " + temp.error();
@@ -49,8 +49,8 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
   return true;
 }
 
-std::string WebserverConfig::apply_default_err_page_entry(const std::string &line)
-{
+std::string
+WebserverConfig::apply_default_err_page_entry(const std::string &line) {
   std::vector<std::string> split = utils::string_split(line, " ");
 
   if (split.size() != 2)
@@ -69,7 +69,7 @@ std::string WebserverConfig::apply_default_err_page_entry(const std::string &lin
     if (!err_line.empty())
       return err_line;
     default_err_page.err_cgi[executable] = env;
-  } else 
+  } else
     return "Error: \"" + line + "\" Syntax error";
   return "";
 }
@@ -113,8 +113,8 @@ bool WebserverConfig::is_valid_mime_type(const std::string &value) {
   const std::vector<std::string> value_data = utils::string_split(temp, "/");
   if (value_data.size() != 2 || utils::count_occurrences(temp, "/") != 1)
     return (false);
-  const std::string& type = value_data[0];
-  const std::string& subtype = value_data[1];
+  const std::string &type = value_data[0];
+  const std::string &subtype = value_data[1];
   if (type.empty() || subtype.empty())
     return (false);
   for (std::size_t i = 0; i < temp.size(); ++i) {
@@ -212,7 +212,7 @@ bool WebserverConfig::is_server_config_header(const std::string &line) {
 
 bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
                                                 const std::string &line) {
-  const std::string& temp(line);
+  const std::string &temp(line);
   const ServerConfig config(file);
 
   const unsigned int key = WebserverConfig::parse_server_port(temp);
@@ -245,7 +245,8 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
 
   os << "========================================================" << std::endl;
   os << "<<Type_map>>\n" << std::endl;
-  for (std::map<std::string, std::string>::const_iterator ty_it = ty.begin(); ty_it != ty.end(); ++ty_it) {
+  for (std::map<std::string, std::string>::const_iterator ty_it = ty.begin();
+       ty_it != ty.end(); ++ty_it) {
     os << "Type key: " << ty_it->first << ", Type value: " << ty_it->second
        << std::endl;
   }
@@ -254,35 +255,39 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   os << "\n\n\n========================================================"
      << std::endl;
   os << "<<Uwsgi>>\n" << std::endl;
-  for (std::map<std::string, std::string>::const_iterator uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
+  for (std::map<std::string, std::string>::const_iterator uw_it = uw.begin();
+       uw_it != uw.end(); ++uw_it) {
     os << "Uwsgi key: " << uw_it->first << ", Uwsgi value: " << uw_it->second
        << std::endl;
   }
   os << "========================================================" << std::endl;
   os << "\n\n\n========================================================"
      << std::endl;
-  
+
   os << "<<DefaultErrPage>>\n" << std::endl;
 
   os << "\nerr_page\n" << std::endl;
   for (std::map<std::string, std::string>::const_iterator er_it =
-           d_e.err_page.begin(); er_it != d_e.err_page.end(); ++er_it) {
-    os << "\terr_page key: " << er_it->first << ", err_page value: " << er_it->second
-      << std::endl;
+           d_e.err_page.begin();
+       er_it != d_e.err_page.end(); ++er_it) {
+    os << "\terr_page key: " << er_it->first
+       << ", err_page value: " << er_it->second << std::endl;
   }
   os << "\nerr_cgi\n" << std::endl;
-  for (CGI::const_iterator cgi_it = d_e.err_cgi.begin(); cgi_it != d_e.err_cgi.end(); ++cgi_it) {
+  for (CGI::const_iterator cgi_it = d_e.err_cgi.begin();
+       cgi_it != d_e.err_cgi.end(); ++cgi_it) {
     os << "\terr_cgi executable: " << cgi_it->first;
     if (cgi_it->second.empty())
       os << "\n\terr_cgi env: empty\n";
     else {
       os << "\n\terr_cgi env\n";
       std::map<std::string, std::string>::const_iterator temp;
-      for (temp = cgi_it->second.begin(); temp != cgi_it->second.end(); ++temp) {
-        os << "\terr_cgi env key: " << temp->first << ", err_cgi env value: " << temp->second
-          << std::endl;
+      for (temp = cgi_it->second.begin(); temp != cgi_it->second.end();
+           ++temp) {
+        os << "\terr_cgi env key: " << temp->first
+           << ", err_cgi env value: " << temp->second << std::endl;
       }
-    }   
+    }
     os << std::endl;
   }
   os << "========================================================" << std::endl;
@@ -292,8 +297,8 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
       data.get_serverconfig_map();
   os << "<<Server_map>>" << std::endl;
   for (std::map<unsigned int, ServerConfig>::const_iterator Server_map_it =
-           Server_map.begin(); Server_map_it != Server_map.end();
-       ++Server_map_it) {
+           Server_map.begin();
+       Server_map_it != Server_map.end(); ++Server_map_it) {
     os << "\nServer key: " << Server_map_it->first << std::endl;
     os << Server_map_it->second;
   }

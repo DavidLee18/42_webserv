@@ -19,12 +19,12 @@ Result<Events> Events::init(const std::list<FileDescriptor> &all_events,
       operator delete((void *)es._events);
       return ERR(Events, Errors::not_found);
     }
-    new (static_cast<void *>(es._events + i)) Event(fd, (events[i].events & EPOLLIN) != 0,
-                                         (events[i].events & EPOLLOUT) != 0,
-                                         (events[i].events & EPOLLRDHUP) != 0,
-                                         (events[i].events & EPOLLPRI) != 0,
-                                         (events[i].events & EPOLLERR) != 0,
-                                         (events[i].events & EPOLLHUP) != 0);
+    new (static_cast<void *>(es._events + i)) Event(
+        fd, (events[i].events & EPOLLIN) != 0,
+        (events[i].events & EPOLLOUT) != 0,
+        (events[i].events & EPOLLRDHUP) != 0,
+        (events[i].events & EPOLLPRI) != 0, (events[i].events & EPOLLERR) != 0,
+        (events[i].events & EPOLLHUP) != 0);
   }
   delete[] events;
   return OK(Events, es);
@@ -73,15 +73,15 @@ Result<EPoll> EPoll::create(const unsigned short sz) {
   const Result<FileDescriptor> rfdesc = FileDescriptor::from_raw(fd);
   if (!rfdesc.has_value())
     return ERR(EPoll, rfdesc.error());
-  const FileDescriptor& fdesc = rfdesc.value();
+  const FileDescriptor &fdesc = rfdesc.value();
   ep._fd = fdesc;
   if (!ep._fd.close_on_exec().has_value())
     return ERR(EPoll, "failed to set epoll to close-on-exec mode");
   return OK(EPoll, ep);
 }
 
-Result<FileDescriptor *> EPoll::add_fd(const FileDescriptor& fd, const Event &ev,
-                                       const Option &op) {
+Result<FileDescriptor *> EPoll::add_fd(const FileDescriptor &fd,
+                                       const Event &ev, const Option &op) {
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;

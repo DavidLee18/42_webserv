@@ -7,11 +7,11 @@ ServerConfig::ServerConfig(FileDescriptor &file) {
   if (!parse_server_block(file)) {
     return;
   }
-  }
+}
 
 bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
 
-    while (true) {
+  while (true) {
     Result<std::string> temp = fd.read_file_line();
     if (!temp.error().empty()) {
       err_line = "FileDescriptor Error: " + temp.error();
@@ -74,7 +74,8 @@ bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
 // header method
 bool ServerConfig::is_header_block(const std::string &line) {
   const std::vector<std::string> temp = utils::string_split(line, " ");
-  return !(temp.size() < 4 || temp[0] != "[]" || temp[1] != "+<=" || temp[2][temp[2].length() - 1] != ':' || temp[3].empty());
+  return !(temp.size() < 4 || temp[0] != "[]" || temp[1] != "+<=" ||
+           temp[2][temp[2].length() - 1] != ':' || temp[3].empty());
 }
 
 bool ServerConfig::parse_header_entry(const FileDescriptor &fd,
@@ -207,7 +208,7 @@ std::vector<PathPattern>
 ServerConfig::expand_path_pattern(const std::string &line) {
   const PathPattern path(line);
   std::vector<PathPattern> paths;
-  const std::vector<std::string>& temp = path.get_path();
+  const std::vector<std::string> &temp = path.get_path();
 
   paths.push_back(path);
   for (std::size_t i = 0; i < temp.size(); ++i) {
@@ -429,8 +430,8 @@ RuleOperator ServerConfig::parse_rule_operator(const std::string &indicator) {
 
 bool ServerConfig::has_compatible_wildcards(const PathPattern &path,
                                             const PathPattern &root) {
-  const std::vector<std::string>& path_pattern = path.get_path();
-  const std::vector<std::string>& root_pattern = root.get_path();
+  const std::vector<std::string> &path_pattern = path.get_path();
+  const std::vector<std::string> &root_pattern = root.get_path();
 
   int path_wild = 0;
   int root_wild = 0;
@@ -597,7 +598,8 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   const std::map<std::string, std::string> &header = data.get_header();
   os << "\n\n\n<<Header>>";
   for (std::map<std::string, std::string>::const_iterator header_it =
-           header.begin(); header_it != header.end(); ++header_it) {
+           header.begin();
+       header_it != header.end(); ++header_it) {
     os << "\n\tkey: " << header_it->first << ", value: " << header_it->second
        << std::endl;
   }
@@ -681,6 +683,7 @@ std::string ServerConfig::get_rewritten_path(const Request::Method method,
   const RouteRule *route = find_route(method, path);
   if (!route)
     return "";
-  return normalize_slashes(route->path.rewrite_path(PathPattern(path), route->root));
+  return normalize_slashes(
+      route->path.rewrite_path(PathPattern(path), route->root));
   // return route->path.rewrite_path(path, route->root);
 }

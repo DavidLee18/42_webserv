@@ -56,7 +56,8 @@ UwsgiClient::send(const std::map<std::string, std::string> &vars,
     return ERR(std::string, "uwsgi vars block exceeds 64 KiB limit");
 
   // 4-byte uwsgi header: [modifier1=0][datasize: 2B LE][modifier2=0]
-  const unsigned short datasize = static_cast<unsigned short>(vars_block.size());
+  const unsigned short datasize =
+      static_cast<unsigned short>(vars_block.size());
   unsigned char header[4];
   header[0] = 0; // modifier1: WSGI/Python
   header[1] = static_cast<unsigned char>(datasize & 0xFF);
@@ -73,7 +74,8 @@ UwsgiClient::send(const std::map<std::string, std::string> &vars,
   if (getaddrinfo(_host.c_str(), port_ss.str().c_str(), &hints, &res) != 0)
     return ERR(std::string, "uwsgi: failed to resolve server address");
 
-  const int sock_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  const int sock_fd =
+      socket(res->ai_family, res->ai_socktype, res->ai_protocol);
   if (sock_fd < 0) {
     freeaddrinfo(res);
     return ERR(std::string, "uwsgi: failed to create socket");

@@ -91,8 +91,7 @@ bool UwsgiServer::setup_socket() {
   addr.sin_addr.s_addr = INADDR_ANY;
   addr.sin_port = htons(static_cast<unsigned short>(_port));
 
-  if (bind(_server_fd, reinterpret_cast<sockaddr *>(&addr),
-           sizeof(addr)) < 0) {
+  if (bind(_server_fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
     std::cerr << "bind() failed" << std::endl;
     return false;
   }
@@ -324,7 +323,7 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
 
     gettimeofday(&tv, NULL);
     const long long now_ms = static_cast<long long>(tv.tv_sec) * 1000LL +
-                       static_cast<long long>(tv.tv_usec) / 1000LL;
+                             static_cast<long long>(tv.tv_usec) / 1000LL;
     if (!sent_sigkill && now_ms >= deadline_ms) {
       kill(pid, SIGKILL);
       sent_sigkill = true;
@@ -332,13 +331,14 @@ UwsgiServer::execute_wsgi(const std::map<std::string, std::string> &vars,
       kill_deadline_ms = now_ms + CHILD_KILL_GRACE_MS;
     }
     if (sent_sigkill && now_ms >= kill_deadline_ms) {
-      std::cerr << "child process " << pid
-                << " reap timed out after SIGKILL" << std::endl;
+      std::cerr << "child process " << pid << " reap timed out after SIGKILL"
+                << std::endl;
       break;
     }
 
     // Sleep up to 100 ms, but no more than the remaining timeout budget.
-    const long long sleep_until_ms = sent_sigkill ? kill_deadline_ms : deadline_ms;
+    const long long sleep_until_ms =
+        sent_sigkill ? kill_deadline_ms : deadline_ms;
     const long long remaining_ms = sleep_until_ms - now_ms;
     if (remaining_ms <= 0) {
       timespec ts_min = {};
@@ -372,7 +372,8 @@ void UwsgiServer::send_error_response(const int fd, const int status,
   const std::string response = oss.str();
   size_t sent = 0;
   while (sent < response.size()) {
-    const ssize_t n = write(fd, response.c_str() + sent, response.size() - sent);
+    const ssize_t n =
+        write(fd, response.c_str() + sent, response.size() - sent);
     if (n <= 0)
       break;
     sent += static_cast<size_t>(n);

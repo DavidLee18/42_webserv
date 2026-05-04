@@ -57,7 +57,7 @@ private:
   Name name;
   std::string value;
 
-  UwsgiMetaVar(const Name n, const std::string& v) : name(n), value(v) {}
+  UwsgiMetaVar(const Name n, const std::string &v) : name(n), value(v) {}
   static UwsgiMetaVar create(Name n, const std::string &v);
 };
 
@@ -108,7 +108,8 @@ class UwsgiDelegate {
   UwsgiDelegate(EPoll &, Request const &);
 
 public:
-  static Result<UwsgiDelegate> from_req(EPoll &, Request const &, unsigned short);
+  static Result<UwsgiDelegate> from_req(EPoll &, Request const &,
+                                        unsigned short);
 
   // Phase 1: create the socket, issue a non-blocking connect to the uwsgi
   // server, and register the socket with the shared epoll. Does NOT call
