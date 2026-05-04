@@ -77,49 +77,49 @@ std::string RouteRule_CGI::is_executable_file(const std::string &path) {
   return "";
 }
 
-bool RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
-  if (line.empty() || line[0] != '$' || utils::has_space(line))
-    return false;
-  std::size_t i = 1;
-  std::size_t pos = line.find(".cgi", i);
-  if (pos != std::string::npos) {
-    std::size_t exec_end = pos + 4;
+// bool RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
+//   if (line.empty() || line[0] != '$' || utils::has_space(line))
+//     return false;
+//   std::size_t i = 1;
+//   std::size_t pos = line.find(".cgi", i);
+//   if (pos != std::string::npos) {
+//     std::size_t exec_end = pos + 4;
 
-    if (exec_end < line.length() && line[exec_end] != '(')
-      return false;
-    std::string exec_path = line.substr(1, exec_end - 1);
-    if (exec_path.empty() || RouteRule_CGI::is_executable_file(exec_path) != "")
-      return false;
+//     if (exec_end < line.length() && line[exec_end] != '(')
+//       return false;
+//     std::string exec_path = line.substr(1, exec_end - 1);
+//     if (exec_path.empty() || RouteRule_CGI::is_executable_file(exec_path) != "")
+//       return false;
 
-    i = exec_end;
-  } else {
-    std::size_t start = i;
+//     i = exec_end;
+//   } else {
+//     std::size_t start = i;
 
-    while (i < line.length() && line[i] != '(') {
-      if (!std::isdigit(static_cast<unsigned char>(line[i])))
-        return false;
-      ++i;
-    }
-    if (start == i)
-      return false;
-  }
+//     while (i < line.length() && line[i] != '(') {
+//       if (!std::isdigit(static_cast<unsigned char>(line[i])))
+//         return false;
+//       ++i;
+//     }
+//     if (start == i)
+//       return false;
+//   }
 
-  if (i == line.length())
-    return true;
-  if (line[i] != '(')
-    return false;
+//   if (i == line.length())
+//     return true;
+//   if (line[i] != '(')
+//     return false;
 
-  std::size_t equals = line.find('=', i + 1);
-  std::size_t end = line.find(')', i + 1);
+//   std::size_t equals = line.find('=', i + 1);
+//   std::size_t end = line.find(')', i + 1);
 
-  if (equals == std::string::npos || end == std::string::npos)
-    return false;
-  if (equals <= i + 1 || equals + 1 >= end)
-    return false;
-  if (end + 1 != line.length())
-    return false;
-  return true;
-}
+//   if (equals == std::string::npos || end == std::string::npos)
+//     return false;
+//   if (equals <= i + 1 || equals + 1 >= end)
+//     return false;
+//   if (end + 1 != line.length())
+//     return false;
+//   return true;
+// }
 
 bool RouteRule_CGI::is_valid_timeout(const std::string &line) {
   if (line.length() < 4 || line[0] != '.' || line[1] != '.' || line[2] != '.')
@@ -202,7 +202,7 @@ std::string RouteRule_CGI::is_valid_uwsgi_config(std::vector<std::string> data) 
 
 std::string
 RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
-                                 std::map<std::string, std::string> &uwsgi, std::size_t &count_line) {
+                                 std::map<int, std::string> &uwsgi, std::size_t &count_line) {
   std::vector<std::string> value_and_key;
   std::string line = "";
   std::string err = "";
@@ -236,14 +236,17 @@ RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
     err = RouteRule_CGI::is_valid_uwsgi_config(value_and_key);
     if (err != "")
       return  "on [\t" + line + "]" + err;
-    if (value_and_key[0].length() < 3 ||
+    else if (value_and_key[0].length() < 3 ||
         value_and_key[0].substr(value_and_key[0].length() - 3) != ".py")
       return "on [\t" + line + "], [" + value_and_key[0] + "]: Violates python file extension rule (the file must have a .py extension).";
-    if (uwsgi.find(value_and_key[1]) != uwsgi.end())
-      return "on [\t" + line + "], [" + value_and_key[1] + "]: Violates duplicate port rule (the port is already assigned to another file).";
-    else {
-      uwsgi[value_and_key[1]] = value_and_key[0];
-    }
+      
+      char* end;
+      unsigned long num = std::strtoul(value_and_key[1].c_str(), &end, 10);
+
+      if (uwsgi.find(static_cast<int>(num)) != uwsgi.end())
+        return "on [\t" + line + "], [" + value_and_key[1] + "]: Violates duplicate port rule (the port is already assigned to another file).";
+    else
+      uwsgi[static_cast<int>(num)] = value_and_key[0];
   }
 }
 

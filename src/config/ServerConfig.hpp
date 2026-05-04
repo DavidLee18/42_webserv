@@ -161,11 +161,6 @@ private:
    */
   std::vector<RouteRule_CGI> R_CGI;
   /**
-   * @var S_CGI
-   * @brief 서버 단위의 CGI 관련 설정 정보를 저장하는 멤버 변수
-   */
-  CGI S_CGI;
-  /**
    * @var err_line
    * @brief 파싱 중 오류가 발생한 설정 파일의 줄 정보를 저장하는 멤버 변수
    */
@@ -283,24 +278,6 @@ private:
    */
   bool has_valid_wildcard_usage(const std::string &url);
   /**
-   * @brief 문자열이 유효한 index 파일명이면 그 값을 반환하는 함수
-   * @param line 검사할 문자열
-   * @return 유효한 index 파일명이면 원본 문자열, 그렇지 않으면 빈 문자열
-   *
-   * - 현재는 .html 또는 .htm 확장자만 유효한 index 파일로 허용한다.
-   */
-  std::string get_valid_index_file(const std::string &line);
-  /**
-   * @brief 오류 페이지 설정 문자열에서 상태 코드와 경로를 분리하는 함수
-   * @param line 파싱할 문자열
-   * @return 파싱에 성공하면 상태 코드, 실패하면 0
-   *
-   * - 입력 문자열은 "<상태코드>:<경로>" 형식이어야 한다.
-   * 
-   * - 성공 시 line에는 오류 페이지 경로만 남는다.
-   */
-  int parse_error_page_entry(std::string &line);
-  /**
    * @brief 최대 요청 바디 크기 문자열을 KB 단위 정수 값으로 변환하는 함수
    * @param line 파싱할 문자열
    * @return 변환에 성공하면 KB 단위 크기, 실패하면 -1
@@ -309,7 +286,7 @@ private:
    * 
    * - MB와 MiB는 각각 1000배, 1024배로 변환한다.
    */
-  int parse_max_body_size(std::string line);
+  std::string parse_max_body_size(std::string line, int &maxbody);
   /**
    * @brief 문자열이 RouteRule 시작 줄 형식에 맞는지 검사하는 함수
    * @param line 검사할 문자열
@@ -412,12 +389,12 @@ public:
   }
   const std::string &get_err_meg(void) const { return err_meg; }
   const std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
-  const CGI get_serve_cgi() const { return S_CGI; }
   const std::vector<RouteRule> &get_routes(void) const { return routes; }
   std::size_t get_count_line(void) const { return count_line; }
   int get_server_response_time(void) const {
     return server_response_time;
   }
+  static std::string apply_default_err_page_entry(const std::string &line, std::map<int, std::string> &err_map);
 
 };
 

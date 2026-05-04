@@ -42,13 +42,15 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (!parse_server_config_entry(file, line)) // 수정 중
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
-      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi, count_line);
+      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi, count_line); // 수정해야 함
       if (err_meg != "")
         return false;
     } else if (line[0] == '!') {
-      err_meg = apply_default_err_page_entry(line, default_err_page);
-      if (err_meg != "")
+      err_meg = ServerConfig::apply_default_err_page_entry(line, default_err_page);
+      if (err_meg != "") {
+        err_meg = "on [" + line + err_meg;
         return false;
+      }
     } else {
       err_meg = "on [" + line + "]: Invalid configuration format (the line does not correspond to a valid grammar rule at indentation level 0).";
       return false;
@@ -64,39 +66,6 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
   return true;
 }
 
-std::string WebserverConfig::apply_default_err_page_entry(const std::string &line, std::map<int, std::string> &err_map)
-{
-  std::vector<std::string> split = utils::string_split(line, " ");
-
-  if (split.size() != 2) {
-    if (split.size() == 1)
-      return "on [" + line + "], []: Violates default error page format (must be \"! <status>:<path>\").";
-    std::string res = "";
-    for (std::size_t i = 2; i < split.size(); ++i)
-      res += " " + split[i];
-    return "on [" + line + "], [" + res + "]: Violates default error page format (invalid format for \"! <status>:<path>\").";
-  } 
-    std::string path = split[1];
-    split = utils::string_split(split[1], ":");
-    if (split.size() != 2 || utils::count_occurrences(path, ":") != 1) {
-      std::size_t pos = line.find(':');
-      pos = line.find(':', pos + 1);
-      return "on [" + line + "], [" + &line[pos] + "]: Violates error page mapping rule (expected \"status:path\" with no trailing ':' or extra fields).";
-    }
-    for (std::size_t i = 0; i < split[0].size(); ++i) {
-      if (!std::isdigit(static_cast<unsigned char>(split[0][i])))
-        return "on [" + line + "], [" + split[0] + "]: Violates status format rule (status must consist only of digits).";
-    }
-    if (split[0][0] != '4' && split[0][0] != '5' && split[0].size() != 3)
-      return "on [" + line + "], [" + split[0] + "]: Violates status range rule (status must start with 4xx or 5xx).";
-    else if (utils::check_html_file(split[1]) != "")
-      return "on [" + line + "], [" + split[1] + "]: " + utils::check_html_file(split[1]);
-    char* end;
-    unsigned long num = std::strtoul(split[0].c_str(), &end, 10);
-    err_map[static_cast<int>(num)] = split[1];
-
-  return "";
-}
 
 // type_map method
 std::vector<std::string>
@@ -275,17 +244,17 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   if (sever.get_err_meg() != "") {
     err_meg = sever.get_err_meg();
     count_line += sever.get_count_line();
-    return (false);
+    return false;
   }
   if (serverconfig_map.find(key) != serverconfig_map.end()) {
     std::ostringstream oss;
     oss << key;
 
     err_meg = "on [\t" + line + "], [" + oss.str() + "]:Violates configuration rule (server block is declared more than once).";
-    return (false);
+    return false;
   }
   serverconfig_map[key] = sever;
-  return (true);
+  return true;
 }
 
 unsigned int WebserverConfig::parse_server_port(const std::string &key) {
@@ -300,10 +269,10 @@ unsigned int WebserverConfig::parse_server_port(const std::string &key) {
 
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.get_type_map();
-  const std::map<std::string, std::string> &uw = data.get_uwsgi();
+  const std::map<int, std::string> &uw = data.get_uwsgi();
   const std::map<int, std::string> &d_e = data.get_default_err_page();
   std::map<std::string, std::string>::const_iterator ty_it;
-  std::map<std::string, std::string>::const_iterator uw_it;
+  std::map<int, std::string>::const_iterator uw_it;
 
   os << "========================================================" << std::endl;
   os << "<<Type_map>>\n" << std::endl;

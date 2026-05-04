@@ -135,17 +135,6 @@ public:
    */
   static bool is_valid_cgi_config(std::string line);
   /**
-   * @brief 문자열이 유효한 CGI 설정 형식인지 검사하는 함수
-   * @param line 검사할 문자열
-   * @return 유효한 CGI 설정 형식이면 true, 그렇지 않으면 false
-   *
-   * - 입력 문자열은 '$'로 시작해야 하며 공백을 포함할 수 없다.
-   * 
-   * - "$<숫자 문자열>" 또는 "$<확장자가 .cgi인 실행 파일>" 뒤에
-   * 선택적으로 "(키=값)" 형식의 문자열이 올 수 있다.
-   */
-  static bool matches_cgi_syntax(const std::string &line);
-  /**
    * @brief 주어진 경로가 실행 가능한 파일인지 검사하는 함수
    * @param path 검사할 실행 파일 경로
    * @return 실행 가능하면 true, 그렇지 않으면 false
@@ -173,8 +162,6 @@ public:
    * @return 성공하면 빈 문자열, 실패하면 오류 메시지
    *
    * - 입력 문자열은 is_valid_cgi_config(const std::string &line) 또는
-   * matches_cgi_syntax(const std::string &line) 함수로 유효성이 확인된 상태여야
-   * 한다.
    */
   static std::string parse_executable(const std::string &line,
                                       std::string &executable,
@@ -193,7 +180,7 @@ public:
    */
   static std::string
   parse_uwsgi_block(FileDescriptor &fd,
-                    std::map<std::string, std::string> &uwsgi, std::size_t &count_line);
+                    std::map<int, std::string> &uwsgi, std::size_t &count_line);
 };
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data);
