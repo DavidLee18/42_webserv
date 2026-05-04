@@ -307,6 +307,8 @@ public:
 
   Result<std::string> poll() const;
 
+  bool is_timeout();
+
   ~CgiDelegate();
 
 private:

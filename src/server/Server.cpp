@@ -446,6 +446,16 @@ Result<Void> Server::start() {
         sessions.clean_expired_sessions(session_timeout);
     }
 
+    for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
+             cgis.begin();
+         it != cgis.end(); ++it) {
+      CgiDelegate &cgi = it->second;
+      if (cgi.is_timeout()) {
+        disconnect(it->first);
+        cgis.erase(it++);
+      }
+    }
+
     // Waiting for events using epoll
     Result<Events> events_result = epoll.wait(static_cast<int>(epoll_timeout));
     if (!events_result.has_value()) {

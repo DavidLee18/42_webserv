@@ -1843,6 +1843,19 @@ Result<std::string> CgiDelegate::poll() const {
     return ERR(std::string, Errors::try_again);
   }
 }
+bool CgiDelegate::is_timeout() {
+  timespec now = {};
+  if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+    return true;
+  }
+  if (static_cast<size_t>(now.tv_sec * 1000000000 + now.tv_nsec) >=
+      _timeout_ns + static_cast<size_t>(_start_time.tv_sec * 1000000000 +
+                                        _start_time.tv_nsec)) {
+    _state = Failed;
+    return true;
+  }
+  return false;
+}
 
 CgiDelegate::~CgiDelegate() {
   if (_stdin != NULL) {
