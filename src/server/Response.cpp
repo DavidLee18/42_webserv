@@ -98,11 +98,9 @@ Response ServerResponse::http_response(
   const ServerConfig *config = client->config;
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
-  if (rule == NULL)
-    return DefaultError::default_err_response(NOT_FOUND_ERR);
   Response response;
   if (rule == NULL) {
-    response = DefaultError::default_err_response(NOT_FOUND_ERR);
+    response = DefaultError::default_err_response(Response::NOT_FOUND);
     response.headers = config->get_header();
     return response;
   }
@@ -130,7 +128,8 @@ Response ServerResponse::http_response(
     if (request->get_method() == Request::DELETE) {
       std::cout << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
-      response = error_response(config, rule, UNAUTHORIZED, mime_type);
+      response =
+          error_response(config, rule, Response::UNAUTHORIZED, mime_type);
       response.headers = config->get_header();
       return response;
     } else {
@@ -154,7 +153,8 @@ Response ServerResponse::http_response(
                                           request, mime_type);
     break;
   default:
-    response = error_response(config, rule, METHOD_NOT_ALLOWED, mime_type);
+    response =
+        error_response(config, rule, Response::METHOD_NOT_ALLOWED, mime_type);
     break;
   }
 
@@ -178,7 +178,7 @@ Response ServerResponse::http_response(
   if (request->get_path() == "/api/session-info") {
     if (request->get_method() == Request::GET) {
       response.mime_type = "application/json";
-      response.status_code = status_code_to_string(OK);
+      response.status_code = status_code_to_string(Response::OK);
 
       if (session_id.empty()) {
         response.body =
@@ -205,22 +205,18 @@ Response ServerResponse::http_response(
       }
       return response;
     } else {
-      return error_response(config, rule, METHOD_NOT_ALLOWED, mime_type);
+      return error_response(config, rule, Response::METHOD_NOT_ALLOWED,
+                            mime_type);
     }
   } else {
     return response;
   }
 }
 
-Result<CgiDelegate> ServerResponse::register_cgi(const Request *request,
-                                                 const ServerConfig *config,
+Result<CgiDelegate> ServerResponse::register_cgi(const Request &request,
+                                                 const RouteRule_CGI &rule,
                                                  EPoll *epoll) {
-  RouteRule_CGI const *rule =
-      config->find_route_cgi(request->get_method(), request->get_path());
-  if (rule == NULL)
-    return ERR(CgiDelegate, "rule not found");
-  const Result<CgiDelegate> del_ =
-      CgiDelegate::from_req(*request, *epoll, *rule);
+  const Result<CgiDelegate> del_ = CgiDelegate::from_req(request, *epoll, rule);
   if (!del_.has_value())
     return ERR(CgiDelegate, del_.error());
   CgiDelegate del(del_.value());
@@ -254,9 +250,9 @@ int ServerResponse::check_path_type(const std::string &path) {
   struct stat info = {};
 
   if (stat(path.c_str(), &info) != 0)
-    return NOT_FOUND_ERR;
+    return Response::NOT_FOUND;
   else if (access(path.c_str(), R_OK) != 0)
-    return FORBIDDEN_ERR;
+    return Response::FORBIDDEN;
   else if (S_ISDIR(info.st_mode))
     return IS_DIR;
   else if (S_ISREG(info.st_mode))
@@ -269,7 +265,7 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
                                       const Request *request) {
   Target target;
   if (rule == NULL) {
-    target.type = NOT_FOUND_ERR;
+    target.type = Response::NOT_FOUND;
     return target;
   }
 
@@ -285,12 +281,12 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
     if (rule->op == SERVE_FROM && request->get_path() == "/")
       target.path += rule->index;
     target.type = check_path_type(target.path);
-  } else if (type == NOT_FOUND_ERR) {
-    target.path += get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
-    target.type = NOT_FOUND_ERR; // Keep error code, don't check path type
-  } else if (type == FORBIDDEN_ERR) {
-    target.path += get_string_from_map(rule->error_pages, FORBIDDEN_ERR);
-    target.type = FORBIDDEN_ERR; // Keep error code, don't check path type
+  } else if (type == Response::NOT_FOUND) {
+    target.path += get_string_from_map(rule->error_pages, Response::NOT_FOUND);
+    target.type = Response::NOT_FOUND; // Keep error code, don't check path type
+  } else if (type == Response::FORBIDDEN) {
+    target.path += get_string_from_map(rule->error_pages, Response::FORBIDDEN);
+    target.type = Response::FORBIDDEN; // Keep error code, don't check path type
   } else {
     target.path += root;
     target.type = check_path_type(target.path);
@@ -310,7 +306,8 @@ std::string ServerResponse::get_pwd() {
 }
 
 Response ServerResponse::error_response(
-    const ServerConfig *config, const RouteRule *rule, int error_code,
+    const ServerConfig *config, const RouteRule *rule,
+    const Response::StatusCode error_code,
     const std::map<std::string, std::string> &mime_type) {
   std::string err_page =
       get_pwd() + get_string_from_map(rule->error_pages, error_code);
@@ -548,7 +545,8 @@ Response ServerResponse::delete_method(
     response.status_code = "204 No Content";
     return response;
   } else {
-    return error_response(config, rule, FORBIDDEN_ERR, mime_type); // 404, 500
+    return error_response(config, rule, Response::FORBIDDEN,
+                          mime_type); // 404, 500
   }
 }
 
@@ -629,7 +627,7 @@ Response ServerResponse::post_method(
         return response;
       }
     } else
-      return error_response(config, rule, NOT_FOUND_ERR, mime_type);
+      return error_response(config, rule, Response::NOT_FOUND, mime_type);
   }
 
   // Handle file uploads
@@ -641,24 +639,25 @@ Response ServerResponse::post_method(
     std::map<std::string, std::string>::const_iterator content_type_it =
         headers.find("Content-Type");
     if (content_type_it == headers.end())
-      return error_response(config, rule, BAD_REQUEST, mime_type);
+      return error_response(config, rule, Response::BAD_REQUEST, mime_type);
 
     std::string content_type = content_type_it->second;
     if (content_type.find("multipart/form-data") == std::string::npos)
-      return error_response(config, rule, BAD_REQUEST, mime_type);
+      return error_response(config, rule, Response::BAD_REQUEST, mime_type);
 
     // Check body size limit
     int max_body_KB = rule->max_body_KB;
     if (static_cast<int>(body.length()) > max_body_KB * 1024) {
       std::cout << "Upload rejected: body size " << body.length()
                 << " exceeds limit " << (max_body_KB * 1024) << std::endl;
-      return error_response(config, rule, PAYLOAD_TOO_LARGE, mime_type);
+      return error_response(config, rule, Response::PAYLOAD_TOO_LARGE,
+                            mime_type);
     }
 
     // Extract boundary
     std::string boundary = extract_boundary(content_type);
     if (boundary.empty())
-      return error_response(config, rule, BAD_REQUEST, mime_type);
+      return error_response(config, rule, Response::BAD_REQUEST, mime_type);
 
     std::cout << "Boundary: " << boundary << std::endl;
 
@@ -667,7 +666,7 @@ Response ServerResponse::post_method(
     if (mkdir(upload_path.c_str(), 0755) != 0 && errno != EEXIST) {
       std::cout << "Failed to create upload directory: " << upload_path
                 << std::endl;
-      return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+      return error_response(config, rule, Response::FORBIDDEN, mime_type);
     }
 
     // Parse multipart parts and save files
@@ -710,7 +709,7 @@ Response ServerResponse::post_method(
         if (!outfile.is_open()) {
           std::cout << "Failed to open file for writing: " << file_path
                     << std::endl;
-          return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+          return error_response(config, rule, Response::FORBIDDEN, mime_type);
         }
 
         // Write file data
@@ -719,7 +718,7 @@ Response ServerResponse::post_method(
         if (outfile.fail()) {
           std::cout << "Failed to write file: " << file_path << std::endl;
           outfile.close();
-          return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+          return error_response(config, rule, Response::FORBIDDEN, mime_type);
         }
 
         outfile.close();
@@ -733,24 +732,24 @@ Response ServerResponse::post_method(
     }
 
     if (!error_msg.empty())
-      return error_response(config, rule, BAD_REQUEST, mime_type);
+      return error_response(config, rule, Response::BAD_REQUEST, mime_type);
 
     if (files_uploaded > 0) {
-      response.status_code = status_code_to_string(OK);
+      response.status_code = status_code_to_string(Response::OK);
       response.mime_type = "text/plain";
       std::ostringstream oss;
       oss << "Successfully uploaded " << files_uploaded << " file(s)";
       response.body = oss.str();
       return response;
     } else {
-      response.status_code = status_code_to_string(BAD_REQUEST);
+      response.status_code = status_code_to_string(Response::BAD_REQUEST);
       response.mime_type = "text/plain";
       response.body = "No files uploaded";
       return response;
     }
   }
 
-  return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+  return error_response(config, rule, Response::FORBIDDEN, mime_type);
 }
 
 Response ServerResponse::get_method(
@@ -758,14 +757,14 @@ Response ServerResponse::get_method(
     const RouteRule *rule, const Request *request,
     const std::map<std::string, std::string> &mime_type) {
   // Handle error responses (NOT_FOUND_ERR, FORBIDDEN_ERR)
-  if (target.type == NOT_FOUND_ERR)
-    return error_response(config, rule, NOT_FOUND_ERR, mime_type);
-  if (target.type == FORBIDDEN_ERR)
-    return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+  if (target.type == Response::NOT_FOUND)
+    return error_response(config, rule, Response::NOT_FOUND, mime_type);
+  if (target.type == Response::FORBIDDEN)
+    return error_response(config, rule, Response::FORBIDDEN, mime_type);
 
   if (rule->op == REDIRECT) {
     std::cout << "=== redirection ===" << std::endl;
-    target.type = MOVED_PERMANENTLY;
+    target.type = Response::MOVED_PERMANENTLY;
     response.redir =
         config->get_rewritten_path(request->get_method(), request->get_path());
     response.status_code = status_code_to_string(target.type);
@@ -775,27 +774,27 @@ Response ServerResponse::get_method(
     DIR *dir = opendir(target.path.c_str());
     if (dir == NULL) {
       if (errno == EACCES) // access denied
-        return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+        return error_response(config, rule, Response::FORBIDDEN, mime_type);
       else if (errno == ENOENT) // no such directory
-        return error_response(config, rule, NOT_FOUND_ERR, mime_type);
+        return error_response(config, rule, Response::NOT_FOUND, mime_type);
     }
-    target.type = OK;
+    target.type = Response::OK;
     response.mime_type = "html";
     response.body = make_autoindex_page(target.path, request->get_path(), dir);
     response.status_code = status_code_to_string(target.type);
   } else {
     if (check_path_type(target.path) != IS_FILE)
-      return error_response(config, rule, NOT_FOUND_ERR, mime_type);
+      return error_response(config, rule, Response::NOT_FOUND, mime_type);
     std::ifstream file(target.path.c_str());
     if (file.is_open()) {
       std::ostringstream ss;
       ss << file.rdbuf();
-      target.type = OK;
+      target.type = Response::OK;
       response.body = ss.str();
       response.status_code = status_code_to_string(target.type);
       file.close();
     } else {
-      return error_response(config, rule, NOT_FOUND_ERR, mime_type);
+      return error_response(config, rule, Response::NOT_FOUND, mime_type);
     }
   }
   return response;

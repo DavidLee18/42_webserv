@@ -37,6 +37,9 @@ public:
   const static std::string bad_request;
   const static std::string internal_server_error;
   const static std::string not_implemented;
+  const static std::string bad_gateway;
+  const static std::string gateway_timeout;
+  const static std::string cgi_invalid_state;
 };
 
 #endif // ERRORS_H

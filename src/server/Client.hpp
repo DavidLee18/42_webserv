@@ -8,11 +8,11 @@
  */
 #include "../result.h"
 #include <cctype>
+#include <cstdlib>
 #include <ctime>
 #include <iostream>
 #include <map>
 #include <sstream>
-#include <stdlib.h>
 #include <string>
 
 /**
@@ -43,13 +43,13 @@ struct ClientSession {
   std::string cookie;
   std::string ip;
   Request *req;
-  time_t
+  timespec
       last_activity_time; ///< Timestamp of last activity for timeout tracking.
 
   /**
    * @brief Default constructor. Initializes config to NULL.
    */
-  ClientSession() : config(NULL), req(NULL), last_activity_time(0) {}
+  ClientSession() : config(NULL), req(NULL), last_activity_time() {}
 };
 
 /**

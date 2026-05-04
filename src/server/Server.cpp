@@ -1,6 +1,5 @@
 #include "Server.hpp"
 #include "../webserv.h"
-#include "DefaultError.hpp"
 #include "Response.hpp"
 #include <cstddef>
 #include <ctime>
@@ -38,9 +37,18 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     }
 
     ClientSession client;
-    client.last_activity_time = time(NULL);
+    if (clock_gettime(CLOCK_MONOTONIC, &client.last_activity_time) != 0) {
+      std::cerr << "ERROR: failed to get current time for client activity"
+                << std::endl;
+      continue;
+    }
     char ip_str[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN);
+    if (inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN) ==
+        NULL) {
+      std::cerr << "ERROR: failed to convert client IP address to string"
+                << std::endl;
+      continue;
+    }
     client.ip = ip_str;
 
     // register client socket to EPoll
@@ -70,7 +78,15 @@ void Server::disconnect(const FileDescriptor *client_fd) {
 }
 
 void Server::client_read(const FileDescriptor *client_fd) {
-  clients.at(client_fd).last_activity_time = time(NULL);
+  if (clients.find(client_fd) == clients.end()) {
+    std::cerr << "ERROR: client not found for read operation" << std::endl;
+    return;
+  }
+  if (clock_gettime(CLOCK_MONOTONIC,
+                    &clients.at(client_fd).last_activity_time) != 0) {
+    std::cerr << "ERROR: failed to update client activity time" << std::endl;
+    return;
+  }
   bool peer_closed = false;
   while (true) { // repeat until nothing to read
     char buf[NETWORK_BUFFER_SIZE];
@@ -100,7 +116,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
           return;
         } else if (req_.error() == Errors::malformed_header ||
                    req_.error() == Errors::bad_request) {
-          Response resp = DefaultError::default_err_response(BAD_REQUEST);
+          Response resp =
+              DefaultError::default_err_response(Response::BAD_REQUEST);
           resp.headers = clients.at(client_fd).config->get_header();
           std::ostringstream oss;
           oss << resp;
@@ -115,7 +132,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
           return;
         } else if (req_.error() == Errors::not_implemented) {
-          Response resp = DefaultError::default_err_response(NOT_IMPLEMENTED);
+          Response resp =
+              DefaultError::default_err_response(Response::NOT_IMPLEMENTED);
           resp.headers = clients.at(client_fd).config->get_header();
           std::ostringstream oss;
           oss << resp;
@@ -148,10 +166,13 @@ void Server::client_read(const FileDescriptor *client_fd) {
                 << " (Body: " << clients.at(client_fd).req->get_content_length()
                 << " bytes)" << std::endl;
 
-      if (ServerResponse::find_file_type(
-              clients.at(client_fd).req->get_path()) == "cgi") {
+      RouteRule_CGI const *cgi_path =
+          clients.at(client_fd).config->find_route_cgi(
+              clients.at(client_fd).req->get_method(),
+              clients.at(client_fd).req->get_path());
+      if (cgi_path != NULL) {
         Result<CgiDelegate> del_ = ServerResponse::register_cgi(
-            clients.at(client_fd).req, clients.at(client_fd).config, &epoll);
+            *clients.at(client_fd).req, *cgi_path, &epoll);
         if (!del_.has_value()) {
           std::cerr << "CGI registration failed: " << del_.error() << std::endl;
           delete clients.at(client_fd).req;
@@ -205,10 +226,14 @@ void Server::client_read(const FileDescriptor *client_fd) {
                 << " (Body: " << clients.at(client_fd).req->get_content_length()
                 << " bytes)" << std::endl;
 
-      if (ServerResponse::find_file_type(
-              clients.at(client_fd).req->get_path()) == "cgi") {
+      RouteRule_CGI const *cgi_path =
+          clients.at(client_fd).config->find_route_cgi(
+              clients.at(client_fd).req->get_method(),
+              clients.at(client_fd).req->get_path());
+
+      if (cgi_path != NULL) {
         Result<CgiDelegate> del_ = ServerResponse::register_cgi(
-            clients.at(client_fd).req, clients.at(client_fd).config, &epoll);
+            *clients.at(client_fd).req, *cgi_path, &epoll);
         if (!del_.has_value()) {
           std::cerr << "CGI registration failed: " << del_.error() << std::endl;
           delete clients.at(client_fd).req;
@@ -263,7 +288,15 @@ void Server::client_write(const FileDescriptor *client_fd) {
   if (clients.find(client_fd) == clients.end())
     return;
 
-  clients.at(client_fd).last_activity_time = time(NULL);
+  if (clients.find(client_fd) == clients.end()) {
+    std::cerr << "ERROR: client not found for write operation" << std::endl;
+    return;
+  }
+  if (clock_gettime(CLOCK_MONOTONIC,
+                    &clients.at(client_fd).last_activity_time) != 0) {
+    std::cerr << "ERROR: failed to update client activity time" << std::endl;
+    return;
+  }
   std::string &write_buffer = clients.at(client_fd).out_buff;
   if (!write_buffer.empty()) {
     while (true) { // ET 모드이므로 보낼 수 있는 만큼 다 보냄
@@ -354,10 +387,15 @@ Result<Void> Server::init() {
 Result<Void> Server::start() {
   // system("open http://localhost:8080");
   std::cout << "Starting server loop..." << std::endl;
+  long epoll_timeout = -1; // Default: wait indefinitely
   while (true) {
     // Check for client timeouts and calculate epoll timeout
-    const time_t now = time(NULL);
-    int epoll_timeout = -1; // Default: wait indefinitely
+    timespec now = {};
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+      std::cerr << "ERROR: failed to get current time for client timeout check"
+                << std::endl;
+      continue;
+    }
 
     // Collect clients to disconnect (avoid modifying map during iteration)
     std::vector<const FileDescriptor *> clients_to_disconnect;
@@ -371,17 +409,27 @@ Result<Void> Server::start() {
       if (session.config == NULL)
         continue;
 
-      const int timeout_sec = session.config->get_server_response_time();
+      const long timeout_sec =
+          static_cast<long>(session.config->get_server_response_time());
       if (timeout_sec > 0) {
-        const time_t elapsed = now - session.last_activity_time;
-        if (elapsed >= static_cast<time_t>(timeout_sec))
+        const timespec elapsed = {
+            .tv_sec = now.tv_sec - session.last_activity_time.tv_sec,
+            .tv_nsec = now.tv_nsec - session.last_activity_time.tv_nsec};
+        if (elapsed.tv_sec < 0 ||
+            (elapsed.tv_sec == 0 && elapsed.tv_nsec < 0)) {
+          std::cerr << "ERROR: client activity time in the future" << std::endl;
+          continue;
+        }
+        if (elapsed.tv_sec >= static_cast<time_t>(timeout_sec))
           // Client has timed out
           clients_to_disconnect.push_back(client_fd);
         else {
           // Calculate remaining time until this client times out
-          const int remaining = timeout_sec - static_cast<int>(elapsed);
+          const long remaining = timeout_sec - elapsed.tv_sec;
           if (epoll_timeout == -1 || remaining < epoll_timeout)
-            epoll_timeout = remaining * 1000; // Convert to milliseconds
+            epoll_timeout =
+                remaining * 1000 -
+                elapsed.tv_nsec / 1000000; // Convert to milliseconds
         }
       }
     }
@@ -399,7 +447,7 @@ Result<Void> Server::start() {
     }
 
     // Waiting for events using epoll
-    Result<Events> events_result = epoll.wait(epoll_timeout);
+    Result<Events> events_result = epoll.wait(static_cast<int>(epoll_timeout));
     if (!events_result.has_value()) {
       if (events_result.error() == Errors::interrupted)
         continue;
@@ -436,9 +484,15 @@ Result<Void> Server::start() {
              it != cgis.end(); ++it) {
           Result<Void> res = it->second.handle_event(event);
           if (!res.has_value()) {
-            std::cerr << "CGI event handling failure: " << res.error()
-                      << std::endl;
-            // TODO: generate 502 Bad Gateway Response
+            std::ostringstream oss;
+            if (res.error() == Errors::gateway_timeout) {
+              oss << DefaultError::default_err_response(
+                  Response::GATEWAY_TIMEOUT);
+              clients.at(it->first).out_buff = oss.str();
+            } else { // res.error() == Errors::bad_gateway
+              oss << DefaultError::default_err_response(Response::BAD_GATEWAY);
+              clients.at(it->first).out_buff = oss.str();
+            }
             reap_cgis.push_back(it->first);
           } else {
             Result<std::string> output = it->second.poll();

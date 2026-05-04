@@ -1470,7 +1470,8 @@ unsigned char to_upper(const unsigned char c) {
 
 CgiDelegate::CgiDelegate(Request const &req, EPoll &ep)
     : _env(), _script_path(), _req(req), _epoll(ep), _pid(-1), _stdin(NULL),
-      _stdout(NULL), _total_written(0), _output(), _completed(false) {}
+      _stdout(NULL), _total_written(0), _output(), _state(NotRegistered),
+      _start_time(), _timeout(0) {}
 
 Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
                                           const RouteRule_CGI &rule) {
@@ -1479,7 +1480,11 @@ Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
   char pwd[PATH_MAX];
   if (getcwd(pwd, sizeof(pwd)) == NULL)
     return ERR(CgiDelegate, "getting PWD failed");
-  del._script_path = pwd + rule.get_path().to_string();
+  del._script_path = pwd + std::string("/");
+  del._script_path += rule.get_executable();
+  if (rule.get_timeout() <= 0)
+    return ERR(CgiDelegate, "timeout must be positive");
+  del._timeout = static_cast<size_t>(rule.get_timeout());
   std::map<std::string, std::string> vars(rule.get_env());
   for (std::map<std::string, std::string>::const_iterator it = vars.begin();
        it != vars.end(); ++it) {
@@ -1492,7 +1497,7 @@ CgiDelegate::CgiDelegate(const CgiDelegate &other)
     : _env(other._env), _script_path(other._script_path), _req(other._req),
       _epoll(other._epoll), _pid(other._pid), _stdin(other._stdin),
       _stdout(other._stdout), _total_written(other._total_written),
-      _output(other._output), _completed(other._completed) {
+      _output(other._output), _state(other._state), _start_time(), _timeout() {
   const_cast<CgiDelegate &>(other)._env.mvars.clear();
   const_cast<CgiDelegate &>(other)._env.req_body.clear();
   const_cast<CgiDelegate &>(other)._script_path.clear();
@@ -1501,7 +1506,7 @@ CgiDelegate::CgiDelegate(const CgiDelegate &other)
   const_cast<CgiDelegate &>(other)._stdout = NULL;
   const_cast<CgiDelegate &>(other)._total_written = 0;
   const_cast<CgiDelegate &>(other)._output.clear();
-  const_cast<CgiDelegate &>(other)._completed = false;
+  const_cast<CgiDelegate &>(other)._state = NotRegistered;
 }
 
 static const int kWaitpidPollIntervalUs = 1000;
@@ -1543,8 +1548,8 @@ CgiDelegate::operator=(const CgiDelegate &other) throw(std::logic_error) {
 // here - the caller's main loop is the sole owner of epoll_wait() and
 // will drive handle_event() for each event delivered.
 Result<Void> CgiDelegate::register_() {
-  if (_pid != -1)
-    return ERR(Void, "CgiDelegate::start() already called");
+  if (_pid != -1 || _state != NotRegistered)
+    return ERR(Void, Errors::cgi_invalid_state);
 
   Result<std::pair<FileDescriptor, FileDescriptor> > stdin_pipe_res =
       FileDescriptor::pipe();
@@ -1592,9 +1597,7 @@ Result<Void> CgiDelegate::register_() {
       FileDescriptor stdout1(stdout_pipe_res.value().second);
     }
     return ERR(Void, "Failed to fork process");
-  }
-
-  if (pid == 0) {
+  } else if (pid == 0) {
     {
       FileDescriptor stdin1 = stdin_pipe_res.value().second;
       FileDescriptor stdout0 = stdout_pipe_res.value().first;
@@ -1626,10 +1629,12 @@ Result<Void> CgiDelegate::register_() {
     size_t last_slash = _script_path.rfind('/');
     std::string path;
     if (last_slash == std::string::npos)
-      path = getenv("PWD") ? getenv("PWD") + std::string("/") + path : "/";
+      path =
+          getenv("PWD") ? getenv("PWD") + std::string("/") + _script_path : "/";
     else
       path = _script_path.substr(0, last_slash + 1);
 
+    argv[0] = const_cast<char *>(path.c_str());
     if (chdir(path.c_str()) != 0) {
       std::cerr << "Failed to change directory to: " << path << std::endl;
       std::exit(1);
@@ -1638,9 +1643,8 @@ Result<Void> CgiDelegate::register_() {
     execve(_script_path.c_str(), argv, envp);
 
     // execve failed
-    for (size_t i = 0; envp[i] != NULL; i++) {
+    for (size_t i = 0; envp[i] != NULL; i++)
       delete[] envp[i];
-    }
     delete[] envp;
 
     std::cerr << "Failed to execute CGI script: " << _script_path << std::endl;
@@ -1660,15 +1664,13 @@ Result<Void> CgiDelegate::register_() {
   // semantics of read/write, and partial IO is expected in the event loop.
   Result<Void> res = _stdin->set_nonblocking();
   if (!res.has_value()) {
-    terminate_child(_pid);
-    _pid = -1;
+    _state = Failed;
     return ERR(Void, "Failed to set stdin pipe to non-blocking mode");
   }
 
   res = _stdout->set_nonblocking();
   if (!res.has_value()) {
-    terminate_child(_pid);
-    _pid = -1;
+    _state = Failed;
     return ERR(Void, "Failed to set stdout pipe to non-blocking mode");
   }
 
@@ -1681,8 +1683,7 @@ Result<Void> CgiDelegate::register_() {
     Result<FileDescriptor *> add_res =
         _epoll.add_fd(*_stdin, write_event, write_option);
     if (!add_res.has_value()) {
-      terminate_child(_pid);
-      _pid = -1;
+      _state = Failed;
       return ERR(Void, "Failed to add stdin to epoll");
     }
     delete _stdin;
@@ -1700,12 +1701,15 @@ Result<Void> CgiDelegate::register_() {
       delete _stdin;
       _stdin = NULL;
     }
-    terminate_child(_pid);
-    _pid = -1;
+    _state = Failed;
     return ERR(Void, "Failed to add stdout to epoll");
   }
   _stdout = add_out_res.value();
-
+  if (clock_gettime(CLOCK_MONOTONIC, &_start_time) != 0) {
+    _state = Failed;
+    return ERR(Void, "Failed to get start time for CGI process");
+  }
+  _state = Waiting;
   return OKV;
 }
 
@@ -1715,13 +1719,31 @@ Result<Void> CgiDelegate::register_() {
 Result<Void> CgiDelegate::handle_event(const Event *ev) {
   if (ev == NULL || ev->fd == NULL)
     return OKV;
+  if (_state == Failed)
+    return ERR(Void, Errors::bad_gateway);
+  if (_state != Waiting)
+    return ERR(Void, Errors::invalid_operation);
+  timespec now = {};
+  if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+    _state = Failed;
+    return ERR(Void, Errors::bad_gateway);
+  }
+  if (static_cast<size_t>(now.tv_sec * 1000000000 + now.tv_nsec) >=
+      _timeout + static_cast<size_t>(_start_time.tv_sec * 1000000000 +
+                                     _start_time.tv_nsec)) {
+    _state = Failed;
+    return ERR(Void, Errors::gateway_timeout);
+  }
   if (_stdin != NULL && *ev->fd == *_stdin) {
-    if (ev->err)
-      return ERR(Void, "EPoll error on CGI stdin");
-    else if (ev->hup || ev->rdhup) {
-      if (_total_written < _req.get_body().length())
-        return ERR(Void,
-                   "CGI process closed stdin before all data was written");
+    if (ev->err) {
+      _state = Failed;
+      return ERR(Void, Errors::bad_gateway);
+    }
+    if (ev->hup || ev->rdhup) {
+      if (_total_written < _req.get_body().length()) {
+        _state = Failed;
+        return ERR(Void, Errors::bad_gateway);
+      }
       // All data was already written; close stdin and continue.
       _epoll.del_fd(*_stdin);
       delete _stdin;
@@ -1735,10 +1757,15 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
                                _req.get_body().length() - _total_written);
         if (written.has_value() && written.value() > 0)
           _total_written += static_cast<size_t>(written.value());
-        else if (written.has_value() && written.value() == 0)
-          return ERR(Void, "CGI process closed stdin prematurely");
-        else
-          return ERR(Void, "Failed to write to CGI stdin");
+        else if (written.has_value() && written.value() == 0) {
+          terminate_child(_pid);
+          _pid = -1;
+          _state = Failed;
+          return ERR(Void, Errors::bad_gateway);
+        } else {
+          _state = Failed;
+          return ERR(Void, Errors::bad_gateway);
+        }
       } else {
         // Done writing: drop stdin from epoll, which also closes the pipe,
         // signalling EOF to the CGI script.
@@ -1759,8 +1786,12 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
         _output.append(buffer, static_cast<size_t>(bytes_read.value()));
         return OKV;
       }
-      if (!bytes_read.has_value() || bytes_read.value() < 0)
-        return ERR(Void, "Failed to read from CGI stdout");
+      if (!bytes_read.has_value() || bytes_read.value() < 0) {
+        terminate_child(_pid);
+        _pid = -1;
+        _state = Failed;
+        return ERR(Void, Errors::bad_gateway);
+      }
 
       // bytes_read == 0: EOF, drain any remaining IO bookkeeping.
       _epoll.del_fd(*_stdout);
@@ -1771,32 +1802,45 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
         delete _stdin;
         _stdin = NULL;
       }
-      _completed = true;
+      _state = Done;
 
       int status = 0;
       if (!waitpid_nohang(_pid, &status)) {
         terminate_child(_pid);
+        _state = Failed;
         _pid = -1;
-        return ERR(Void, "CGI child process did not exit cleanly");
+        return ERR(Void, Errors::bad_gateway);
       }
       _pid = -1;
 
-      if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-        return ERR(Void, "CGI script failed");
+      if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        _state = Failed;
+        return ERR(Void, Errors::bad_gateway);
+      }
 
       return OKV;
     }
 
-    if (ev->err)
-      return ERR(Void, "EPoll error on CGI stdout");
+    if (ev->err) {
+      terminate_child(_pid);
+      _pid = -1;
+      _state = Failed;
+      return ERR(Void, Errors::bad_gateway);
+    }
     return OKV;
   } else
     return OKV; // not for us
 }
 
 Result<std::string> CgiDelegate::poll() const {
-  return _completed ? OK(std::string, _output)
-                    : ERR(std::string, Errors::try_again);
+  switch (_state) {
+  case Done:
+    return OK(std::string, _output);
+  case Failed:
+    return ERR(std::string, "CGI failed");
+  default:
+    return ERR(std::string, Errors::try_again);
+  }
 }
 
 CgiDelegate::~CgiDelegate() {

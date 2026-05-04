@@ -281,20 +281,14 @@ public:
 };
 
 class CgiDelegate {
-  CgiInput _env;
-  std::string _script_path;
-  const Request &_req;
-  EPoll &_epoll;
-  pid_t _pid;
-  FileDescriptor *_stdin;
-  FileDescriptor *_stdout;
-  size_t _total_written;
-  std::string _output;
-  bool _completed;
-
-  CgiDelegate(Request const &, EPoll &);
-
 public:
+  enum State {
+    NotRegistered,
+    Waiting,
+    Failed,
+    Done,
+  };
+
   static Result<CgiDelegate> from_req(Request const &, EPoll &,
                                       RouteRule_CGI const &);
 
@@ -314,6 +308,22 @@ public:
   Result<std::string> poll() const;
 
   ~CgiDelegate();
+
+private:
+  CgiInput _env;
+  std::string _script_path;
+  const Request &_req;
+  EPoll &_epoll;
+  pid_t _pid;
+  FileDescriptor *_stdin;
+  FileDescriptor *_stdout;
+  size_t _total_written;
+  std::string _output;
+  State _state;
+  timespec _start_time;
+  size_t _timeout;
+
+  CgiDelegate(Request const &, EPoll &);
 };
 
 unsigned char to_upper(unsigned char);

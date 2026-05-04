@@ -9,7 +9,6 @@
 #include "../cgi_1_1.h"
 #include "../config/ServerConfig.hpp"
 #include "Client.hpp"
-#include "DefaultError.hpp"
 #include "Session.hpp"
 
 #include <dirent.h>
@@ -20,24 +19,6 @@
 #include <unistd.h>
 
 class EPoll;
-
-/**
- * @enum StatusCode
- * @brief Enum for commonly used HTTP status codes.
- */
-enum StatusCode {
-  OK = 200,
-  MOVED_PERMANENTLY = 301,
-  BAD_REQUEST = 400,
-  UNAUTHORIZED = 401,
-  FORBIDDEN_ERR = 403,
-  NOT_FOUND_ERR = 404,
-  METHOD_NOT_ALLOWED = 405,
-  CONFLICT = 409,
-  PAYLOAD_TOO_LARGE = 413,
-  INTERNAL_SERVER_ERR = 500,
-  NOT_IMPLEMENTED = 501,
-};
 
 /**
  * @struct Target
@@ -63,6 +44,25 @@ struct StatusInfo {
  * @brief Represents the components of an HTTP response.
  */
 struct Response {
+  /**
+   * @enum StatusCode
+   * @brief Enum for commonly used HTTP status codes.
+   */
+  enum StatusCode {
+    OK = 200,
+    MOVED_PERMANENTLY = 301,
+    BAD_REQUEST = 400,
+    UNAUTHORIZED = 401,
+    FORBIDDEN = 403,
+    NOT_FOUND = 404,
+    METHOD_NOT_ALLOWED = 405,
+    CONFLICT = 409,
+    PAYLOAD_TOO_LARGE = 413,
+    INTERNAL_SERVER_ERR = 500,
+    NOT_IMPLEMENTED = 501,
+    BAD_GATEWAY = 502,
+    GATEWAY_TIMEOUT = 504,
+  };
   std::string version;      ///< HTTP version (e.g., "HTTP/1.1").
   std::string status_code;  ///< HTTP status code and reason (e.g., "200 OK").
   size_t content_length;    ///< Content-Length header value.
@@ -120,9 +120,8 @@ public:
                 const std::map<std::string, std::string> &mime_type,
                 Session *session);
 
-  static Result<CgiDelegate> register_cgi(const Request *request,
-                                          const ServerConfig *config,
-                                          EPoll *epoll);
+  static Result<CgiDelegate>
+  register_cgi(const Request &request, const RouteRule_CGI &rule, EPoll *epoll);
 
 private:
   /**
@@ -178,7 +177,7 @@ private:
    */
   static Response
   error_response(const ServerConfig *config, const RouteRule *rule,
-                 int error_code,
+                 Response::StatusCode error_code,
                  const std::map<std::string, std::string> &mime_type);
 
   /**
@@ -231,6 +230,19 @@ private:
   get_method(Target target, Response response, const ServerConfig *config,
              const RouteRule *rule, const Request *request,
              const std::map<std::string, std::string> &mime_type);
+};
+
+class DefaultError {
+  virtual int phantom() = 0;
+  static std::string bad_request();
+  static std::string forbidden();
+  static std::string not_found();
+  static std::string server_error();
+  static std::string unknown_err();
+  static std::string status_code_to_string(Response::StatusCode status_code);
+
+public:
+  static Response default_err_response(Response::StatusCode err_code);
 };
 
 #endif
