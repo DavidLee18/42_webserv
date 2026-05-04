@@ -2,8 +2,9 @@
 
 RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line) {
   err_meg = "";
-  timeout = 3;
+  timeout_ms = 3000;
   count_line = 0;
+  worker_instance = 0;
 
   std::vector<std::string> temp = utils::string_split(line, " ");
 
@@ -24,37 +25,69 @@ std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
     return "on [" + line + "], [" + split[2] + "]: The CGI script reference does not start with the required $ prefix. (CGI syntax rule, the script identifier must begin with $ to be recognized as a valid CGI command, but the provided value does not follow this required format).";
   std::string file_line = utils::remove_char(split[2], '$');
 
-  err_meg = RouteRule_CGI::parse_executable(file_line, this->executable, this->env);
+  err_meg = RouteRule_CGI::parse_executable(file_line, this->executable, this->env); // 1. 수정 중
   if (err_meg != "")
     return "on [\t" + line + err_meg;
+  err_meg = RouteRule_CGI::parse_cgi_params(*this, fd, "");
+  if (err_meg != "")
+    return err_meg;
+  return "";
+}
+
+std::string RouteRule_CGI::parse_cgi_params(RouteRule_CGI& cgi, FileDescriptor &fd, std::string executable) {
+  std::string file_line = "";
+  std::string err_format = "on [\t\t";
+  bool is_server = true;
+  bool is_server_uwsgi = false;
+  if (executable != "") {
+    is_server = false;
+    err_format = "on [\t";
+    cgi.executable = executable;
+  } else if (std::isdigit(static_cast<unsigned char>(cgi.executable[0])))
+    is_server_uwsgi = true;
+
   while (true) {
     Result<std::string> temp = fd.read_file_line();
-    count_line++;
+    cgi.count_line++;
     if (temp.error() != "")
       return "FileDescriptor Error: " + temp.error();
     else if (temp.value() == "\n" || temp.value() == "")
-      return "";
+      return  "";
+    else if (is_server_uwsgi)
+      return err_format + utils::remove_char(temp.value(), '\n') + "], [" + utils::remove_char(temp.value(), '\n') + "]:Invalid RouteRule (uWSGI mode does not support additional information in RouteRule)";
     
     file_line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(file_line, 2);
-    if (err_meg != "")
-      return err_meg;
+    cgi.err_meg = utils::get_indent_whitespace_error(file_line, 2);
+    if (cgi.err_meg != "")
+      return cgi.err_meg;
     file_line = utils::trim_whitespace(file_line);
 
     if (utils::has_space(file_line))
-      err_meg = "on [" + line + "], [" + line + "]: The CGI extended information line does not match any of the allowed formats. (CGI extension rule, the line must follow either key=value or ...<numeric string> format, but the provided line does not conform to either pattern).";
-    else if (is_valid_timeout(file_line))
-      err_meg = parse_timeout_value(file_line);
-    else if (std::string::npos != file_line.find("=")) {
-      err_meg = RouteRule_CGI::parse_env_entry(file_line, this->env);
-      if (err_meg != "")
-        err_meg = "on [\t\t" + line + err_meg;
+      return err_format + file_line + "], [" + file_line + "]: The CGI extended information line does not match any of the allowed formats. (CGI extension rule, the line must follow either key=value or ...<numeric string> format, but the provided line does not conform to either pattern).";
+    else if (is_valid_timeout(file_line)) {
+      cgi.err_meg = parse_timeout_value(cgi, file_line);
+      if (cgi.err_meg != "")
+        return cgi.err_meg;
     }
-    else
-      err_meg = "on [" + line + "], [" + line + "]: The CGI extended information line does not match any of the allowed formats. (CGI extension rule, the line must follow either key=value or ...<numeric string> format, but the provided line does not conform to either pattern).";
+    else if (std::string::npos != file_line.find("=")) {
+      cgi.err_meg = RouteRule_CGI::parse_env_entry(file_line, cgi.env);
+      if (cgi.err_meg != "")
+        return err_format + file_line + cgi.err_meg;
+    } else if (file_line[0] == '*') {
+      if (cgi.worker_instance == 0 || is_server)
+        return err_format + file_line + "], [" + file_line + "]:Invalid worker_instance (this parameter can only be configured in the server-side global uWSGI configuration and is not allowed in CGI or server-side uWSGI additional parameters).";
+      char* end;
+      std::string worker_instance_data = file_line.substr(1);
+      unsigned long num = std::strtoul(worker_instance_data.c_str(), &end, 10);
 
-    if (err_meg != "")
-      return err_meg;
+      if (*end != '\0')
+        return err_format + file_line + "], [" + worker_instance_data + "]:Invalid worker_instance (must contain only digits (0-9), but non-numeric characters were found).";
+      else if (num > 4096 || num < 1)
+        return err_format + file_line + "], [" + worker_instance_data + "]: Invalid worker_instance (must be within the range 1 ~ 4096, but the provided value is outside this range).";
+      else
+        cgi.worker_instance = static_cast<int>(num);
+    } else
+        return err_format + file_line + "], [" + file_line + "]: The CGI extended information line does not match any of the allowed formats. (CGI extension rule, the line must follow either key=value or ...<numeric string> format, but the provided line does not conform to either pattern).";
   }
 }
 
@@ -127,23 +160,18 @@ bool RouteRule_CGI::is_valid_timeout(const std::string &line) {
   return true;
 }
 
-std::string RouteRule_CGI::parse_timeout_value(std::string &line) {
-  double data = 0;
-  bool dot = false;
+std::string RouteRule_CGI::parse_timeout_value(RouteRule_CGI &cgi, std::string &line) {
+  int data = 0;
   for (size_t i = 3; i < line.length(); ++i) {
-    if (line[i] == '.') {
-      if (dot)
-        return "on [\t" + line + "], [" + &line[3] + "]: The CGI response time configuration contains an invalid decimal format due to incorrect placement of the dot character. (CGI response time rule, the value must be a properly formatted number, but the decimal point is incorrectly positioned, making it unparseable).";
-      dot = true;
-    } else if (!std::isdigit(static_cast<unsigned char>(line[i])))
+    if (!std::isdigit(static_cast<unsigned char>(line[i])))
       return "on [\t" + line + "], [" + &line[3] + "]: The CGI response time configuration contains an invalid value type after the delimiter. (CGI response time rule, the value after ... must consist only of numeric characters, but non-numeric characters are present, making it invalid for parsing).";
   }
   std::stringstream ss(line.substr(3));
   ss >> data;
 
-  if (data > 15.0 || 0.05 > data)
-    return "on [\t" + line + "], [" + &line[3] + "]: The CGI response time configuration is out of the allowed range. (CGI response time rule, the value must be between 0.05 and 15.0 inclusive, but the provided value falls outside this range).";
-  timeout = data;
+  if (data > 3600000 || 1 > data)
+    return "on [\t" + line + "], [" + &line[3] + "]: The CGI response time configuration is out of the allowed range. (CGI response time rule, the value must be between 1ms and 3600000ms inclusive, but the provided value falls outside this range).";
+  cgi.timeout_ms = data;
   return "";
 }
 
@@ -249,8 +277,11 @@ RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
       return "[" + line + "], [" + value_and_key[1] + "]: The port value must contain only numeric characters (the port value syntax rule is violated because the provided value contains non-numeric characters or cannot be fully converted to a number).";
     else if (num > 65535)
       return "[" + line + "], [" + value_and_key[1] + "]: Violates port range rule (port must be between 0 and 65535).";
-    uwsgi[static_cast<int>(num)] = RouteRule_CGI(); // work_instance 파싱 관련
-    // 추가정보 파싱 부분 추가
+  
+    err = RouteRule_CGI::parse_cgi_params(uwsgi[static_cast<int>(num)], fd, value_and_key[0]);
+    count_line += uwsgi[static_cast<int>(num)].get_count_line(); 
+    if (err != "")
+      return err;
   }
 }
 
@@ -270,14 +301,24 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
   std::map<std::string, std::string> env = data.get_env();
   std::map<std::string, std::string>::const_iterator env_it;
 
-  os << "\nExecutable: " << data.get_executable() << "\n";
-  os << "\n\tEnv\n";
-  for (env_it = env.begin(); env_it != env.end(); ++env_it) {
-    os << "\tEnv key: " << env_it->first << ", Env value: " << env_it->second
-       << "\n";
+  if (data.get_worker_instance() == 0) {
+    os << "\nCGI: ";
+    if (data.get_method() == Request::GET)
+      os << "GET";
+    else if (data.get_method() == Request::POST)
+      os << "POST";
+    else if (data.get_method() == Request::DELETE)
+      os << "DELETE";
+    os << " " << data.get_path().to_string() << "\n";
   }
-  os << "\n\tTimeout: " << data.get_timeout() << "\n";
-  os << "\n\tworker_instance: " << data.get_worker_instance() << "\n";
+  os << "\tExecutable: " << data.get_executable();
+  os << "\n\tEnv";
+  for (env_it = env.begin(); env_it != env.end(); ++env_it) {
+    os << "\n\t\tEnv key: " << env_it->first << ", Env value: " << env_it->second;
+  }
+  os << "\n\tTimeout: " << data.get_timeout_ms() << "\n";
+  if (data.get_worker_instance() != 0)
+    os << "\tworker_instance: " << data.get_worker_instance() << "\n";
 
   return (os);
 }
@@ -288,7 +329,9 @@ RouteRule_CGI::parse_executable(const std::string &line,
                                 std::map<std::string, std::string> &map) {
   std::string err_msg = "";
 
-  // 실팽파일의 문법 검사를 여기서 할지 생각중
+  // uwsgi 인지 cgi 인지 구분 추가
+  // 확장이 .cgi 인 경우, 실행할 수 있어야 합니다 추가. 
+  // 그게 아닌 경우에는 uWSGI로, 파일은 여러 가지가 올 수 있으니 실행 가능하기만 하면 될 것 같습니다 추가
   std::string file_line = utils::remove_char(line, '$');
   std::size_t start = file_line.find('(');
   if (std::string::npos != start) {

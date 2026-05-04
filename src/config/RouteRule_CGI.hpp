@@ -38,7 +38,7 @@ private:
    * @var timeout
    * @brief CGI 실행의 제한 시간을 저장하는 멤버 변수
    */
-  double timeout;
+  int timeout_ms;
   /**
    * @var err
    * @brief CGI 규칙 파싱 또는 처리 중 발생한 오류 정보를 저장하는 멤버 변수
@@ -57,7 +57,7 @@ private:
    * 
    * - 숫자 문자열의 값은 0.05보다 크고 15.0 이하여야 한다.
    */
-  bool is_valid_timeout(const std::string &line);
+  static bool is_valid_timeout(const std::string &line);
   /**
    * @brief 검증된 timeout 문자열을 double 값으로 변환하는 함수
    * @param line 변환할 문자열
@@ -66,7 +66,7 @@ private:
    * - 입력 문자열은 is_valid_timeout(const std::string &line) 함수로
    * 유효성이 확인된 상태여야 한다.
    */
-  std::string parse_timeout_value(std::string &line);
+  static std::string parse_timeout_value(RouteRule_CGI &cgi, std::string &line);
   /**
    * @brief CGI 설정 블록을 파싱하여 실행 파일, 환경 변수, timeout 정보를
    * 저장하는 함수
@@ -80,9 +80,9 @@ private:
    * 읽는다.
    */
   std::string parse_cgi_block(FileDescriptor &fd, std::string line);
-
+  static std::string parse_cgi_params(RouteRule_CGI& cgi, FileDescriptor &fd, std::string line);
 public:
-  RouteRule_CGI() : executable(""), env(), timeout(0.05), err_meg(""), worker_instance(0) {};
+  RouteRule_CGI() : met(Request::GET), path(""), executable(""), env(), timeout_ms(3000), err_meg(""), count_line(0), worker_instance(5) {};
   /**
    * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
    * 생성자
@@ -93,7 +93,19 @@ public:
    * 실행 파일, 환경 변수, timeout 정보를 초기화한다.
    */
   RouteRule_CGI(FileDescriptor &fd, const std::string &line);
-
+  RouteRule_CGI &operator=(const RouteRule_CGI &other) {
+    if (this != &other) {
+      met = other.met;
+      path = other.path;
+      executable = other.executable;
+      env = other.env;
+      timeout_ms = other.timeout_ms;
+      err_meg = other.err_meg;
+      count_line = other.count_line;
+      worker_instance = other.worker_instance;
+    }
+    return *this;
+  }
   const PathPattern get_path(void) const { return path; }
   Request::Method get_method (void) const { return met; }
   const std::string get_err_meg(void) const { return err_meg; }
@@ -101,7 +113,7 @@ public:
   const std::map<std::string, std::string> get_env(void) const { return env; }
   std::size_t get_count_line(void) const { return count_line; }
   int get_worker_instance (void) const { return worker_instance; };
-  double get_timeout() const { return timeout; }
+  int get_timeout_ms() const { return timeout_ms; }
 
   /**
    * @brief 문자열이 환경 변수 이름 문법에 맞는지 검사하는 함수

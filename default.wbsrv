@@ -11,6 +11,9 @@ types =
 
 uwsgi =
 	/uwsgi/get_files.py:9000
+		*20
+		...10
+
 	/uwsgi/get_files.py:9080
 
 

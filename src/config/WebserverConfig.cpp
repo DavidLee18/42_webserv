@@ -39,10 +39,10 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (!parse_types_block(file))
         return false;
     } else if (WebserverConfig::is_server_config_header(line)) {
-      if (!parse_server_config_entry(file, line)) // 수정 중
+      if (!parse_server_config_entry(file, line))
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
-      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi, count_line); // 수정해야 함
+      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi, count_line); //2. 수정 중
       if (err_meg != "")
         return false;
     } else if (line[0] == '!') {
@@ -286,7 +286,7 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
      << std::endl;
   os << "<<Uwsgi>>\n" << std::endl;
   for (uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
-    os << "Uwsgi key: " << uw_it->first << ", Uwsgi value: " << uw_it->second
+    os << "Uwsgi key: " << uw_it->first << "\nUwsgi value:\n" << uw_it->second
        << std::endl;
   }
   os << "========================================================" << std::endl;

@@ -21,19 +21,19 @@ int main(const int argc, char *argv[]) {
     return 1;
   } else {
 
-    // std::cout << result_config.value() << std::endl;
-    const WebserverConfig &config = result_config.value();
-    Server server(config);
-    Result<Void> init_result = server.init();
-    if (!init_result.has_value()) {
-      std::cerr << "Server init failed: " << init_result.error() << std::endl;
-      return 1;
-    }
-    Result<Void> server_result = server.start();
-    if (!server_result.has_value()) {
-      std::cerr << "Server Error: " << server_result.error() << std::endl;
-      return 1;
-    }
+    std::cout << result_config.value() << std::endl;
+    // const WebserverConfig &config = result_config.value();
+    // Server server(config);
+    // Result<Void> init_result = server.init();
+    // if (!init_result.has_value()) {
+    //   std::cerr << "Server init failed: " << init_result.error() << std::endl;
+    //   return 1;
+    // }
+    // Result<Void> server_result = server.start();
+    // if (!server_result.has_value()) {
+    //   std::cerr << "Server Error: " << server_result.error() << std::endl;
+    //   return 1;
+    // }
     
   }
   return 0;

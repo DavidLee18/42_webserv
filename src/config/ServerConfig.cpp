@@ -36,7 +36,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
     line = utils::trim_whitespace(line);
     
     if (is_header_block(line)) {
-      if (!parse_header_entry(fd, line)) { // 수정해야 함
+      if (!parse_header_entry(fd, line)) { // 마지막에 수정해야 함
         err_meg = "Header syntax Error: " + err_meg;
         return false;
       }
@@ -49,8 +49,8 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
       if (!parse_route_rule_block(line, fd)) {
         return false;
       }
-    } else if (RouteRule_CGI::is_valid_cgi_config(line)) { // 수정해야 함
-      RouteRule_CGI temp(fd, line);
+    } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
+      RouteRule_CGI temp(fd, line);  // 1. 수정 중
       count_line += temp.get_count_line();
       if (temp.get_err_meg() != "") {
         err_meg = temp.get_err_meg();
@@ -543,7 +543,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
     err_meg = utils::get_indent_whitespace_error(line, 2);
     if (err_meg != "")
       return false;
-    else if (apply_route_rule_entry(mets, route_line_data[1], line)) { // 수정해야 함
+    else if (apply_route_rule_entry(mets, route_line_data[1], line)) {
       if (err_meg != "")
         return false;
       continue;
