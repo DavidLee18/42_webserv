@@ -2,7 +2,11 @@
 #define PARSINGUTILS_HPP
 
 #include "server/Client.hpp"
+#include "file_descriptor.h"
+#include <cstdlib>
 #include <vector>
+#include <unistd.h>
+#include <sys/stat.h>
 
 namespace utils {
 /**
@@ -60,5 +64,10 @@ std::string remove_char(std::string s, char ch);
 
 std::string join(const std::vector<std::string> &elements,
                  const std::string &delimiter);
+std::size_t return_indent_level(std::string line);
+bool has_leading_space(const std::string& str);
+bool has_trailing_space(const std::string& str);
+std::string get_indent_whitespace_error(const std::string& line, size_t level);
+std::string check_html_file(const std::string &path);
 } // namespace utils
 #endif

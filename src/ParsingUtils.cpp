@@ -61,6 +61,17 @@ bool utils::match_indent_level(const std::string &line, const size_t num) {
   return (len == num);
 }
 
+std::size_t utils::return_indent_level(std::string line) {
+  size_t len = 0;
+
+  if (line.empty())
+    return (0);
+  while (len < line.size() && line[len] == '\t') {
+    len++;
+  }
+  return len;
+}
+
 std::vector<std::string> utils::string_split(const std::string &line,
                                              const std::string &delim) {
   std::vector<std::string> tokens;
@@ -95,4 +106,77 @@ std::string utils::join(const std::vector<std::string> &elements,
     ss << elements[i];
   }
   return ss.str();
+}
+
+bool utils::has_leading_space(const std::string& str)
+{
+    if (str.empty())
+        return false;
+
+    return std::isspace(str[0]);
+}
+
+bool utils::has_trailing_space(const std::string& str)
+{
+    if (str.empty())
+        return false;
+
+    return std::isspace(str[str.length() - 1]);
+}
+
+std::string utils::get_indent_whitespace_error(const std::string& line, size_t level) {
+  std::size_t indent_level = utils::return_indent_level(line);
+  std::string err_line = "";
+
+
+  if (level != 0 && line[0] != '\t') {
+    err_line += "on [" + line + "]: It is not a valid indentation character (expected indentation character: ['\\t'], found: [" + line[0] +"])";
+  }
+  else if ((level == 0 && std::isspace(line[0])) || indent_level != level) {
+    std::ostringstream i_oss;
+    std::ostringstream l_oss;
+
+    l_oss << level;
+    if (level == 0) {
+      for (std::size_t i = 0; i < line.size(); i++) {
+        indent_level = i;
+        if (!std::isspace(line[i]))
+          break;
+      }
+    }
+    i_oss << indent_level;;
+
+    err_line += "on [" + line + "]: It is not a valid indentation level(expected indentation level: " + l_oss.str() + ", found: " + i_oss.str() +")";
+    return err_line;
+  } else if (utils::has_leading_space(&line[level])) {
+    err_line += "on [" + line + "]: Leading whitespace exists.";
+    return err_line;
+  } else if (utils::has_trailing_space(line)) {
+    err_line += "on [" + line + "]: Trailing whitespace exists.";
+    return err_line;
+  }
+  return err_line;
+}
+
+std::string utils::check_html_file(const std::string &path)
+{
+    char cwd[4096];
+    getcwd(cwd, sizeof(cwd));
+
+    std::string real_path = std::string(cwd) + path;
+    struct stat st;
+
+    if (stat(real_path.c_str(), &st) != 0)
+        return "Invalid HTML file (file does not exist or cannot be accessed).";
+
+    if (!S_ISREG(st.st_mode))
+        return "Invalid HTML file (path is not a regular file).";
+
+    if (real_path.length() < 5 || real_path.substr(real_path.length() - 5) != ".html")
+        return "Invalid HTML file (file extension must be .html).";
+
+    if (access(real_path.c_str(), R_OK) != 0)
+        return "Invalid HTML file (no read permission).";
+
+    return "";
 }
