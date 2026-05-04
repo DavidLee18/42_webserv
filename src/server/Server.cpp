@@ -456,13 +456,13 @@ Result<Void> Server::start() {
         clients.at(it->first).out_buff = oss.str();
         cgis.erase(it++);
       } else {
+        const size_t cgi_remaining =
+            cgi.remaining_ns() / 1000000; // milliseconds
+        if (epoll_timeout == -1 ||
+            cgi_remaining < static_cast<size_t>(epoll_timeout)) {
+          epoll_timeout = static_cast<long>(cgi_remaining);
+        }
         ++it;
-      }
-
-      const size_t cgi_remaining = cgi.remaining_ns() / 1000000; // milliseconds
-      if (epoll_timeout == -1 ||
-          cgi_remaining < static_cast<size_t>(epoll_timeout)) {
-        epoll_timeout = static_cast<long>(cgi_remaining);
       }
     }
 

@@ -149,7 +149,7 @@ struct Void {};
 
 #define TRY_PAIR(t1, t2, v, r)                                                 \
   if ((r).error().empty()) {                                                   \
-    v = (r).value();                                                           \
+    (v) = (r).value();                                                         \
   } else {                                                                     \
     return (r);                                                                \
   }

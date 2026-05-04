@@ -13,6 +13,8 @@ struct SessionData {
 
   time_t created_at;
   time_t last_access;
+
+  SessionData() : created_at(0), last_access(0) {}
 };
 
 /**

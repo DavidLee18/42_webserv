@@ -1859,15 +1859,16 @@ size_t CgiDelegate::remaining_ns() const {
   if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
     return 0;
   }
-  size_t now_ns = static_cast<size_t>(now.tv_sec * 1000000000 + now.tv_nsec);
-  size_t start_ns = static_cast<size_t>(_start_time.tv_sec * 1000000000 +
-                                        _start_time.tv_nsec);
+  const size_t now_ns =
+      static_cast<size_t>(now.tv_sec * 1000000000 + now.tv_nsec);
+  const size_t start_ns = static_cast<size_t>(_start_time.tv_sec * 1000000000 +
+                                              _start_time.tv_nsec);
   if (now_ns == start_ns) {
     return _timeout_ns;
   } else if (now_ns >= start_ns + _timeout_ns) {
     return 0;
   } else {
-    return now_ns - start_ns;
+    return start_ns + _timeout_ns - now_ns;
   }
 }
 
