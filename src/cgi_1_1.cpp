@@ -1471,7 +1471,7 @@ unsigned char to_upper(const unsigned char c) {
 CgiDelegate::CgiDelegate(Request const &req, EPoll &ep)
     : _env(), _script_path(), _req(req), _epoll(ep), _pid(-1), _stdin(NULL),
       _stdout(NULL), _total_written(0), _output(), _state(NotRegistered),
-      _start_time(), _timeout(0) {}
+      _start_time(), _timeout_ns(0) {}
 
 Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
                                           const RouteRule_CGI &rule) {
@@ -1484,7 +1484,7 @@ Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
   del._script_path += rule.get_executable();
   if (rule.get_timeout() <= 0)
     return ERR(CgiDelegate, "timeout must be positive");
-  del._timeout = static_cast<size_t>(rule.get_timeout());
+  del._timeout_ns = static_cast<size_t>(rule.get_timeout() * 1e9);
   std::map<std::string, std::string> vars(rule.get_env());
   for (std::map<std::string, std::string>::const_iterator it = vars.begin();
        it != vars.end(); ++it) {
@@ -1497,7 +1497,8 @@ CgiDelegate::CgiDelegate(const CgiDelegate &other)
     : _env(other._env), _script_path(other._script_path), _req(other._req),
       _epoll(other._epoll), _pid(other._pid), _stdin(other._stdin),
       _stdout(other._stdout), _total_written(other._total_written),
-      _output(other._output), _state(other._state), _start_time(), _timeout() {
+      _output(other._output), _state(other._state), _start_time(),
+      _timeout_ns() {
   const_cast<CgiDelegate &>(other)._env.mvars.clear();
   const_cast<CgiDelegate &>(other)._env.req_body.clear();
   const_cast<CgiDelegate &>(other)._script_path.clear();
@@ -1729,8 +1730,8 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
     return ERR(Void, Errors::bad_gateway);
   }
   if (static_cast<size_t>(now.tv_sec * 1000000000 + now.tv_nsec) >=
-      _timeout + static_cast<size_t>(_start_time.tv_sec * 1000000000 +
-                                     _start_time.tv_nsec)) {
+      _timeout_ns + static_cast<size_t>(_start_time.tv_sec * 1000000000 +
+                                        _start_time.tv_nsec)) {
     _state = Failed;
     return ERR(Void, Errors::gateway_timeout);
   }

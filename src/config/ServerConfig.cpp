@@ -27,7 +27,7 @@ bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
       break;
     end_flag = 0;
 
-    line = utils::remove_char(temp.value(), '\n');
+    std::string line = utils::remove_char(temp.value(), '\n');
     err_meg = utils::get_indent_whitespace_error(line, 1);
     if (err_meg != "")
       return false;
@@ -40,8 +40,8 @@ bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
       }
     } else if (RouteRule_CGI::matches_cgi_syntax(line)) {
       std::string key;
-      std::map<std::string, std::string> temp;
-      err_meg = RouteRule_CGI::parse_executable(line, key, temp);
+      std::map<std::string, std::string> _temp;
+      err_meg = RouteRule_CGI::parse_executable(line, key, _temp);
       if (err_meg != "") {
         err_meg = "on [\t" + line + err_meg;
         return false;
@@ -50,7 +50,7 @@ bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
         err_meg = "on [\t" + line + "], [" + key + "]: The CGI server block configuration is duplicated. (CGI server block rule, each CGI path must be declared only once per server context, but the same CGI definition appears multiple times, causing a configuration conflict).";
         return false;
       }
-      S_CGI[key] = temp;
+      S_CGI[key] = _temp;
     } else if (is_valid_server_response_time(line)) {
       parse_server_response_time(line);
       if (err_meg != "")
@@ -61,13 +61,13 @@ bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
         return false;
       }
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
-      RouteRule_CGI temp(fd, line);
-      count_line += temp.get_count_line();
-      if (temp.get_err_meg() != "") {
-        err_meg = temp.get_err_meg();
+      RouteRule_CGI _temp2(fd, line);
+      count_line += _temp2.get_count_line();
+      if (_temp2.get_err_meg() != "") {
+        err_meg = _temp2.get_err_meg();
         return false;
       }
-      R_CGI.push_back(temp);
+      R_CGI.push_back(_temp2);
     } else {
       err_meg = "on [\t" + line + "], []: The configuration line does not conform to the required server configuration syntax. (server configuration rule, each line must follow the defined config format specification, but the provided line does not match any valid syntax pattern).";
       return false;
@@ -489,7 +489,7 @@ bool ServerConfig::create_route_rules(
 }
 
 bool ServerConfig::parse_route_rule_block(const std::string &route_line,
-                                          FileDescriptor &fd) {
+                                          const FileDescriptor &fd) {
   std::string line;
   std::vector<Request::Method> mets;
   std::vector<std::string> route_line_data =

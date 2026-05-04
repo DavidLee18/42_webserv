@@ -1,6 +1,7 @@
 #include "RouteRule_CGI.hpp"
 
-RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line) {
+RouteRule_CGI::RouteRule_CGI(const FileDescriptor &fd,
+                             const std::string &line) {
   err_meg = "";
   timeout = 3;
   count_line = 0;
@@ -88,7 +89,8 @@ bool RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
     if (exec_end < line.length() && line[exec_end] != '(')
       return false;
     const std::string exec_path = line.substr(1, exec_end - 1);
-    if (exec_path.empty() || !RouteRule_CGI::is_executable_file(exec_path))
+    if (exec_path.empty() ||
+        !RouteRule_CGI::is_executable_file(exec_path).empty())
       return false;
 
     i = exec_end;
@@ -277,7 +279,7 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
 std::string
 RouteRule_CGI::parse_executable(const std::string &line,
                                 std::string &executable,
-                                std::map<std::string, std::string> &env) {
+                                std::map<std::string, std::string> &map) {
   std::string err_msg;
 
   // 실팽파일의 문법 검사를 여기서 할지 생각중

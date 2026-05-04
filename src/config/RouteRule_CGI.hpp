@@ -83,7 +83,8 @@ class RouteRule_CGI {
                               const std::string &line);
 
 public:
-  RouteRule_CGI() : met(Request::ERROR), timeout(-1), err_meg("No parse") {}
+  RouteRule_CGI()
+      : met(Request::ERROR), timeout(-1), err_meg("No parse"), count_line() {}
   /**
    * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
    * 생성자
@@ -95,12 +96,12 @@ public:
    */
   RouteRule_CGI(const FileDescriptor &fd, const std::string &line);
 
-  const PathPattern get_path(void) const { return path; }
-  Request::Method get_method (void) const { return met; }
-  const std::string get_err_meg(void) const { return err_meg; }
-  const std::string get_executable(void) const { return executable; }
-  const std::map<std::string, std::string> get_env(void) const { return env; }
-  std::size_t get_count_line(void) const { return count_line; }
+  PathPattern get_path() const { return path; }
+  Request::Method get_method() const { return met; }
+  std::string get_err_meg() const { return err_meg; }
+  std::string get_executable() const { return executable; }
+  std::map<std::string, std::string> get_env() const { return env; }
+  std::size_t get_count_line() const { return count_line; }
   double get_timeout() const { return timeout; }
 
   /**
@@ -170,7 +171,7 @@ public:
    * 추출하는 함수
    * @param line 파싱할 문자열
    * @param executable 파싱한 실행 파일 경로를 저장할 변수
-   * @param env 파싱한 환경 변수 정보를 저장할 변수
+   * @param map 파싱한 환경 변수 정보를 저장할 변수
    * @return 성공하면 빈 문자열, 실패하면 오류 메시지
    *
    * - 입력 문자열은 is_valid_cgi_config(const std::string &line) 또는
@@ -179,7 +180,7 @@ public:
    */
   static std::string parse_executable(const std::string &line,
                                       std::string &executable,
-                                      std::map<std::string, std::string> &env);
+                                      std::map<std::string, std::string> &map);
   /**
    * @brief uwsgi 설정 블록을 파싱하여 포트 번호를 키로, 실행 파일 경로를 값으로
    * 저장하는 함수

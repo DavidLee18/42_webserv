@@ -321,7 +321,7 @@ private:
   std::string _output;
   State _state;
   timespec _start_time;
-  size_t _timeout;
+  size_t _timeout_ns;
 
   CgiDelegate(Request const &, EPoll &);
 };

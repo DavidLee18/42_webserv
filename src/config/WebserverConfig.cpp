@@ -27,7 +27,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     else if (temp.value() == "\n")
       continue;
 
-    line = utils::remove_char(temp.value(), '\n');
+    std::string line(utils::remove_char(temp.value(), '\n'));
     err_meg = utils::get_indent_whitespace_error(line, 0);
     if (err_meg != "")
       return false;
@@ -146,7 +146,7 @@ bool WebserverConfig::is_valid_mime_type(const std::string &value) {
       return false;
     }
   }
-  value_data = utils::string_split(value, "/");
+  const std::vector<std::string> value_data = utils::string_split(value, "/");
   if (value_data.size() != 2) {
     err_meg += value + "]: Invalid MIME type format (the value does not follow the required 'type/subtype' structure).";
     return false;
@@ -209,7 +209,7 @@ bool WebserverConfig::parse_types_block(const FileDescriptor &file) {
     } else if (temp.value() == "\n" || temp.value() == "")
       break;
 
-    line = utils::remove_char(temp.value(), '\n');
+    std::string line(utils::remove_char(temp.value(), '\n'));
     err_meg = utils::get_indent_whitespace_error(line, 1);
     if (err_meg != "")
       return false;
@@ -303,8 +303,7 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
 
   os << "========================================================" << std::endl;
   os << "<<Type_map>>\n" << std::endl;
-  for (std::map<std::string, std::string>::const_iterator ty_it = ty.begin();
-       ty_it != ty.end(); ++ty_it) {
+  for (ty_it = ty.begin(); ty_it != ty.end(); ++ty_it) {
     os << "Type key: " << ty_it->first << ", Type value: " << ty_it->second
        << std::endl;
   }
@@ -313,8 +312,7 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   os << "\n\n\n========================================================"
      << std::endl;
   os << "<<Uwsgi>>\n" << std::endl;
-  for (std::map<std::string, std::string>::const_iterator uw_it = uw.begin();
-       uw_it != uw.end(); ++uw_it) {
+  for (uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
     os << "Uwsgi key: " << uw_it->first << ", Uwsgi value: " << uw_it->second
        << std::endl;
   }
