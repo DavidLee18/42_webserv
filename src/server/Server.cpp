@@ -116,19 +116,20 @@ void Server::client_read(const FileDescriptor *client_fd) {
           return;
         } else if (req_.error() == Errors::malformed_header ||
                    req_.error() == Errors::bad_request) {
-          Response resp =
-              DefaultError::default_err_response(Response::BAD_REQUEST);
+          Response resp(
+              DefaultError::default_err_response(Response::BAD_REQUEST));
           resp.headers = clients.at(client_fd).config->get_header();
           std::ostringstream oss;
           oss << resp;
+          if (!resp.keep_alive)
+            clients.at(client_fd).dropping = true;
           clients.at(client_fd).out_buff += oss.str();
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
 
-          if (peer_closed && clients.find(client_fd) != clients.end() &&
-              clients.at(client_fd).out_buff.empty()) {
+          if ((peer_closed || !resp.keep_alive) &&
+              clients.at(client_fd).out_buff.empty())
             disconnect(client_fd);
-          }
 
           return;
         } else if (req_.error() == Errors::not_implemented) {
@@ -137,14 +138,15 @@ void Server::client_read(const FileDescriptor *client_fd) {
           resp.headers = clients.at(client_fd).config->get_header();
           std::ostringstream oss;
           oss << resp;
+          if (!resp.keep_alive)
+            clients.at(client_fd).dropping = true;
           clients.at(client_fd).out_buff += oss.str();
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
 
-          if (peer_closed && clients.find(client_fd) != clients.end() &&
-              clients.at(client_fd).out_buff.empty()) {
+          if ((peer_closed || !resp.keep_alive) &&
+              clients.at(client_fd).out_buff.empty())
             disconnect(client_fd);
-          }
 
           return;
         }
@@ -285,9 +287,6 @@ void Server::client_read(const FileDescriptor *client_fd) {
 }
 
 void Server::client_write(const FileDescriptor *client_fd) {
-  if (clients.find(client_fd) == clients.end())
-    return;
-
   if (clients.find(client_fd) == clients.end()) {
     std::cerr << "ERROR: client not found for write operation" << std::endl;
     return;
@@ -451,6 +450,7 @@ Result<Void> Server::start() {
         sessions.clean_expired_sessions(session_timeout);
     }
 
+    // applu CGI timeout
     for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
              cgis.begin();
          it != cgis.end();) {
@@ -460,18 +460,16 @@ Result<Void> Server::start() {
         const Response resp(
             DefaultError::default_err_response(Response::GATEWAY_TIMEOUT));
         oss << resp;
-        if (resp.keep_alive == false) {
+        if (resp.keep_alive == false)
           clients.at(it->first).dropping = true;
-        }
         clients.at(it->first).out_buff = oss.str();
         cgis.erase(it++);
       } else {
         const size_t cgi_remaining =
             cgi.remaining_ns() / 1000000; // milliseconds
         if (epoll_timeout == -1 ||
-            cgi_remaining < static_cast<size_t>(epoll_timeout)) {
+            cgi_remaining < static_cast<size_t>(epoll_timeout))
           epoll_timeout = static_cast<long>(cgi_remaining);
-        }
         ++it;
       }
     }
@@ -516,17 +514,25 @@ Result<Void> Server::start() {
           if (!res.has_value()) {
             std::ostringstream oss;
             if (res.error() == Errors::gateway_timeout) {
-              oss << DefaultError::default_err_response(
-                  Response::GATEWAY_TIMEOUT);
+              const Response resp(DefaultError::default_err_response(
+                  Response::GATEWAY_TIMEOUT));
+              oss << resp;
+              if (!resp.keep_alive)
+                clients.at(it->first).dropping = true;
               clients.at(it->first).out_buff = oss.str();
             } else { // res.error() == Errors::bad_gateway
-              oss << DefaultError::default_err_response(Response::BAD_GATEWAY);
+              const Response resp(
+                  DefaultError::default_err_response(Response::BAD_GATEWAY));
+              oss << resp;
+              if (!resp.keep_alive)
+                clients.at(it->first).dropping = true;
               clients.at(it->first).out_buff = oss.str();
             }
             reap_cgis.push_back(it->first);
           } else {
             Result<std::string> output = it->second.poll();
             if (output.has_value()) {
+              // TODO: build HTTP response from CGI output
               clients.at(it->first).out_buff += output.value();
               client_write(it->first);
               reap_cgis.push_back(it->first);
