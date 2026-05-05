@@ -127,8 +127,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
 
-          if ((peer_closed || !resp.keep_alive) &&
-              clients.at(client_fd).out_buff.empty())
+          if (peer_closed && clients.at(client_fd).out_buff.empty())
             disconnect(client_fd);
 
           return;
@@ -144,8 +143,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
 
-          if ((peer_closed || !resp.keep_alive) &&
-              clients.at(client_fd).out_buff.empty())
+          if (peer_closed && clients.at(client_fd).out_buff.empty())
             disconnect(client_fd);
 
           return;
@@ -207,7 +205,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
       clients.at(client_fd).out_buff += server_response.str();
 
       // If client sent "Connection: close", close after sending response
-      if (http.should_close) {
+      if (!http.keep_alive) {
         client_write(client_fd);
         if (clients.find(client_fd) != clients.end() &&
             clients.at(client_fd).out_buff.empty()) {
@@ -267,7 +265,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
       clients.at(client_fd).out_buff += server_response.str();
 
       // If client sent "Connection: close", close after sending response
-      if (http.should_close) {
+      if (!http.keep_alive) {
         client_write(client_fd);
         if (clients.find(client_fd) != clients.end() &&
             clients.at(client_fd).out_buff.empty()) {
@@ -450,7 +448,7 @@ Result<Void> Server::start() {
         sessions.clean_expired_sessions(session_timeout);
     }
 
-    // applu CGI timeout
+    // apply CGI timeout
     for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
              cgis.begin();
          it != cgis.end();) {
@@ -460,9 +458,10 @@ Result<Void> Server::start() {
         const Response resp(
             DefaultError::default_err_response(Response::GATEWAY_TIMEOUT));
         oss << resp;
-        if (resp.keep_alive == false)
+        if (!resp.keep_alive)
           clients.at(it->first).dropping = true;
         clients.at(it->first).out_buff = oss.str();
+        client_write(it->first);
         cgis.erase(it++);
       } else {
         const size_t cgi_remaining =
@@ -520,6 +519,7 @@ Result<Void> Server::start() {
               if (!resp.keep_alive)
                 clients.at(it->first).dropping = true;
               clients.at(it->first).out_buff = oss.str();
+              client_write(it->first);
             } else { // res.error() == Errors::bad_gateway
               const Response resp(
                   DefaultError::default_err_response(Response::BAD_GATEWAY));
@@ -527,6 +527,7 @@ Result<Void> Server::start() {
               if (!resp.keep_alive)
                 clients.at(it->first).dropping = true;
               clients.at(it->first).out_buff = oss.str();
+              client_write(it->first);
             }
             reap_cgis.push_back(it->first);
           } else {
