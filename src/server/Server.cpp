@@ -310,9 +310,14 @@ void Server::client_write(const FileDescriptor *client_fd) {
         break;
 
       write_buffer.erase(0, static_cast<std::size_t>(bytes));
-      if (write_buffer.empty())
+      if (write_buffer.empty()) {
+        disconnect(client_fd);
         break;
+      }
     }
+  } else {
+    if (clients.at(client_fd).dropping)
+      disconnect(client_fd);
   }
 }
 
@@ -452,7 +457,12 @@ Result<Void> Server::start() {
       CgiDelegate &cgi = it->second;
       if (cgi.check_timeout()) {
         std::ostringstream oss;
-        oss << DefaultError::default_err_response(Response::GATEWAY_TIMEOUT);
+        const Response resp(
+            DefaultError::default_err_response(Response::GATEWAY_TIMEOUT));
+        oss << resp;
+        if (resp.keep_alive == false) {
+          clients.at(it->first).dropping = true;
+        }
         clients.at(it->first).out_buff = oss.str();
         cgis.erase(it++);
       } else {

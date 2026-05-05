@@ -1,4 +1,3 @@
-#include "cgi_1_1.h"
 #include "webserv.h"
 
 CgiAuthType::CgiAuthType(const CgiAuthType::Type type)
@@ -1863,9 +1862,7 @@ size_t CgiDelegate::remaining_ns() const {
       static_cast<size_t>(now.tv_sec * 1000000000 + now.tv_nsec);
   const size_t start_ns = static_cast<size_t>(_start_time.tv_sec * 1000000000 +
                                               _start_time.tv_nsec);
-  if (now_ns == start_ns) {
-    return _timeout_ns;
-  } else if (now_ns >= start_ns + _timeout_ns) {
+  if (now_ns >= start_ns + _timeout_ns) {
     return 0;
   } else {
     return start_ns + _timeout_ns - now_ns;

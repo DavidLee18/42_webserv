@@ -45,11 +45,13 @@ struct ClientSession {
   Request *req;
   timespec
       last_activity_time; ///< Timestamp of last activity for timeout tracking.
+  bool dropping;
 
   /**
    * @brief Default constructor. Initializes config to NULL.
    */
-  ClientSession() : config(NULL), req(NULL), last_activity_time() {}
+  ClientSession()
+      : config(NULL), req(NULL), last_activity_time(), dropping(false) {}
 };
 
 /**
