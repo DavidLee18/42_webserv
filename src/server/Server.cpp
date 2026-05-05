@@ -266,11 +266,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
       // If client sent "Connection: close", close after sending response
       if (!http.keep_alive) {
+        clients.at(client_fd).dropping = true;
         client_write(client_fd);
-        if (clients.find(client_fd) != clients.end() &&
-            clients.at(client_fd).out_buff.empty()) {
-          disconnect(client_fd);
-        }
         return;
       }
     }
@@ -534,6 +531,7 @@ Result<Void> Server::start() {
             Result<std::string> output = it->second.poll();
             if (output.has_value()) {
               // TODO: build HTTP response from CGI output
+              // TODO: if `keep_alive` of that response, set `dropping` to true
               clients.at(it->first).out_buff += output.value();
               client_write(it->first);
               reap_cgis.push_back(it->first);
