@@ -531,9 +531,19 @@ Result<Void> Server::start() {
           } else {
             Result<std::string> output = it->second.poll();
             if (output.has_value()) {
-              // TODO: build HTTP response from CGI output
-              // TODO: if `keep_alive` of that response, set `dropping` to true
-              clients.at(it->first).out_buff += output.value();
+              const Result<Response> res =
+                  Response::from_cgi_outbuff(output.value());
+              std::ostringstream oss;
+              Response resp;
+              if (res.has_value())
+                resp = res.value();
+              else
+                resp =
+                    DefaultError::default_err_response(Response::BAD_GATEWAY);
+              oss << resp;
+              if (!resp.keep_alive)
+                clients.at(it->first).dropping = true;
+              clients.at(it->first).out_buff = oss.str();
               client_write(it->first);
               reap_cgis.push_back(it->first);
             }

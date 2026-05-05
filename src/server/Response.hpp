@@ -6,7 +6,6 @@
  * @brief Defines the HTTP Response generation structures and classes.
  */
 
-#include "../cgi_1_1.h"
 #include "../config/ServerConfig.hpp"
 #include "Client.hpp"
 #include "Session.hpp"
@@ -19,6 +18,7 @@
 #include <unistd.h>
 
 class EPoll;
+class CgiDelegate;
 
 /**
  * @struct Target
@@ -72,16 +72,16 @@ struct Response {
   std::string body;         ///< The response body payload.
   std::string mime_type; ///< The determined MIME type of the response payload.
   std::string redir;     ///< Redirect location, if applicable.
-  bool keep_alive;       ///< Connection keep-alive status.
-  bool should_close; ///< Whether to close connection after sending response.
-  std::string cgi;   ///< Generated CGI script.
+  bool keep_alive;       ///< Connection keep-alive status. Whether to close
+                         ///< connection after sending response.
   std::map<std::string, std::string>
       headers; ///< Additional response headers from config.
 
   Response()
       : version(), status_code(), content_length(0), content_type(),
         connection(), cookie(), body(), mime_type(), redir(), keep_alive(false),
-        should_close(false), cgi(), headers() {}
+        headers() {}
+  static Result<Response> from_cgi_outbuff(std::string const &);
 };
 
 std::ostream &operator<<(std::ostream &, Response const &);

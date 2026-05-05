@@ -34,30 +34,24 @@ static std::string get_http_date() {
 }
 
 std::ostream &operator<<(std::ostream &os, Response const &resp) {
-  if (!resp.cgi.empty())
-    os << resp.cgi;
-  else {
-    os << "HTTP/1.1 " << resp.status_code << "\r\n";
-    os << "Date: " << get_http_date() << "\r\n";
-    os << "Server: webserv\r\n";
-    if (!resp.redir.empty())
-      os << "Location: " << resp.redir << "\r\n";
-    os << "Content-Type:" << resp.mime_type << "\r\n";
-    if (!resp.cookie.empty()) {
-      os << "Set-Cookie:" << resp.cookie << "\r\n";
-    }
-    for (std::map<std::string, std::string>::const_iterator it =
-             resp.headers.begin();
-         it != resp.headers.end(); ++it) {
-      os << it->first << ": " << it->second << "\r\n";
-    }
-    os << "Content-Length: " << resp.body.length() << "\r\n";
-    if (!resp.connection.empty())
-      os << "Connection: " << resp.connection << "\r\n";
-    os << "\r\n";
-    if (!resp.body.empty())
-      os << resp.body;
-  }
+  os << "HTTP/1.1 " << resp.status_code << "\r\n";
+  os << "Date: " << get_http_date() << "\r\n";
+  os << "Server: webserv\r\n";
+  if (!resp.redir.empty())
+    os << "Location: " << resp.redir << "\r\n";
+  os << "Content-Type:" << resp.mime_type << "\r\n";
+  if (!resp.cookie.empty())
+    os << "Set-Cookie:" << resp.cookie << "\r\n";
+  for (std::map<std::string, std::string>::const_iterator it =
+           resp.headers.begin();
+       it != resp.headers.end(); ++it)
+    os << it->first << ": " << it->second << "\r\n";
+  os << "Content-Length: " << resp.body.length() << "\r\n";
+  if (!resp.connection.empty())
+    os << "Connection: " << resp.connection << "\r\n";
+  os << "\r\n";
+  if (!resp.body.empty())
+    os << resp.body;
   return os;
 }
 
@@ -104,7 +98,6 @@ Response ServerResponse::http_response(
     response.headers = config->get_header();
     return response;
   }
-  response.should_close = !request->has_keep_alive();
   if (!request->has_keep_alive())
     response.connection = "close";
   else

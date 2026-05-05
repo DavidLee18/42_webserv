@@ -5,6 +5,7 @@
 #include "errors.h"
 #include "result.h"
 #include "server/Client.hpp"
+#include "server/Response.hpp"
 #include <cstddef>
 #include <list>
 #include <map>
