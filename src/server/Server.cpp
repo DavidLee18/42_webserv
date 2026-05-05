@@ -305,8 +305,9 @@ void Server::client_write(const FileDescriptor *client_fd) {
 
       write_buffer.erase(0, static_cast<std::size_t>(bytes));
       if (write_buffer.empty()) {
-        disconnect(client_fd);
-        break;
+        if (clients.at(client_fd).dropping)
+          disconnect(client_fd);
+        return;
       }
     }
   } else {
