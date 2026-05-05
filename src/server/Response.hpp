@@ -50,7 +50,9 @@ struct Response {
    */
   enum StatusCode {
     OK = 200,
+    NO_CONTENT = 204,
     MOVED_PERMANENTLY = 301,
+    FOUND = 302,
     BAD_REQUEST = 400,
     UNAUTHORIZED = 401,
     FORBIDDEN = 403,
@@ -64,10 +66,9 @@ struct Response {
     GATEWAY_TIMEOUT = 504,
   };
   std::string version;      ///< HTTP version (e.g., "HTTP/1.1").
-  std::string status_code;  ///< HTTP status code and reason (e.g., "200 OK").
+  StatusCode status_code;   ///< HTTP status code and reason (e.g., "200 OK").
   size_t content_length;    ///< Content-Length header value.
   std::string content_type; ///< Content-Type header.
-  std::string connection;   ///< Connection header.
   std::string cookie;       ///< Cookies.
   std::string body;         ///< The response body payload.
   std::string mime_type; ///< The determined MIME type of the response payload.
@@ -78,9 +79,9 @@ struct Response {
       headers; ///< Additional response headers from config.
 
   Response()
-      : version(), status_code(), content_length(0), content_type(),
-        connection(), cookie(), body(), mime_type(), redir(), keep_alive(false),
-        headers() {}
+      : version("HTTP/1.1"), status_code(INTERNAL_SERVER_ERR),
+        content_length(0), content_type(), cookie(), body(), mime_type(),
+        redir(), keep_alive(false), headers() {}
   static Result<Response> from_cgi_outbuff(std::string const &);
 };
 
@@ -129,14 +130,6 @@ private:
    * @brief Enum for internal target path typing.
    */
   enum Type { IS_DIR, IS_FILE, PATH_ERROR };
-
-  /**
-   * @brief Converts an integer status code to its HTTP reason phrase string.
-   *
-   * @param status_code The numeric HTTP status code.
-   * @return std::string The status line string (e.g., "200 OK").
-   */
-  static std::string status_code_to_string(int status_code);
 
   /**
    * @brief Checks the file system to determine what kind of resource exists at
@@ -239,9 +232,9 @@ class DefaultError {
   static std::string not_found();
   static std::string server_error();
   static std::string unknown_err();
-  static std::string status_code_to_string(Response::StatusCode status_code);
 
 public:
+  static std::string status_code_to_string(Response::StatusCode status_code);
   static Response default_err_response(Response::StatusCode err_code);
 };
 

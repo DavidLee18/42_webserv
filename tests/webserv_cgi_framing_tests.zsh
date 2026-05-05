@@ -29,8 +29,8 @@ set -u
 
 PROJECT_ROOT=${PROJECT_ROOT:-$(pwd)}
 BUILD_DIR=${BUILD_DIR:-/tmp/webserv_framing_test}
-FRAME_HEADER=${FRAME_HEADER:-src/cgi_framing.h}        # adjust to your header
-FRAME_CALL=${FRAME_CALL:-frame_cgi_output}             # adjust to your fn name
+FRAME_HEADER=${FRAME_HEADER:-src/server/Response.h}
+FRAME_CALL=${FRAME_CALL:-Response::from_cgi_outbuff}
 KEEP=${KEEP:-0}
 
 if [[ -t 1 ]]; then
@@ -71,12 +71,14 @@ int main(int argc, char **argv) {
   ss << f.rdbuf();
   const std::string input = ss.str();
 
-  Result<std::string> r = $FRAME_CALL(input);
+  Result<Response> r = $FRAME_CALL(input);
   if (!r.has_value()) {
     std::cerr << "ERR: " << r.error() << std::endl;
     return 1;
   }
-  std::cout << r.value();
+  std::ostringstream out;
+  out << r.value();
+  std::cout << out.str();
   return 0;
 }
 EOF
@@ -89,7 +91,10 @@ INCLUDES=(-I"$PROJECT_ROOT" -I"$PROJECT_ROOT/src" -I"$PROJECT_ROOT/src/server")
 # fails — typically you'll need the file that defines frame_cgi_output and
 # whatever Result<>/Errors symbols it pulls in.
 SOURCES=(
-  "$PROJECT_ROOT/src/cgi_framing.cpp"      # adjust to your impl file
+  "$PROJECT_ROOT/src/server/Response.cpp"
+  "$PROJECT_ROOT/src/server/DefaultError.cpp"
+  "$PROJECT_ROOT/src/server/Client.cpp"
+  "$PROJECT_ROOT/src/server/Session.cpp"
   "$PROJECT_ROOT/src/errors.cpp"
 )
 

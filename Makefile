@@ -38,6 +38,14 @@ all: $(NAME) uwsgi cgi
 integration-test: all
 	bash tests/integration/cgi_uwsgi_full_suite.sh
 
+test-cgi: $(NAME) cgi
+	@echo "── CGI framing parser unit tests ──────────────────────────────"
+	@cd tests && PROJECT_ROOT=$(CURDIR) zsh ./webserv_cgi_framing_tests.zsh
+	@echo ""
+	@echo "── CGI sandboxing integration tests ───────────────────────────"
+	@echo "NOTE: start ./$(NAME) <config> in another terminal first."
+	@cd tests && zsh ./webserv_cgi_tests.zsh
+
 cgi: $(CGI_NAME)
 
 $(CGI_NAME): $(CGI_SRC)
@@ -78,4 +86,4 @@ cgiclean:
 -include $(DEPS)
 -include $(UWSGI_DEPS)
 
-.PHONY: all clean fclean re bonus rebo uwsgi cgi integration-test compile-commands
+.PHONY: all clean fclean re bonus rebo uwsgi cgi integration-test test-cgi compile-commands

@@ -34,12 +34,13 @@ static std::string get_http_date() {
 }
 
 std::ostream &operator<<(std::ostream &os, Response const &resp) {
-  os << "HTTP/1.1 " << resp.status_code << "\r\n";
+  os << "HTTP/1.1 " << DefaultError::status_code_to_string(resp.status_code)
+     << "\r\n";
   os << "Date: " << get_http_date() << "\r\n";
   os << "Server: webserv\r\n";
   if (!resp.redir.empty())
     os << "Location: " << resp.redir << "\r\n";
-  os << "Content-Type:" << resp.mime_type << "\r\n";
+  os << "Content-Type: " << resp.mime_type << "\r\n";
   if (!resp.cookie.empty())
     os << "Set-Cookie:" << resp.cookie << "\r\n";
   for (std::map<std::string, std::string>::const_iterator it =
@@ -47,8 +48,10 @@ std::ostream &operator<<(std::ostream &os, Response const &resp) {
        it != resp.headers.end(); ++it)
     os << it->first << ": " << it->second << "\r\n";
   os << "Content-Length: " << resp.body.length() << "\r\n";
-  if (!resp.connection.empty())
-    os << "Connection: " << resp.connection << "\r\n";
+  if (resp.keep_alive)
+    os << "Connection: keep-alive\r\n";
+  else
+    os << "Connection: close\r\n";
   os << "\r\n";
   if (!resp.body.empty())
     os << resp.body;
@@ -98,10 +101,6 @@ Response ServerResponse::http_response(
     response.headers = config->get_header();
     return response;
   }
-  if (!request->has_keep_alive())
-    response.connection = "close";
-  else
-    response.connection = "keep-alive";
   response.headers = config->get_header();
   const Target target = resolve_target(rule, config, request);
 
@@ -159,19 +158,11 @@ Response ServerResponse::http_response(
   response.mime_type =
       get_string_from_map(mime_type, find_file_type(target.path));
   std::cout << "mime type: " << response.mime_type << std::endl;
-
-  if (request->get_connection_string() == "keep-alive")
-    response.connection = "keep-alive";
-  else if (request->get_connection_string() == "close")
-    response.connection = "close";
-  else
-    response.connection.clear();
-
   // Special API endpoint for session info
   if (request->get_path() == "/api/session-info") {
     if (request->get_method() == Request::GET) {
       response.mime_type = "application/json";
-      response.status_code = status_code_to_string(Response::OK);
+      response.status_code = Response::OK;
 
       if (session_id.empty()) {
         response.body =
@@ -217,26 +208,6 @@ Result<CgiDelegate> ServerResponse::register_cgi(const Request &request,
   if (!res.has_value())
     return ERR(CgiDelegate, res.error());
   return OK(CgiDelegate, del);
-}
-
-std::string ServerResponse::status_code_to_string(const int status_code) {
-  if (status_code == 200)
-    return "200 OK";
-  else if (status_code == 301)
-    return "301 Moved Permanently";
-  else if (status_code == 400)
-    return "400 Bad Request";
-  else if (status_code == 403)
-    return "403 Forbidden";
-  else if (status_code == 404)
-    return "404 Not Found";
-  else if (status_code == 405)
-    return "405 Method Not Allowed";
-  else if (status_code == 413)
-    return "413 Payload Too Large";
-  else if (status_code == 500)
-    return "500 Internal Server Error";
-  return "500 Internal Server Error";
 }
 
 int ServerResponse::check_path_type(const std::string &path) {
@@ -313,7 +284,7 @@ Response ServerResponse::error_response(
   std::ifstream file(err_page.c_str());
   if (file.is_open()) {
     Response response;
-    response.status_code = status_code_to_string(error_code);
+    response.status_code = error_code;
     response.headers = config->get_header();
     response.mime_type =
         get_string_from_map(mime_type, find_file_type(err_page));
@@ -535,7 +506,7 @@ Response ServerResponse::delete_method(
     const RouteRule *rule,
     const std::map<std::string, std::string> &mime_type) {
   if (unlink(target.path.c_str()) == 0) {
-    response.status_code = "204 No Content";
+    response.status_code = Response::NO_CONTENT;
     return response;
   } else {
     return error_response(config, rule, Response::FORBIDDEN,
@@ -598,7 +569,7 @@ Response ServerResponse::post_method(
 
         // 1. 브라우저에게 "이 주소로 가라"고 알리는 상태 코드 설정
         // 일반적으로 다른 페이지 이동 시 302 혹은 303을 사용
-        response.status_code = "302 Found";
+        response.status_code = Response::FOUND;
         response.redir = rule->index;
         response.mime_type = "text/html";
         response.body = "<html><body>Redirecting...</body></html>";
@@ -609,7 +580,7 @@ Response ServerResponse::post_method(
       } else {
         std::cout << "Authentication FAILED for: " << id << std::endl;
 
-        response.status_code = status_code_to_string(200);
+        response.status_code = Response::OK;
         response.mime_type = "text/html";
         // 로그인 실패 시 브라우저 자체 Alert 팝업을 띄우고 이전(로그인)
         // 화면으로 다시 돌려보냅니다.
@@ -728,14 +699,14 @@ Response ServerResponse::post_method(
       return error_response(config, rule, Response::BAD_REQUEST, mime_type);
 
     if (files_uploaded > 0) {
-      response.status_code = status_code_to_string(Response::OK);
+      response.status_code = Response::OK;
       response.mime_type = "text/plain";
       std::ostringstream oss;
       oss << "Successfully uploaded " << files_uploaded << " file(s)";
       response.body = oss.str();
       return response;
     } else {
-      response.status_code = status_code_to_string(Response::BAD_REQUEST);
+      response.status_code = Response::BAD_REQUEST;
       response.mime_type = "text/plain";
       response.body = "No files uploaded";
       return response;
@@ -760,7 +731,7 @@ Response ServerResponse::get_method(
     target.type = Response::MOVED_PERMANENTLY;
     response.redir =
         config->get_rewritten_path(request->get_method(), request->get_path());
-    response.status_code = status_code_to_string(target.type);
+    response.status_code = Response::MOVED_PERMANENTLY;
     response.mime_type = "text/html";
     response.body = "<html><body><h1>301 Moved Permanently</h1></body></html>";
   } else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
@@ -774,7 +745,7 @@ Response ServerResponse::get_method(
     target.type = Response::OK;
     response.mime_type = "html";
     response.body = make_autoindex_page(target.path, request->get_path(), dir);
-    response.status_code = status_code_to_string(target.type);
+    response.status_code = Response::OK;
   } else {
     if (check_path_type(target.path) != IS_FILE)
       return error_response(config, rule, Response::NOT_FOUND, mime_type);
@@ -784,11 +755,31 @@ Response ServerResponse::get_method(
       ss << file.rdbuf();
       target.type = Response::OK;
       response.body = ss.str();
-      response.status_code = status_code_to_string(target.type);
+      response.status_code = Response::OK;
       file.close();
     } else {
       return error_response(config, rule, Response::NOT_FOUND, mime_type);
     }
   }
   return response;
+}
+
+Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
+  size_t bound_pos = cgi_out.find("\r\n\r\n");
+  if (bound_pos == std::string::npos)
+    bound_pos = cgi_out.find("\n\n");
+  if (bound_pos == std::string::npos)
+    return ERR(Response, Errors::bad_gateway);
+  std::string header_part(cgi_out.substr(0, bound_pos));
+  Response resp;
+  resp.body = cgi_out.substr(bound_pos + 1);
+  std::istringstream iss(header_part);
+  std::string header_line;
+  while (std::getline(iss, header_line) && !iss.eof() && !iss.fail()) {
+    size_t colon_pos = header_line.find(':');
+    if (colon_pos == std::string::npos)
+      return ERR(Response, Errors::bad_gateway);
+    // HTTP header name +value conformance checking & insert into map
+  }
+  return OK(Response, resp);
 }
