@@ -768,20 +768,23 @@ Response ServerResponse::get_method(
 
 Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
   size_t bound_pos = cgi_out.find("\r\n\r\n");
+  size_t bound_len = 4;
 
-  if (bound_pos == std::string::npos)
+  if (bound_pos == std::string::npos) {
     bound_pos = cgi_out.find("\n\n");
+    bound_len = 2;
+  }
   if (bound_pos == std::string::npos)
     return ERR(Response, Errors::bad_gateway);
 
   std::string header_part(cgi_out.substr(0, bound_pos));
   Response resp;
 
-  resp.body = cgi_out.substr(bound_pos + 1);
+  resp.body = cgi_out.substr(bound_pos + bound_len);
 
   std::istringstream iss(header_part);
   std::string header_line;
-  while (std::getline(iss, header_line) && !iss.eof() && !iss.fail()) {
+  while (std::getline(iss, header_line) && !iss.fail()) {
     size_t colon_pos = header_line.find(':');
     if (colon_pos == std::string::npos)
       return ERR(Response, Errors::bad_gateway);
@@ -795,16 +798,13 @@ Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
       return ERR(Response, Errors::bad_gateway);
     header_value = header_value.substr(whitespace_pos);
     whitespace_pos = header_value.find_last_not_of(" \t");
-    if (whitespace_pos == std::string::npos)
-      return ERR(Response, Errors::bad_gateway);
-    header_value = header_value.substr(0, whitespace_pos + 1);
+    if (whitespace_pos != std::string::npos)
+      header_value = header_value.substr(0, whitespace_pos + 1);
     if (!utils::is_header_name(header_name) ||
         !utils::is_header_value(header_value))
       return ERR(Response, Errors::bad_gateway);
     std::transform(header_name.begin(), header_name.end(), header_name.begin(),
                    utils::tolower);
-    std::transform(header_value.begin(), header_value.end(),
-                   header_value.begin(), utils::tolower);
     std::map<std::string, std::string>::iterator header_name_pos =
         resp.headers.find(header_name);
     if (header_name_pos != resp.headers.end())
@@ -823,7 +823,8 @@ Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
     unsigned short status_code;
     iss_ >> status_code;
     resp.status_code = DefaultError::int_to_status_code(status_code);
-    if (resp.status_code == Response::INTERNAL_SERVER_ERR && status_code != 500)
+    if (resp.status_code == Response::INTERNAL_SERVER_ERR &&
+        (status_code < 100 || status_code > 599))
       return ERR(Response, Errors::bad_gateway);
     resp.headers.erase("status");
   }

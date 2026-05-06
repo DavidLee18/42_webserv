@@ -196,7 +196,7 @@ bool utils::is_header_name(const std::string &name) {
 
 bool utils::is_header_value(const std::string &value) {
   if (value.empty())
-    return false;
+    return true;
   for (std::string::const_iterator it = value.begin(); it != value.end();
        ++it) {
     unsigned char c = static_cast<unsigned char>(*it);

@@ -29,7 +29,7 @@ set -u
 
 PROJECT_ROOT=${PROJECT_ROOT:-$(pwd)}
 BUILD_DIR=${BUILD_DIR:-/tmp/webserv_framing_test}
-FRAME_HEADER=${FRAME_HEADER:-src/server/Response.h}
+FRAME_HEADER=${FRAME_HEADER:-src/server/Response.hpp}
 FRAME_CALL=${FRAME_CALL:-Response::from_cgi_outbuff}
 KEEP=${KEEP:-0}
 
