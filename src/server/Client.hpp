@@ -163,14 +163,20 @@ private:
   std::string cookie;
   std::string body;     ///< The request body, if any.
   std::string remnants; ///< remaining string to parse.
+  bool decode_chunked;
 
   Request()
       : method(ERROR), path(), version(), header(), keep_alive(true),
-        content_length(0), cookie(), body(), remnants() {}
+        content_length(0), cookie(), body(), remnants(), decode_chunked(false) {
+  }
   Request(const Method method, std::string const &path,
           std::string const &version, const size_t content_length)
       : method(method), path(path), version(version), keep_alive(true),
-        content_length(content_length) {}
+        content_length(content_length), decode_chunked(false) {}
+  Request(const Method method, std::string const &path,
+          std::string const &version)
+      : method(method), path(path), version(version), keep_alive(true),
+        content_length(0), decode_chunked(true) {}
 };
 
 #endif

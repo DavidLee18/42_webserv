@@ -78,13 +78,14 @@ Result<Request *> Request::from_buff(std::string &buff) {
     return ERR(Request *, Errors::bad_request);
   const size_t cl_pos = header_lower.find("content-length:");
   const size_t te_pos = header_lower.find("transfer-encoding:");
+  bool decode_chunked = false;
   if (cl_pos != std::string::npos && te_pos != std::string::npos)
     return ERR(Request *, Errors::malformed_header); // conforming to the RFC
   if (te_pos != std::string::npos &&
       (header_lower.find("transfer-encoding:chunked") != std::string::npos ||
        header_lower.find("transfer-encoding: chunked") != std::string::npos))
-    return ERR(Request *, Errors::not_implemented);
-  if (cl_pos != std::string::npos && te_pos == std::string::npos) {
+    decode_chunked = true;
+  if (cl_pos != std::string::npos && !decode_chunked) {
     const char *str =
         header_lower.c_str() + cl_pos + std::strlen("content-length:");
     while (*str == ' ' || *str == '\t')
@@ -108,7 +109,7 @@ Result<Request *> Request::from_buff(std::string &buff) {
   std::string req_path;
   std::string req_version;
   // 1. 첫 번째 줄(Request Line)만 읽기
-  if (std::getline(ss, line)) {
+  if (std::getline(ss, line) && !ss.fail()) {
     if (!line.empty() && line[line.size() - 1] == '\r')
       line.erase(line.size() - 1);
 
@@ -149,7 +150,11 @@ Result<Request *> Request::from_buff(std::string &buff) {
   } else {
     return ERR(Request *, Errors::internal_server_error);
   }
-  Request *req = new Request(method, req_path, req_version, content_length);
+  Request *req;
+  if (!decode_chunked)
+    req = new Request(method, req_path, req_version, content_length);
+  else
+    req = new Request(method, req_path, req_version);
 
   while (std::getline(ss, line) && line != "\r" && !line.empty()) {
     if (!line.empty() && line[line.size() - 1] == '\r')
@@ -197,24 +202,39 @@ Result<Request *> Request::from_buff(std::string &buff) {
     req->keep_alive = false;
 
   req->cookie = get_string_from_map(req->header, "Cookie");
+  if (!decode_chunked) {
+    // check body if body not full break to get more event
+    const size_t total_request_len =
+        header_end + std::strlen("\r\n\r\n") + req->content_length;
+    if (buff.length() < total_request_len) {
+      req->remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
+      buff.erase(0, total_request_len);
+      return OK(Request *, req);
+    }
 
-  // check body if body not full break to get more event
-  const size_t total_request_len =
-      header_end + std::strlen("\r\n\r\n") + req->content_length;
-  if (buff.length() < total_request_len) {
-    req->remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
-    buff.erase(0, total_request_len);
-    return OK(Request *, req);
-  }
-
-  const std::streampos pos = ss.tellg();
-  if (pos != std::streampos(-1))
+    const std::streampos pos = ss.tellg();
+    if (pos == std::streampos(-1)) {
+      delete req;
+      return ERR(Request *, "streampos error");
+    }
     req->body = buff.substr(static_cast<size_t>(pos));
 
-  if (req->body.empty() || req->body.size() == req->content_length)
-    req->remnants = "";
-  buff.erase(0, total_request_len);
-  return OK(Request *, req);
+    if (req->body.empty() || req->body.size() == req->content_length)
+      req->remnants = "";
+    buff.erase(0, total_request_len);
+    return OK(Request *, req);
+  } else {
+    const std::streampos body_start = ss.tellg();
+    if (body_start == std::streampos(-1)) {
+      delete req;
+      return ERR(Request *, "streampos error");
+    }
+    req->remnants = buff.substr(static_cast<size_t>(body_start));
+    if (req->remnants.find("0\r\n\r\n") != std::string::npos) {
+      // TODO: decode chunked
+    }
+    return OK(Request *, req);
+  }
 }
 
 void Request::continue_parsing(std::string &buff) {
