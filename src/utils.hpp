@@ -1,12 +1,12 @@
-#ifndef PARSINGUTILS_HPP
-#define PARSINGUTILS_HPP
+#ifndef UTILS_HPP
+#define UTILS_HPP
 
-#include "server/Client.hpp"
 #include "file_descriptor.h"
+#include "server/Client.hpp"
 #include <cstdlib>
-#include <vector>
-#include <unistd.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <vector>
 
 namespace utils {
 /**
@@ -69,5 +69,11 @@ bool has_leading_space(const std::string& str);
 bool has_trailing_space(const std::string& str);
 std::string get_indent_whitespace_error(const std::string& line, size_t level);
 std::string check_html_file(const std::string &path);
+
+bool is_header_name(const std::string &name);
+
+bool is_header_value(const std::string &value);
+
+unsigned char tolower(unsigned char c);
 } // namespace utils
 #endif

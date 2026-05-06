@@ -180,3 +180,32 @@ std::string utils::check_html_file(const std::string &path)
 
     return "";
 }
+
+bool utils::is_header_name(const std::string &name) {
+  if (name.empty())
+    return false;
+  for (std::string::const_iterator it = name.begin(); it != name.end(); ++it) {
+    unsigned char c = static_cast<unsigned char>(*it);
+    if (!std::isalnum(c) && c != '!' && c != '#' && c != '$' && c != '%' &&
+        c != '&' && c != '\'' && c != '*' && c != '+' && c != '-' && c != '.' &&
+        c != '^' && c != '_' && c != '`' && c != '|' && c != '~')
+      return false;
+  }
+  return true;
+}
+
+bool utils::is_header_value(const std::string &value) {
+  if (value.empty())
+    return false;
+  for (std::string::const_iterator it = value.begin(); it != value.end();
+       ++it) {
+    unsigned char c = static_cast<unsigned char>(*it);
+    if ((c < 0x21 || c > 0x7e) && c != 0x20 && c != 0x09)
+      return false;
+  }
+  return true;
+}
+
+unsigned char utils::tolower(const unsigned char c) {
+  return static_cast<unsigned char>(std::tolower(static_cast<int>(c)));
+}

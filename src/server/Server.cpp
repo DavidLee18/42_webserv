@@ -531,12 +531,12 @@ Result<Void> Server::start() {
           } else {
             Result<std::string> output = it->second.poll();
             if (output.has_value()) {
-              const Result<Response> res =
+              const Result<Response> res_ =
                   Response::from_cgi_outbuff(output.value());
               std::ostringstream oss;
               Response resp;
-              if (res.has_value())
-                resp = res.value();
+              if (res_.has_value())
+                resp = res_.value();
               else
                 resp =
                     DefaultError::default_err_response(Response::BAD_GATEWAY);

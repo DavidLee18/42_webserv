@@ -1,7 +1,7 @@
 #ifndef PATHPATTERN_HPP
 #define PATHPATTERN_HPP
 
-#include "../ParsingUtils.hpp"
+#include "../utils.hpp"
 
 /**
  * @class PathPattern

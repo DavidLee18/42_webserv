@@ -32,7 +32,7 @@ struct Target {
 
 /**
  * @struct StatusInfo
- * @brief Holds status message and corresponding error file path.
+ * @brief Holds a status message and corresponding error file path.
  */
 struct StatusInfo {
   std::string message;   ///< Status message.
@@ -74,7 +74,7 @@ struct Response {
   std::string mime_type; ///< The determined MIME type of the response payload.
   std::string redir;     ///< Redirect location, if applicable.
   bool keep_alive;       ///< Connection keep-alive status. Whether to close
-                         ///< connection after sending response.
+                         ///< the connection after sending a response.
   std::map<std::string, std::string>
       headers; ///< Additional response headers from config.
 
@@ -234,6 +234,7 @@ class DefaultError {
   static std::string unknown_err();
 
 public:
+  static Response::StatusCode int_to_status_code(unsigned short status_code);
   static std::string status_code_to_string(Response::StatusCode status_code);
   static Response default_err_response(Response::StatusCode err_code);
 };

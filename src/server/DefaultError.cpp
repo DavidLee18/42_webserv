@@ -56,6 +56,41 @@ std::string DefaultError::unknown_err() {
          "ERROR</h1>\n<p> </p>\n<a href=\"/\">Back to "
          "main</a>\n<br>\n</body>\n</html>";
 }
+Response::StatusCode
+DefaultError::int_to_status_code(unsigned short status_code) {
+  switch (status_code) {
+  case 200:
+    return Response::OK;
+  case 204:
+    return Response::NO_CONTENT;
+  case 301:
+    return Response::MOVED_PERMANENTLY;
+  case 302:
+    return Response::FOUND;
+  case 400:
+    return Response::BAD_REQUEST;
+  case 401:
+    return Response::UNAUTHORIZED;
+  case 403:
+    return Response::FORBIDDEN;
+  case 404:
+    return Response::NOT_FOUND;
+  case 405:
+    return Response::METHOD_NOT_ALLOWED;
+  case 409:
+    return Response::CONFLICT;
+  case 413:
+    return Response::PAYLOAD_TOO_LARGE;
+  case 501:
+    return Response::NOT_IMPLEMENTED;
+  case 502:
+    return Response::BAD_GATEWAY;
+  case 504:
+    return Response::GATEWAY_TIMEOUT;
+  default:
+    return Response::INTERNAL_SERVER_ERR;
+  }
+}
 
 std::string
 DefaultError::status_code_to_string(const Response::StatusCode status_code) {
