@@ -208,9 +208,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
       if (!http.keep_alive) {
         client_write(client_fd);
         if (clients.find(client_fd) != clients.end() &&
-            clients.at(client_fd).out_buff.empty()) {
+            clients.at(client_fd).out_buff.empty())
           disconnect(client_fd);
-        }
         return;
       }
     } else {

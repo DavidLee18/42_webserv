@@ -47,7 +47,11 @@ bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
         return false;
       }
       if (S_CGI.find(key) != S_CGI.end()) {
-        err_meg = "on [\t" + line + "], [" + key + "]: The CGI server block configuration is duplicated. (CGI server block rule, each CGI path must be declared only once per server context, but the same CGI definition appears multiple times, causing a configuration conflict).";
+        err_meg = "on [\t" + line + "], [" + key +
+                  "]: The CGI server block configuration is duplicated. (CGI "
+                  "server block rule, each CGI path must be declared only once "
+                  "per server context, but the same CGI definition appears "
+                  "multiple times, causing a configuration conflict).";
         return false;
       }
       S_CGI[key] = _temp;
@@ -55,8 +59,7 @@ bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
       parse_server_response_time(line);
       if (err_meg != "")
         return false;
-    }
-    else if (matches_route_rule_syntax(line)) {
+    } else if (matches_route_rule_syntax(line)) {
       if (!parse_route_rule_block(line, fd)) { // 수정 중
         return false;
       }
@@ -69,7 +72,12 @@ bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
       }
       R_CGI.push_back(_temp2);
     } else {
-      err_meg = "on [\t" + line + "], []: The configuration line does not conform to the required server configuration syntax. (server configuration rule, each line must follow the defined config format specification, but the provided line does not match any valid syntax pattern).";
+      err_meg =
+          "on [\t" + line +
+          "], []: The configuration line does not conform to the required "
+          "server configuration syntax. (server configuration rule, each line "
+          "must follow the defined config format specification, but the "
+          "provided line does not match any valid syntax pattern).";
       return false;
     }
   }
@@ -92,12 +100,21 @@ bool ServerConfig::parse_header_entry(const FileDescriptor &fd,
   if (utils::count_occurrences(temp, ":") != 1) {
     std::size_t pos = temp.find(":");
     pos = temp.find(":", pos);
-    err_meg = "on [\t" + temp + "], [" + &temp[pos] + "]: The HTTP header contains an invalid format due to extra delimiter characters. (HTTP header structure, a header must follow the key: value format with only one : separator, but additional : characters are present, making parsing ambiguous and invalid).";
+    err_meg =
+        "on [\t" + temp + "], [" + &temp[pos] +
+        "]: The HTTP header contains an invalid format due to extra delimiter "
+        "characters. (HTTP header structure, a header must follow the key: "
+        "value format with only one : separator, but additional : characters "
+        "are present, making parsing ambiguous and invalid).";
     return false;
   } else if (key_value.size() != 2) {
-    err_meg = "The HTTP header value is missing, so the request cannot be processed. (HTTP header structure, a key must have an associated value, but it is empty, making the header invalid).";
+    err_meg = "The HTTP header value is missing, so the request cannot be "
+              "processed. (HTTP header structure, a key must have an "
+              "associated value, but it is empty, making the header invalid).";
     // if () 키가 없는 경우
-      err_meg = "The HTTP header key is missing, so the request cannot be processed. (HTTP header structure, a header must include a key to be identifiable, but the key is empty).";
+    err_meg = "The HTTP header key is missing, so the request cannot be "
+              "processed. (HTTP header structure, a header must include a key "
+              "to be identifiable, but the key is empty).";
     return false;
   }
   key = utils::string_split(key_value[0], " ")[2];
@@ -134,14 +151,22 @@ void ServerConfig::parse_server_response_time(std::string line) {
 
   for (size_t i = 3; i < line.length(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(line[i]))) {
-      err_meg = "on [\t" + line + "], [" + &line[3] + "]: The response time configuration contains an invalid value type after the delimiter. (response time rule, the value after ... must consist only of numeric characters, but non-numeric characters are present, making it invalid for parsing).";
-      return ;
+      err_meg =
+          "on [\t" + line + "], [" + &line[3] +
+          "]: The response time configuration contains an invalid value type "
+          "after the delimiter. (response time rule, the value after ... must "
+          "consist only of numeric characters, but non-numeric characters are "
+          "present, making it invalid for parsing).";
+      return;
     }
     data = data * 10 + (line[i] - '0');
   }
   if (data > 900 || 0 >= data) {
-    err_meg = "on [\t" + line + "], [" + &line[3] + "]: The response time configuration is out of the allowed range. (response time rule, the value must be between 0 and 900 inclusive, but the provided value falls outside this range).";
-    return ;
+    err_meg = "on [\t" + line + "], [" + &line[3] +
+              "]: The response time configuration is out of the allowed range. "
+              "(response time rule, the value must be between 0 and 900 "
+              "inclusive, but the provided value falls outside this range).";
+    return;
   }
   server_response_time = data;
 }
@@ -327,8 +352,7 @@ bool ServerConfig::apply_route_rule_entry(
     const std::vector<Request::Method> &mets, const std::string &key_data,
     const std::string &line) {
 
-  std::vector<std::string> rule =
-      utils::string_split(line, " ");
+  std::vector<std::string> rule = utils::string_split(line, " ");
   std::size_t size = rule.size();
   PathPattern key(key_data);
 
@@ -395,7 +419,9 @@ bool ServerConfig::apply_route_rule_entry(
       routes[targetRouteIndex].max_body_KB = max;
     } else if (rule[0] == "!") {
       std::string errPageLine = rule[1]; // Make a copy to avoid modification
-      int err_key = parse_error_page_entry(errPageLine); // WebserverConfig::apply_default_err_page_entry 함수로 수정 해야함
+      int err_key = parse_error_page_entry(
+          errPageLine); // WebserverConfig::apply_default_err_page_entry
+                        // 함수로 수정 해야함
       if (err_key == 0)
         return false;
       routes[targetRouteIndex].error_pages[err_key] = errPageLine;
@@ -466,7 +492,10 @@ bool ServerConfig::create_route_rules(
     route.method = mets[i];
     route.op = parse_rule_operator(data[2]);
     if (route.op == UNDEFINED) {
-      err_meg = data[2] + "]: The route rule contains an undefined operator type. (route rule, the operator used in the rule is not registered in the supported operation set, so it cannot be interpreted within the routing logic).";
+      err_meg = data[2] + "]: The route rule contains an undefined operator "
+                          "type. (route rule, the operator used in the rule is "
+                          "not registered in the supported operation set, so "
+                          "it cannot be interpreted within the routing logic).";
       return false;
     }
     route.index = "";
@@ -477,7 +506,12 @@ bool ServerConfig::create_route_rules(
       route.path = path_url[j];
       route.root = root_url;
       if (!has_compatible_wildcards(route.path, route.root)) {
-        err_meg = route.path.to_string() + ", " + route.root.to_string() + "]: The route rule has a mismatch in wildcard usage around the operator. (route rule, the number of wildcard * occurrences in the left-hand and right-hand expressions must match, but the provided rule has inconsistent wildcard counts, making the mapping invalid).";
+        err_meg = route.path.to_string() + ", " + route.root.to_string() +
+                  "]: The route rule has a mismatch in wildcard usage around "
+                  "the operator. (route rule, the number of wildcard * "
+                  "occurrences in the left-hand and right-hand expressions "
+                  "must match, but the provided rule has inconsistent wildcard "
+                  "counts, making the mapping invalid).";
         return false;
       }
       if (route.op == REDIRECT)
@@ -527,7 +561,8 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
     err_meg = utils::get_indent_whitespace_error(line, 2);
     if (err_meg != "")
       return false;
-    else if (apply_route_rule_entry(mets, route_line_data[1], line)) { // 수정해야 함
+    else if (apply_route_rule_entry(mets, route_line_data[1],
+                                    line)) { // 수정해야 함
       if (err_meg != "")
         return false;
       continue;
@@ -560,7 +595,8 @@ ServerConfig::find_route_cgi(const Request::Method method,
   const PathPattern pathPattern(path);
 
   for (size_t i = 0; i < R_CGI.size(); ++i) {
-    if (R_CGI[i].get_method() == method &&
+    if ((R_CGI[i].get_method() == method ||
+         (R_CGI[i].get_method() == Request::HEAD && method == Request::GET)) &&
         R_CGI[i].get_path().matches(pathPattern)) {
       return &R_CGI[i];
     }
