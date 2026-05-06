@@ -91,11 +91,19 @@ INCLUDES=(-I"$PROJECT_ROOT" -I"$PROJECT_ROOT/src" -I"$PROJECT_ROOT/src/server")
 # fails — typically you'll need the file that defines frame_cgi_output and
 # whatever Result<>/Errors symbols it pulls in.
 SOURCES=(
+  "$PROJECT_ROOT/src/config/PathPattern.cpp"
+  "$PROJECT_ROOT/src/config/RouteRule_CGI.cpp"
+  "$PROJECT_ROOT/src/config/ServerConfig.cpp"
   "$PROJECT_ROOT/src/server/Response.cpp"
   "$PROJECT_ROOT/src/server/DefaultError.cpp"
   "$PROJECT_ROOT/src/server/Client.cpp"
+  "$PROJECT_ROOT/src/server/Server.cpp"
   "$PROJECT_ROOT/src/server/Session.cpp"
+  "$PROJECT_ROOT/src/cgi_1_1.cpp"
+  "$PROJECT_ROOT/src/epoll_kqueue.cpp"
   "$PROJECT_ROOT/src/errors.cpp"
+  "$PROJECT_ROOT/src/file_descriptor.cpp"
+  "$PROJECT_ROOT/src/utils.cpp"
 )
 
 print -- "Building runner…"
