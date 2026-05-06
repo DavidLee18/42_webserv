@@ -12,14 +12,15 @@ Probabilities are evaluator-probing estimates, not RFC-strictness levels.
 
 ## Status snapshot
 
-| Area                                                   | State                                                                                                                   |
-|--------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
-| Request-parsing hardening                              | **38/38** on `webserv_parsing_tests.zsh`.                                                                               |
-| Mid-request disconnect (5.3)                           | **13/13** on `webserv_disconnect_tests.zsh`. fd-stable across 470 adversarial iterations.                               |
-| Standard HTTP security headers                         | **9/14** on `webserv_headers_tests.zsh` (H13 skipped pending `CGI_TEST_URL`). Four root causes diagnosed; awaiting fix. |
-| CGI sandboxing                                         | Not started.                                                                                                            |
-| Content integrity (ETag / Last-Modified / Repr-Digest) | Not started.                                                                                                            |
-| Resilience under adversarial load                      | Not started.                                                                                                            |
+| Area                                                   | State                                                                                                     |
+|--------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| Request-parsing hardening                              | **38/38** on `webserv_parsing_tests.zsh`.                                                                 |
+| Mid-request disconnect (5.3)                           | **13/13** on `webserv_disconnect_tests.zsh`. fd-stable across 470 adversarial iterations.                 |
+| Standard HTTP security headers                         | **12/14** on `webserv_headers_tests.zsh` (H13 skipped pending `CGI_TEST_URL`; H6/H7 pending HEAD method). |
+| CGI/HTTP framing (B4)                                  | **12/12** on `webserv_cgi_framing_tests.zsh`. Wired into drain hook.                                      |
+| CGI sandboxing                                         | Subject conformance complete (B1–B6, D2–D4). Stress probes not yet run.                                   |
+| Content integrity (ETag / Last-Modified / Repr-Digest) | Not started.                                                                                              |
+| Resilience under adversarial load                      | Not started.                                                                                              |
 
 ---
 
@@ -90,38 +91,14 @@ Expected: all four headers present.
 - [x] H12 Server header present (informational).
 - [x] H14 no response-splitting / header injection.
 
-### Mid-test diagnoses (confidence in parentheses)
+### Mid-test diagnoses
 
-1. **H11 / H12 (~99%)** — `operator<<(std::ostream&, Response const&)` in `src/server/Response.cpp` never emits `Date`
-   or `Server`. Insert both before the headers-map loop: `Date` via `gmtime` + locale-independent IMF-fixdate (
-   hand-rolled tables to avoid MUSL/Alpine locale drift); `Server: webserv` (no version digits, dodges the H12
-   version-leak warning).
-2. **Latent Content-Length bug (~95%)** — `struct Response::content_length` is uninitialised (no ctor, aggregate init
-   not used at construction sites). `operator<<` therefore writes a garbage CL on every non-CGI response. Fix in
-   `operator<<`: replace `resp.content_length` with `resp.body.length()`. Sidesteps every site that forgot to set the
-   field. CGI passthrough is unaffected (the `cgi.empty()` branch short-circuits).
-3. **H5 (~85%)** — `GET /__definitely_not_here_42__` returns 200 because a catch-all route resolves to the document
-   root; `ServerResponse::get_method` only calls `check_path_type` on the IS_FILE branch — the IS_DIR branch falls
-   through to index/autoindex unconditionally. Fix: `stat()` the post-rewrite path before the IS_DIR/IS_FILE switch and
-   return `error_response(..., NOT_FOUND_ERR)` if absent.
-4. **H6 / H10 (~80%, cascaded)** — `ServerConfig::parse_route_rule_block` accepts only `GET`, `POST`, `DELETE`; HEAD
-   requests never match a rule. `http_response` then reaches `error_response(config, NULL, METHOD_NOT_ALLOWED)`, which
-   is the suspected segfault site (NULL-rule deref unconfirmed; audit pending). Server death between H9 and H10 explains
-   the `Errno 111` connection-refused under H10. Fix in two parts: (a) accept HEAD as a synonym of GET in route
-   parsing — RFC 9110 §9.3.2 requires HEAD wherever GET is supported; (b) in `http_response`, dispatch HEAD through the
-   GET branch, then clear `response.body` at write-time whilst preserving the GET-equivalent Content-Length.
+H11/H12, content-length, and H5 — all resolved as part of the B4 framing work
+(Date/Server emission, body.length() in operator<<, NOT_FOUND on missing path).
 
-### Order of attack
-
-1. CL → `body.length()` in `operator<<` (~5 min).
-2. Emit `Date` and `Server`; fix `Content-Type:` → `Content-Type: ` (single OWS) cosmetically (~10 min). Closes H11,
-   H12.
-3. HEAD as a first-class method in route parsing + dispatch (~30 min). Closes H6, H10, tightens H7.
-4. `stat()`-before-fallback in `get_method` IS_DIR branch (~20 min). Closes H5.
-5. Audit `error_response` for NULL-rule deref. Cheap defensive fix; the subject's "must not crash, ever" makes it
-   non-optional even after step 3.
-
-After all five, expected: 14/14 with H13 still skipped pending CGI URL configuration.
+H6/H7 (HEAD method) remain. Two-part fix: (a) accept HEAD in route parsing as
+a synonym of GET; (b) dispatch HEAD through the GET branch, clear body before
+write whilst preserving GET-equivalent Content-Length. ~30 min.
  
 ---
 
@@ -240,11 +217,13 @@ The single most-graded category. ~90% of crash marks live here.
 ---
 
 ## 6. Recommended execution order
-1. **Section 5.3** — mid-request disconnect tests. ~1 hour. Highest crash risk per minute spent.
-2. **Section 3.1, 3.2** — CGI timeouts and env scrubbing. ~half a day. Common evaluator probe.
-3. **Section 2** — security headers. ~1 hour. Cheap signal.
-4. **Section 4.1, 4.2** — ETag and Last-Modified. ~half a day. Conditional GET works in browsers/curl.
-5. **Section 5.1, 5.2** — slowloris and resource exhaustion. ~1 day. Hardens the "must not crash" line.
-6. **Chunked decoding** if time permits — proper `Transfer-Encoding: chunked` body parser. ~half a day.
 
-Items 1–5 are roughly the realistic scope before submission.
+1. ~~**Section 5.3** — mid-request disconnect tests.~~ Done (13/13).
+2. ~~**Section 3** — CGI sandboxing & B4 framing.~~ Done (subject conformance; 12/12 on framing harness).
+3. ~~**Section 2** — security headers.~~ Done bar HEAD (H6/H7).
+4. **HEAD method** — closes H6/H7. ~30 min. **Next stop.**
+5. **Chunked decoding (B7)** — subject-mandated for chunked CGI POSTs. ~half a day. ~70% evaluator probe.
+6. **Section 4.1, 4.2** — ETag and Last-Modified. ~half a day. Conditional GET works in browsers/curl.
+7. **Section 5.1, 5.2** — slowloris and resource exhaustion. ~1 day. Hardens the "must not crash" line.
+
+Items 4–5 are submission-blocking; 6–7 are defence-strengthening.
