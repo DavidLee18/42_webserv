@@ -74,6 +74,6 @@ bool is_header_name(const std::string &name);
 
 bool is_header_value(const std::string &value);
 
-unsigned char tolower(unsigned char c);
+char tolower(char c);
 } // namespace utils
 #endif

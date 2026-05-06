@@ -185,7 +185,7 @@ bool utils::is_header_name(const std::string &name) {
   if (name.empty())
     return false;
   for (std::string::const_iterator it = name.begin(); it != name.end(); ++it) {
-    unsigned char c = static_cast<unsigned char>(*it);
+    const char c = *it;
     if (!std::isalnum(c) && c != '!' && c != '#' && c != '$' && c != '%' &&
         c != '&' && c != '\'' && c != '*' && c != '+' && c != '-' && c != '.' &&
         c != '^' && c != '_' && c != '`' && c != '|' && c != '~')
@@ -199,14 +199,13 @@ bool utils::is_header_value(const std::string &value) {
     return true;
   for (std::string::const_iterator it = value.begin(); it != value.end();
        ++it) {
-    unsigned char c = static_cast<unsigned char>(*it);
-    if ((c < 0x21 || c > 0x7e) && c != 0x20 && c != 0x09)
+    const char c = *it;
+    if ((c < 0x20 || c > 0x7e) && c != 0x09)
       return false;
   }
   return true;
 }
 
-unsigned char utils::tolower(const unsigned char c) {
-  return static_cast<unsigned char>(
-      static_cast<char>(std::tolower(static_cast<int>(static_cast<char>(c)))));
+char utils::tolower(const char c) {
+  return static_cast<char>(std::tolower(static_cast<int>(c)));
 }

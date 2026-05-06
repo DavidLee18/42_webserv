@@ -138,8 +138,7 @@ run_case() {
   local outfile="$BUILD_DIR/out.bin"
   local errfile="$BUILD_DIR/err.bin"
 
-  # printf %b lets us put \r\n in the test inputs literally.
-  printf -- '%b' "$input" > "$infile"
+  print -rn -- "$input" > "$infile"
 
   "$RUNNER" "$infile" >"$outfile" 2>"$errfile"
   local rc=$?
@@ -193,85 +192,85 @@ run_case() {
 
 # F1: well-formed with explicit Status:
 run_case "F1 explicit Status: 200 OK" \
-  'Status: 200 OK\r\nContent-Type: text/plain\r\n\r\nhello' \
+  $'Status: 200 OK\r\nContent-Type: text/plain\r\n\r\nhello' \
   ok \
-  '^HTTP/1\.1 200 OK\r\n' \
-  '^Status:'
+  $'^HTTP/1\\.1 200 OK\r\n' \
+  $'\nStatus:'
 
 # F2: Status: 404 Not Found → status line synthesised, Status: stripped
 run_case "F2 Status: 404 → status line synthesised" \
-  'Status: 404 Not Found\r\nContent-Type: text/html\r\n\r\n<h1>Not Found</h1>' \
+  $'Status: 404 Not Found\r\nContent-Type: text/html\r\n\r\n<h1>Not Found</h1>' \
   ok \
-  '^HTTP/1\.1 404 Not Found\r\n' \
-  '^Status:'
+  $'^HTTP/1\\.1 404 Not Found\r\n' \
+  $'\nStatus:'
 
 # F3: redirect via Status: 302 + Location header
 run_case "F3 Status: 302 + Location forwarded" \
-  'Status: 302 Found\r\nLocation: /elsewhere\r\nContent-Type: text/html\r\n\r\n' \
+  $'Status: 302 Found\r\nLocation: /elsewhere\r\nContent-Type: text/html\r\n\r\n' \
   ok \
-  'Location: /elsewhere\r\n' \
+  $'Location: /elsewhere\r\n' \
   ''
 
 # F4: standard CRLF boundary
 run_case "F4 CRLF boundary" \
-  'Content-Type: text/plain\r\n\r\nbody' \
+  $'Content-Type: text/plain\r\n\r\nbody' \
   ok \
-  '^HTTP/1\.1 200 OK\r\n' \
+  $'^HTTP/1\\.1 200 OK\r\n' \
   ''
 
 # F5: bare LF boundary should be tolerated
 run_case "F5 LF-only boundary tolerated" \
-  'Content-Type: text/plain\n\nbody' \
+  $'Content-Type: text/plain\n\nbody' \
   ok \
-  '^HTTP/1\.1 200 OK' \
+  $'^HTTP/1\\.1 200 OK' \
   ''
 
 # F6: no Content-Length from CGI → server computes it (body = "hello", 5 bytes)
 run_case "F6 missing CL → server computes" \
-  'Content-Type: text/plain\r\n\r\nhello' \
+  $'Content-Type: text/plain\r\n\r\nhello' \
   ok \
-  'Content-Length: 5\r\n' \
+  $'Content-Length: 5\r\n' \
   ''
 
 # F7: CGI provides Content-Length → server trusts and forwards
 run_case "F7 CGI-provided CL trusted" \
-  'Content-Type: text/plain\r\nContent-Length: 5\r\n\r\nhello' \
+  $'Content-Type: text/plain\r\nContent-Length: 5\r\n\r\nhello' \
   ok \
-  'Content-Length: 5\r\n' \
+  $'Content-Length: 5\r\n' \
   ''
 
 # F8: empty body, headers only → CL: 0
 run_case "F8 empty body → CL: 0" \
-  'Content-Type: text/plain\r\n\r\n' \
+  $'Content-Type: text/plain\r\n\r\n' \
   ok \
-  'Content-Length: 0\r\n' \
+  $'Content-Length: 0\r\n' \
   ''
 
 # F9: Set-Cookie passed through
 run_case "F9 Set-Cookie forwarded" \
-  'Content-Type: text/html\r\nSet-Cookie: sid=abc; Path=/\r\n\r\n<p>hi</p>' \
+  $'Content-Type: text/html\r\nSet-Cookie: sid=abc; Path=/\r\n\r\n<p>hi</p>' \
   ok \
-  'Set-Cookie: sid=abc; Path=/\r\n' \
+  $'Set-Cookie: sid=abc; Path=/\r\n' \
   ''
 
 # F10: multiple custom headers all forwarded
 run_case "F10 multiple custom headers forwarded" \
-  'Content-Type: application/json\r\nX-One: 1\r\nX-Two: 2\r\n\r\n{}' \
+  $'Content-Type: application/json\r\nX-One: 1\r\nX-Two: 2\r\n\r\n{}' \
   ok \
-  'X-One: 1\r\n.*X-Two: 2\r\n' \
+  $'X-One: 1\r\n.*X-Two: 2\r\n' \
   ''
 
 # F11: no header/body boundary at all → must error
 run_case "F11 no boundary → error" \
-  'Content-Type: text/plain (no blank line)' \
+  $'Content-Type: text/plain (no blank line)' \
   err
 
 # F12: body containing \r\n\r\n → split on FIRST occurrence, not last
 # Headers: just Content-Type. Body: "first\r\n\r\nsecond" (15 bytes).
 run_case "F12 body containing \\r\\n\\r\\n: first split wins" \
-  'Content-Type: text/plain\r\n\r\nfirst\r\n\r\nsecond' \
+  $'Content-Type: text/plain\r\n\r\nfirst\r\n\r\nsecond' \
   ok \
-  'Content-Length: 15\r\n' \
+  $'Content-Length: 15\r\n' \
   ''
 
 # -----------------------------------------------------------------------------

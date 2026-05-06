@@ -824,7 +824,7 @@ Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
        content_type_found = false;
   for (std::map<std::string, std::string>::iterator it = resp.headers.begin();
        it != resp.headers.end();) {
-    std::string header_name_lower;
+    std::string header_name_lower(it->first.size(), '\0');
     std::transform(it->first.begin(), it->first.end(),
                    header_name_lower.begin(), utils::tolower);
 
