@@ -133,7 +133,7 @@ DefaultError::default_err_response(const Response::StatusCode err_code) {
   Response response;
 
   response.version = "HTTP/1.1";
-  response.mime_type = "text/html";
+  response.content_type = "text/html";
   response.status_code = err_code;
   response.keep_alive = false;
   switch (err_code) {

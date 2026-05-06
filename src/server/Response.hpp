@@ -71,7 +71,6 @@ struct Response {
   std::string content_type; ///< Content-Type header.
   std::string cookie;       ///< Cookies.
   std::string body;         ///< The response body payload.
-  std::string mime_type; ///< The determined MIME type of the response payload.
   std::string redir;     ///< Redirect location, if applicable.
   bool keep_alive;       ///< Connection keep-alive status. Whether to close
                          ///< the connection after sending a response.
@@ -80,8 +79,8 @@ struct Response {
 
   Response()
       : version("HTTP/1.1"), status_code(INTERNAL_SERVER_ERR),
-        content_length(0), content_type(), cookie(), body(), mime_type(),
-        redir(), keep_alive(false), headers() {}
+        content_length(0), content_type(), cookie(), body(), redir(),
+        keep_alive(false), headers() {}
   static Result<Response> from_cgi_outbuff(std::string const &);
 };
 
@@ -91,7 +90,7 @@ class Request;
 class ServerConfig;
 
 /**
- * @class Response
+ * @class ServerResponse
  * @brief Static utility class for generating HTTP responses.
  */
 class ServerResponse {

@@ -40,16 +40,18 @@ std::ostream &operator<<(std::ostream &os, Response const &resp) {
      << "\r\n";
   os << "Date: " << get_http_date() << "\r\n";
   os << "Server: webserv\r\n";
-  if (!resp.redir.empty())
+  if ((resp.status_code == Response::MOVED_PERMANENTLY ||
+       resp.status_code == Response::FOUND) &&
+      !resp.redir.empty())
     os << "Location: " << resp.redir << "\r\n";
-  os << "Content-Type: " << resp.mime_type << "\r\n";
+  os << "Content-Type: " << resp.content_type << "\r\n";
   if (!resp.cookie.empty())
     os << "Set-Cookie:" << resp.cookie << "\r\n";
   for (std::map<std::string, std::string>::const_iterator it =
            resp.headers.begin();
        it != resp.headers.end(); ++it)
     os << it->first << ": " << it->second << "\r\n";
-  os << "Content-Length: " << resp.body.length() << "\r\n";
+  os << "Content-Length: " << resp.content_length << "\r\n";
   if (resp.keep_alive)
     os << "Connection: keep-alive\r\n";
   else
@@ -157,13 +159,13 @@ Response ServerResponse::http_response(
   if (request->get_method() == Request::HEAD)
     response.body.clear();
 
-  response.mime_type =
+  response.content_type =
       get_string_from_map(mime_type, find_file_type(target.path));
-  std::cout << "mime type: " << response.mime_type << std::endl;
+  std::cout << "mime type: " << response.content_type << std::endl;
   // Special API endpoint for session info
   if (request->get_path() == "/api/session-info") {
     if (request->get_method() == Request::GET) {
-      response.mime_type = "application/json";
+      response.content_type = "application/json";
       response.status_code = Response::OK;
 
       if (session_id.empty()) {
@@ -288,11 +290,12 @@ Response ServerResponse::error_response(
     Response response;
     response.status_code = error_code;
     response.headers = config->get_header();
-    response.mime_type =
+    response.content_type =
         get_string_from_map(mime_type, find_file_type(err_page));
     std::ostringstream ss;
     ss << file.rdbuf();
     response.body = ss.str();
+    response.content_length = response.body.length();
     file.close();
     return response;
   } else {
@@ -573,7 +576,7 @@ Response ServerResponse::post_method(
         // 일반적으로 다른 페이지 이동 시 302 혹은 303을 사용
         response.status_code = Response::FOUND;
         response.redir = rule->index;
-        response.mime_type = "text/html";
+        response.content_type = "text/html";
         response.body = "<html><body>Redirecting...</body></html>";
         response.cookie =
             "session_id=" + session->create_session(id, client->ip) +
@@ -583,7 +586,7 @@ Response ServerResponse::post_method(
         std::cout << "Authentication FAILED for: " << id << std::endl;
 
         response.status_code = Response::OK;
-        response.mime_type = "text/html";
+        response.content_type = "text/html";
         // 로그인 실패 시 브라우저 자체 Alert 팝업을 띄우고 이전(로그인)
         // 화면으로 다시 돌려보냅니다.
         response.body = "<script>"
@@ -702,14 +705,14 @@ Response ServerResponse::post_method(
 
     if (files_uploaded > 0) {
       response.status_code = Response::OK;
-      response.mime_type = "text/plain";
+      response.content_type = "text/plain";
       std::ostringstream oss;
       oss << "Successfully uploaded " << files_uploaded << " file(s)";
       response.body = oss.str();
       return response;
     } else {
       response.status_code = Response::BAD_REQUEST;
-      response.mime_type = "text/plain";
+      response.content_type = "text/plain";
       response.body = "No files uploaded";
       return response;
     }
@@ -734,7 +737,7 @@ Response ServerResponse::get_method(
     response.redir =
         config->get_rewritten_path(request->get_method(), request->get_path());
     response.status_code = Response::MOVED_PERMANENTLY;
-    response.mime_type = "text/html";
+    response.content_type = "text/html";
     response.body = "<html><body><h1>301 Moved Permanently</h1></body></html>";
   } else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     DIR *dir = opendir(target.path.c_str());
@@ -745,7 +748,7 @@ Response ServerResponse::get_method(
         return error_response(config, rule, Response::NOT_FOUND, mime_type);
     }
     target.type = Response::OK;
-    response.mime_type = "html";
+    response.content_type = "html";
     response.body = make_autoindex_page(target.path, request->get_path(), dir);
     response.status_code = Response::OK;
   } else {
@@ -787,7 +790,7 @@ Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
   while (std::getline(iss, header_line) && !iss.fail()) {
     size_t colon_pos = header_line.find(':');
     if (colon_pos == std::string::npos)
-      return ERR(Response, Errors::bad_gateway);
+      continue;
     std::string header_name = header_line.substr(0, colon_pos);
     std::string header_value = header_line.substr(colon_pos + 1);
     if (!header_value.empty() &&
@@ -803,30 +806,88 @@ Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
     if (!utils::is_header_name(header_name) ||
         !utils::is_header_value(header_value))
       return ERR(Response, Errors::bad_gateway);
-    std::transform(header_name.begin(), header_name.end(), header_name.begin(),
-                   utils::tolower);
-    std::map<std::string, std::string>::iterator header_name_pos =
-        resp.headers.find(header_name);
-    if (header_name_pos != resp.headers.end())
-      return ERR(Response, Errors::bad_gateway);
+    std::string header_name_lower;
+    std::transform(header_name.begin(), header_name.end(),
+                   header_name_lower.begin(), utils::tolower);
+    for (std::map<std::string, std::string>::iterator it = resp.headers.begin();
+         it != resp.headers.end(); ++it) {
+      std::string header_name_lower_;
+      std::transform(it->first.begin(), it->first.end(),
+                     header_name_lower_.begin(), utils::tolower);
+      if (header_name_lower_ == header_name_lower)
+        return ERR(Response, Errors::bad_gateway);
+    }
     resp.headers[header_name] = header_value;
   }
 
-  if (resp.headers.find("content-length") == resp.headers.end()) {
-    std::ostringstream oss;
-    oss << resp.body.length();
-    resp.headers["content-length"] = oss.str();
+  bool status_found = false, content_length_found = false,
+       content_type_found = false;
+  for (std::map<std::string, std::string>::iterator it = resp.headers.begin();
+       it != resp.headers.end();) {
+    std::string header_name_lower;
+    std::transform(it->first.begin(), it->first.end(),
+                   header_name_lower.begin(), utils::tolower);
+
+    if (header_name_lower == "content-length") {
+      std::istringstream iss_(it->second);
+      iss_ >> resp.content_length;
+      if (iss_.fail())
+        return ERR(Response, Errors::bad_gateway);
+      resp.headers.erase(it++);
+      content_length_found = true;
+      continue;
+    }
+
+    if (header_name_lower == "status") {
+      std::istringstream iss_(it->second);
+      unsigned short status_code;
+      iss_ >> status_code;
+      if (iss_.fail() || status_code < 100 || status_code > 599)
+        return ERR(Response, Errors::bad_gateway);
+      resp.status_code = DefaultError::int_to_status_code(status_code);
+      resp.headers.erase(it++);
+      status_found = true;
+      continue;
+    }
+
+    if (header_name_lower == "content-type") {
+      resp.content_type = it->second;
+      resp.headers.erase(it++);
+      content_type_found = true;
+      continue;
+    }
+
+    if (header_name_lower == "set-cookie") {
+      resp.cookie = it->second;
+      resp.headers.erase(it++);
+      continue;
+    }
+
+    if (header_name_lower == "connection") {
+      resp.keep_alive = it->second == "keep-alive";
+      resp.headers.erase(it++);
+      continue;
+    }
+
+    ++it;
   }
 
-  if (resp.headers.find("status") != resp.headers.end()) {
-    std::istringstream iss_(resp.headers["status"]);
-    unsigned short status_code;
-    iss_ >> status_code;
-    resp.status_code = DefaultError::int_to_status_code(status_code);
-    if (resp.status_code == Response::INTERNAL_SERVER_ERR &&
-        (status_code < 100 || status_code > 599))
+  if (!status_found)
+    resp.status_code = Response::OK;
+  if (!content_length_found)
+    resp.content_length = resp.body.length();
+  if (!content_type_found)
+    resp.content_type = "text/html";
+  if (resp.status_code == Response::MOVED_PERMANENTLY ||
+      resp.status_code == Response::FOUND) {
+    if (resp.headers.find("location") != resp.headers.end())
+      resp.redir = resp.headers.at("location");
+    else if (resp.headers.find("Location") != resp.headers.end())
+      resp.redir = resp.headers.at("Location");
+    else
       return ERR(Response, Errors::bad_gateway);
-    resp.headers.erase("status");
+    resp.headers.erase("location");
+    resp.headers.erase("Location");
   }
 
   return OK(Response, resp);
