@@ -195,14 +195,14 @@ run_case "F1 explicit Status: 200 OK" \
   $'Status: 200 OK\r\nContent-Type: text/plain\r\n\r\nhello' \
   ok \
   $'^HTTP/1\\.1 200 OK\r\n' \
-  $'\nStatus:'
+  '(^|[\r\n])Status:'
 
 # F2: Status: 404 Not Found → status line synthesised, Status: stripped
 run_case "F2 Status: 404 → status line synthesised" \
   $'Status: 404 Not Found\r\nContent-Type: text/html\r\n\r\n<h1>Not Found</h1>' \
   ok \
   $'^HTTP/1\\.1 404 Not Found\r\n' \
-  $'\nStatus:'
+  '(^|[\r\n])Status:'
 
 # F3: redirect via Status: 302 + Location header
 run_case "F3 Status: 302 + Location forwarded" \
