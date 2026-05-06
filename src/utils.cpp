@@ -207,5 +207,6 @@ bool utils::is_header_value(const std::string &value) {
 }
 
 unsigned char utils::tolower(const unsigned char c) {
-  return static_cast<unsigned char>(std::tolower(static_cast<int>(c)));
+  return static_cast<unsigned char>(
+      static_cast<char>(std::tolower(static_cast<int>(static_cast<char>(c)))));
 }

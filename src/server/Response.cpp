@@ -806,12 +806,12 @@ Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
     if (!utils::is_header_name(header_name) ||
         !utils::is_header_value(header_value))
       return ERR(Response, Errors::bad_gateway);
-    std::string header_name_lower;
+    std::string header_name_lower(header_name.size(), '\0');
     std::transform(header_name.begin(), header_name.end(),
                    header_name_lower.begin(), utils::tolower);
     for (std::map<std::string, std::string>::iterator it = resp.headers.begin();
          it != resp.headers.end(); ++it) {
-      std::string header_name_lower_;
+      std::string header_name_lower_(it->first.size(), '\0');
       std::transform(it->first.begin(), it->first.end(),
                      header_name_lower_.begin(), utils::tolower);
       if (header_name_lower_ == header_name_lower)
