@@ -581,7 +581,7 @@ RouteRule const *ServerConfig::find_route(const Request::Method method,
   // Iterate through all routes to find a match
   for (size_t i = 0; i < routes.size(); ++i) {
     if ((routes[i].method == method ||
-         (routes[i].method == Request::HEAD && method == Request::GET)) &&
+         (routes[i].method == Request::GET && method == Request::HEAD)) &&
         routes[i].path.matches(pathPattern)) {
       return &routes[i];
     }
@@ -596,7 +596,7 @@ ServerConfig::find_route_cgi(const Request::Method method,
 
   for (size_t i = 0; i < R_CGI.size(); ++i) {
     if ((R_CGI[i].get_method() == method ||
-         (R_CGI[i].get_method() == Request::HEAD && method == Request::GET)) &&
+         (R_CGI[i].get_method() == Request::GET && method == Request::HEAD)) &&
         R_CGI[i].get_path().matches(pathPattern)) {
       return &R_CGI[i];
     }
