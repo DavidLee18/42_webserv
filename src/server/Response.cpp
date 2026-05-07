@@ -38,21 +38,34 @@ std::ostream &operator<<(std::ostream &os, Response const &resp) {
     os << resp.cgi;
   else {
     os << "HTTP/1.1 " << resp.status_code << "\r\n";
+    std::cout << "HTTP/1.1 " << resp.status_code << "\r\n";
     os << "Date: " << get_http_date() << "\r\n";
+    std::cout << "Date: " << get_http_date() << "\r\n";
     os << "Server: webserv\r\n";
+    std::cout << "Server: webserv\r\n";
     if (!resp.redir.empty())
+    {
       os << "Location: " << resp.redir << "\r\n";
+      std::cout << "Location: " << resp.redir << "\r\n";
+    }
     os << "Content-Type:" << resp.mime_type << "\r\n";
+    std::cout << "Content-Type:" << resp.mime_type << "\r\n";
     if (!resp.cookie.empty()) {
       os << "Set-Cookie:" << resp.cookie << "\r\n";
+      std::cout << "Set-Cookie:" << resp.cookie << "\r\n";
     }
     for (std::map<std::string, std::string>::const_iterator it = resp.headers.begin();
          it != resp.headers.end(); ++it) {
       os << it->first << ": " << it->second << "\r\n";
+      std::cout << it->first << ": " << it->second << "\r\n";
     }
     os << "Content-Length: " << resp.body.length() << "\r\n";
+    std::cout << "Content-Length: " << resp.body.length() << "\r\n";
     if (!resp.connection.empty())
+    {
       os << "Connection: " << resp.connection << "\r\n";
+      std::cout << "Connection: " << resp.connection << "\r\n";
+    }
     os << "\r\n";
     os << resp.body;
   }
@@ -248,7 +261,10 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   if (type == IS_DIR) {
     target.path += root;
     if (rule->op == SERVE_FROM && request->get_path() == "/")
+    {
       target.path += rule->index;
+      std::cout << "index rule working." << std::endl;
+    }
     target.type = check_path_type(target.path);
   } else if (type == NOT_FOUND_ERR) {
     target.path += get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
@@ -531,7 +547,7 @@ Response ServerResponse::post_method(const Target& target, Response response,
     std::string auth_target =
         get_pwd() +
         config->get_rewritten_path(request->get_method(), rule->auth_info);
-    std::cout << "\n" << auth_target << "\n" << std::endl;
+    std::cout << "\nauth info: " << auth_target << "\n" << std::endl;
     std::ifstream file(auth_target.c_str());
     if (file.is_open()) {
       std::string pw;

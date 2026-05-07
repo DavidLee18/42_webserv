@@ -171,7 +171,6 @@ void Server::client_read(const FileDescriptor *client_fd) {
       std::ostringstream server_response;
 
       server_response << http;
-      std::cout << "http: " << http << std::endl;
 
       delete clients.at(client_fd).req;
       clients.at(client_fd).req = NULL;

@@ -45,7 +45,7 @@ uwsgi =
 		! 500:/tmp/error_500.html
 
 	GET|POST|DELETE * <- /spool/www/*
-		? index.html
+		? hello.html
 		@ auth_info
 		->{} 10MB
 		! 400:/spool/www/error/400.html
