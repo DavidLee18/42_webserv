@@ -359,6 +359,9 @@ bool ServerConfig::apply_route_rule_entry(
   if (size != 2)
     return false;
 
+  // Strip whitespace from the rule operator (first element)
+  rule[0] = utils::trim_whitespace(rule[0]);
+
   // Find or create routes for each method with this path pattern
   for (std::size_t i = 0; i < mets.size(); ++i) {
     std::size_t targetRouteIndex =

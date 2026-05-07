@@ -160,7 +160,6 @@ Response ServerResponse::http_response(
 
   response.content_type =
       get_string_from_map(mime_type, find_file_type(target.path));
-  std::cout << "mime type: " << response.content_type << std::endl;
   // Special API endpoint for session info
   if (request->get_path() == "/api/session-info") {
     if (request->get_method() == Request::GET) {
@@ -239,15 +238,12 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
       config->get_rewritten_path(request->get_method(), request->get_path());
 
   target.path = get_pwd();
-  std::cout << "Root: " << root << std::endl;
-  std::cout << "rule op: " << rule->op << std::endl;
   const int type = check_path_type(target.path + root);
   if (type == IS_DIR) {
     target.path += root;
     if (rule->op == SERVE_FROM && request->get_path() == "/")
     {
       target.path += rule->index;
-      std::cout << "index rule working." << std::endl;
     }
     target.type = check_path_type(target.path);
   } else if (type == Response::NOT_FOUND) {
@@ -261,8 +257,6 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
     target.type = check_path_type(target.path);
   }
 
-  std::cout << "target path: " << target.path << std::endl;
-  std::cout << "rule index: " << rule->index << std::endl;
   return target;
 }
 
@@ -279,7 +273,6 @@ Response ServerResponse::error_response(
     const Response::StatusCode error_code) {
   std::string err_page =
       get_pwd() + get_string_from_map(rule->error_pages, error_code);
-  std::cout << "error page: " << err_page << std::endl;
 
   if (err_page.empty())
     return DefaultError::default_err_response(error_code);
