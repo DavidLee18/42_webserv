@@ -38,24 +38,39 @@ static std::string get_http_date() {
 std::ostream &operator<<(std::ostream &os, Response const &resp) {
   os << "HTTP/1.1 " << DefaultError::status_code_to_string(resp.status_code)
      << "\r\n";
+  std::cout << "HTTP/1.1 " << DefaultError::status_code_to_string(resp.status_code)
+     << "\r\n";
   os << "Date: " << get_http_date() << "\r\n";
+  std::cout << "Date: " << get_http_date() << "\r\n";
   os << "Server: webserv\r\n";
+  std::cout << "Server: webserv\r\n";
   if ((resp.status_code == Response::MOVED_PERMANENTLY ||
        resp.status_code == Response::FOUND) &&
-      !resp.redir.empty())
-    os << "Location: " << resp.redir << "\r\n";
+      !resp.redir.empty()) {
+        os << "Location: " << resp.redir << "\r\n";
+        std::cout << "Location: " << resp.redir << "\r\n";
+  }
   os << "Content-Type: " << resp.content_type << "\r\n";
-  if (!resp.cookie.empty())
+  std::cout << "Content-Type: " << resp.content_type << "\r\n";
+  if (!resp.cookie.empty()) {
     os << "Set-Cookie:" << resp.cookie << "\r\n";
+    std::cout << "Set-Cookie:" << resp.cookie << "\r\n";
+  }
   for (std::map<std::string, std::string>::const_iterator it =
            resp.headers.begin();
-       it != resp.headers.end(); ++it)
+       it != resp.headers.end(); ++it) {
     os << it->first << ": " << it->second << "\r\n";
+    std::cout << it->first << ": " << it->second << "\r\n";
+  }
   os << "Content-Length: " << resp.content_length << "\r\n";
-  if (resp.keep_alive)
+  std::cout << "Content-Length: " << resp.content_length << "\r\n";
+  if (resp.keep_alive) {
     os << "Connection: keep-alive\r\n";
-  else
+    std::cout << "Connection: keep-alive\r\n";
+  } else {
     os << "Connection: close\r\n";
+    std::cout << "Connection: close\r\n";
+  }
   os << "\r\n";
   if (!resp.body.empty())
     os << resp.body;
