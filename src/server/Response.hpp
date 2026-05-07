@@ -165,12 +165,11 @@ private:
    * @param config
    * @param rule
    * @param error_code The HTTP error status code.
-   * @return std::string Path to the configured error file.
+   * @return Response with proper status code and content type.
    */
   static Response
   error_response(const ServerConfig *config, const RouteRule *rule,
-                 Response::StatusCode error_code,
-                 const std::map<std::string, std::string> &mime_type);
+                 Response::StatusCode error_code);
 
   /**
    * @brief Generates an HTML page listing the contents of a directory
@@ -211,17 +210,14 @@ private:
 
   static Response
   delete_method(const Target &target, Response response,
-                const ServerConfig *config, const RouteRule *rule,
-                const std::map<std::string, std::string> &mime_type);
+                const ServerConfig *config, const RouteRule *rule);
   static Response
   post_method(const Target &target, Response response,
               const ClientSession *client, const RouteRule *rule,
-              const Request *request, Session *session,
-              const std::map<std::string, std::string> &mime_type);
+              const Request *request, Session *session);
   static Response
   get_method(Target target, Response response, const ServerConfig *config,
-             const RouteRule *rule, const Request *request,
-             const std::map<std::string, std::string> &mime_type);
+             const RouteRule *rule, const Request *request);
 };
 
 class DefaultError {
