@@ -1,4 +1,3 @@
-#include "DefaultError.hpp"
 #include "Response.hpp"
 
 std::string DefaultError::bad_request() {
@@ -57,46 +56,102 @@ std::string DefaultError::unknown_err() {
          "ERROR</h1>\n<p> </p>\n<a href=\"/\">Back to "
          "main</a>\n<br>\n</body>\n</html>";
 }
-
-std::string DefaultError::status_code_to_string(const int status_code) {
-  if (status_code == 200)
-    return "200 OK";
-  else if (status_code == 301)
-    return "301 Moved Permanently";
-  else if (status_code == 400)
-    return "400 Bad Request";
-  else if (status_code == 403)
-    return "403 Forbidden";
-  else if (status_code == 404)
-    return "404 Not Found";
-  else if (status_code == 405)
-    return "405 Method Not Allowed";
-  else if (status_code == 413)
-    return "413 Payload Too Large";
-  else if (status_code == 500)
-    return "500 Internal Server Error";
-  else if (status_code == 501)
-    return "501 Not Implemented";
-  return "500 Internal Server Error";
+Response::StatusCode
+DefaultError::int_to_status_code(unsigned short status_code) {
+  switch (status_code) {
+  case 200:
+    return Response::OK;
+  case 204:
+    return Response::NO_CONTENT;
+  case 301:
+    return Response::MOVED_PERMANENTLY;
+  case 302:
+    return Response::FOUND;
+  case 400:
+    return Response::BAD_REQUEST;
+  case 401:
+    return Response::UNAUTHORIZED;
+  case 403:
+    return Response::FORBIDDEN;
+  case 404:
+    return Response::NOT_FOUND;
+  case 405:
+    return Response::METHOD_NOT_ALLOWED;
+  case 409:
+    return Response::CONFLICT;
+  case 413:
+    return Response::PAYLOAD_TOO_LARGE;
+  case 501:
+    return Response::NOT_IMPLEMENTED;
+  case 502:
+    return Response::BAD_GATEWAY;
+  case 504:
+    return Response::GATEWAY_TIMEOUT;
+  default:
+    return Response::INTERNAL_SERVER_ERR;
+  }
 }
 
-Response DefaultError::default_err_response(const int err_code) {
+std::string
+DefaultError::status_code_to_string(const Response::StatusCode status_code) {
+  switch (status_code) {
+  case Response::OK:
+    return "200 OK";
+  case Response::NO_CONTENT:
+    return "204 No Content";
+  case Response::MOVED_PERMANENTLY:
+    return "301 Moved Permanently";
+  case Response::FOUND:
+    return "302 Found";
+  case Response::BAD_REQUEST:
+    return "400 Bad Request";
+  case Response::UNAUTHORIZED:
+    return "401 Unauthorized";
+  case Response::FORBIDDEN:
+    return "403 Forbidden";
+  case Response::NOT_FOUND:
+    return "404 Not Found";
+  case Response::METHOD_NOT_ALLOWED:
+    return "405 Method Not Allowed";
+  case Response::CONFLICT:
+    return "409 Conflict";
+  case Response::PAYLOAD_TOO_LARGE:
+    return "413 Payload Too Large";
+  case Response::NOT_IMPLEMENTED:
+    return "501 Not Implemented";
+  case Response::BAD_GATEWAY:
+    return "502 Bad Gateway";
+  case Response::GATEWAY_TIMEOUT:
+    return "504 Gateway Timeout";
+  default:
+    return "500 Internal Server Error";
+  }
+}
+
+Response
+DefaultError::default_err_response(const Response::StatusCode err_code) {
   Response response;
 
   response.version = "HTTP/1.1";
-  response.mime_type = "text/html";
-  response.status_code = status_code_to_string(err_code);
+  response.content_type = "text/html";
+  response.status_code = err_code;
   response.keep_alive = false;
-  response.connection = "keep-alive";
-  if (err_code == BAD_REQUEST)
+  switch (err_code) {
+  case Response::BAD_REQUEST:
     response.body = bad_request();
-  else if (err_code == FORBIDDEN_ERR)
+    break;
+  case Response::FORBIDDEN:
     response.body = forbidden();
-  else if (err_code == NOT_FOUND_ERR)
+    break;
+  case Response::NOT_FOUND:
     response.body = not_found();
-  else if (err_code == INTERNAL_SERVER_ERR)
+    break;
+  case Response::INTERNAL_SERVER_ERR:
     response.body = server_error();
-  else
+    break;
+  default:
     response.body = unknown_err();
+    break;
+  }
   return response;
 }

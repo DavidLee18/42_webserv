@@ -5,6 +5,7 @@
 #include "errors.h"
 #include "result.h"
 #include "server/Client.hpp"
+#include "server/Response.hpp"
 #include <cstddef>
 #include <list>
 #include <map>
@@ -69,8 +70,10 @@ class ServerName {
 public:
   class Parser {
     virtual void phantom() = 0;
-    static Result<std::pair<ServerName, size_t> > parse_host(const std::string &raw);
-    static Result<std::pair<ServerName, size_t> > parse_ipv4(const std::string &raw);
+    static Result<std::pair<ServerName, size_t> >
+    parse_host(const std::string &raw);
+    static Result<std::pair<ServerName, size_t> >
+    parse_ipv4(const std::string &raw);
 
   public:
     static Result<std::pair<ServerName, size_t> > parse(const std::string &raw);
@@ -174,39 +177,42 @@ public:
 
   class Parser {
     virtual void phantom() = 0;
-    static Result<std::pair<CgiMetaVar, size_t> > parse_auth_type(const std::string&);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_content_length(const std::string &raw);
+    parse_auth_type(const std::string &);
+    static Result<std::pair<CgiMetaVar, size_t> >
+    parse_content_length(const std::string &raw);
     static Result<std::pair<CgiMetaVar, size_t> >
         parse_content_type(std::string);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_gateway_interface(const std::string&);
-    static Result<std::pair<CgiMetaVar, size_t> > parse_path_info(const std::string &);
+    parse_gateway_interface(const std::string &);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_path_translated(const std::string&);
+    parse_path_info(const std::string &);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_query_string(const std::string&);
+    parse_path_translated(const std::string &);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_addr(const std::string&);
+    parse_query_string(const std::string &);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_host(const std::string &raw);
+    parse_remote_addr(const std::string &);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_ident(const std::string &raw);
+    parse_remote_host(const std::string &raw);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_remote_user(const std::string&);
+    parse_remote_ident(const std::string &raw);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_request_method(const std::string&);
+    parse_remote_user(const std::string &);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_script_name(const std::string &);
+    parse_request_method(const std::string &);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_server_name(const std::string &raw);
+    parse_script_name(const std::string &);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_server_port(const std::string &raw);
+    parse_server_name(const std::string &raw);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_server_protocol(const std::string &raw);
+    parse_server_port(const std::string &raw);
     static Result<std::pair<CgiMetaVar, size_t> >
-        parse_server_software(const std::string &raw);
-    static Result<std::pair<CgiMetaVar, size_t> > parse_custom_var(const std::string &name, const std::string &value);
+    parse_server_protocol(const std::string &raw);
+    static Result<std::pair<CgiMetaVar, size_t> >
+    parse_server_software(const std::string &raw);
+    static Result<std::pair<CgiMetaVar, size_t> >
+    parse_custom_var(const std::string &name, const std::string &value);
 
   public:
     static Result<std::pair<CgiMetaVar, size_t> > parse(std::string const &,
@@ -228,25 +234,26 @@ private:
 
   CgiMetaVar(Name, Val);
 
-  static CgiMetaVar auth_type(const CgiAuthType&);
+  static CgiMetaVar auth_type(const CgiAuthType &);
   static CgiMetaVar content_length(unsigned int);
   static CgiMetaVar content_type(const ContentType &);
   static CgiMetaVar gateway_interface(GatewayInterface);
-  static CgiMetaVar path_info(const std::list<std::string>&);
-  static CgiMetaVar path_translated(const std::string&);
-  static CgiMetaVar query_string(const std::map<std::string, std::string>&);
+  static CgiMetaVar path_info(const std::list<std::string> &);
+  static CgiMetaVar path_translated(const std::string &);
+  static CgiMetaVar query_string(const std::map<std::string, std::string> &);
   static CgiMetaVar remote_addr(unsigned char, unsigned char, unsigned char,
                                 unsigned char);
-  static CgiMetaVar remote_host(const std::list<std::string>&);
-  static CgiMetaVar remote_ident(const std::string&);
-  static CgiMetaVar remote_user(const std::string&);
+  static CgiMetaVar remote_host(const std::list<std::string> &);
+  static CgiMetaVar remote_ident(const std::string &);
+  static CgiMetaVar remote_user(const std::string &);
   static CgiMetaVar request_method(Request::Method);
-  static CgiMetaVar script_name(const std::list<std::string>&);
-  static CgiMetaVar server_name(const ServerName&);
+  static CgiMetaVar script_name(const std::list<std::string> &);
+  static CgiMetaVar server_name(const ServerName &);
   static CgiMetaVar server_port(unsigned short);
   static CgiMetaVar server_protocol(ServerProtocol);
   static CgiMetaVar server_software(ServerSoftware);
-  static CgiMetaVar custom_var(EtcMetaVar::Type, const std::string&, const std::string&);
+  static CgiMetaVar custom_var(EtcMetaVar::Type, const std::string &,
+                               const std::string &);
 };
 
 class CgiInput {
@@ -254,7 +261,7 @@ class CgiInput {
   std::string req_body;
 
   CgiInput();
-  CgiInput(std::vector<CgiMetaVar> const &, const std::string&);
+  CgiInput(std::vector<CgiMetaVar> const &, const std::string &);
   explicit CgiInput(Request const &);
 
 public:
@@ -275,22 +282,19 @@ public:
 };
 
 class CgiDelegate {
-  CgiInput _env;
-  std::string _script_path;
-  const Request &_req;
-  EPoll &_epoll;
-  pid_t _pid;
-  FileDescriptor *_stdin;
-  FileDescriptor *_stdout;
-  size_t _total_written;
-  std::string _output;
-  bool _completed;
-
-  CgiDelegate(Request const &, EPoll &);
-
 public:
+  enum State {
+    NotRegistered,
+    Waiting,
+    Failed,
+    Done,
+  };
+
   static Result<CgiDelegate> from_req(Request const &, EPoll &,
                                       RouteRule_CGI const &);
+
+  CgiDelegate(const CgiDelegate &);
+  CgiDelegate &operator=(const CgiDelegate &) throw(std::logic_error);
 
   // Phase 1: create pipes, fork, register the pipe fds with epoll.
   // After this returns OK, the main event loop will deliver events on the
@@ -304,7 +308,27 @@ public:
 
   Result<std::string> poll() const;
 
+  bool check_timeout();
+
+  size_t remaining_ns() const;
+
   ~CgiDelegate();
+
+private:
+  CgiInput _env;
+  std::string _script_path;
+  const Request &_req;
+  EPoll &_epoll;
+  pid_t _pid;
+  FileDescriptor *_stdin;
+  FileDescriptor *_stdout;
+  size_t _total_written;
+  std::string _output;
+  State _state;
+  timespec _start_time;
+  size_t _timeout_ns;
+
+  CgiDelegate(Request const &, EPoll &);
 };
 
 unsigned char to_upper(unsigned char);

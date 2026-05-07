@@ -45,7 +45,8 @@ class RouteRule_CGI {
    *
    * - 정상적으로 파싱이 성공했을 시 빈 문자열을 가지고 있다.
    */
-  std::string err;
+  std::string err_meg;
+  std::size_t count_line;
 
   /**
    * @brief 문자열이 timeout 문법과 값 범위에 맞는지 확인하는 함수
@@ -65,7 +66,7 @@ class RouteRule_CGI {
    * - 입력 문자열은 is_valid_timeout(const std::string &line) 함수로
    * 유효성이 확인된 상태여야 한다.
    */
-  static double parse_timeout_value(std::string &line);
+  std::string parse_timeout_value(std::string &line);
   /**
    * @brief CGI 설정 블록을 파싱하여 실행 파일, 환경 변수, timeout 정보를
    * 저장하는 함수
@@ -78,10 +79,12 @@ class RouteRule_CGI {
    * - 이후 들여쓰기 2단계의 하위 줄에서 timeout 또는 추가 환경 변수 정보를
    * 읽는다.
    */
-  std::string parse_cgi_block(const FileDescriptor &fd, const std::string& line);
+  std::string parse_cgi_block(const FileDescriptor &fd,
+                              const std::string &line);
 
 public:
-  RouteRule_CGI() : met(Request::ERROR), timeout(-1), err("No parse") {}
+  RouteRule_CGI()
+      : met(Request::ERROR), timeout(-1), err_meg("No parse"), count_line() {}
   /**
    * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
    * 생성자
@@ -94,10 +97,11 @@ public:
   RouteRule_CGI(const FileDescriptor &fd, const std::string &line);
 
   PathPattern get_path() const { return path; }
-  Request::Method get_method () const { return met; }
-  std::string get_err() const { return err; }
+  Request::Method get_method() const { return met; }
+  std::string get_err_meg() const { return err_meg; }
   std::string get_executable() const { return executable; }
   std::map<std::string, std::string> get_env() const { return env; }
+  std::size_t get_count_line() const { return count_line; }
   double get_timeout() const { return timeout; }
 
   /**
@@ -121,7 +125,7 @@ public:
    * - 첫 번째 원소는 실행 가능한 파일 경로여야 하고,
    * 두 번째 원소는 포트 번호를 나타내는 숫자 문자열이어야 한다.
    */
-  static bool is_valid_uwsgi_config(const std::vector<std::string> &data);
+  static std::string is_valid_uwsgi_config(std::vector<std::string> data);
   /**
    * @brief CGI 설정 한 줄의 기본 형식을 검사하는 함수
    * @param line 검사할 문자열
@@ -150,7 +154,7 @@ public:
    *
    * - 파일이 존재해야 하며, 일반 파일이어야 하고, 실행 권한이 있어야 한다.
    */
-  static bool is_executable_file(const std::string &path);
+  static std::string is_executable_file(const std::string &path);
   /**
    * @brief 환경 변수 한 줄을 파싱하여 env 맵에 추가하는 함수
    * @param line 파싱할 문자열
@@ -167,7 +171,7 @@ public:
    * 추출하는 함수
    * @param line 파싱할 문자열
    * @param executable 파싱한 실행 파일 경로를 저장할 변수
-   * @param env 파싱한 환경 변수 정보를 저장할 변수
+   * @param map 파싱한 환경 변수 정보를 저장할 변수
    * @return 성공하면 빈 문자열, 실패하면 오류 메시지
    *
    * - 입력 문자열은 is_valid_cgi_config(const std::string &line) 또는
@@ -176,7 +180,7 @@ public:
    */
   static std::string parse_executable(const std::string &line,
                                       std::string &executable,
-                                      std::map<std::string, std::string> &env);
+                                      std::map<std::string, std::string> &map);
   /**
    * @brief uwsgi 설정 블록을 파싱하여 포트 번호를 키로, 실행 파일 경로를 값으로
    * 저장하는 함수
@@ -190,8 +194,8 @@ public:
    * 가져야 한다.
    */
   static std::string
-  parse_uwsgi_block(const FileDescriptor &fd,
-                    std::map<std::string, std::string> &uwsgi);
+  parse_uwsgi_block(FileDescriptor &fd,
+                    std::map<std::string, std::string> &uwsgi, std::size_t &count_line);
 };
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data);

@@ -166,7 +166,8 @@ public:
   Result<Events> wait(int timeout_ms) const;
   Result<FileDescriptor *> add_fd(const FileDescriptor &fd, const Event &,
                                   const Option &);
-  Result<Void> modify_fd(const FileDescriptor &, const Event &, const Option &) const;
+  Result<Void> modify_fd(const FileDescriptor &, const Event &,
+                         const Option &) const;
   Result<Void> del_fd(const FileDescriptor &);
 };
 

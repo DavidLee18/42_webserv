@@ -13,11 +13,12 @@ UwsgiMetaVar &UwsgiMetaVar::operator=(const UwsgiMetaVar &other) {
 
 UwsgiMetaVar::~UwsgiMetaVar() {}
 
-UwsgiMetaVar UwsgiMetaVar::create(const Name n, const std::string& v) {
+UwsgiMetaVar UwsgiMetaVar::create(const Name n, const std::string &v) {
   return UwsgiMetaVar(n, v);
 }
 
-UwsgiInput::UwsgiInput(const std::vector<UwsgiMetaVar>& vars, Request const &req)
+UwsgiInput::UwsgiInput(const std::vector<UwsgiMetaVar> &vars,
+                       Request const &req)
     : _mvars(vars), _req(req) {}
 
 UwsgiInput::UwsgiInput(Request const &req) : _mvars(), _req(req) {}

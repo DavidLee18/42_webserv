@@ -6,10 +6,8 @@
  * @brief Defines the HTTP Response generation structures and classes.
  */
 
-#include "../cgi_1_1.h"
 #include "../config/ServerConfig.hpp"
 #include "Client.hpp"
-#include "DefaultError.hpp"
 #include "Session.hpp"
 
 #include <dirent.h>
@@ -20,24 +18,7 @@
 #include <unistd.h>
 
 class EPoll;
-
-/**
- * @enum StatusCode
- * @brief Enum for commonly used HTTP status codes.
- */
-enum StatusCode {
-  OK = 200,
-  MOVED_PERMANENTLY = 301,
-  BAD_REQUEST = 400,
-  UNAUTHORIZED = 401,
-  FORBIDDEN_ERR = 403,
-  NOT_FOUND_ERR = 404,
-  METHOD_NOT_ALLOWED = 405,
-  CONFLICT = 409,
-  PAYLOAD_TOO_LARGE = 413,
-  INTERNAL_SERVER_ERR = 500,
-  NOT_IMPLEMENTED = 501,
-};
+class CgiDelegate;
 
 /**
  * @struct Target
@@ -51,7 +32,7 @@ struct Target {
 
 /**
  * @struct StatusInfo
- * @brief Holds status message and corresponding error file path.
+ * @brief Holds a status message and corresponding error file path.
  */
 struct StatusInfo {
   std::string message;   ///< Status message.
@@ -63,18 +44,44 @@ struct StatusInfo {
  * @brief Represents the components of an HTTP response.
  */
 struct Response {
+  /**
+   * @enum StatusCode
+   * @brief Enum for commonly used HTTP status codes.
+   */
+  enum StatusCode {
+    OK = 200,
+    NO_CONTENT = 204,
+    MOVED_PERMANENTLY = 301,
+    FOUND = 302,
+    BAD_REQUEST = 400,
+    UNAUTHORIZED = 401,
+    FORBIDDEN = 403,
+    NOT_FOUND = 404,
+    METHOD_NOT_ALLOWED = 405,
+    CONFLICT = 409,
+    PAYLOAD_TOO_LARGE = 413,
+    INTERNAL_SERVER_ERR = 500,
+    NOT_IMPLEMENTED = 501,
+    BAD_GATEWAY = 502,
+    GATEWAY_TIMEOUT = 504,
+  };
   std::string version;      ///< HTTP version (e.g., "HTTP/1.1").
-  std::string status_code;  ///< HTTP status code and reason (e.g., "200 OK").
+  StatusCode status_code;   ///< HTTP status code and reason (e.g., "200 OK").
+  size_t content_length;    ///< Content-Length header value.
   std::string content_type; ///< Content-Type header.
-  std::string connection;   ///< Connection header.
   std::string cookie;       ///< Cookies.
   std::string body;         ///< The response body payload.
-  std::string mime_type; ///< The determined MIME type of the response payload.
   std::string redir;     ///< Redirect location, if applicable.
-  bool keep_alive;       ///< Connection keep-alive status.
-  bool should_close;     ///< Whether to close connection after sending response.
-  std::string cgi;       ///< Generated CGI script.
-  std::map<std::string, std::string> headers; ///< Additional response headers from config.
+  bool keep_alive;       ///< Connection keep-alive status. Whether to close
+                         ///< the connection after sending a response.
+  std::map<std::string, std::string>
+      headers; ///< Additional response headers from config.
+
+  Response()
+      : version("HTTP/1.1"), status_code(INTERNAL_SERVER_ERR),
+        content_length(0), content_type(), cookie(), body(), redir(),
+        keep_alive(false), headers() {}
+  static Result<Response> from_cgi_outbuff(std::string const &);
 };
 
 std::ostream &operator<<(std::ostream &, Response const &);
@@ -83,7 +90,7 @@ class Request;
 class ServerConfig;
 
 /**
- * @class Response
+ * @class ServerResponse
  * @brief Static utility class for generating HTTP responses.
  */
 class ServerResponse {
@@ -113,9 +120,8 @@ public:
                 const std::map<std::string, std::string> &mime_type,
                 Session *session);
 
-  static Result<CgiDelegate> register_cgi(const Request *request,
-                                          const ServerConfig *config,
-                                          EPoll *epoll);
+  static Result<CgiDelegate>
+  register_cgi(const Request &request, const RouteRule_CGI &rule, EPoll *epoll);
 
 private:
   /**
@@ -123,14 +129,6 @@ private:
    * @brief Enum for internal target path typing.
    */
   enum Type { IS_DIR, IS_FILE, PATH_ERROR };
-
-  /**
-   * @brief Converts an integer status code to its HTTP reason phrase string.
-   *
-   * @param status_code The numeric HTTP status code.
-   * @return std::string The status line string (e.g., "200 OK").
-   */
-  static std::string status_code_to_string(int status_code);
 
   /**
    * @brief Checks the file system to determine what kind of resource exists at
@@ -169,9 +167,10 @@ private:
    * @param error_code The HTTP error status code.
    * @return std::string Path to the configured error file.
    */
-  static Response error_response(const ServerConfig *config,
-                                 const RouteRule *rule, int error_code,
-                                 std::map<std::string, std::string>mime_type);
+  static Response
+  error_response(const ServerConfig *config, const RouteRule *rule,
+                 Response::StatusCode error_code,
+                 const std::map<std::string, std::string> &mime_type);
 
   /**
    * @brief Generates an HTML page listing the contents of a directory
@@ -210,19 +209,33 @@ private:
                        std::size_t start_pos, std::string &out_filename,
                        std::string &out_fieldname, std::string &out_data);
 
-  static Response delete_method(const Target &target, Response response,
-                                const ServerConfig *config,
-                                const RouteRule *rule,
-                                std::map<std::string, std::string> mime_type);
-  static Response post_method(const Target &target, Response response,
-                              const ClientSession *client,
-                              const RouteRule *rule, const Request *request,
-                              Session *session,
-                              std::map<std::string, std::string> mime_type);
-  static Response get_method(Target target, Response response,
-                             const ServerConfig *config, const RouteRule *rule,
-                             const Request *request,
-                             std::map<std::string, std::string> mime_type);
+  static Response
+  delete_method(const Target &target, Response response,
+                const ServerConfig *config, const RouteRule *rule,
+                const std::map<std::string, std::string> &mime_type);
+  static Response
+  post_method(const Target &target, Response response,
+              const ClientSession *client, const RouteRule *rule,
+              const Request *request, Session *session,
+              const std::map<std::string, std::string> &mime_type);
+  static Response
+  get_method(Target target, Response response, const ServerConfig *config,
+             const RouteRule *rule, const Request *request,
+             const std::map<std::string, std::string> &mime_type);
+};
+
+class DefaultError {
+  virtual int phantom() = 0;
+  static std::string bad_request();
+  static std::string forbidden();
+  static std::string not_found();
+  static std::string server_error();
+  static std::string unknown_err();
+
+public:
+  static Response::StatusCode int_to_status_code(unsigned short status_code);
+  static std::string status_code_to_string(Response::StatusCode status_code);
+  static Response default_err_response(Response::StatusCode err_code);
 };
 
 #endif

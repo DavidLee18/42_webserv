@@ -74,15 +74,15 @@ Json Json::_bool(const bool b) { return Json(Bool, (Value){._bool = b}); }
 
 Json Json::num(const long double ld) { return Json(Num, (Value){.num = ld}); }
 
-Json Json::str(const std::string& s) {
+Json Json::str(const std::string &s) {
   return Json(Str, (Value){._str = new std::string(s)});
 }
 
-Json Json::arr(const std::vector<Json>& js) {
+Json Json::arr(const std::vector<Json> &js) {
   return Json(Arr, (Value){.arr = new std::vector<Json>(js)});
 }
 
-Json Json::obj(const std::vector<std::pair<std::string, Json> >& m) {
+Json Json::obj(const std::vector<std::pair<std::string, Json> > &m) {
   return Json(
       Obj, (Value){.obj = new std::vector<std::pair<std::string, Json> >(m)});
 }

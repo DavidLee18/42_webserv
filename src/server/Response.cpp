@@ -1,11 +1,13 @@
 #include "Response.hpp"
-#include "../ParsingUtils.hpp"
 #include "../cgi_1_1.h"
+#include "../utils.hpp"
 #include "Session.hpp"
+
+#include <algorithm>
 #include <cerrno>
 #include <ctime>
 
-std::string get_string_from_map(const std::map<int, std::string>& map,
+std::string get_string_from_map(const std::map<int, std::string> &map,
                                 const int key) {
   const std::map<int, std::string>::const_iterator it = map.find(key);
 
@@ -15,8 +17,8 @@ std::string get_string_from_map(const std::map<int, std::string>& map,
     return "";
 }
 
-std::string get_string_from_map(const std::map<std::string, std::string>& map,
-                                const std::string& key) {
+std::string get_string_from_map(const std::map<std::string, std::string> &map,
+                                const std::string &key) {
   const std::map<std::string, std::string>::const_iterator it = map.find(key);
 
   if (it != map.end())
@@ -26,52 +28,39 @@ std::string get_string_from_map(const std::map<std::string, std::string>& map,
 }
 
 static std::string get_http_date() {
-  time_t now = std::time(NULL);
-  struct tm *timeinfo = std::gmtime(&now);
+  const time_t now = std::time(NULL);
+  const struct tm *timeinfo = std::gmtime(&now);
   char buffer[100];
   std::strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", timeinfo);
   return std::string(buffer);
 }
 
 std::ostream &operator<<(std::ostream &os, Response const &resp) {
-  if (!resp.cgi.empty())
-    os << resp.cgi;
-  else {
-    os << "HTTP/1.1 " << resp.status_code << "\r\n";
-    std::cout << "HTTP/1.1 " << resp.status_code << "\r\n";
-    os << "Date: " << get_http_date() << "\r\n";
-    std::cout << "Date: " << get_http_date() << "\r\n";
-    os << "Server: webserv\r\n";
-    std::cout << "Server: webserv\r\n";
-    if (!resp.redir.empty())
-    {
-      os << "Location: " << resp.redir << "\r\n";
-      std::cout << "Location: " << resp.redir << "\r\n";
-    }
-    os << "Content-Type:" << resp.mime_type << "\r\n";
-    std::cout << "Content-Type:" << resp.mime_type << "\r\n";
-    if (!resp.cookie.empty()) {
-      os << "Set-Cookie:" << resp.cookie << "\r\n";
-      std::cout << "Set-Cookie:" << resp.cookie << "\r\n";
-    }
-    for (std::map<std::string, std::string>::const_iterator it = resp.headers.begin();
-         it != resp.headers.end(); ++it) {
-      os << it->first << ": " << it->second << "\r\n";
-      std::cout << it->first << ": " << it->second << "\r\n";
-    }
-    os << "Content-Length: " << resp.body.length() << "\r\n";
-    std::cout << "Content-Length: " << resp.body.length() << "\r\n";
-    if (!resp.connection.empty())
-    {
-      os << "Connection: " << resp.connection << "\r\n";
-      std::cout << "Connection: " << resp.connection << "\r\n";
-    }
-    os << "\r\n";
+  os << "HTTP/1.1 " << DefaultError::status_code_to_string(resp.status_code)
+     << "\r\n";
+  os << "Date: " << get_http_date() << "\r\n";
+  os << "Server: webserv\r\n";
+  if ((resp.status_code == Response::MOVED_PERMANENTLY ||
+       resp.status_code == Response::FOUND) &&
+      !resp.redir.empty())
+    os << "Location: " << resp.redir << "\r\n";
+  os << "Content-Type: " << resp.content_type << "\r\n";
+  if (!resp.cookie.empty())
+    os << "Set-Cookie:" << resp.cookie << "\r\n";
+  for (std::map<std::string, std::string>::const_iterator it =
+           resp.headers.begin();
+       it != resp.headers.end(); ++it)
+    os << it->first << ": " << it->second << "\r\n";
+  os << "Content-Length: " << resp.content_length << "\r\n";
+  if (resp.keep_alive)
+    os << "Connection: keep-alive\r\n";
+  else
+    os << "Connection: close\r\n";
+  os << "\r\n";
+  if (!resp.body.empty())
     os << resp.body;
-  }
   return os;
 }
-
 
 std::string ServerResponse::find_file_type(const std::string &path) {
   std::vector<std::string> file_type = utils::string_split(path, ".");
@@ -81,7 +70,8 @@ std::string ServerResponse::find_file_type(const std::string &path) {
   return file_type.back();
 }
 
-std::string ServerResponse::get_mime_type_for_extension(const std::string &ext) {
+std::string
+ServerResponse::get_mime_type_for_extension(const std::string &ext) {
   if (ext == "html" || ext == "htm")
     return "text/html";
   else if (ext == "json")
@@ -100,23 +90,21 @@ std::string ServerResponse::get_mime_type_for_extension(const std::string &ext) 
     return "image/png";
   else if (ext == "gif")
     return "image/gif";
-  return "text/html";  // default
+  return "text/html"; // default
 }
 
 Response ServerResponse::http_response(
     const Request *request, const ClientSession *client,
-    const std::map<std::string, std::string>& mime_type, Session *session) {
+    const std::map<std::string, std::string> &mime_type, Session *session) {
   const ServerConfig *config = client->config;
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
-  if (rule == NULL)
-    return DefaultError::default_err_response(NOT_FOUND_ERR);
   Response response;
-  response.should_close = !request->has_keep_alive();
-  if (!request->has_keep_alive())
-    response.connection = "close";
-  else
-    response.connection = "keep-alive";
+  if (rule == NULL) {
+    response = DefaultError::default_err_response(Response::NOT_FOUND);
+    response.headers = config->get_header();
+    return response;
+  }
   response.headers = config->get_header();
   const Target target = resolve_target(rule, config, request);
 
@@ -136,24 +124,54 @@ Response ServerResponse::http_response(
     if (request->get_method() == Request::DELETE) {
       std::cout << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
-      return error_response(config, rule, UNAUTHORIZED, mime_type);
+      response =
+          error_response(config, rule, Response::UNAUTHORIZED, mime_type);
+      response.headers = config->get_header();
+      return response;
     } else {
-      std::cout << "[Authentication] No valid session. Guest user." << std::endl;
+      std::cout << "[Authentication] No valid session. Guest user."
+                << std::endl;
     }
   }
 
-  response.mime_type =
-      get_string_from_map(mime_type, find_file_type(target.path));
-  std::cout << "mime type: " << response.mime_type << std::endl;
+  switch (request->get_method()) {
+  case Request::DELETE:
+    response = ServerResponse::delete_method(target, response, config, rule,
+                                             mime_type);
+    break;
+  case Request::POST:
+    response = ServerResponse::post_method(target, response, client, rule,
+                                           request, session, mime_type);
+    break;
+  case Request::HEAD:
+  case Request::GET:
+    response = ServerResponse::get_method(target, response, config, rule,
+                                          request, mime_type);
+    break;
+  default:
+    response =
+        error_response(config, rule, Response::METHOD_NOT_ALLOWED, mime_type);
+    break;
+  }
 
+  response.headers = config->get_header();
+  response.content_length = response.body.length();
+  if (request->get_method() == Request::HEAD)
+    response.body.clear();
+
+  response.content_type =
+      get_string_from_map(mime_type, find_file_type(target.path));
+  std::cout << "mime type: " << response.content_type << std::endl;
   // Special API endpoint for session info
   if (request->get_path() == "/api/session-info") {
     if (request->get_method() == Request::GET) {
-      response.mime_type = "application/json";
-      response.status_code = status_code_to_string(OK);
+      response.content_type = "application/json";
+      response.status_code = Response::OK;
 
       if (session_id.empty()) {
-        response.body = "{\"logged_in\":false,\"message\":\"No active session\"}";
+        response.body =
+            "{\"logged_in\":false,\"message\":\"No active session\"}";
+        return response;
       } else {
         std::string user_id;
         int elapsed_seconds = 0;
@@ -161,7 +179,7 @@ Response ServerResponse::http_response(
         const int timeout_seconds = TIMEOUT_SECONDS;
 
         if (session->get_session_info(session_id, timeout_seconds, user_id,
-                                       elapsed_seconds, remaining_seconds)) {
+                                      elapsed_seconds, remaining_seconds)) {
           std::ostringstream json;
           json << "{\"logged_in\":true,\"user_id\":\"" << user_id
                << "\",\"elapsed_seconds\":" << elapsed_seconds
@@ -169,36 +187,24 @@ Response ServerResponse::http_response(
                << ",\"timeout_seconds\":" << timeout_seconds << "}";
           response.body = json.str();
         } else {
-          response.body = "{\"logged_in\":false,\"message\":\"Session expired\"}";
+          response.body =
+              "{\"logged_in\":false,\"message\":\"Session expired\"}";
         }
       }
       return response;
     } else {
-      return error_response(config, rule, METHOD_NOT_ALLOWED, mime_type);
+      return error_response(config, rule, Response::METHOD_NOT_ALLOWED,
+                            mime_type);
     }
-  }
-
-  if (request->get_method() == Request::DELETE) {
-    return ServerResponse::delete_method(target, response, config, rule, mime_type);
-  } else if (request->get_method() == Request::POST) {
-    return ServerResponse::post_method(target, response, client, rule, request,
-                                       session, mime_type);
-  } else if (request->get_method() == Request::GET) {
-    return ServerResponse::get_method(target, response, config, rule, request, mime_type);
   } else {
-    return error_response(config, rule, METHOD_NOT_ALLOWED, mime_type);
+    return response;
   }
-  return response;
 }
 
-Result<CgiDelegate> ServerResponse::register_cgi(const Request *request,
-                                                 const ServerConfig *config,
+Result<CgiDelegate> ServerResponse::register_cgi(const Request &request,
+                                                 const RouteRule_CGI &rule,
                                                  EPoll *epoll) {
-  RouteRule_CGI const *rule =
-      config->find_route_cgi(request->get_method(), request->get_path());
-  if (rule == NULL)
-    return ERR(CgiDelegate, "rule not found");
-  const Result<CgiDelegate> del_ = CgiDelegate::from_req(*request, *epoll, *rule);
+  const Result<CgiDelegate> del_ = CgiDelegate::from_req(request, *epoll, rule);
   if (!del_.has_value())
     return ERR(CgiDelegate, del_.error());
   CgiDelegate del(del_.value());
@@ -208,33 +214,13 @@ Result<CgiDelegate> ServerResponse::register_cgi(const Request *request,
   return OK(CgiDelegate, del);
 }
 
-std::string ServerResponse::status_code_to_string(const int status_code) {
-  if (status_code == 200)
-    return "200 OK";
-  else if (status_code == 301)
-    return "301 Moved Permanently";
-  else if (status_code == 400)
-    return "400 Bad Request";
-  else if (status_code == 403)
-    return "403 Forbidden";
-  else if (status_code == 404)
-    return "404 Not Found";
-  else if (status_code == 405)
-    return "405 Method Not Allowed";
-  else if (status_code == 413)
-    return "413 Payload Too Large";
-  else if (status_code == 500)
-    return "500 Internal Server Error";
-  return "500 Internal Server Error";
-}
-
 int ServerResponse::check_path_type(const std::string &path) {
   struct stat info = {};
 
   if (stat(path.c_str(), &info) != 0)
-    return NOT_FOUND_ERR;
+    return Response::NOT_FOUND;
   else if (access(path.c_str(), R_OK) != 0)
-    return FORBIDDEN_ERR;
+    return Response::FORBIDDEN;
   else if (S_ISDIR(info.st_mode))
     return IS_DIR;
   else if (S_ISREG(info.st_mode))
@@ -247,7 +233,7 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
                                       const Request *request) {
   Target target;
   if (rule == NULL) {
-    target.type = NOT_FOUND_ERR;
+    target.type = Response::NOT_FOUND;
     return target;
   }
 
@@ -266,12 +252,12 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
       std::cout << "index rule working." << std::endl;
     }
     target.type = check_path_type(target.path);
-  } else if (type == NOT_FOUND_ERR) {
-    target.path += get_string_from_map(rule->error_pages, NOT_FOUND_ERR);
-    target.type = NOT_FOUND_ERR;  // Keep error code, don't check path type
-  } else if (type == FORBIDDEN_ERR) {
-    target.path += get_string_from_map(rule->error_pages, FORBIDDEN_ERR);
-    target.type = FORBIDDEN_ERR;  // Keep error code, don't check path type
+  } else if (type == Response::NOT_FOUND) {
+    target.path += get_string_from_map(rule->error_pages, Response::NOT_FOUND);
+    target.type = Response::NOT_FOUND; // Keep error code, don't check path type
+  } else if (type == Response::FORBIDDEN) {
+    target.path += get_string_from_map(rule->error_pages, Response::FORBIDDEN);
+    target.type = Response::FORBIDDEN; // Keep error code, don't check path type
   } else {
     target.path += root;
     target.type = check_path_type(target.path);
@@ -290,10 +276,10 @@ std::string ServerResponse::get_pwd() {
   return "";
 }
 
-Response ServerResponse::error_response(const ServerConfig *config,
-                                        const RouteRule *rule, int error_code,
-                                        std::map<std::string, std::string>mime_type) {
-  Response response;
+Response ServerResponse::error_response(
+    const ServerConfig *config, const RouteRule *rule,
+    const Response::StatusCode error_code,
+    const std::map<std::string, std::string> &mime_type) {
   std::string err_page =
       get_pwd() + get_string_from_map(rule->error_pages, error_code);
   std::cout << "error page: " << err_page << std::endl;
@@ -304,17 +290,20 @@ Response ServerResponse::error_response(const ServerConfig *config,
     return DefaultError::default_err_response(error_code);
   std::ifstream file(err_page.c_str());
   if (file.is_open()) {
-    response.status_code = status_code_to_string(error_code);
+    Response response;
+    response.status_code = error_code;
     response.headers = config->get_header();
-    response.mime_type = get_string_from_map(mime_type, find_file_type(err_page));
+    response.content_type =
+        get_string_from_map(mime_type, find_file_type(err_page));
     std::ostringstream ss;
     ss << file.rdbuf();
     response.body = ss.str();
+    response.content_length = response.body.length();
     file.close();
+    return response;
   } else {
     return DefaultError::default_err_response(error_code);
   }
-  return response;
 }
 
 std::string ServerResponse::make_autoindex_page(const std::string &real_path,
@@ -520,29 +509,29 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
   return next_boundary;
 }
 
-Response ServerResponse::delete_method(const Target& target, Response response,
-                                       const ServerConfig *config,
-                                       const RouteRule *rule,
-                                       std::map<std::string, std::string> mime_type) {
+Response ServerResponse::delete_method(
+    const Target &target, Response response, const ServerConfig *config,
+    const RouteRule *rule,
+    const std::map<std::string, std::string> &mime_type) {
   if (unlink(target.path.c_str()) == 0) {
-    response.status_code = "204 No Content";
+    response.status_code = Response::NO_CONTENT;
     return response;
   } else {
-    return error_response(config, rule, FORBIDDEN_ERR, mime_type); // 404, 500
+    return error_response(config, rule, Response::FORBIDDEN,
+                          mime_type); // 404, 500
   }
 }
 
-Response ServerResponse::post_method(const Target& target, Response response,
-                                     const ClientSession *client,
-                                     const RouteRule *rule,
-                                     const Request *request, Session *session,
-                                     std::map<std::string, std::string> mime_type) {
+Response ServerResponse::post_method(
+    const Target &target, Response response, const ClientSession *client,
+    const RouteRule *rule, const Request *request, Session *session,
+    const std::map<std::string, std::string> &mime_type) {
   (void)target;
   const ServerConfig *config = client->config;
 
   // Handle login/authentication
   if (request->get_path() == "/login" || request->get_path() == "/login.html") {
-    const std::string& body = request->get_body();
+    const std::string &body = request->get_body();
 
     std::string auth_target =
         get_pwd() +
@@ -588,9 +577,9 @@ Response ServerResponse::post_method(const Target& target, Response response,
 
         // 1. 브라우저에게 "이 주소로 가라"고 알리는 상태 코드 설정
         // 일반적으로 다른 페이지 이동 시 302 혹은 303을 사용
-        response.status_code = "302 Found";
+        response.status_code = Response::FOUND;
         response.redir = rule->index;
-        response.mime_type = "text/html";
+        response.content_type = "text/html";
         response.body = "<html><body>Redirecting...</body></html>";
         response.cookie =
             "session_id=" + session->create_session(id, client->ip) +
@@ -599,8 +588,8 @@ Response ServerResponse::post_method(const Target& target, Response response,
       } else {
         std::cout << "Authentication FAILED for: " << id << std::endl;
 
-        response.status_code = status_code_to_string(200);
-        response.mime_type = "text/html";
+        response.status_code = Response::OK;
+        response.content_type = "text/html";
         // 로그인 실패 시 브라우저 자체 Alert 팝업을 띄우고 이전(로그인)
         // 화면으로 다시 돌려보냅니다.
         response.body = "<script>"
@@ -610,36 +599,37 @@ Response ServerResponse::post_method(const Target& target, Response response,
         return response;
       }
     } else
-      return error_response(config, rule, NOT_FOUND_ERR, mime_type);
+      return error_response(config, rule, Response::NOT_FOUND, mime_type);
   }
 
   // Handle file uploads
   if (!rule->upload_dir.empty()) {
-    const std::string& body = request->get_body();
+    const std::string &body = request->get_body();
     const std::map<std::string, std::string> &headers = request->get_headers();
 
     // Check Content-Type for multipart/form-data
     std::map<std::string, std::string>::const_iterator content_type_it =
         headers.find("Content-Type");
     if (content_type_it == headers.end())
-      return error_response(config, rule, BAD_REQUEST, mime_type);
+      return error_response(config, rule, Response::BAD_REQUEST, mime_type);
 
     std::string content_type = content_type_it->second;
     if (content_type.find("multipart/form-data") == std::string::npos)
-      return error_response(config, rule, BAD_REQUEST, mime_type);
+      return error_response(config, rule, Response::BAD_REQUEST, mime_type);
 
     // Check body size limit
     int max_body_KB = rule->max_body_KB;
     if (static_cast<int>(body.length()) > max_body_KB * 1024) {
       std::cout << "Upload rejected: body size " << body.length()
                 << " exceeds limit " << (max_body_KB * 1024) << std::endl;
-      return error_response(config, rule, PAYLOAD_TOO_LARGE, mime_type);
+      return error_response(config, rule, Response::PAYLOAD_TOO_LARGE,
+                            mime_type);
     }
 
     // Extract boundary
     std::string boundary = extract_boundary(content_type);
     if (boundary.empty())
-      return error_response(config, rule, BAD_REQUEST, mime_type);
+      return error_response(config, rule, Response::BAD_REQUEST, mime_type);
 
     std::cout << "Boundary: " << boundary << std::endl;
 
@@ -648,7 +638,7 @@ Response ServerResponse::post_method(const Target& target, Response response,
     if (mkdir(upload_path.c_str(), 0755) != 0 && errno != EEXIST) {
       std::cout << "Failed to create upload directory: " << upload_path
                 << std::endl;
-      return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+      return error_response(config, rule, Response::FORBIDDEN, mime_type);
     }
 
     // Parse multipart parts and save files
@@ -675,10 +665,13 @@ Response ServerResponse::post_method(const Target& target, Response response,
           break;
         }
 
-        std::string file_path = upload_path + "/" + filename;
+        std::string file_path = upload_path + "/";
+        file_path += filename;
         std::cout << "Uploading file: " << file_path
                   << " (size: " << part_data.length() << ")" << std::endl;
-        for (size_t i = 0; i < std::min(static_cast<size_t>(20), part_data.length()); i++) {
+        std::cout << "First 20 bytes (hex): ";
+        for (size_t i = 0;
+             i < std::min(static_cast<size_t>(20), part_data.length()); i++) {
           printf("%02x ", static_cast<unsigned char>(part_data[i]));
         }
         std::cout << std::endl;
@@ -688,7 +681,7 @@ Response ServerResponse::post_method(const Target& target, Response response,
         if (!outfile.is_open()) {
           std::cout << "Failed to open file for writing: " << file_path
                     << std::endl;
-          return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+          return error_response(config, rule, Response::FORBIDDEN, mime_type);
         }
 
         // Write file data
@@ -697,7 +690,7 @@ Response ServerResponse::post_method(const Target& target, Response response,
         if (outfile.fail()) {
           std::cout << "Failed to write file: " << file_path << std::endl;
           outfile.close();
-          return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+          return error_response(config, rule, Response::FORBIDDEN, mime_type);
         }
 
         outfile.close();
@@ -711,71 +704,194 @@ Response ServerResponse::post_method(const Target& target, Response response,
     }
 
     if (!error_msg.empty())
-      return error_response(config, rule, BAD_REQUEST, mime_type);
+      return error_response(config, rule, Response::BAD_REQUEST, mime_type);
 
     if (files_uploaded > 0) {
-      response.status_code = status_code_to_string(OK);
-      response.mime_type = "text/plain";
+      response.status_code = Response::OK;
+      response.content_type = "text/plain";
       std::ostringstream oss;
       oss << "Successfully uploaded " << files_uploaded << " file(s)";
       response.body = oss.str();
       return response;
     } else {
-      response.status_code = status_code_to_string(BAD_REQUEST);
-      response.mime_type = "text/plain";
+      response.status_code = Response::BAD_REQUEST;
+      response.content_type = "text/plain";
       response.body = "No files uploaded";
       return response;
     }
   }
 
-  return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+  return error_response(config, rule, Response::FORBIDDEN, mime_type);
 }
 
-Response ServerResponse::get_method(Target target, Response response,
-                                    const ServerConfig *config,
-                                    const RouteRule *rule,
-                                    const Request *request,
-                                    std::map<std::string, std::string> mime_type) {
+Response ServerResponse::get_method(
+    Target target, Response response, const ServerConfig *config,
+    const RouteRule *rule, const Request *request,
+    const std::map<std::string, std::string> &mime_type) {
   // Handle error responses (NOT_FOUND_ERR, FORBIDDEN_ERR)
-  if (target.type == NOT_FOUND_ERR)
-    return error_response(config, rule, NOT_FOUND_ERR, mime_type);
-  if (target.type == FORBIDDEN_ERR)
-    return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+  if (target.type == Response::NOT_FOUND)
+    return error_response(config, rule, Response::NOT_FOUND, mime_type);
+  if (target.type == Response::FORBIDDEN)
+    return error_response(config, rule, Response::FORBIDDEN, mime_type);
 
   if (rule->op == REDIRECT) {
     std::cout << "=== redirection ===" << std::endl;
-    target.type = MOVED_PERMANENTLY;
+    target.type = Response::MOVED_PERMANENTLY;
     response.redir =
         config->get_rewritten_path(request->get_method(), request->get_path());
-    response.status_code = status_code_to_string(target.type);
-    response.mime_type = "text/html";
+    response.status_code = Response::MOVED_PERMANENTLY;
+    response.content_type = "text/html";
     response.body = "<html><body><h1>301 Moved Permanently</h1></body></html>";
   } else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     DIR *dir = opendir(target.path.c_str());
     if (dir == NULL) {
       if (errno == EACCES) // access denied
-        return error_response(config, rule, FORBIDDEN_ERR, mime_type);
+        return error_response(config, rule, Response::FORBIDDEN, mime_type);
       else if (errno == ENOENT) // no such directory
-        return error_response(config, rule, NOT_FOUND_ERR, mime_type);
+        return error_response(config, rule, Response::NOT_FOUND, mime_type);
     }
-    target.type = OK;
-    response.mime_type = "html";
+    target.type = Response::OK;
+    response.content_type = "html";
     response.body = make_autoindex_page(target.path, request->get_path(), dir);
-    response.status_code = status_code_to_string(target.type);
+    response.status_code = Response::OK;
   } else {
     if (check_path_type(target.path) != IS_FILE)
-      return error_response(config, rule, NOT_FOUND_ERR, mime_type);
+      return error_response(config, rule, Response::NOT_FOUND, mime_type);
     std::ifstream file(target.path.c_str());
     if (file.is_open()) {
       std::ostringstream ss;
       ss << file.rdbuf();
-      target.type = OK;
+      target.type = Response::OK;
       response.body = ss.str();
-      response.status_code = status_code_to_string(target.type);
+      response.status_code = Response::OK;
       file.close();
     } else {
-      return error_response(config, rule, NOT_FOUND_ERR, mime_type);
+      return error_response(config, rule, Response::NOT_FOUND, mime_type);
     }
   }
   return response;
+}
+
+Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
+  size_t bound_pos = cgi_out.find("\r\n\r\n");
+  size_t bound_len = 4;
+
+  if (bound_pos == std::string::npos) {
+    bound_pos = cgi_out.find("\n\n");
+    bound_len = 2;
+  }
+  if (bound_pos == std::string::npos)
+    return ERR(Response, Errors::bad_gateway);
+
+  std::string header_part(cgi_out.substr(0, bound_pos));
+  Response resp;
+
+  resp.body = cgi_out.substr(bound_pos + bound_len);
+
+  std::istringstream iss(header_part);
+  std::string header_line;
+  while (std::getline(iss, header_line) && !iss.fail()) {
+    size_t colon_pos = header_line.find(':');
+    if (colon_pos == std::string::npos)
+      continue;
+    std::string header_name = header_line.substr(0, colon_pos);
+    std::string header_value = header_line.substr(colon_pos + 1);
+    if (!header_value.empty() &&
+        header_value[header_value.length() - 1] == '\r')
+      header_value = header_value.substr(0, header_value.length() - 1);
+    size_t whitespace_pos = header_value.find_first_not_of(" \t");
+    if (whitespace_pos == std::string::npos)
+      return ERR(Response, Errors::bad_gateway);
+    header_value = header_value.substr(whitespace_pos);
+    whitespace_pos = header_value.find_last_not_of(" \t");
+    if (whitespace_pos != std::string::npos)
+      header_value = header_value.substr(0, whitespace_pos + 1);
+    if (!utils::is_header_name(header_name) ||
+        !utils::is_header_value(header_value))
+      return ERR(Response, Errors::bad_gateway);
+    std::string header_name_lower(header_name.size(), '\0');
+    std::transform(header_name.begin(), header_name.end(),
+                   header_name_lower.begin(), utils::tolower);
+    for (std::map<std::string, std::string>::iterator it = resp.headers.begin();
+         it != resp.headers.end(); ++it) {
+      std::string header_name_lower_(it->first.size(), '\0');
+      std::transform(it->first.begin(), it->first.end(),
+                     header_name_lower_.begin(), utils::tolower);
+      if (header_name_lower_ == header_name_lower)
+        return ERR(Response, Errors::bad_gateway);
+    }
+    resp.headers[header_name] = header_value;
+  }
+
+  bool status_found = false, content_length_found = false,
+       content_type_found = false;
+  for (std::map<std::string, std::string>::iterator it = resp.headers.begin();
+       it != resp.headers.end();) {
+    std::string header_name_lower(it->first.size(), '\0');
+    std::transform(it->first.begin(), it->first.end(),
+                   header_name_lower.begin(), utils::tolower);
+
+    if (header_name_lower == "content-length") {
+      std::istringstream iss_(it->second);
+      iss_ >> resp.content_length;
+      if (iss_.fail())
+        return ERR(Response, Errors::bad_gateway);
+      resp.headers.erase(it++);
+      content_length_found = true;
+      continue;
+    }
+
+    if (header_name_lower == "status") {
+      std::istringstream iss_(it->second);
+      unsigned short status_code;
+      iss_ >> status_code;
+      if (iss_.fail() || status_code < 100 || status_code > 599)
+        return ERR(Response, Errors::bad_gateway);
+      resp.status_code = DefaultError::int_to_status_code(status_code);
+      resp.headers.erase(it++);
+      status_found = true;
+      continue;
+    }
+
+    if (header_name_lower == "content-type") {
+      resp.content_type = it->second;
+      resp.headers.erase(it++);
+      content_type_found = true;
+      continue;
+    }
+
+    if (header_name_lower == "set-cookie") {
+      resp.cookie = it->second;
+      resp.headers.erase(it++);
+      continue;
+    }
+
+    if (header_name_lower == "connection") {
+      resp.keep_alive = it->second == "keep-alive";
+      resp.headers.erase(it++);
+      continue;
+    }
+
+    ++it;
+  }
+
+  if (!status_found)
+    resp.status_code = Response::OK;
+  if (!content_length_found)
+    resp.content_length = resp.body.length();
+  if (!content_type_found)
+    resp.content_type = "text/html";
+  if (resp.status_code == Response::MOVED_PERMANENTLY ||
+      resp.status_code == Response::FOUND) {
+    if (resp.headers.find("location") != resp.headers.end())
+      resp.redir = resp.headers.at("location");
+    else if (resp.headers.find("Location") != resp.headers.end())
+      resp.redir = resp.headers.at("Location");
+    else
+      return ERR(Response, Errors::bad_gateway);
+    resp.headers.erase("location");
+    resp.headers.erase("Location");
+  }
+
+  return OK(Response, resp);
 }

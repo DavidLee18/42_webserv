@@ -1,6 +1,5 @@
 #include "Server.hpp"
 #include "../webserv.h"
-#include "DefaultError.hpp"
 #include "Response.hpp"
 #include <cstddef>
 #include <ctime>
@@ -11,8 +10,7 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     // init client socket
     sockaddr_in client_addr = {};
     socklen_t client_len = sizeof(client_addr);
-    Result<FileDescriptor> client_result =
-        server_fd->socket_accept(
+    Result<FileDescriptor> client_result = server_fd->socket_accept(
         reinterpret_cast<struct sockaddr *>(&client_addr), &client_len);
     if (!client_result.has_value()) {
       const std::string &err = client_result.error();
@@ -32,10 +30,25 @@ void Server::new_connection(const FileDescriptor *server_fd) {
       continue;
     }
 
+    if (!client_fd.close_on_exec().has_value()) {
+      std::cerr << "ERROR: failed to set client socket to close-on-exec mode"
+                << std::endl;
+      continue;
+    }
+
     ClientSession client;
-    client.last_activity_time = time(NULL);
+    if (clock_gettime(CLOCK_MONOTONIC, &client.last_activity_time) != 0) {
+      std::cerr << "ERROR: failed to get current time for client activity"
+                << std::endl;
+      continue;
+    }
     char ip_str[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN);
+    if (inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN) ==
+        NULL) {
+      std::cerr << "ERROR: failed to convert client IP address to string"
+                << std::endl;
+      continue;
+    }
     client.ip = ip_str;
 
     // register client socket to EPoll
@@ -65,7 +78,15 @@ void Server::disconnect(const FileDescriptor *client_fd) {
 }
 
 void Server::client_read(const FileDescriptor *client_fd) {
-  clients.at(client_fd).last_activity_time = time(NULL);
+  if (clients.find(client_fd) == clients.end()) {
+    std::cerr << "ERROR: client not found for read operation" << std::endl;
+    return;
+  }
+  if (clock_gettime(CLOCK_MONOTONIC,
+                    &clients.at(client_fd).last_activity_time) != 0) {
+    std::cerr << "ERROR: failed to update client activity time" << std::endl;
+    return;
+  }
   bool peer_closed = false;
   while (true) { // repeat until nothing to read
     char buf[NETWORK_BUFFER_SIZE];
@@ -95,33 +116,35 @@ void Server::client_read(const FileDescriptor *client_fd) {
           return;
         } else if (req_.error() == Errors::malformed_header ||
                    req_.error() == Errors::bad_request) {
-          Response resp = DefaultError::default_err_response(BAD_REQUEST);
+          Response resp(
+              DefaultError::default_err_response(Response::BAD_REQUEST));
           resp.headers = clients.at(client_fd).config->get_header();
           std::ostringstream oss;
           oss << resp;
+          if (!resp.keep_alive)
+            clients.at(client_fd).dropping = true;
           clients.at(client_fd).out_buff += oss.str();
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
 
-          if (peer_closed && clients.find(client_fd) != clients.end() &&
-              clients.at(client_fd).out_buff.empty()) {
+          if (peer_closed && clients.at(client_fd).out_buff.empty())
             disconnect(client_fd);
-          }
 
           return;
         } else if (req_.error() == Errors::not_implemented) {
-          Response resp = DefaultError::default_err_response(NOT_IMPLEMENTED);
+          Response resp =
+              DefaultError::default_err_response(Response::NOT_IMPLEMENTED);
           resp.headers = clients.at(client_fd).config->get_header();
           std::ostringstream oss;
           oss << resp;
+          if (!resp.keep_alive)
+            clients.at(client_fd).dropping = true;
           clients.at(client_fd).out_buff += oss.str();
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
 
-          if (peer_closed && clients.find(client_fd) != clients.end() &&
-              clients.at(client_fd).out_buff.empty()) {
+          if (peer_closed && clients.at(client_fd).out_buff.empty())
             disconnect(client_fd);
-          }
 
           return;
         }
@@ -143,10 +166,13 @@ void Server::client_read(const FileDescriptor *client_fd) {
                 << " (Body: " << clients.at(client_fd).req->get_content_length()
                 << " bytes)" << std::endl;
 
-      if (ServerResponse::find_file_type(
-              clients.at(client_fd).req->get_path()) == "cgi") {
+      RouteRule_CGI const *cgi_path =
+          clients.at(client_fd).config->find_route_cgi(
+              clients.at(client_fd).req->get_method(),
+              clients.at(client_fd).req->get_path());
+      if (cgi_path != NULL) {
         Result<CgiDelegate> del_ = ServerResponse::register_cgi(
-            clients.at(client_fd).req, clients.at(client_fd).config, &epoll);
+            *clients.at(client_fd).req, *cgi_path, &epoll);
         if (!del_.has_value()) {
           std::cerr << "CGI registration failed: " << del_.error() << std::endl;
           delete clients.at(client_fd).req;
@@ -178,12 +204,11 @@ void Server::client_read(const FileDescriptor *client_fd) {
       clients.at(client_fd).out_buff += server_response.str();
 
       // If client sent "Connection: close", close after sending response
-      if (http.should_close) {
+      if (!http.keep_alive) {
         client_write(client_fd);
         if (clients.find(client_fd) != clients.end() &&
-            clients.at(client_fd).out_buff.empty()) {
+            clients.at(client_fd).out_buff.empty())
           disconnect(client_fd);
-        }
         return;
       }
     } else {
@@ -199,10 +224,14 @@ void Server::client_read(const FileDescriptor *client_fd) {
                 << " (Body: " << clients.at(client_fd).req->get_content_length()
                 << " bytes)" << std::endl;
 
-      if (ServerResponse::find_file_type(
-              clients.at(client_fd).req->get_path()) == "cgi") {
+      RouteRule_CGI const *cgi_path =
+          clients.at(client_fd).config->find_route_cgi(
+              clients.at(client_fd).req->get_method(),
+              clients.at(client_fd).req->get_path());
+
+      if (cgi_path != NULL) {
         Result<CgiDelegate> del_ = ServerResponse::register_cgi(
-            clients.at(client_fd).req, clients.at(client_fd).config, &epoll);
+            *clients.at(client_fd).req, *cgi_path, &epoll);
         if (!del_.has_value()) {
           std::cerr << "CGI registration failed: " << del_.error() << std::endl;
           delete clients.at(client_fd).req;
@@ -234,12 +263,9 @@ void Server::client_read(const FileDescriptor *client_fd) {
       clients.at(client_fd).out_buff += server_response.str();
 
       // If client sent "Connection: close", close after sending response
-      if (http.should_close) {
+      if (!http.keep_alive) {
+        clients.at(client_fd).dropping = true;
         client_write(client_fd);
-        if (clients.find(client_fd) != clients.end() &&
-            clients.at(client_fd).out_buff.empty()) {
-          disconnect(client_fd);
-        }
         return;
       }
     }
@@ -254,10 +280,15 @@ void Server::client_read(const FileDescriptor *client_fd) {
 }
 
 void Server::client_write(const FileDescriptor *client_fd) {
-  if (clients.find(client_fd) == clients.end())
+  if (clients.find(client_fd) == clients.end()) {
+    std::cerr << "ERROR: client not found for write operation" << std::endl;
     return;
-
-  clients.at(client_fd).last_activity_time = time(NULL);
+  }
+  if (clock_gettime(CLOCK_MONOTONIC,
+                    &clients.at(client_fd).last_activity_time) != 0) {
+    std::cerr << "ERROR: failed to update client activity time" << std::endl;
+    return;
+  }
   std::string &write_buffer = clients.at(client_fd).out_buff;
   if (!write_buffer.empty()) {
     while (true) { // ET 모드이므로 보낼 수 있는 만큼 다 보냄
@@ -271,9 +302,15 @@ void Server::client_write(const FileDescriptor *client_fd) {
         break;
 
       write_buffer.erase(0, static_cast<std::size_t>(bytes));
-      if (write_buffer.empty())
-        break;
+      if (write_buffer.empty()) {
+        if (clients.at(client_fd).dropping)
+          disconnect(client_fd);
+        return;
+      }
     }
+  } else {
+    if (clients.at(client_fd).dropping)
+      disconnect(client_fd);
   }
 }
 
@@ -303,13 +340,16 @@ Result<Void> Server::init() {
     if (!nb_result.has_value())
       return ERR(Void, "set nonblocking fail: " + nb_result.error());
 
+    Result<Void> close_on_exec_result = server_fd.close_on_exec();
+    if (!close_on_exec_result.has_value())
+      return ERR(Void, "close on exec fail: " + close_on_exec_result.error());
+
     // Port reusing option
     int opt = 1;
     Result<Void> reuseaddr_result = server_fd.set_socket_option(
         SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
     if (!reuseaddr_result.has_value())
-      std::cerr << "WARNING: SO_REUSEADDR failed: " << reuseaddr_result.error()
-                << std::endl;
+      return ERR(Void, "SO_REUSEADDR failed: " + reuseaddr_result.error());
 
     // Bind (associate IP and port)
     in_addr addr = {};
@@ -345,69 +385,103 @@ Result<Void> Server::init() {
 Result<Void> Server::start() {
   // system("open http://localhost:8080");
   std::cout << "Starting server loop..." << std::endl;
+  long epoll_timeout = -1; // Default: wait indefinitely
   while (true) {
     // Check for client timeouts and calculate epoll timeout
-    time_t now = time(NULL);
-    int epoll_timeout = -1; // Default: wait indefinitely
+    timespec now = {};
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+      std::cerr << "ERROR: failed to get current time for client timeout check"
+                << std::endl;
+      continue;
+    }
 
     // Collect clients to disconnect (avoid modifying map during iteration)
     std::vector<const FileDescriptor *> clients_to_disconnect;
 
-    for (std::map<const FileDescriptor *, ClientSession>::iterator it = clients.begin();
+    for (std::map<const FileDescriptor *, ClientSession>::iterator it =
+             clients.begin();
          it != clients.end(); ++it) {
       const FileDescriptor *client_fd = it->first;
-      ClientSession &session = it->second;
+      const ClientSession &session = it->second;
 
       if (session.config == NULL)
         continue;
 
-      int timeout_sec = session.config->get_server_response_time();
+      const long timeout_sec =
+          static_cast<long>(session.config->get_server_response_time());
       if (timeout_sec > 0) {
-        time_t elapsed = now - session.last_activity_time;
-        if (elapsed >= static_cast<time_t>(timeout_sec)) {
+        const timespec elapsed = {
+            .tv_sec = now.tv_sec - session.last_activity_time.tv_sec,
+            .tv_nsec = now.tv_nsec - session.last_activity_time.tv_nsec};
+        if (elapsed.tv_sec < 0 ||
+            (elapsed.tv_sec == 0 && elapsed.tv_nsec < 0)) {
+          std::cerr << "ERROR: client activity time in the future" << std::endl;
+          continue;
+        }
+        if (elapsed.tv_sec >= static_cast<time_t>(timeout_sec))
           // Client has timed out
           clients_to_disconnect.push_back(client_fd);
-        } else {
+        else {
           // Calculate remaining time until this client times out
-          int remaining = timeout_sec - static_cast<int>(elapsed);
-          if (epoll_timeout == -1 || remaining < epoll_timeout) {
-            epoll_timeout = remaining * 1000; // Convert to milliseconds
-          }
+          const long remaining = timeout_sec - elapsed.tv_sec;
+          if (epoll_timeout == -1 || remaining < epoll_timeout)
+            epoll_timeout =
+                remaining * 1000 -
+                elapsed.tv_nsec / 1000000; // Convert to milliseconds
         }
       }
     }
 
     // Disconnect timed-out clients
-    for (size_t i = 0; i < clients_to_disconnect.size(); ++i) {
+    for (size_t i = 0; i < clients_to_disconnect.size(); ++i)
       disconnect(clients_to_disconnect[i]);
-    }
 
     // Clean expired sessions (use the first server's timeout as default)
     if (clients.begin() != clients.end()) {
-      int session_timeout = clients.begin()->second.config->get_server_response_time();
-      if (session_timeout > 0) {
+      const int session_timeout =
+          clients.begin()->second.config->get_server_response_time();
+      if (session_timeout > 0)
         sessions.clean_expired_sessions(session_timeout);
+    }
+
+    // apply CGI timeout
+    for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
+             cgis.begin();
+         it != cgis.end();) {
+      CgiDelegate &cgi = it->second;
+      if (cgi.check_timeout()) {
+        std::ostringstream oss;
+        const Response resp(
+            DefaultError::default_err_response(Response::GATEWAY_TIMEOUT));
+        oss << resp;
+        if (!resp.keep_alive)
+          clients.at(it->first).dropping = true;
+        clients.at(it->first).out_buff = oss.str();
+        client_write(it->first);
+        cgis.erase(it++);
+      } else {
+        const size_t cgi_remaining =
+            cgi.remaining_ns() / 1000000; // milliseconds
+        if (epoll_timeout == -1 ||
+            cgi_remaining < static_cast<size_t>(epoll_timeout))
+          epoll_timeout = static_cast<long>(cgi_remaining);
+        ++it;
       }
     }
 
     // Waiting for events using epoll
-    Result<Events> events_result = epoll.wait(epoll_timeout);
+    Result<Events> events_result = epoll.wait(static_cast<int>(epoll_timeout));
     if (!events_result.has_value()) {
       if (events_result.error() == Errors::interrupted)
         continue;
-      else {
-        std::cerr << "ERROR: " << events_result.error() << std::endl;
-        break;
-      }
+      std::cerr << "ERROR: " << events_result.error() << std::endl;
+      break;
     }
 
-    Events events = events_result.value();
-    while (!events.is_end()) {
+    for (Events events = events_result.value(); !events.is_end(); ++events) {
       Result<const Event *> ev_result = *events;
-      if (!ev_result.has_value()) {
-        ++events;
+      if (!ev_result.has_value())
         continue;
-      }
 
       const Event *event = ev_result.value();
       const FileDescriptor *fd = event->fd;
@@ -427,20 +501,60 @@ Result<Void> Server::start() {
           disconnect(fd);
         }
       } else { // CGI
+        std::vector<const FileDescriptor *> reap_cgis;
         for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
                  cgis.begin();
              it != cgis.end(); ++it) {
           Result<Void> res = it->second.handle_event(event);
-          if (!res.has_value())
-            std::cerr << "CGI event handling failure: " << res.error()
-                      << std::endl;
+          if (!res.has_value()) {
+            std::ostringstream oss;
+            if (res.error() == Errors::gateway_timeout) {
+              const Response resp(DefaultError::default_err_response(
+                  Response::GATEWAY_TIMEOUT));
+              oss << resp;
+              if (!resp.keep_alive)
+                clients.at(it->first).dropping = true;
+              clients.at(it->first).out_buff = oss.str();
+              client_write(it->first);
+            } else { // res.error() == Errors::bad_gateway
+              const Response resp(
+                  DefaultError::default_err_response(Response::BAD_GATEWAY));
+              oss << resp;
+              if (!resp.keep_alive)
+                clients.at(it->first).dropping = true;
+              clients.at(it->first).out_buff = oss.str();
+              client_write(it->first);
+            }
+            reap_cgis.push_back(it->first);
+          } else {
+            Result<std::string> output = it->second.poll();
+            if (output.has_value()) {
+              const Result<Response> res_ =
+                  Response::from_cgi_outbuff(output.value());
+              std::ostringstream oss;
+              Response resp;
+              if (res_.has_value())
+                resp = res_.value();
+              else
+                resp =
+                    DefaultError::default_err_response(Response::BAD_GATEWAY);
+              oss << resp;
+              if (!resp.keep_alive)
+                clients.at(it->first).dropping = true;
+              clients.at(it->first).out_buff = oss.str();
+              client_write(it->first);
+              reap_cgis.push_back(it->first);
+            }
+          }
         }
+        for (std::vector<const FileDescriptor *>::iterator it =
+                 reap_cgis.begin();
+             it != reap_cgis.end(); ++it)
+          cgis.erase(*it);
       }
-
-      ++events;
     }
   }
 
   clients.clear();
-  return OK(Void, Void());
+  return OKV;
 }

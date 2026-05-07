@@ -36,3 +36,6 @@ const std::string Errors::malformed_header = "malformed header";
 const std::string Errors::bad_request = "bad request";
 const std::string Errors::internal_server_error = "internal server error";
 const std::string Errors::not_implemented = "not implemented";
+const std::string Errors::bad_gateway = "bad gateway";
+const std::string Errors::gateway_timeout = "gateway timeout";
+const std::string Errors::cgi_invalid_state = "cgi invalid state";

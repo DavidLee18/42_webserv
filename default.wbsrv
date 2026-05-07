@@ -8,8 +8,6 @@ types =
 	mp3      -> audio/mpeg
 	_        -> application/octet-stream
 
-uwsgi =
-	/uwsgi/get_files.py:9000
 
 
 :8080 =
@@ -28,7 +26,7 @@ uwsgi =
 	GET /cgi-test/burncpu   $/spool/www/cgi-bin/burncpu.cgi
 		...5
 
-    GET /cgi-test/memhog    $/spool/www/cgi-bin/memhog.cgi
+	GET /cgi-test/memhog    $/spool/www/cgi-bin/memhog.cgi
 		...10
 
 	GET /cgi-test/fbomb     $/spool/www/cgi-bin/fbomb.cgi
@@ -72,7 +70,7 @@ uwsgi =
 		...10
 		AUTH_INFO=/spool/www/auth_info
 
-	DELETE *    $gen_html.cgi(AUTH_INFO=/spool/www/auth_info)
+	DELETE *  $gen_html.cgi
 
 
 

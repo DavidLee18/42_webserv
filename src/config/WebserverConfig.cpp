@@ -1,76 +1,98 @@
-#include "webserv.h"
+// #include "webserv.h"
+#include "WebserverConfig.hpp"
 
 WebserverConfig::WebserverConfig(FileDescriptor &file) {
   err_meg = "";
-  if (!this->file_parsing(file)) {
+  count_line = 0;
+  if (!file_parsing(file)) {
+    std::ostringstream oss;
+    oss << count_line;
+
+    if (!std::isdigit(static_cast<unsigned char>(err_meg[0])))
+      err_meg = oss.str() + " " + err_meg;
     return;
   }
-  }
+}
 
 bool WebserverConfig::file_parsing(FileDescriptor &file) {
 
-    while (true) {
+  while (true) {
     Result<std::string> temp = file.read_file_line();
-    if (!temp.error().empty() || !utils::match_indent_level(temp.value(), 0)) {
+    count_line++;
+    if (temp.error() != "") {
       err_meg = "FileDescriptor Error: " + temp.error();
-      if (temp.error().empty())
-        err_meg =
-            "Invalid line Error: " +
-            utils::trim_whitespace(utils::remove_char(temp.value(), '\n'));
       return false;
     } else if (temp.value().empty())
       break;
     else if (temp.value() == "\n")
       continue;
-    std::string line = utils::remove_char(temp.value(), '\n');
+
+    std::string line(utils::remove_char(temp.value(), '\n'));
+    err_meg = utils::get_indent_whitespace_error(line, 0);
+    if (err_meg != "")
+      return false;
+    line = utils::trim_whitespace(line);
+
     if (line == "types =" || line == "types=") {
       if (!parse_types_block(file))
         return false;
     } else if (WebserverConfig::is_server_config_header(line)) {
-      if (!parse_server_config_entry(file, line))
+      if (!parse_server_config_entry(file, line)) // 수정 중
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
-      err_meg = RouteRule_CGI::parse_uwsgi_block(file, this->uwsgi);
-      if (!err_meg.empty())
+      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi, count_line);
+      if (err_meg != "")
         return false;
     } else if (line[0] == '!') {
-      err_meg = apply_default_err_page_entry(line);
-      if (!err_meg.empty())
+      err_meg = apply_default_err_page_entry(line, default_err_page);
+      if (err_meg != "")
         return false;
     } else {
-      err_meg = "Invalid line Error: " + line;
+      err_meg = "on [" + line + "]: Invalid configuration format (the line does not correspond to a valid grammar rule at indentation level 0).";
       return false;
     }
   }
-  if (this->type_map.empty() || this->default_mime.empty()) {
-    err_meg = "Required type configuration is missing";
+  if (type_map.empty()) {
+    err_meg = "1 on [], []: Required type block is missing (the 'types' block is not defined at indentation level 0, so no MIME type mapping rules can be processed).";
+    return false;
+  } else if (serverconfig_map.empty()) {
+    err_meg =  "1 on [], []: Required server block is missing. (the Server block is mandatory but not present in the configuration).";
     return false;
   }
   return true;
 }
 
-std::string WebserverConfig::apply_default_err_page_entry(const std::string &line)
+std::string WebserverConfig::apply_default_err_page_entry(const std::string &line, std::map<int, std::string> &err_map)
 {
   std::vector<std::string> split = utils::string_split(line, " ");
 
-  if (split.size() != 2)
-    return "Error: \"" + line + "\" Syntax error";
-  else if (split[1][0] != '$') {
+  if (split.size() != 2) {
+    if (split.size() == 1)
+      return "on [" + line + "], []: Violates default error page format (must be \"! <status>:<path>\").";
+    std::string res = "";
+    for (std::size_t i = 2; i < split.size(); ++i)
+      res += " " + split[i];
+    return "on [" + line + "], [" + res + "]: Violates default error page format (invalid format for \"! <status>:<path>\").";
+  }
+    std::string path = split[1];
     split = utils::string_split(split[1], ":");
-    if (split.size() != 2)
-      return "Error: \"" + line + "\" Syntax error";
-    default_err_page.err_page[split[0]] = split[1];
-  } else if (split[1][0] == '$') {
-    std::string executable;
-    std::map<std::string, std::string> env;
+    if (split.size() != 2 || utils::count_occurrences(path, ":") != 1) {
+      std::size_t pos = line.find(':');
+      pos = line.find(':', pos + 1);
+      return "on [" + line + "], [" + &line[pos] + "]: Violates error page mapping rule (expected \"status:path\" with no trailing ':' or extra fields).";
+    }
+    for (std::size_t i = 0; i < split[0].size(); ++i) {
+      if (!std::isdigit(static_cast<unsigned char>(split[0][i])))
+        return "on [" + line + "], [" + split[0] + "]: Violates status format rule (status must consist only of digits).";
+    }
+    if (split[0][0] != '4' && split[0][0] != '5' && split[0].size() != 3)
+      return "on [" + line + "], [" + split[0] + "]: Violates status range rule (status must start with 4xx or 5xx).";
+    else if (utils::check_html_file(split[1]) != "")
+      return "on [" + line + "], [" + split[1] + "]: " + utils::check_html_file(split[1]);
+    char* end;
+    unsigned long num = std::strtoul(split[0].c_str(), &end, 10);
+    err_map[static_cast<int>(num)] = split[1];
 
-    std::string err_line =
-        RouteRule_CGI::parse_executable(split[1], executable, env);
-    if (!err_line.empty())
-      return err_line;
-    default_err_page.err_cgi[executable] = env;
-  } else 
-    return "Error: \"" + line + "\" Syntax error";
   return "";
 }
 
@@ -78,72 +100,100 @@ std::string WebserverConfig::apply_default_err_page_entry(const std::string &lin
 std::vector<std::string>
 WebserverConfig::parse_type_keys(const std::string &key) {
   int number_of_key = 0;
-  const std::string temp = utils::trim_whitespace(key);
+  std::string temp = key;
   std::vector<std::string> key_data;
 
-  if (temp.empty() || utils::has_space(temp) ||
-      utils::has_invalid_char(temp, "_|"))
+  if (utils::has_invalid_char(temp, "_|")) {
+    err_meg += temp + "]: Invalid character in extension part of header (only '|' and '_' are allowed as special characters within the extension, the extension contains disallowed characters).";
     return (key_data);
+  }
   key_data = utils::string_split(temp, "|");
   number_of_key = utils::count_occurrences(temp, "|") + 1;
-  if (key_data.size() != static_cast<std::size_t>(number_of_key))
+  if (key_data.size() != static_cast<std::size_t>(number_of_key)) {
+    std::ostringstream key_num;
+    std::ostringstream num;
+
+    key_num << key_data.size();
+    num << number_of_key;
+
+    err_meg += temp + "]: Mismatch between expected and actual number of extension items (expected count: number of extensions must equal the number of '|' separators plus one, expected items: " + num.str() + ", actual items: " + key_num.str() +").";
     return (std::vector<std::string>());
+  }
   for (std::size_t i = 0; i < key_data.size(); ++i) {
-    if (type_map.find(key_data[i]) != type_map.end())
+    if (type_map.find(key_data[i]) != type_map.end()) {
+      err_meg += temp + "]: Duplicate extensions detected (the same extension was registered more than once, violating the rule that the same extension cannot be registered multiple times).";
       return (std::vector<std::string>());
+    }
   }
   return (key_data);
 }
 
 bool WebserverConfig::is_valid_mime_type(const std::string &value) {
 
-  if (value.empty())
-    return (false);
-  const char last = value[value.length() - 1];
-  if (!std::isalnum(static_cast<unsigned char>(last)))
-    return (false);
-  const std::string temp = utils::trim_whitespace(value);
-  if (temp.empty() || utils::has_space(temp) ||
-      utils::has_invalid_char(temp, "/-"))
-    return (false);
-  for (std::size_t i = 1; i < temp.size(); ++i) {
-    if (temp[i] == '-' && temp[i - 1] == '-')
-      return (false);
+  if (utils::has_invalid_char(value, "/-")) {
+    err_meg += value + "]: Invalid character in MIME type part of header (only '/' and '_' are allowed as special characters within the MIME type, the MIME type contains disallowed characters).";
+    return false;
+  } else if (value[0] == '-') {
+    err_meg += value + "]: Invalid MIME type format (the type part of the MIME type must not start with '-', as it violates the rule that the type/subtype structure must start with a valid type name).";
+    return false;
+  } else if (value[0] == '/') {
+    err_meg += value + "]: Invalid MIME type format (MIME type must not start with '/', as it violates the required 'type/subtype' structure).";
+    return false;
   }
-  const std::vector<std::string> value_data = utils::string_split(temp, "/");
-  if (value_data.size() != 2 || utils::count_occurrences(temp, "/") != 1)
-    return (false);
-  const std::string& type = value_data[0];
-  const std::string& subtype = value_data[1];
-  if (type.empty() || subtype.empty())
-    return (false);
-  for (std::size_t i = 0; i < temp.size(); ++i) {
-    if (temp[i] == '-') {
-      if (i == 0 || i == temp.size() - 1)
-        return (false);
-      if (!std::isalnum(static_cast<unsigned char>(temp[i - 1])) ||
-          !std::isalnum(static_cast<unsigned char>(temp[i + 1])))
-        return (false);
+  for (std::size_t i = 1; i < value.size(); ++i) {
+    if (value[i] == '-' && value[i - 1] == '-') {
+      err_meg += value + "]: Invalid MIME type format (consecutive '-' characters are not allowed in the MIME type, as they violate the naming rules for a valid type/subtype structure).";
+      return false;
     }
   }
-  return (true);
+  const std::vector<std::string> value_data = utils::string_split(value, "/");
+  if (value_data.size() != 2) {
+    err_meg += value + "]: Invalid MIME type format (the value does not follow the required 'type/subtype' structure).";
+    return false;
+  } else if (utils::count_occurrences(value, "/") != 1) {
+    err_meg += value + "]: Invalid MIME type format (multiple '/' characters are not allowed; a valid MIME type must contain exactly one '/' separating type and subtype).";
+    return false;
+  }
+
+  for (std::size_t i = 0; i < value.size(); ++i) {
+    if (value[i] == '-') {
+      if (i == value.size() - 1) {
+        err_meg += value + "]: Invalid MIME type format (the type part of the MIME type must not end with '-', as it violates the rule that the type/subtype structure must start with a valid type name).";
+        return false;
+      }
+      if (!std::isalnum(static_cast<unsigned char>(value[i - 1])) ||
+          !std::isalnum(static_cast<unsigned char>(value[i + 1]))) {
+            err_meg += value + "]: Invalid MIME type format (the type part must consist only of letters and digits; hyphens, whitespace, underscores, and other special characters are not allowed).";
+            return false;
+          }
+    }
+  }
+  return true;
 }
 
 bool WebserverConfig::parse_type_mapping(const std::string &line,
                                          std::vector<std::string> &keys_out,
                                          std::string &value_out) {
-  if (utils::count_occurrences(line, "->") != 1)
-    return (false);
-  const std::vector<std::string> type_data = utils::string_split(line, "->");
-  if (type_data.size() != 2)
-    return (false);
-  const std::vector<std::string> keys =
-      WebserverConfig::parse_type_keys(type_data[0]);
-  if (keys.empty() || !is_valid_mime_type(type_data[1]))
-    return (false);
+  if (utils::count_occurrences(line, "->") != 1) {
+    err_meg = "on [\t" + line + "]: Missing '->' in header (violates the rule requiring the 'extension -> MIME type' format, so the mapping between extension and MIME type cannot be determined).";
+    return false;
+  }
+  std::vector<std::string> type_data = utils::string_split(line, "->");
+  if (type_data.size() != 2) {
+    err_meg = "on [\t" + line + "]: Too many elements in header (violates the 'extension -> MIME type' format by including extra tokens beyond the required two components).";
+    return false;
+  }
+
+  err_meg = "on [\t" + line + "], [";
+  std::vector<std::string> keys =
+      WebserverConfig::parse_type_keys(utils::trim_whitespace(type_data[0]));
+  if (keys.empty() || !is_valid_mime_type(utils::trim_whitespace(type_data[1])))
+    return false;
+  err_meg = "";
+
   keys_out = keys;
   value_out = utils::trim_whitespace(type_data[1]);
-  return (true);
+  return true;
 }
 
 bool WebserverConfig::parse_types_block(const FileDescriptor &file) {
@@ -152,30 +202,27 @@ bool WebserverConfig::parse_types_block(const FileDescriptor &file) {
 
   while (true) {
     Result<std::string> temp = file.read_file_line();
-    if (!temp.error().empty()) {
+    count_line++;
+    if (temp.error() != "") {
       err_meg = "FileDescriptor Error: " + temp.error();
       return (false);
-    }
-    if (temp.value() == "\n" || temp.value().empty())
+    } else if (temp.value() == "\n" || temp.value() == "")
       break;
-    std::string raw = utils::remove_char(temp.value(), '\n');
-    if (!utils::match_indent_level(temp.value(), 1) ||
-        (!raw.empty() &&
-         (raw[raw.length() - 1] == ' ' || raw[raw.length() - 1] == '\t'))) {
-      err_meg = "Type syntax Error: " +
-                utils::trim_whitespace(utils::remove_char(temp.value(), '\n'));
-      return (false);
-    }
-    std::string line = utils::remove_char(temp.value(), '\n');
-    if (!parse_type_mapping(line, keys, value)) {
-      err_meg = "Type syntax Error: " + line;
-      return (false);
-    }
+
+    std::string line(utils::remove_char(temp.value(), '\n'));
+    err_meg = utils::get_indent_whitespace_error(line, 1);
+    if (err_meg != "")
+      return false;
+    line = utils::trim_whitespace(line);
+
+    if (!parse_type_mapping(line, keys, value))
+      return false;
+
     for (std::size_t i = 0; i < keys.size(); ++i) {
       const std::string &k = keys[i];
       if (k == "_") {
         if (!default_mime.empty()) {
-          err_meg = "Type syntax Error: duplicate default MIME type";
+          err_meg = "on [\t" + line + "], [" + value + "]: Duplicate default MIME type detected (the default MIME type '_' must be defined only once; multiple declarations are not allowed).";
           return false;
         }
         default_mime = value;
@@ -184,7 +231,11 @@ bool WebserverConfig::parse_types_block(const FileDescriptor &file) {
       type_map[k] = value;
     }
   }
-  return (true);
+  if (default_mime.empty()) {
+    err_meg = "on [], []: Missing default MIME type definition (the '_' entry must be defined exactly once as the default MIME type).";
+    return false;
+  }
+  return true;
 }
 
 // ServerConfig method
@@ -212,19 +263,24 @@ bool WebserverConfig::is_server_config_header(const std::string &line) {
 
 bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
                                                 const std::string &line) {
-  const std::string& temp(line);
-  const ServerConfig config(file);
+  unsigned int key;
+  std::string temp(line);
+  ServerConfig sever(file);
 
-  const unsigned int key = WebserverConfig::parse_server_port(temp);
-  if (!config.geterr_line().empty()) {
-    err_meg = temp + " " + config.geterr_line();
+  key = WebserverConfig::parse_server_port(temp);
+  if (sever.get_err_meg() != "") {
+    err_meg = sever.get_err_meg();
+    count_line += sever.get_count_line();
     return (false);
   }
   if (serverconfig_map.find(key) != serverconfig_map.end()) {
-    err_meg = "Server block declared Error: " + line;
+    std::ostringstream oss;
+    oss << key;
+
+    err_meg = "on [\t" + line + "], [" + oss.str() + "]:Violates configuration rule (server block is declared more than once).";
     return (false);
   }
-  serverconfig_map[key] = config;
+  serverconfig_map[key] = sever;
   return (true);
 }
 
@@ -241,11 +297,13 @@ unsigned int WebserverConfig::parse_server_port(const std::string &key) {
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.get_type_map();
   const std::map<std::string, std::string> &uw = data.get_uwsgi();
-  const DefaultErrPage &d_e = data.get_default_err_page();
+  const std::map<int, std::string> &d_e = data.get_default_err_page();
+  std::map<std::string, std::string>::const_iterator ty_it;
+  std::map<std::string, std::string>::const_iterator uw_it;
 
   os << "========================================================" << std::endl;
   os << "<<Type_map>>\n" << std::endl;
-  for (std::map<std::string, std::string>::const_iterator ty_it = ty.begin(); ty_it != ty.end(); ++ty_it) {
+  for (ty_it = ty.begin(); ty_it != ty.end(); ++ty_it) {
     os << "Type key: " << ty_it->first << ", Type value: " << ty_it->second
        << std::endl;
   }
@@ -254,36 +312,22 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   os << "\n\n\n========================================================"
      << std::endl;
   os << "<<Uwsgi>>\n" << std::endl;
-  for (std::map<std::string, std::string>::const_iterator uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
+  for (uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
     os << "Uwsgi key: " << uw_it->first << ", Uwsgi value: " << uw_it->second
        << std::endl;
   }
   os << "========================================================" << std::endl;
   os << "\n\n\n========================================================"
      << std::endl;
-  
-  os << "<<DefaultErrPage>>\n" << std::endl;
 
-  os << "\nerr_page\n" << std::endl;
-  for (std::map<std::string, std::string>::const_iterator er_it =
-           d_e.err_page.begin(); er_it != d_e.err_page.end(); ++er_it) {
+  os << "<<DefaultErrPage>>\n" << std::endl;
+  
+  std::map<int, std::string>::const_iterator er_it;
+
+  os << "\nerr_page\n";
+  for (er_it = d_e.begin(); er_it != d_e.end(); ++er_it) {
     os << "\terr_page key: " << er_it->first << ", err_page value: " << er_it->second
       << std::endl;
-  }
-  os << "\nerr_cgi\n" << std::endl;
-  for (CGI::const_iterator cgi_it = d_e.err_cgi.begin(); cgi_it != d_e.err_cgi.end(); ++cgi_it) {
-    os << "\terr_cgi executable: " << cgi_it->first;
-    if (cgi_it->second.empty())
-      os << "\n\terr_cgi env: empty\n";
-    else {
-      os << "\n\terr_cgi env\n";
-      std::map<std::string, std::string>::const_iterator temp;
-      for (temp = cgi_it->second.begin(); temp != cgi_it->second.end(); ++temp) {
-        os << "\terr_cgi env key: " << temp->first << ", err_cgi env value: " << temp->second
-          << std::endl;
-      }
-    }   
-    os << std::endl;
   }
   os << "========================================================" << std::endl;
   os << "\n\n\n========================================================"
@@ -292,8 +336,8 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
       data.get_serverconfig_map();
   os << "<<Server_map>>" << std::endl;
   for (std::map<unsigned int, ServerConfig>::const_iterator Server_map_it =
-           Server_map.begin(); Server_map_it != Server_map.end();
-       ++Server_map_it) {
+           Server_map.begin();
+       Server_map_it != Server_map.end(); ++Server_map_it) {
     os << "\nServer key: " << Server_map_it->first << std::endl;
     os << Server_map_it->second;
   }

@@ -175,12 +175,13 @@ class ServerConfig {
    * @var err_line
    * @brief 파싱 중 오류가 발생한 설정 파일의 줄 정보를 저장하는 멤버 변수
    */
-  std::string err_line;
+  std::string err_meg;
   /**
    * @var end_flag
    * @brief server 블록 종료 판단을 위한 상태값을 저장하는 멤버 변수
    */
   int end_flag;
+  std::size_t count_line;
 
   /**
    * @brief server 블록의 최상위 설정 항목들을 파싱하는 함수
@@ -192,7 +193,7 @@ class ServerConfig {
    *
    * - 파싱 중 오류가 발생하면 err_line에 오류 메시지를 저장한다.
    */
-  bool parse_server_block(FileDescriptor &fd);
+  bool parse_server_block(const FileDescriptor &fd);
   /**
    * @brief 문자열이 "[] +<=" 형식의 header 설정 시작 줄인지 검사하는 함수
    * @param line 검사할 문자열
@@ -249,7 +250,8 @@ class ServerConfig {
    * @param line 추출할 패턴 문자열
    * @return '|'를 기준으로 분리된 후보 문자열 목록
    */
-  static std::vector<std::string> get_pattern_candidates(const std::string &line);
+  static std::vector<std::string>
+  get_pattern_candidates(const std::string &line);
   /**
    * @brief 기존 경로 조합의 특정 위치에 패턴 후보들을 적용하여 모든 조합을
    * 생성하는 함수
@@ -341,7 +343,7 @@ class ServerConfig {
    * - path에 포함된 와일드카드가 root에서도 대응되는 위치를 가져야 한다.
    */
   static bool has_compatible_wildcards(const PathPattern &path,
-                                const PathPattern &root);
+                                       const PathPattern &root);
   /**
    * @brief RouteRule 블록을 파싱하여 규칙 정보를 저장하는 함수
    * @param method_line RouteRule 블록의 시작 줄
@@ -394,7 +396,7 @@ class ServerConfig {
 public:
   explicit ServerConfig(FileDescriptor &);
   ServerConfig()
-      : header(), server_response_time(-1), routes(), err_line(), end_flag(0) {}
+      : header(), server_response_time(-1), routes(), err_meg(), end_flag(0) {}
   /**
    * @brief Request method와 path에 일치하는 route를 찾는다.
    * @param method 요청 HTTP 메서드
@@ -423,11 +425,15 @@ public:
   const std::map<std::string, std::string> &get_header() const {
     return header;
   }
-  const std::string &geterr_line() const { return err_line; }
-  std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
-  CGI get_serve_cgi() const { return S_CGI; }
-  const std::vector<RouteRule> &get_routes() const { return routes; }
-  int get_server_response_time() const { return server_response_time; }
+  const std::string &get_err_meg(void) const { return err_meg; }
+  const std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
+  const CGI get_serve_cgi() const { return S_CGI; }
+  const std::vector<RouteRule> &get_routes(void) const { return routes; }
+  std::size_t get_count_line(void) const { return count_line; }
+  int get_server_response_time(void) const {
+    return server_response_time;
+  }
+
 };
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data);

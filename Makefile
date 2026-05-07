@@ -17,7 +17,7 @@ UWSGI_DEPS     := $(addprefix $(UWSGI_BUILD_DIR)/, $(UWSGI_SRC_FILES:.cpp=.d))
 
 
 SRC_FILES	:= errors.cpp epoll_kqueue.cpp file_descriptor.cpp \
-	ParsingUtils.cpp json.cpp cgi_1_1.cpp uwsgi.cpp uwsgi_client.cpp \
+	utils.cpp json.cpp cgi_1_1.cpp uwsgi.cpp uwsgi_client.cpp \
 	main.cpp
 SERVER		:= Server.cpp Client.cpp Response.cpp DefaultError.cpp Session.cpp
 CONFIG		:= WebserverConfig.cpp ServerConfig.cpp RouteRule_CGI.cpp PathPattern.cpp
@@ -38,9 +38,18 @@ all: $(NAME) uwsgi cgi
 integration-test: all
 	bash tests/integration/cgi_uwsgi_full_suite.sh
 
+test-cgi: $(NAME) cgi
+	@echo "── CGI framing parser unit tests ──────────────────────────────"
+	@cd tests && PROJECT_ROOT=$(CURDIR) zsh ./webserv_cgi_framing_tests.zsh
+	@echo ""
+	@echo "── CGI sandboxing integration tests ───────────────────────────"
+	@echo "NOTE: start ./$(NAME) <config> in another terminal first."
+	@cd tests && zsh ./webserv_cgi_tests.zsh
+
 cgi: $(CGI_NAME)
 
 $(CGI_NAME): $(CGI_SRC)
+	mkdir -p spool/www/cgi-bin/
 	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(CGI_NAME) $(CGI_SRC)
 
 $(NAME): $(OBJS)
@@ -53,10 +62,9 @@ $(BUILD_DIR)/%.o: %.cpp
 clean:
 	rm -rf $(BUILD_DIR)
 
-fclean:	clean
+fclean:	clean cgiclean
 	rm -f $(NAME)
 	rm -f $(UWSGI_NAME)
-	rm -f $(CGI_NAME)
 
 re:	fclean all
 
@@ -78,4 +86,4 @@ cgiclean:
 -include $(DEPS)
 -include $(UWSGI_DEPS)
 
-.PHONY: all clean fclean re bonus rebo uwsgi cgi integration-test compile-commands
+.PHONY: all clean fclean re bonus rebo uwsgi cgi integration-test test-cgi compile-commands

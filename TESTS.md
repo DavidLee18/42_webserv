@@ -12,14 +12,15 @@ Probabilities are evaluator-probing estimates, not RFC-strictness levels.
 
 ## Status snapshot
 
-| Area | State |
-|---|---|
-| Request-parsing hardening | **38/38** on `webserv_parsing_tests.zsh`. |
-| Mid-request disconnect (5.3) | **13/13** on `webserv_disconnect_tests.zsh`. fd-stable across 470 adversarial iterations. |
-| Standard HTTP security headers | Not started. |
-| CGI sandboxing | Not started. |
-| Content integrity (ETag / Last-Modified / Repr-Digest) | Not started. |
-| Resilience under adversarial load | Not started. |
+| Area                                                   | State                                                                                                     |
+|--------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| Request-parsing hardening                              | **38/38** on `webserv_parsing_tests.zsh`.                                                                 |
+| Mid-request disconnect (5.3)                           | **13/13** on `webserv_disconnect_tests.zsh`. fd-stable across 470 adversarial iterations.                 |
+| Standard HTTP security headers                         | **12/14** on `webserv_headers_tests.zsh` (H13 skipped pending `CGI_TEST_URL`; H6/H7 pending HEAD method). |
+| CGI/HTTP framing (B4)                                  | **12/12** on `webserv_cgi_framing_tests.zsh`. Wired into drain hook.                                      |
+| CGI sandboxing                                         | Subject conformance complete (B1–B6, D2–D4). Stress probes not yet run.                                   |
+| Content integrity (ETag / Last-Modified / Repr-Digest) | Not started.                                                                                              |
+| Resilience under adversarial load                      | Not started.                                                                                              |
 
 ---
 
@@ -43,7 +44,10 @@ This is where real web servers get killed. Already largely covered by
 
 ### 1.2 Outstanding
 - [x] **B9 — non-hex chunk size in `Transfer-Encoding: chunked`** &nbsp; Harness `expect` relaxed to `^(400|501)$` per RFC 9112 §6.1; server returns 501 (chunked decoding unimplemented). Score: **38/38**.
-- [ ] **Optional follow-on** — implement chunked decoding properly. Worth it if the evaluator probes file uploads with `Transfer-Encoding: chunked` (~50% probability). curl with stdin streaming does this.
+- [ ] **B7 — chunked decoding before CGI hand-off** &nbsp; Subject mandates: "for chunked requests, your server needs to
+  un-chunk them, the CGI will expect EOF as the end of the body." Decode `Transfer-Encoding: chunked` request bodies in
+  `Request::from_buff` so `Request::get_body()` returns the decoded byte stream. Evaluator probability ~70% (curl `-T`
+  with stdin uses chunked).
 
 ### 1.3 Follow-on probes worth running once
 - [ ] CRLF injection in path: `GET /foo%0d%0aSet-Cookie:%20evil HTTP/1.1` — must not echo decoded CRLF into response headers.
@@ -59,10 +63,10 @@ This is where real web servers get killed. Already largely covered by
 Costs ~5 lines of config (or constants), universally beneficial. Add to every
 non-CGI response.
 
-- [ ] `X-Content-Type-Options: nosniff` — disables MIME sniffing.
-- [ ] `X-Frame-Options: DENY` — clickjacking baseline.
-- [ ] `Referrer-Policy: no-referrer` — privacy default.
-- [ ] `Content-Security-Policy: default-src 'self'` — minimal viable CSP.
+- [x] `X-Content-Type-Options: nosniff` — disables MIME sniffing. (H1)
+- [x] `X-Frame-Options: DENY` — clickjacking baseline. (H2)
+- [x] `Referrer-Policy: no-referrer` — privacy default. (H3)
+- [x] `Content-Security-Policy: default-src 'self'` — minimal viable CSP. (H4)
 - [ ] `Strict-Transport-Security` — **omit** (no TLS context here).
 
 ### Acceptance test
@@ -72,15 +76,46 @@ curl -sI http://127.0.0.1:8080/ | grep -E '^(X-Content-Type-Options|X-Frame-Opti
 Expected: all four headers present.
 
 ### Edge cases to verify
-- [ ] CGI responses: do **not** double-emit if the CGI script already sets one.
-- [ ] Error responses (4xx/5xx) carry the headers too.
-- [ ] HEAD requests: headers identical to GET.
 
+- [ ] CGI responses: do **not** double-emit if the CGI script already sets one. (H13 — skipped pending `CGI_TEST_URL`)
+- [x] Error responses (4xx/5xx) carry the headers too. (H5)
+- [ ] HEAD requests: headers identical to GET. (H6 — **next stop**)
+
+### Header hygiene (additional harness coverage)
+
+- [x] H7 HEAD body empty; CL matches GET — passes tautologically (both unset); tightens once H10 fixed.
+- [x] H8 no header duplicated on root response.
+- [x] H9 Content-Type set on 2xx and 4xx.
+- [x] H10 Content-Length matches actual body length.
+- [x] H11 Date header present and RFC 7231 IMF-fixdate parseable.
+- [x] H12 Server header present (informational).
+- [x] H14 no response-splitting / header injection.
+
+### Mid-test diagnoses
+
+H11/H12, content-length, and H5 — all resolved as part of the B4 framing work
+(Date/Server emission, body.length() in operator<<, NOT_FOUND on missing path).
+
+H6/H7 (HEAD method) remain. Two-part fix: (a) accept HEAD in route parsing as
+a synonym of GET; (b) dispatch HEAD through the GET branch, clear body before
+write whilst preserving GET-equivalent Content-Length. ~30 min.
+ 
 ---
 
 ## 3. CGI sandboxing &nbsp; *(highest single-class crash risk in webserv)*
 
 42 webserv projects most commonly fail or get marked down here.
+
+## 3.0 CGI/HTTP framing &nbsp; *(B4)*
+
+- [x] Parse CGI output: locate `\r\n\r\n` or `\n\n` boundary (first occurrence).
+- [x] Synthesise `HTTP/1.1 NNN reason\r\n` from optional `Status:` header (default 200).
+- [x] Trust CGI-supplied `Content-Length`; compute from body length otherwise.
+- [x] Forward `Set-Cookie`, `Location`, custom `X-*` headers verbatim.
+- [x] Reject malformed CGI output (no boundary, bad header name/value, dup name) → 502.
+- [x] Validate header names against tchar grammar; values against VCHAR + SP/HTAB.
+- [x] CRLF wire format on all output lines.
+- [x] Unit-tested via `tests/webserv_cgi_framing_tests.zsh` (12/12 cases).
 
 ### 3.1 Process limits
 - [ ] **Wall-clock timeout** on the child (e.g. 5–10 s). `alarm()` in child, or `kill()` from parent on poll timeout.
@@ -182,11 +217,13 @@ The single most-graded category. ~90% of crash marks live here.
 ---
 
 ## 6. Recommended execution order
-1. **Section 5.3** — mid-request disconnect tests. ~1 hour. Highest crash risk per minute spent.
-2. **Section 3.1, 3.2** — CGI timeouts and env scrubbing. ~half a day. Common evaluator probe.
-3. **Section 2** — security headers. ~1 hour. Cheap signal.
-4. **Section 4.1, 4.2** — ETag and Last-Modified. ~half a day. Conditional GET works in browsers/curl.
-5. **Section 5.1, 5.2** — slowloris and resource exhaustion. ~1 day. Hardens the "must not crash" line.
-6. **Chunked decoding** if time permits — proper `Transfer-Encoding: chunked` body parser. ~half a day.
 
-Items 1–5 are roughly the realistic scope before submission.
+1. ~~**Section 5.3** — mid-request disconnect tests.~~ Done (13/13).
+2. ~~**Section 3** — CGI sandboxing & B4 framing.~~ Done (subject conformance; 12/12 on framing harness).
+3. ~~**Section 2** — security headers.~~ Done bar HEAD (H6/H7).
+4. **HEAD method** — closes H6/H7. ~30 min. **Next stop.**
+5. **Chunked decoding (B7)** — subject-mandated for chunked CGI POSTs. ~half a day. ~70% evaluator probe.
+6. **Section 4.1, 4.2** — ETag and Last-Modified. ~half a day. Conditional GET works in browsers/curl.
+7. **Section 5.1, 5.2** — slowloris and resource exhaustion. ~1 day. Hardens the "must not crash" line.
+
+Items 4–5 are submission-blocking; 6–7 are defence-strengthening.

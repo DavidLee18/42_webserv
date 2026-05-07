@@ -8,11 +8,11 @@
  */
 #include "../result.h"
 #include <cctype>
+#include <cstdlib>
 #include <ctime>
 #include <iostream>
 #include <map>
 #include <sstream>
-#include <stdlib.h>
 #include <string>
 
 /**
@@ -43,12 +43,15 @@ struct ClientSession {
   std::string cookie;
   std::string ip;
   Request *req;
-  time_t last_activity_time; ///< Timestamp of last activity for timeout tracking.
+  timespec
+      last_activity_time; ///< Timestamp of last activity for timeout tracking.
+  bool dropping;
 
   /**
    * @brief Default constructor. Initializes config to NULL.
    */
-  ClientSession() : config(NULL), req(NULL), last_activity_time(0) {}
+  ClientSession()
+      : config(NULL), req(NULL), last_activity_time(), dropping(false) {}
 };
 
 /**
@@ -124,7 +127,7 @@ public:
   /**
    * @brief Sets client's cookie.
    */
-  void set_cookie(const std::string& value) { cookie = value; }
+  void set_cookie(const std::string &value) { cookie = value; }
 
   /**
    * @brief Gets the parsed HTTP headers.
@@ -155,18 +158,25 @@ private:
   std::string path;    ///< The requested path (e.g., "/").
   std::string version; ///< The HTTP version (e.g., "HTTP/1.1").
   std::map<std::string, std::string> header; ///< Parsed HTTP headers.
-  bool keep_alive;                           ///< Connection keep-alive status (HTTP/1.1 default: true).
+  bool keep_alive; ///< Connection keep-alive status (HTTP/1.1 default: true).
   size_t content_length;
   std::string cookie;
   std::string body;     ///< The request body, if any.
   std::string remnants; ///< remaining string to parse.
+  bool decode_chunked;
 
   Request()
       : method(ERROR), path(), version(), header(), keep_alive(true),
-        content_length(0), cookie(), body(), remnants() {}
-  Request(const Method method, std::string const &path, std::string const &version, const size_t content_length)
+        content_length(0), cookie(), body(), remnants(), decode_chunked(false) {
+  }
+  Request(const Method method, std::string const &path,
+          std::string const &version, const size_t content_length)
       : method(method), path(path), version(version), keep_alive(true),
-        content_length(content_length) {}
+        content_length(content_length), decode_chunked(false) {}
+  Request(const Method method, std::string const &path,
+          std::string const &version)
+      : method(method), path(path), version(version), keep_alive(true),
+        content_length(0), decode_chunked(true) {}
 };
 
 #endif
