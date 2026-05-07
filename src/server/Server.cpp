@@ -156,13 +156,19 @@ void Server::client_read(const FileDescriptor *client_fd) {
         return;
       }
 
+      Result<size_t> content_length =
+          clients.at(client_fd).req->get_content_length();
+
       // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
       std::cout << "\nclient ip: " << clients.at(client_fd).ip << std::endl;
       std::cout << "[Request] "
                 << clients.at(client_fd).req->get_method_string() << " "
-                << clients.at(client_fd).req->get_path()
-                << " (Body: " << clients.at(client_fd).req->get_content_length()
-                << " bytes)" << std::endl;
+                << clients.at(client_fd).req->get_path() << " (Body: ";
+      if (content_length.has_value())
+        std::cout << content_length.value();
+      else
+        std::cout << "(non-existent)";
+      std::cout << " bytes)" << std::endl;
 
       RouteRule_CGI const *cgi_path =
           clients.at(client_fd).config->find_route_cgi(
@@ -214,13 +220,19 @@ void Server::client_read(const FileDescriptor *client_fd) {
       if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
         return;
 
+      const Result<size_t> content_length =
+          clients.at(client_fd).req->get_content_length();
+
       // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
       std::cout << "\nclient ip: " << clients.at(client_fd).ip << std::endl;
       std::cout << "[Request] "
                 << clients.at(client_fd).req->get_method_string() << " "
-                << clients.at(client_fd).req->get_path()
-                << " (Body: " << clients.at(client_fd).req->get_content_length()
-                << " bytes)" << std::endl;
+                << clients.at(client_fd).req->get_path() << " (Body: ";
+      if (content_length.has_value())
+        std::cout << content_length.value();
+      else
+        std::cout << "(non-existent)";
+      std::cout << " bytes)" << std::endl;
 
       RouteRule_CGI const *cgi_path =
           clients.at(client_fd).config->find_route_cgi(

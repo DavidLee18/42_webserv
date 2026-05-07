@@ -202,10 +202,10 @@ Result<Request *> Request::from_buff(std::string &buff) {
     req->keep_alive = false;
 
   req->cookie = get_string_from_map(req->header, "Cookie");
-  if (!decode_chunked) {
-    // check body if body not full break to get more event
-    const size_t total_request_len =
-        header_end + std::strlen("\r\n\r\n") + req->content_length;
+  if (req->decode_chunk_state == NOT_CHUNKED) {
+    // check body; if body is not full, break to get more event
+    const size_t total_request_len = header_end + std::strlen("\r\n\r\n") +
+                                     static_cast<size_t>(req->content_length);
     if (buff.length() < total_request_len) {
       req->remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
       buff.erase(0, total_request_len);
@@ -219,7 +219,8 @@ Result<Request *> Request::from_buff(std::string &buff) {
     }
     req->body = buff.substr(static_cast<size_t>(pos));
 
-    if (req->body.empty() || req->body.size() == req->content_length)
+    if (req->body.empty() ||
+        req->body.size() == static_cast<size_t>(req->content_length))
       req->remnants = "";
     buff.erase(0, total_request_len);
     return OK(Request *, req);
@@ -230,26 +231,107 @@ Result<Request *> Request::from_buff(std::string &buff) {
       return ERR(Request *, "streampos error");
     }
     req->remnants = buff.substr(static_cast<size_t>(body_start));
-    if (req->remnants.find("0\r\n\r\n") != std::string::npos) {
-      // TODO: decode chunked
+    const size_t chunk_end = req->remnants.find("0\r\n\r\n");
+    if (chunk_end != std::string::npos) {
+      if (!req->unchunk(chunk_end).has_value())
+        return ERR(Request *, Errors::bad_request);
     }
     return OK(Request *, req);
   }
 }
 
-void Request::continue_parsing(std::string &buff) {
+Result<Void> Request::continue_parsing(std::string &buff) {
   if (remnants.empty())
-    return;
-  else if (remnants.length() < content_length) {
-    if (remnants.length() + buff.length() >= content_length) {
-      const size_t diff = content_length - remnants.length();
+    return OKV;
+  else if (decode_chunk_state == NOT_CHUNKED &&
+           remnants.length() < static_cast<size_t>(content_length)) {
+    if (remnants.length() + buff.length() >=
+        static_cast<size_t>(content_length)) {
+      const size_t diff =
+          static_cast<size_t>(content_length) - remnants.length();
       remnants += buff.substr(0, diff);
       buff.erase(0, diff);
       body = remnants;
       remnants.clear();
+      return OKV;
     } else {
       remnants += buff;
       buff.clear();
+      return OKV;
     }
+  } else if (decode_chunk_state != NOT_CHUNKED && decode_chunk_state != DONE) {
+    remnants += buff;
+    const size_t chunk_end = remnants.find("0\r\n\r\n");
+    if (chunk_end != std::string::npos && !unchunk(chunk_end).has_value()) {
+      return ERR(Void, Errors::bad_request);
+    }
+    return OKV;
   }
+  return ERR(Void, Errors::bad_request);
+}
+
+bool Request::is_partial() const {
+  return (decode_chunk_state == NOT_CHUNKED && remnants.empty()) ||
+         decode_chunk_state != DONE;
+}
+
+Result<Void> Request::unchunk(size_t remnant_end) {
+  if (remnant_end >= remnants.length())
+    return ERR(Void, Errors::bad_request);
+  std::string rems(remnants.substr(0, remnant_end + 1));
+  size_t line_end = 0;
+  if (rems.empty())
+    return ERR(Void, Errors::bad_request);
+  std::string size_or_data;
+  size_t chunk_size = 0;
+  size_t size_line_semicolon_pos = 0;
+  while (!rems.empty()) {
+    line_end = rems.find("\r\n");
+    if (line_end == std::string::npos)
+      return ERR(Void, Errors::bad_request);
+    size_or_data = rems.substr(0, line_end);
+    rems = rems.substr(line_end + 1);
+    size_line_semicolon_pos = size_or_data.find(';');
+    if (size_line_semicolon_pos != std::string::npos)
+      size_or_data = size_or_data.substr(0, size_line_semicolon_pos);
+    for (std::string::const_iterator it = size_or_data.begin();
+         it != size_or_data.end(); ++it) {
+      chunk_size *= 16;
+      if (*it >= '0' && *it <= '9')
+        chunk_size += static_cast<size_t>(*it - '0');
+      else if (*it >= 'A' && *it <= 'F')
+        chunk_size += static_cast<size_t>(*it - 'A');
+      else if (*it >= 'a' && *it <= 'f')
+        chunk_size += static_cast<size_t>(*it - 'a');
+      else
+        return ERR(Void, Errors::bad_request);
+    }
+    if (chunk_size == 0) {
+      line_end = rems.find("\r\n");
+      if (line_end != std::string::npos)
+        return ERR(Void, Errors::bad_request);
+      rems = rems.substr(line_end + 1);
+      if (!rems.empty())
+        return ERR(Void, Errors::bad_request);
+      else {
+        content_length = static_cast<ssize_t>(body.length());
+        return OKV;
+      }
+    } else if (chunk_size > 10 * 1024 * 1024)
+      return ERR(Void, Errors::bad_request);
+    body += rems.substr(0, chunk_size);
+    line_end = rems.find("\r\n", line_end + chunk_size);
+    if (line_end == std::string::npos)
+      return ERR(Void, Errors::bad_request);
+    rems = rems.substr(line_end + 1);
+  }
+  // 0\r\n\r\n not found yet remnant string empty
+  return ERR(Void, Errors::bad_request);
+}
+
+Result<size_t> Request::get_content_length() const {
+  if (content_length < 0)
+    return ERR(size_t, Errors::access_denied);
+  else
+    return OK(size_t, static_cast<size_t>(content_length));
 }
