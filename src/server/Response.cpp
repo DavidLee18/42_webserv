@@ -184,6 +184,7 @@ Response ServerResponse::http_response(
       if (session_id.empty()) {
         response.body =
             "{\"logged_in\":false,\"message\":\"No active session\"}";
+        response.content_length = response.body.length();
         return response;
       } else {
         std::string user_id;
@@ -203,6 +204,7 @@ Response ServerResponse::http_response(
           response.body =
               "{\"logged_in\":false,\"message\":\"Session expired\"}";
         }
+        response.content_length = response.body.length();
       }
       return response;
     } else {
