@@ -44,6 +44,26 @@ print -- "(VERBOSE=1 to dump raw responses on failure)"
 print -- ""
 
 # -----------------------------------------------------------------------------
+# Auto-deploy the echo CGI script if ECHO_CGI_URL is set.
+# Adjust ECHO_CGI_PATH to match your server's CGI document root.
+# -----------------------------------------------------------------------------
+ECHO_CGI_PATH=${ECHO_CGI_PATH:-./spool/www/cgi-bin/echo.cgi}
+
+if [[ -n $ECHO_CGI_URL ]]; then
+  mkdir -p "${ECHO_CGI_PATH:h}"
+  cat > "$ECHO_CGI_PATH" <<'CGI'
+#!/usr/bin/env python3
+import sys
+sys.stdout.write("Content-Type: application/octet-stream\r\n\r\n")
+sys.stdout.flush()
+sys.stdout.buffer.write(sys.stdin.buffer.read())
+CGI
+  chmod +x "$ECHO_CGI_PATH"
+  print -- "deployed: $ECHO_CGI_PATH"
+  print -- ""
+fi
+
+# -----------------------------------------------------------------------------
 # Send a raw chunked POST and capture the response.
 #   $1 path
 #   $2 raw body (already chunk-framed by the caller; literal \r\n bytes)

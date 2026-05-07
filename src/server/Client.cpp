@@ -278,7 +278,7 @@ bool Request::is_partial() const {
 Result<Void> Request::unchunk(size_t remnant_end) {
   if (remnant_end >= remnants.length())
     return ERR(Void, Errors::bad_request);
-  std::string rems(remnants.substr(0, remnant_end + 1));
+  std::string rems(remnants.substr(0, remnant_end + std::strlen("0\r\n\r\n")));
   size_t line_end = 0;
   if (rems.empty())
     return ERR(Void, Errors::bad_request);
@@ -290,7 +290,8 @@ Result<Void> Request::unchunk(size_t remnant_end) {
     if (line_end == std::string::npos)
       return ERR(Void, Errors::bad_request);
     size_or_data = rems.substr(0, line_end);
-    rems = rems.substr(line_end + 1);
+    rems = rems.substr(line_end + std::strlen("\r\n"));
+    chunk_size = 0;
     size_line_semicolon_pos = size_or_data.find(';');
     if (size_line_semicolon_pos != std::string::npos)
       size_or_data = size_or_data.substr(0, size_line_semicolon_pos);
@@ -300,30 +301,29 @@ Result<Void> Request::unchunk(size_t remnant_end) {
       if (*it >= '0' && *it <= '9')
         chunk_size += static_cast<size_t>(*it - '0');
       else if (*it >= 'A' && *it <= 'F')
-        chunk_size += static_cast<size_t>(*it - 'A');
+        chunk_size += static_cast<size_t>(*it - 'A') + 10;
       else if (*it >= 'a' && *it <= 'f')
-        chunk_size += static_cast<size_t>(*it - 'a');
+        chunk_size += static_cast<size_t>(*it - 'a') + 10;
       else
         return ERR(Void, Errors::bad_request);
     }
     if (chunk_size == 0) {
       line_end = rems.find("\r\n");
-      if (line_end != std::string::npos)
+      if (line_end == std::string::npos)
         return ERR(Void, Errors::bad_request);
-      rems = rems.substr(line_end + 1);
+      rems = rems.substr(line_end + std::strlen("\r\n"));
       if (!rems.empty())
         return ERR(Void, Errors::bad_request);
       else {
         content_length = static_cast<ssize_t>(body.length());
         return OKV;
       }
-    } else if (chunk_size > 10 * 1024 * 1024)
+    } else if (chunk_size > 10 * 1024 * 1024 || chunk_size > rems.length())
       return ERR(Void, Errors::bad_request);
     body += rems.substr(0, chunk_size);
-    line_end = rems.find("\r\n", line_end + chunk_size);
-    if (line_end == std::string::npos)
+    if (rems.substr(chunk_size, 2) != "\r\n")
       return ERR(Void, Errors::bad_request);
-    rems = rems.substr(line_end + 1);
+    rems = rems.substr(chunk_size + std::strlen("\r\n"));
   }
   // 0\r\n\r\n not found yet remnant string empty
   return ERR(Void, Errors::bad_request);
