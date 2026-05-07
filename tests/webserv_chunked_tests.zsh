@@ -228,12 +228,12 @@ status_test "B4 chunk with extension → 2xx" \
 
 # B5: uppercase hex
 status_test "B5 uppercase hex size → 2xx" \
-  $'1A\r\nThis is twenty-six bytes.\r\n0\r\n\r\n' \
+  $'19\r\nThis is twenty-five bytes\r\n0\r\n\r\n' \
   '^[23][0-9][0-9]$'
 
 # B6: chunk data containing \r\n (must not split on it)
 status_test "B6 chunk data containing CRLF → 2xx" \
-  $'7\r\nfoo\r\nbar\r\n0\r\n\r\n' \
+  $'8\r\nfoo\r\nbar\r\n0\r\n\r\n' \
   '^[23][0-9][0-9]$'
 
 # B7: trailers after 0-chunk (usually empty; some clients send headers)
@@ -260,7 +260,7 @@ integrity_test "C2 chunk extensions stripped" \
 
 # C3: data with embedded CRLF preserved
 integrity_test "C3 embedded CRLF in data preserved" \
-  $'7\r\nfoo\r\nbar\r\n0\r\n\r\n' \
+  $'8\r\nfoo\r\nbar\r\n0\r\n\r\n' \
   $'foo\r\nbar'
 
 # C4: empty body

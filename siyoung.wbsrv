@@ -29,7 +29,7 @@ uwsgi =
 
 	GET *.(jpg|jpeg|gif) <- /spool/www/*
 
-	GET /cgi-test/echo     $/spool/www/cgi-bin/echo.cgi
+	POST /cgi-test/echo     $/spool/www/cgi-bin/echo.cgi
 
 	POST /storage/ <- /spool/www/storage/
 		+> spool/www/storage/
