@@ -72,14 +72,12 @@ void Server::new_connection(const FileDescriptor *server_fd) {
 }
 
 void Server::disconnect(const FileDescriptor *client_fd) {
-  std::cout << "Client disconnected" << std::endl;
   epoll.del_fd(*client_fd);
   clients.erase(client_fd);
 }
 
 void Server::client_read(const FileDescriptor *client_fd) {
   if (clients.find(client_fd) == clients.end()) {
-    std::cerr << "ERROR: client not found for read operation" << std::endl;
     return;
   }
   if (clock_gettime(CLOCK_MONOTONIC,
@@ -281,7 +279,6 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
 void Server::client_write(const FileDescriptor *client_fd) {
   if (clients.find(client_fd) == clients.end()) {
-    std::cerr << "ERROR: client not found for write operation" << std::endl;
     return;
   }
   if (clock_gettime(CLOCK_MONOTONIC,
