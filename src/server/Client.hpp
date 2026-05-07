@@ -52,6 +52,7 @@ struct ClientSession {
    */
   ClientSession()
       : config(NULL), req(NULL), last_activity_time(), dropping(false) {}
+  ~ClientSession();
 };
 
 /**

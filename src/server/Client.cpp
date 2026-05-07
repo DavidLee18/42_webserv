@@ -1,6 +1,11 @@
 #include "Client.hpp"
 #include "../errors.h"
 
+ClientSession::~ClientSession() {
+  if (req != NULL)
+    delete req;
+}
+
 std::string Request::get_method_string() const {
   if (method == GET)
     return "GET";

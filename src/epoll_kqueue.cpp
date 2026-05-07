@@ -31,8 +31,8 @@ Result<Events> Events::init(const std::list<FileDescriptor> &all_events,
 }
 
 Events::~Events() {
-  // for (size_t i = 0; i < _len; i++)
-  // _events[i].~Event();
+  for (size_t i = 0; i < _len; i++)
+    _events[i].~Event();
   operator delete((void *)_events);
 }
 

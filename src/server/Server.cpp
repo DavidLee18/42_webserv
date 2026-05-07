@@ -395,7 +395,7 @@ Result<Void> Server::start() {
   // system("open http://localhost:8080");
   std::cout << "Starting server loop..." << std::endl;
   long epoll_timeout = -1; // Default: wait indefinitely
-  while (true) {
+  while (g_receivedSignal == 0) {
     // Check for client timeouts and calculate epoll timeout
     timespec now = {};
     if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
