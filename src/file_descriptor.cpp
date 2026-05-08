@@ -366,13 +366,13 @@ Result<std::string> FileDescriptor::read_file_line() const {
 }
 
 Result<Void> FileDescriptor::dup2stdin() {
-  if (dup2(_fd, 0) != 0)
+  if (dup2(_fd, STDIN_FILENO) < 0)
     return ERR(Void, "dup2 to stdin failed");
   return OKV;
 }
 
 Result<Void> FileDescriptor::dup2stdout() {
-  if (dup2(_fd, 1) != 0)
+  if (dup2(_fd, STDOUT_FILENO) < 0)
     return ERR(Void, "dup2 to stdout failed");
   return OKV;
 }
