@@ -414,7 +414,7 @@ Result<Void> Server::start() {
           clients_to_disconnect.push_back(client_fd);
         else {
           // Calculate remaining time until this client times out
-          const long remaining = timeout_sec - elapsed.tv_sec;
+          const long remaining = (timeout_sec - elapsed.tv_sec) / 1000;
           if (epoll_timeout == -1 || remaining < epoll_timeout)
             epoll_timeout =
                 remaining * 1000 -
@@ -440,7 +440,7 @@ Result<Void> Server::start() {
     for (std::map<const FileDescriptor *,
                   std::pair<const FileDescriptor *, CgiDelegate *> >::iterator
              it = cgis.begin();
-         it != cgis.end();) {
+         it != cgis.end(); ++it) {
       CgiDelegate *cgi = it->second.second;
       if (cgi->check_timeout()) {
         std::ostringstream oss;
@@ -462,7 +462,6 @@ Result<Void> Server::start() {
         if (epoll_timeout == -1 ||
             cgi_remaining < static_cast<size_t>(epoll_timeout))
           epoll_timeout = static_cast<long>(cgi_remaining);
-        ++it;
       }
     }
     for (std::set<CgiDelegate *>::const_iterator it = cgis_to_reap.begin();
@@ -522,14 +521,13 @@ Result<Void> Server::start() {
             if (output.has_value()) {
               const Result<Response> res_ =
                   Response::from_cgi_outbuff(output.value());
-              std::ostringstream oss;
-              Response resp;
               if (res_.has_value())
                 resp = res_.value();
               else
                 resp =
                     DefaultError::default_err_response(Response::BAD_GATEWAY);
-            }
+            } else
+              return OKV;
             oss << resp;
             if (!resp.keep_alive)
               clients.at(client_fd).dropping = true;
