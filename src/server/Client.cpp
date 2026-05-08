@@ -238,8 +238,10 @@ Result<Request *> Request::from_buff(std::string &buff) {
     req->remnants = buff.substr(static_cast<size_t>(body_start));
     const size_t chunk_end = req->remnants.find("0\r\n\r\n");
     if (chunk_end != std::string::npos) {
-      if (!req->unchunk(chunk_end).has_value())
+      if (!req->unchunk(chunk_end).has_value()) {
+        delete req;
         return ERR(Request *, Errors::bad_request);
+      }
     }
     return OK(Request *, req);
   }

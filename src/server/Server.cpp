@@ -74,23 +74,6 @@ void Server::new_connection(const FileDescriptor *server_fd) {
 void Server::disconnect(const FileDescriptor *client_fd) {
   epoll.del_fd(client_fd);
   clients.erase(client_fd);
-  CgiDelegate *cgi = NULL;
-  for (std::map<FileDescriptor const *,
-                std::pair<FileDescriptor const *, CgiDelegate *> >::iterator
-           it = cgis.begin();
-       it != cgis.end();) {
-    if (it->second.first == client_fd) {
-      if (cgi == NULL)
-        cgi = it->second.second;
-      else {
-        cgi->~CgiDelegate();
-        operator delete(cgi);
-        cgi = NULL;
-      }
-      cgis.erase(it++);
-    } else
-      ++it;
-  }
 }
 
 void Server::client_read(const FileDescriptor *client_fd) {
@@ -292,9 +275,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
 }
 
 void Server::client_write(const FileDescriptor *client_fd) {
-  if (clients.find(client_fd) == clients.end()) {
+  if (clients.find(client_fd) == clients.end())
     return;
-  }
   if (clock_gettime(CLOCK_MONOTONIC,
                     &clients.at(client_fd).last_activity_time) != 0) {
     std::cerr << "ERROR: failed to update client activity time" << std::endl;
@@ -319,10 +301,8 @@ void Server::client_write(const FileDescriptor *client_fd) {
         return;
       }
     }
-  } else {
-    if (clients.at(client_fd).dropping)
-      disconnect(client_fd);
-  }
+  } else if (clients.at(client_fd).dropping)
+    disconnect(client_fd);
 }
 
 Result<Void> Server::init() {
@@ -456,6 +436,7 @@ Result<Void> Server::start() {
     }
 
     // apply CGI timeout
+    std::set<CgiDelegate *> cgis_to_reap;
     for (std::map<const FileDescriptor *,
                   std::pair<const FileDescriptor *, CgiDelegate *> >::iterator
              it = cgis.begin();
@@ -466,11 +447,15 @@ Result<Void> Server::start() {
         const Response resp(
             DefaultError::default_err_response(Response::GATEWAY_TIMEOUT));
         oss << resp;
-        if (!resp.keep_alive)
-          clients.at(it->second.first).dropping = true;
-        clients.at(it->second.first).out_buff = oss.str();
-        client_write(it->second.first);
-        cgis.erase(it++);
+        std::map<FileDescriptor const *, ClientSession>::iterator jt =
+            clients.find(it->second.first);
+        if (jt != clients.end()) {
+          if (!resp.keep_alive)
+            jt->second.dropping = true;
+          jt->second.out_buff = oss.str();
+          client_write(jt->first);
+        }
+        cgis_to_reap.insert(cgi);
       } else {
         const size_t cgi_remaining =
             cgi->remaining_ns() / 1000000; // milliseconds
@@ -480,6 +465,9 @@ Result<Void> Server::start() {
         ++it;
       }
     }
+    for (std::set<CgiDelegate *>::const_iterator it = cgis_to_reap.begin();
+         it != cgis_to_reap.end(); ++it)
+      reap_cgi(*it);
 
     // Waiting for events using epoll
     Result<Events> events_result = epoll.wait(static_cast<int>(epoll_timeout));
@@ -513,35 +501,24 @@ Result<Void> Server::start() {
           disconnect(fd);
         }
       } else { // CGI
-        std::vector<const FileDescriptor *> reap_cgis;
         std::map<FileDescriptor const *,
                  std::pair<FileDescriptor const *, CgiDelegate *> >::iterator
             it = cgis.find(fd);
 
         if (it != cgis.end()) {
-          Result<Void> res = it->second.second->handle_event(event);
+          FileDescriptor const *client_fd = it->second.first;
+          CgiDelegate *cgi = it->second.second;
+          Result<Void> res = cgi->handle_event(event);
+          std::ostringstream oss;
+          Response resp;
           if (!res.has_value()) {
-            std::ostringstream oss;
-            if (res.error() == Errors::gateway_timeout) {
-              const Response resp(DefaultError::default_err_response(
-                  Response::GATEWAY_TIMEOUT));
-              oss << resp;
-              if (!resp.keep_alive)
-                clients.at(it->second.first).dropping = true;
-              clients.at(it->second.first).out_buff = oss.str();
-              client_write(it->second.first);
-            } else { // res.error() == Errors::bad_gateway
-              const Response resp(
-                  DefaultError::default_err_response(Response::BAD_GATEWAY));
-              oss << resp;
-              if (!resp.keep_alive)
-                clients.at(it->second.first).dropping = true;
-              clients.at(it->second.first).out_buff = oss.str();
-              client_write(it->second.first);
-            }
-            reap_cgis.push_back(it->second.first);
+            if (res.error() == Errors::gateway_timeout)
+              resp =
+                  DefaultError::default_err_response(Response::GATEWAY_TIMEOUT);
+            else // res.error() == Errors::bad_gateway
+              resp = DefaultError::default_err_response(Response::BAD_GATEWAY);
           } else {
-            Result<std::string> output = it->second.second->poll();
+            Result<std::string> output = cgi->poll();
             if (output.has_value()) {
               const Result<Response> res_ =
                   Response::from_cgi_outbuff(output.value());
@@ -552,26 +529,13 @@ Result<Void> Server::start() {
               else
                 resp =
                     DefaultError::default_err_response(Response::BAD_GATEWAY);
-              oss << resp;
-              if (!resp.keep_alive)
-                clients.at(it->second.first).dropping = true;
-              clients.at(it->second.first).out_buff = oss.str();
-              client_write(it->second.first);
-              reap_cgis.push_back(it->second.first);
             }
-          }
-        }
-        for (std::vector<const FileDescriptor *>::iterator it =
-                 reap_cgis.begin();
-             it != reap_cgis.end(); ++it) {
-          for (std::map<FileDescriptor const *,
-                        std::pair<FileDescriptor const *,
-                                  CgiDelegate *> >::iterator jt = cgis.begin();
-               jt != cgis.end();) {
-            if (jt->second.first == *it)
-              cgis.erase(jt++);
-            else
-              ++jt;
+            oss << resp;
+            if (!resp.keep_alive)
+              clients.at(client_fd).dropping = true;
+            clients.at(client_fd).out_buff = oss.str();
+            client_write(client_fd);
+            reap_cgi(cgi);
           }
         }
       }
@@ -579,4 +543,18 @@ Result<Void> Server::start() {
   }
   clients.clear();
   return OKV;
+}
+
+void Server::reap_cgi(CgiDelegate *cgi) {
+  for (std::map<FileDescriptor const *,
+                std::pair<FileDescriptor const *, CgiDelegate *> >::iterator
+           it = cgis.begin();
+       it != cgis.end();) {
+    if (it->second.second == cgi)
+      cgis.erase(it++);
+    else
+      ++it;
+  }
+  cgi->~CgiDelegate();
+  operator delete(cgi);
 }

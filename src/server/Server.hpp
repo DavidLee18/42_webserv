@@ -111,6 +111,8 @@ class Server {
    */
   void client_write(const FileDescriptor *client_fd);
 
+  void reap_cgi(CgiDelegate *cgi);
+
 public:
   /**
    * @brief Constructs a new Server based on the parsed WebserverConfig.
