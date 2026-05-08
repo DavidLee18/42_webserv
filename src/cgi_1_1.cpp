@@ -1698,7 +1698,7 @@ Result<Void> CgiDelegate::register_() {
       _epoll.add_fd(*_stdout, read_event, read_option);
   if (!add_out_res.has_value()) {
     if (_stdin != NULL) {
-      _epoll.del_fd(*_stdin);
+      _epoll.del_fd(_stdin);
       _stdin = NULL;
     }
     _state = Failed;
@@ -1745,7 +1745,7 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
         return ERR(Void, Errors::bad_gateway);
       }
       // All data was already written; close stdin and continue.
-      _epoll.del_fd(*_stdin);
+      _epoll.del_fd(_stdin);
       _stdin = NULL;
       return OKV;
     }
@@ -1768,7 +1768,7 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       } else {
         // Done writing: drop stdin from epoll, which also closes the pipe,
         // signalling EOF to the CGI script.
-        _epoll.del_fd(*_stdin);
+        _epoll.del_fd(_stdin);
         _stdin = NULL;
         return OKV;
       }
@@ -1792,10 +1792,10 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       }
 
       // bytes_read == 0: EOF, drain any remaining IO bookkeeping.
-      _epoll.del_fd(*_stdout);
+      _epoll.del_fd(_stdout);
       _stdout = NULL;
       if (_stdin != NULL) {
-        _epoll.del_fd(*_stdin);
+        _epoll.del_fd(_stdin);
         _stdin = NULL;
       }
       _state = Done;
@@ -1866,11 +1866,11 @@ size_t CgiDelegate::remaining_ns() const {
 
 CgiDelegate::~CgiDelegate() {
   if (_stdin != NULL) {
-    _epoll.del_fd(*_stdin);
+    _epoll.del_fd(_stdin);
     _stdin = NULL;
   }
   if (_stdout != NULL) {
-    _epoll.del_fd(*_stdout);
+    _epoll.del_fd(_stdout);
     _stdout = NULL;
   }
   if (_pid > 0) {

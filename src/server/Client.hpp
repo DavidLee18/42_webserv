@@ -152,6 +152,8 @@ public:
 
   bool is_partial() const;
 
+  bool is_chunked() const;
+
   bool has_keep_alive() const { return keep_alive; }
 
   Result<Void> continue_parsing(std::string &);

@@ -72,7 +72,7 @@ void Server::new_connection(const FileDescriptor *server_fd) {
 }
 
 void Server::disconnect(const FileDescriptor *client_fd) {
-  epoll.del_fd(*client_fd);
+  epoll.del_fd(client_fd);
   clients.erase(client_fd);
 }
 
@@ -85,7 +85,6 @@ void Server::client_read(const FileDescriptor *client_fd) {
     std::cerr << "ERROR: failed to update client activity time" << std::endl;
     return;
   }
-  bool peer_closed = false;
   while (true) { // repeat until nothing to read
     char buf[NETWORK_BUFFER_SIZE];
     Result<ssize_t> recv_res = client_fd->sock_recv(buf, sizeof(buf));
@@ -94,7 +93,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
     ssize_t bytes = recv_res.value();
     if (bytes == 0) { // (EOF)
-      peer_closed = true;
+      clients.at(client_fd).dropping = true;
       break;
     }
     clients.at(client_fd).in_buff.append(buf, static_cast<std::size_t>(bytes));
@@ -109,7 +108,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
       if (!req_.has_value()) {
         std::cerr << "request parsing failed: " << req_.error() << std::endl;
         if (req_.error() == Errors::incomplete_header) {
-          if (peer_closed)
+          if (clients.at(client_fd).dropping)
             disconnect(client_fd);
           return;
         } else if (req_.error() == Errors::malformed_header ||
@@ -125,7 +124,9 @@ void Server::client_read(const FileDescriptor *client_fd) {
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
 
-          if (peer_closed && clients.at(client_fd).out_buff.empty())
+          if (clients.find(client_fd) != clients.end() &&
+              clients.at(client_fd).dropping &&
+              clients.at(client_fd).out_buff.empty())
             disconnect(client_fd);
 
           return;
@@ -141,7 +142,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
 
-          if (peer_closed && clients.at(client_fd).out_buff.empty())
+          if (clients.at(client_fd).dropping &&
+              clients.at(client_fd).out_buff.empty())
             disconnect(client_fd);
 
           return;
@@ -151,7 +153,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
       clients.at(client_fd).req = req_.value();
       if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
       {
-        if (peer_closed)
+        if (clients.at(client_fd).dropping)
           disconnect(client_fd);
         return;
       }
@@ -283,7 +285,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
   client_write(client_fd); // when the response is generated freshly, likely
                            // EPOLLIN | EPOLLOUT
 
-  if (peer_closed && clients.find(client_fd) != clients.end() &&
+  if (clients.find(client_fd) != clients.end() &&
+      clients.at(client_fd).dropping &&
       clients.at(client_fd).out_buff.empty()) {
     disconnect(client_fd);
   }

@@ -342,3 +342,7 @@ Result<size_t> Request::get_content_length() const {
   else
     return OK(size_t, static_cast<size_t>(content_length));
 }
+
+bool Request::is_chunked() const {
+  return decode_chunk_state != NOT_CHUNKED && decode_chunk_state != DONE;
+}
