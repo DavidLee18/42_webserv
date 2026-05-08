@@ -1,4 +1,5 @@
 #include "webserv.h"
+#include <cstdio>
 
 CgiAuthType::CgiAuthType(const CgiAuthType::Type type)
     : _type(type), _other(NULL) {}
@@ -1652,10 +1653,20 @@ Result<Void> CgiDelegate::register_() {
     exit(1);
   }
 
+  int stdin_fd = -1, stdout_fd = -1;
   {
     FileDescriptor _stdin0(stdin_pipe_res.value().first);
     FileDescriptor _stdout1(stdout_pipe_res.value().second);
+    stdout_fd = _stdout1._fd;
+    stdin_fd = _stdin0._fd;
   }
+  int r = fcntl(stdin_fd, F_GETFD);
+  dprintf(2, "F_GETFD stdin(%d): %d errno: %d (%s)\n", stdin_fd, r, errno,
+          strerror(errno));
+
+  r = fcntl(stdout_fd, F_GETFD);
+  dprintf(2, "F_GETFD stdout(%d): %d errno: %d (%s)\n", stdout_fd, r, errno,
+          strerror(errno));
 
   _pid = pid;
   _stdin = new FileDescriptor(stdin_pipe_res.value().second);
@@ -1776,6 +1787,7 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
   }
   if (_stdout != NULL && *ev->fd == *_stdout) {
     // is_stdout
+    dprintf(2, "stdout event: in=%d hup=%d\n", ev->in, ev->hup);
     if (ev->in || ev->hup || ev->rdhup) {
       char buffer[4096];
       const Result<ssize_t> bytes_read =

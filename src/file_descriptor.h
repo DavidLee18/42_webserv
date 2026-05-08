@@ -102,6 +102,7 @@ public:
   friend bool operator!=(const int &, const FileDescriptor &);
 
   friend class EPoll;
+  friend class CgiDelegate;
 };
 
 #endif // FILE_DESCRIPTOR_H
