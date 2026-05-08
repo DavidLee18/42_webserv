@@ -103,6 +103,7 @@ public:
 
   friend class EPoll;
   friend class CgiDelegate;
+  friend class Server;
 };
 
 #endif // FILE_DESCRIPTOR_H

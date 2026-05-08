@@ -74,6 +74,23 @@ void Server::new_connection(const FileDescriptor *server_fd) {
 void Server::disconnect(const FileDescriptor *client_fd) {
   epoll.del_fd(client_fd);
   clients.erase(client_fd);
+  CgiDelegate *cgi = NULL;
+  for (std::map<FileDescriptor const *,
+                std::pair<FileDescriptor const *, CgiDelegate *> >::iterator
+           it = cgis.begin();
+       it != cgis.end();) {
+    if (it->second.first == client_fd) {
+      if (cgi == NULL)
+        cgi = it->second.second;
+      else {
+        cgi->~CgiDelegate();
+        operator delete(cgi);
+        cgi = NULL;
+      }
+      cgis.erase(it++);
+    } else
+      ++it;
+  }
 }
 
 void Server::client_read(const FileDescriptor *client_fd) {
@@ -177,19 +194,10 @@ void Server::client_read(const FileDescriptor *client_fd) {
               clients.at(client_fd).req->get_method(),
               clients.at(client_fd).req->get_path());
       if (cgi_path != NULL) {
-        Result<CgiDelegate> del_ = ServerResponse::register_cgi(
-            *clients.at(client_fd).req, *cgi_path, &epoll);
-        if (!del_.has_value()) {
+        Result<Void> del_ = ServerResponse::register_cgi(
+            *clients.at(client_fd).req, *cgi_path, &epoll, cgis, client_fd);
+        if (!del_.has_value())
           std::cerr << "CGI registration failed: " << del_.error() << std::endl;
-          delete clients.at(client_fd).req;
-          clients.at(client_fd).req = NULL;
-          return;
-        }
-        std::pair<std::map<const FileDescriptor *, CgiDelegate>::iterator, bool>
-            res = cgis.insert(std::make_pair(client_fd, del_.value()));
-        if (!res.second)
-          std::cerr << "[ERROR] CGI already registered for " << client_fd
-                    << std::endl;
         delete clients.at(client_fd).req;
         clients.at(client_fd).req = NULL;
         return;
@@ -242,19 +250,10 @@ void Server::client_read(const FileDescriptor *client_fd) {
               clients.at(client_fd).req->get_path());
 
       if (cgi_path != NULL) {
-        Result<CgiDelegate> del_ = ServerResponse::register_cgi(
-            *clients.at(client_fd).req, *cgi_path, &epoll);
-        if (!del_.has_value()) {
+        Result<Void> del_ = ServerResponse::register_cgi(
+            *clients.at(client_fd).req, *cgi_path, &epoll, cgis, client_fd);
+        if (!del_.has_value())
           std::cerr << "CGI registration failed: " << del_.error() << std::endl;
-          delete clients.at(client_fd).req;
-          clients.at(client_fd).req = NULL;
-          return;
-        }
-        std::pair<std::map<const FileDescriptor *, CgiDelegate>::iterator, bool>
-            res = cgis.insert(std::make_pair(client_fd, del_.value()));
-        if (!res.second)
-          std::cerr << "[ERROR] CGI already registered for " << client_fd
-                    << std::endl;
         delete clients.at(client_fd).req;
         clients.at(client_fd).req = NULL;
         return;
@@ -457,23 +456,24 @@ Result<Void> Server::start() {
     }
 
     // apply CGI timeout
-    for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
-             cgis.begin();
+    for (std::map<const FileDescriptor *,
+                  std::pair<const FileDescriptor *, CgiDelegate *> >::iterator
+             it = cgis.begin();
          it != cgis.end();) {
-      CgiDelegate &cgi = it->second;
-      if (cgi.check_timeout()) {
+      CgiDelegate *cgi = it->second.second;
+      if (cgi->check_timeout()) {
         std::ostringstream oss;
         const Response resp(
             DefaultError::default_err_response(Response::GATEWAY_TIMEOUT));
         oss << resp;
         if (!resp.keep_alive)
-          clients.at(it->first).dropping = true;
-        clients.at(it->first).out_buff = oss.str();
-        client_write(it->first);
+          clients.at(it->second.first).dropping = true;
+        clients.at(it->second.first).out_buff = oss.str();
+        client_write(it->second.first);
         cgis.erase(it++);
       } else {
         const size_t cgi_remaining =
-            cgi.remaining_ns() / 1000000; // milliseconds
+            cgi->remaining_ns() / 1000000; // milliseconds
         if (epoll_timeout == -1 ||
             cgi_remaining < static_cast<size_t>(epoll_timeout))
           epoll_timeout = static_cast<long>(cgi_remaining);
@@ -497,7 +497,7 @@ Result<Void> Server::start() {
 
       const Event *event = ev_result.value();
       const FileDescriptor *fd = &event->fd;
-
+      dprintf(2, "epoll event on fd=%d\n", fd->_fd);
       // 1. 서버 소켓(문지기)인 경우 (listeners map에 Key가 존재함)
       if (listeners.find(fd) != listeners.end()) {
         new_connection(fd);
@@ -514,10 +514,12 @@ Result<Void> Server::start() {
         }
       } else { // CGI
         std::vector<const FileDescriptor *> reap_cgis;
-        for (std::map<const FileDescriptor *, CgiDelegate>::iterator it =
-                 cgis.begin();
-             it != cgis.end(); ++it) {
-          Result<Void> res = it->second.handle_event(event);
+        std::map<FileDescriptor const *,
+                 std::pair<FileDescriptor const *, CgiDelegate *> >::iterator
+            it = cgis.find(fd);
+
+        if (it != cgis.end()) {
+          Result<Void> res = it->second.second->handle_event(event);
           if (!res.has_value()) {
             std::ostringstream oss;
             if (res.error() == Errors::gateway_timeout) {
@@ -525,21 +527,21 @@ Result<Void> Server::start() {
                   Response::GATEWAY_TIMEOUT));
               oss << resp;
               if (!resp.keep_alive)
-                clients.at(it->first).dropping = true;
-              clients.at(it->first).out_buff = oss.str();
-              client_write(it->first);
+                clients.at(it->second.first).dropping = true;
+              clients.at(it->second.first).out_buff = oss.str();
+              client_write(it->second.first);
             } else { // res.error() == Errors::bad_gateway
               const Response resp(
                   DefaultError::default_err_response(Response::BAD_GATEWAY));
               oss << resp;
               if (!resp.keep_alive)
-                clients.at(it->first).dropping = true;
-              clients.at(it->first).out_buff = oss.str();
-              client_write(it->first);
+                clients.at(it->second.first).dropping = true;
+              clients.at(it->second.first).out_buff = oss.str();
+              client_write(it->second.first);
             }
-            reap_cgis.push_back(it->first);
+            reap_cgis.push_back(it->second.first);
           } else {
-            Result<std::string> output = it->second.poll();
+            Result<std::string> output = it->second.second->poll();
             if (output.has_value()) {
               const Result<Response> res_ =
                   Response::from_cgi_outbuff(output.value());
@@ -552,21 +554,29 @@ Result<Void> Server::start() {
                     DefaultError::default_err_response(Response::BAD_GATEWAY);
               oss << resp;
               if (!resp.keep_alive)
-                clients.at(it->first).dropping = true;
-              clients.at(it->first).out_buff = oss.str();
-              client_write(it->first);
-              reap_cgis.push_back(it->first);
+                clients.at(it->second.first).dropping = true;
+              clients.at(it->second.first).out_buff = oss.str();
+              client_write(it->second.first);
+              reap_cgis.push_back(it->second.first);
             }
           }
         }
         for (std::vector<const FileDescriptor *>::iterator it =
                  reap_cgis.begin();
-             it != reap_cgis.end(); ++it)
-          cgis.erase(*it);
+             it != reap_cgis.end(); ++it) {
+          for (std::map<FileDescriptor const *,
+                        std::pair<FileDescriptor const *,
+                                  CgiDelegate *> >::iterator jt = cgis.begin();
+               jt != cgis.end();) {
+            if (jt->second.first == *it)
+              cgis.erase(jt++);
+            else
+              ++jt;
+          }
+        }
       }
     }
   }
-
   clients.clear();
   return OKV;
 }

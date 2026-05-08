@@ -38,8 +38,8 @@ static std::string get_http_date() {
 std::ostream &operator<<(std::ostream &os, Response const &resp) {
   os << "HTTP/1.1 " << DefaultError::status_code_to_string(resp.status_code)
      << "\r\n";
-  std::cout << "HTTP/1.1 " << DefaultError::status_code_to_string(resp.status_code)
-     << "\r\n";
+  std::cout << "HTTP/1.1 "
+            << DefaultError::status_code_to_string(resp.status_code) << "\r\n";
   os << "Date: " << get_http_date() << "\r\n";
   std::cout << "Date: " << get_http_date() << "\r\n";
   os << "Server: webserv\r\n";
@@ -47,8 +47,8 @@ std::ostream &operator<<(std::ostream &os, Response const &resp) {
   if ((resp.status_code == Response::MOVED_PERMANENTLY ||
        resp.status_code == Response::FOUND) &&
       !resp.redir.empty()) {
-        os << "Location: " << resp.redir << "\r\n";
-        std::cout << "Location: " << resp.redir << "\r\n";
+    os << "Location: " << resp.redir << "\r\n";
+    std::cout << "Location: " << resp.redir << "\r\n";
   }
   os << "Content-Type: " << resp.content_type << "\r\n";
   std::cout << "Content-Type: " << resp.content_type << "\r\n";
@@ -139,8 +139,7 @@ Response ServerResponse::http_response(
     if (request->get_method() == Request::DELETE) {
       std::cout << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
-      response =
-          error_response(config, rule, Response::UNAUTHORIZED);
+      response = error_response(config, rule, Response::UNAUTHORIZED);
       response.headers = config->get_header();
       return response;
     } else {
@@ -159,12 +158,11 @@ Response ServerResponse::http_response(
     break;
   case Request::HEAD:
   case Request::GET:
-    response = ServerResponse::get_method(target, response, config, rule,
-                                          request);
+    response =
+        ServerResponse::get_method(target, response, config, rule, request);
     break;
   default:
-    response =
-        error_response(config, rule, Response::METHOD_NOT_ALLOWED);
+    response = error_response(config, rule, Response::METHOD_NOT_ALLOWED);
     break;
   }
 
@@ -213,17 +211,26 @@ Response ServerResponse::http_response(
   }
 }
 
-Result<CgiDelegate> ServerResponse::register_cgi(const Request &request,
-                                                 const RouteRule_CGI &rule,
-                                                 EPoll *epoll) {
+Result<Void> ServerResponse::register_cgi(
+    const Request &request, const RouteRule_CGI &rule, EPoll *epoll,
+    std::map<FileDescriptor const *,
+             std::pair<FileDescriptor const *, CgiDelegate *> > &cgis,
+    FileDescriptor const *client_fd) {
+  CgiDelegate *del =
+      static_cast<CgiDelegate *>(operator new(sizeof(CgiDelegate)));
   const Result<CgiDelegate> del_ = CgiDelegate::from_req(request, *epoll, rule);
-  if (!del_.has_value())
-    return ERR(CgiDelegate, del_.error());
-  CgiDelegate del(del_.value());
-  const Result<Void> res = del.register_();
-  if (!res.has_value())
-    return ERR(CgiDelegate, res.error());
-  return OK(CgiDelegate, del);
+  if (!del_.has_value()) {
+    operator delete(del);
+    return ERR(Void, del_.error());
+  }
+  new (del) CgiDelegate(del_.value());
+  Result<Void> res = del->register_(cgis, client_fd);
+  if (!res.has_value()) {
+    del->~CgiDelegate();
+    operator delete(del);
+    return ERR(Void, res.error());
+  }
+  return OKV;
 }
 
 int ServerResponse::check_path_type(const std::string &path) {
@@ -256,8 +263,7 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   const int type = check_path_type(target.path + root);
   if (type == IS_DIR) {
     target.path += root;
-    if (rule->op == SERVE_FROM && request->get_path() == "/")
-    {
+    if (rule->op == SERVE_FROM && request->get_path() == "/") {
       target.path += rule->index;
     }
     target.type = check_path_type(target.path);
@@ -283,9 +289,9 @@ std::string ServerResponse::get_pwd() {
   return "";
 }
 
-Response ServerResponse::error_response(
-    const ServerConfig *config, const RouteRule *rule,
-    const Response::StatusCode error_code) {
+Response ServerResponse::error_response(const ServerConfig *config,
+                                        const RouteRule *rule,
+                                        const Response::StatusCode error_code) {
   std::string err_page =
       get_pwd() + get_string_from_map(rule->error_pages, error_code);
 
@@ -299,7 +305,8 @@ Response ServerResponse::error_response(
     response.status_code = error_code;
     response.headers = config->get_header();
     // Use get_mime_type_for_extension helper instead of map lookup
-    response.content_type = get_mime_type_for_extension(find_file_type(err_page));
+    response.content_type =
+        get_mime_type_for_extension(find_file_type(err_page));
     std::ostringstream ss;
     ss << file.rdbuf();
     response.body = ss.str();
@@ -514,9 +521,9 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
   return next_boundary;
 }
 
-Response ServerResponse::delete_method(
-    const Target &target, Response response, const ServerConfig *config,
-    const RouteRule *rule) {
+Response ServerResponse::delete_method(const Target &target, Response response,
+                                       const ServerConfig *config,
+                                       const RouteRule *rule) {
   if (unlink(target.path.c_str()) == 0) {
     response.status_code = Response::NO_CONTENT;
     return response;
@@ -525,9 +532,10 @@ Response ServerResponse::delete_method(
   }
 }
 
-Response ServerResponse::post_method(
-    const Target &target, Response response, const ClientSession *client,
-    const RouteRule *rule, const Request *request, Session *session) {
+Response ServerResponse::post_method(const Target &target, Response response,
+                                     const ClientSession *client,
+                                     const RouteRule *rule,
+                                     const Request *request, Session *session) {
   (void)target;
   const ServerConfig *config = client->config;
 
@@ -725,9 +733,10 @@ Response ServerResponse::post_method(
   return error_response(config, rule, Response::FORBIDDEN);
 }
 
-Response ServerResponse::get_method(
-    Target target, Response response, const ServerConfig *config,
-    const RouteRule *rule, const Request *request) {
+Response ServerResponse::get_method(Target target, Response response,
+                                    const ServerConfig *config,
+                                    const RouteRule *rule,
+                                    const Request *request) {
   // Handle error responses (NOT_FOUND_ERR, FORBIDDEN_ERR)
   if (target.type == Response::NOT_FOUND)
     return error_response(config, rule, Response::NOT_FOUND);

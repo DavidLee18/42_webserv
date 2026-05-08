@@ -1550,7 +1550,10 @@ CgiDelegate::operator=(const CgiDelegate &other) throw(std::logic_error) {
 // pipe ends with the shared epoll instance. No epoll_wait() is performed
 // here - the caller's main loop is the sole owner of epoll_wait() and
 // will drive handle_event() for each event delivered.
-Result<Void> CgiDelegate::register_() {
+Result<Void> CgiDelegate::register_(
+    std::map<FileDescriptor const *,
+             std::pair<FileDescriptor const *, CgiDelegate *> > &cgis,
+    FileDescriptor const *client_fd) {
   if (_pid != -1 || _state != NotRegistered)
     return ERR(Void, Errors::cgi_invalid_state);
 
@@ -1713,6 +1716,8 @@ Result<Void> CgiDelegate::register_() {
     _state = Failed;
     return ERR(Void, "Failed to get start time for CGI process");
   }
+  cgis[_stdin] = std::make_pair(client_fd, this);
+  cgis[_stdout] = std::make_pair(client_fd, this);
   _state = Waiting;
   return OKV;
 }
@@ -1721,6 +1726,9 @@ Result<Void> CgiDelegate::register_() {
 // Caller is expected to filter events and only forward those belonging to
 // fds this delegate registered. Unknown events are ignored.
 Result<Void> CgiDelegate::handle_event(const Event *ev) {
+  dprintf(2, "handle_event called: ev_fd=%d stdin=%d stdout=%d\n",
+          ev ? ev->fd._fd : -1, _stdin ? _stdin->_fd : -1,
+          _stdout ? _stdout->_fd : -1);
   if (ev == NULL)
     return OKV;
   if (_state == Failed)

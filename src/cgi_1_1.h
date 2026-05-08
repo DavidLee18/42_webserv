@@ -299,7 +299,10 @@ public:
   // Phase 1: create pipes, fork, register the pipe fds with epoll.
   // After this returns OK, the main event loop will deliver events on the
   // registered fds; the caller must route them to handle_event().
-  Result<Void> register_();
+  Result<Void>
+  register_(std::map<FileDescriptor const *,
+                     std::pair<FileDescriptor const *, CgiDelegate *> > &cgis,
+            FileDescriptor const *client_fd);
 
   // Phase 2: process a single epoll event for this CGI. Performs
   // non-blocking IO only; never calls epoll->wait(). Returns an error if
