@@ -50,13 +50,13 @@ private:
  */
 class Event {
 public:
-  Event(const FileDescriptor *fd, const bool in, const bool out,
+  Event(const FileDescriptor &fd, const bool in, const bool out,
         const bool rdhup, const bool pri, const bool err, const bool hup)
       : fd(fd), in(in), out(out), rdhup(rdhup), pri(pri), err(err), hup(hup) {}
   Event(const Event &other)
       : fd(other.fd), in(other.in), out(other.out), rdhup(other.rdhup),
         pri(other.pri), err(other.err), hup(other.hup) {}
-  const FileDescriptor *fd;
+  const FileDescriptor &fd;
   const bool in;
   const bool out;
   const bool rdhup;
@@ -132,8 +132,6 @@ class EPoll {
   std::list<FileDescriptor> _events;
   unsigned short _size;
 
-  bool event_contains(const FileDescriptor *fd) const;
-
 public:
   EPoll() : _fd(), _events(), _size(0) {}
 
@@ -164,6 +162,7 @@ public:
     return *this;
   }
 
+  bool event_contains(const FileDescriptor *fd) const;
   static Result<EPoll> create(unsigned short);
   Result<Events> wait(int timeout_ms) const;
   Result<FileDescriptor *> add_fd(const FileDescriptor &fd, const Event &,

@@ -20,7 +20,7 @@ Result<Events> Events::init(const std::list<FileDescriptor> &all_events,
       return ERR(Events, Errors::not_found);
     }
     new (static_cast<void *>(es._events + i)) Event(
-        fd, (events[i].events & EPOLLIN) != 0,
+        *fd, (events[i].events & EPOLLIN) != 0,
         (events[i].events & EPOLLOUT) != 0,
         (events[i].events & EPOLLRDHUP) != 0,
         (events[i].events & EPOLLPRI) != 0, (events[i].events & EPOLLERR) != 0,

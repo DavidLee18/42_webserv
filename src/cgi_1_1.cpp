@@ -1,5 +1,6 @@
 #include "webserv.h"
 #include <cstdio>
+#include <fcntl.h>
 
 CgiAuthType::CgiAuthType(const CgiAuthType::Type type)
     : _type(type), _other(NULL) {}
@@ -1605,25 +1606,22 @@ Result<Void> CgiDelegate::register_() {
       FileDescriptor stdout0 = stdout_pipe_res.value().first;
     }
 
-    _stdin = new FileDescriptor(stdin_pipe_res.value().first);
-    _stdout = new FileDescriptor(stdout_pipe_res.value().second);
+    FileDescriptor &stdin =
+        const_cast<FileDescriptor &>(stdin_pipe_res.value().first);
+    FileDescriptor &stdout =
+        const_cast<FileDescriptor &>(stdout_pipe_res.value().second);
 
-    Result<Void> res = _stdin->dup2stdin();
+    Result<Void> res = stdin.dup2stdin();
     if (!res.has_value()) {
       std::cerr << res.error() << std::endl;
       std::exit(1);
     }
 
-    res = _stdout->dup2stdout();
+    res = stdout.dup2stdout();
     if (!res.has_value()) {
       std::cerr << res.error() << std::endl;
       std::exit(1);
     }
-
-    delete _stdin;
-    _stdin = NULL;
-    delete _stdout;
-    _stdout = NULL;
 
     char **envp = _env.to_envp();
     char *argv[2] = {const_cast<char *>(_script_path.c_str()), NULL};
@@ -1653,34 +1651,26 @@ Result<Void> CgiDelegate::register_() {
     exit(1);
   }
 
-  int stdin_fd = -1, stdout_fd = -1;
   {
     FileDescriptor _stdin0(stdin_pipe_res.value().first);
     FileDescriptor _stdout1(stdout_pipe_res.value().second);
-    stdout_fd = _stdout1._fd;
-    stdin_fd = _stdin0._fd;
   }
-  int r = fcntl(stdin_fd, F_GETFD);
-  dprintf(2, "F_GETFD stdin(%d): %d errno: %d (%s)\n", stdin_fd, r, errno,
-          strerror(errno));
-
-  r = fcntl(stdout_fd, F_GETFD);
-  dprintf(2, "F_GETFD stdout(%d): %d errno: %d (%s)\n", stdout_fd, r, errno,
-          strerror(errno));
 
   _pid = pid;
-  _stdin = new FileDescriptor(stdin_pipe_res.value().second);
-  _stdout = new FileDescriptor(stdout_pipe_res.value().first);
+  FileDescriptor &stdin =
+      const_cast<FileDescriptor &>(stdin_pipe_res.value().second);
+  FileDescriptor &stdout =
+      const_cast<FileDescriptor &>(stdout_pipe_res.value().first);
 
   // Non-blocking is mandatory: epoll readiness does not imply non-blocking
   // semantics of read/write, and partial IO is expected in the event loop.
-  Result<Void> res = _stdin->set_nonblocking();
+  Result<Void> res = stdin.set_nonblocking();
   if (!res.has_value()) {
     _state = Failed;
     return ERR(Void, "Failed to set stdin pipe to non-blocking mode");
   }
 
-  res = _stdout->set_nonblocking();
+  res = stdout.set_nonblocking();
   if (!res.has_value()) {
     _state = Failed;
     return ERR(Void, "Failed to set stdout pipe to non-blocking mode");
@@ -1690,26 +1680,29 @@ Result<Void> CgiDelegate::register_() {
   // If there is no body, let the stdin_fd destructor close the pipe so the
   // CGI script sees EOF on its stdin.
   if (!_req.get_body().empty()) {
-    Event write_event(_stdin, false, true, false, false, true, true);
+    Event write_event(stdin, false, true, false, false, true, true);
     Option write_option(false, false, false, false);
     Result<FileDescriptor *> add_res =
-        _epoll.add_fd(*_stdin, write_event, write_option);
+        _epoll.add_fd(stdin, write_event, write_option);
     if (!add_res.has_value()) {
       _state = Failed;
       return ERR(Void, "Failed to add stdin to epoll");
     }
-    delete _stdin;
     _stdin = add_res.value();
   }
 
   // Register stdout for EPOLLIN (plus err/hup so we notice child exit).
-  Event read_event(_stdout, true, false, true, false, true, true);
+  Event read_event(stdout, true, false, true, false, true, true);
   Option read_option(false, false, false, false);
   Result<FileDescriptor *> add_out_res =
-      _epoll.add_fd(*_stdout, read_event, read_option);
+      _epoll.add_fd(stdout, read_event, read_option);
   if (!add_out_res.has_value()) {
     if (_stdin != NULL) {
+      dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+      const int stdin = _stdin->_fd;
       _epoll.del_fd(_stdin);
+      const int r = fcntl(stdin, F_GETFD);
+      dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
       _stdin = NULL;
     }
     _state = Failed;
@@ -1728,7 +1721,7 @@ Result<Void> CgiDelegate::register_() {
 // Caller is expected to filter events and only forward those belonging to
 // fds this delegate registered. Unknown events are ignored.
 Result<Void> CgiDelegate::handle_event(const Event *ev) {
-  if (ev == NULL || ev->fd == NULL)
+  if (ev == NULL)
     return OKV;
   if (_state == Failed)
     return ERR(Void, Errors::bad_gateway);
@@ -1745,7 +1738,7 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
     _state = Failed;
     return ERR(Void, Errors::gateway_timeout);
   }
-  if (_stdin != NULL && *ev->fd == *_stdin) {
+  if (_stdin != NULL && ev->fd == *_stdin) {
     if (ev->err) {
       _state = Failed;
       return ERR(Void, Errors::bad_gateway);
@@ -1756,7 +1749,12 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
         return ERR(Void, Errors::bad_gateway);
       }
       // All data was already written; close stdin and continue.
+
+      dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+      const int stdin = _stdin->_fd;
       _epoll.del_fd(_stdin);
+      const int r = fcntl(stdin, F_GETFD);
+      dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
       _stdin = NULL;
       return OKV;
     }
@@ -1779,13 +1777,17 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       } else {
         // Done writing: drop stdin from epoll, which also closes the pipe,
         // signalling EOF to the CGI script.
+        dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+        const int stdin = _stdin->_fd;
         _epoll.del_fd(_stdin);
+        const int r = fcntl(stdin, F_GETFD);
+        dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
         _stdin = NULL;
         return OKV;
       }
     }
   }
-  if (_stdout != NULL && *ev->fd == *_stdout) {
+  if (_stdout != NULL && ev->fd == *_stdout) {
     // is_stdout
     dprintf(2, "stdout event: in=%d hup=%d\n", ev->in, ev->hup);
     if (ev->in || ev->hup || ev->rdhup) {
@@ -1807,7 +1809,11 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       _epoll.del_fd(_stdout);
       _stdout = NULL;
       if (_stdin != NULL) {
+        dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+        const int stdin = _stdin->_fd;
         _epoll.del_fd(_stdin);
+        const int r = fcntl(stdin, F_GETFD);
+        dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
         _stdin = NULL;
       }
       _state = Done;

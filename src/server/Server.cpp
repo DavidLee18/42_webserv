@@ -52,7 +52,7 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     client.ip = ip_str;
 
     // register client socket to EPoll
-    Event client_event(&client_fd, true, true, true, false, false, false);
+    Event client_event(client_fd, true, true, true, false, false, false);
     Option client_option(true, false, false, false);
 
     Result<FileDescriptor *> add_result =
@@ -376,8 +376,8 @@ Result<Void> Server::init() {
       return ERR(Void, "Listen fail: " + listen_result.error());
 
     // EPoll event and option setting
-    Event event(&server_fd, true, false, false, false, false, false); // in=true
-    Option op(true, false, false, false);                             // et=true
+    Event event(server_fd, true, false, false, false, false, false); // in=true
+    Option op(true, false, false, false);                            // et=true
 
     // Add server socket to EPoll
     Result<FileDescriptor *> add_result = epoll.add_fd(server_fd, event, op);
@@ -496,7 +496,7 @@ Result<Void> Server::start() {
         continue;
 
       const Event *event = ev_result.value();
-      const FileDescriptor *fd = event->fd;
+      const FileDescriptor *fd = &event->fd;
 
       // 1. 서버 소켓(문지기)인 경우 (listeners map에 Key가 존재함)
       if (listeners.find(fd) != listeners.end()) {
