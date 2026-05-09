@@ -32,8 +32,7 @@ uwsgi =
 	POST /cgi-test/echo     $/spool/www/cgi-bin/echo.cgi
 		...10
 
-	POST /storage/ <- /spool/www/storage/
-		+> spool/www/storage/
+	POST /storage/ -> /spool/www/storage/
 		->{} 10MB
 		@ auth_info
 		! 400:/tmp/error_400.html
