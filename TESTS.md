@@ -18,8 +18,8 @@ Probabilities are evaluator-probing estimates, not RFC-strictness levels.
 | Mid-request disconnect (5.3)                           | **13/13** on `webserv_disconnect_tests.zsh`. fd-stable across 470 adversarial iterations.                 |
 | Standard HTTP security headers                         | **12/14** on `webserv_headers_tests.zsh` (H13 skipped pending `CGI_TEST_URL`; H6/H7 pending HEAD method). |
 | CGI/HTTP framing (B4)                                  | **12/12** on `webserv_cgi_framing_tests.zsh`. Wired into drain hook.                                      |
-| CGI sandboxing                                         | Subject conformance complete (B1–B6, D2–D4). Stress probes not yet run.                                   |
-| Content integrity (ETag / Last-Modified / Repr-Digest) | Not started.                                                                                              |
+| CGI sandboxing                                         | Subject conformance complete (B1–B6, D2–D4). Stress probes not yet run; harness `webserv_cgi_tests.zsh` written, implementation pending. |
+| Chunked decoding (B7)                                  | **20/20** on `webserv_chunked_tests.zsh` (A: malformed framing, B: well-formed, C: CGI body integrity, D: chunked multipart upload). || Content integrity (ETag / Last-Modified / Repr-Digest) | Not started.                                                                                              |
 | Resilience under adversarial load                      | Not started.                                                                                              |
 
 ---
@@ -44,10 +44,11 @@ This is where real web servers get killed. Already largely covered by
 
 ### 1.2 Outstanding
 - [x] **B9 — non-hex chunk size in `Transfer-Encoding: chunked`** &nbsp; Harness `expect` relaxed to `^(400|501)$` per RFC 9112 §6.1; server returns 501 (chunked decoding unimplemented). Score: **38/38**.
-- [ ] **B7 — chunked decoding before CGI hand-off** &nbsp; Subject mandates: "for chunked requests, your server needs to
-  un-chunk them, the CGI will expect EOF as the end of the body." Decode `Transfer-Encoding: chunked` request bodies in
-  `Request::from_buff` so `Request::get_body()` returns the decoded byte stream. Evaluator probability ~70% (curl `-T`
-  with stdin uses chunked).
+- [x] **B7 — chunked decoding before CGI hand-off** &nbsp; `Request::from_buff` + `Request::unchunk` decode `Transfer-Encoding: chunked` request bodies; CGI sees decoded body via stdin EOF. Verified end-to-end through `webserv_chunked_tests.zsh` (A1–A5 malformed-framing rejection, B1–B7 well-formed acceptance, C1–C5 body-integrity through CGI echo, D1–D3 chunked multipart upload). 20/20.
+
+### 1.2.1 Known minor regressions from chunked work
+- [ ] **A2 / A5 return 408 instead of 400** &nbsp; The marker-detection tightening (`find("\r\n0\r\n")` + body-offset-0 special-case) means malformed framing where the zero-chunk marker is unreachable (e.g. `5\r\nhelloMISSING0\r\n\r\n` — no CRLF before the `0`) is no longer rejected synchronously; the request goes partial and is timed out by the chunked-pending sweep. Functionally accepted by the harness regex. Logically a regression: malformed framing should 400 immediately. Worth a closer look post-submission. ~30% probability of evaluator probe.
+- [ ] **Double 504 on CGI gateway timeout** &nbsp; Cosmetic: timeout sweep emits 504 once, then `handle_event` re-enters the gateway_timeout branch on the next event and emits a second copy. Log artefact only; client sees the first one and closes. Worth state-machine cleanup but not blocking.
 
 ### 1.3 Follow-on probes worth running once
 - [ ] CRLF injection in path: `GET /foo%0d%0aSet-Cookie:%20evil HTTP/1.1` — must not echo decoded CRLF into response headers.
@@ -217,13 +218,15 @@ The single most-graded category. ~90% of crash marks live here.
 ---
 
 ## 6. Recommended execution order
-
 1. ~~**Section 5.3** — mid-request disconnect tests.~~ Done (13/13).
-2. ~~**Section 3** — CGI sandboxing & B4 framing.~~ Done (subject conformance; 12/12 on framing harness).
+2. ~~**Section 3 (B4 framing)** — CGI output → HTTP framing.~~ Done (12/12).
 3. ~~**Section 2** — security headers.~~ Done bar HEAD (H6/H7).
-4. **HEAD method** — closes H6/H7. ~30 min. **Next stop.**
-5. **Chunked decoding (B7)** — subject-mandated for chunked CGI POSTs. ~half a day. ~70% evaluator probe.
-6. **Section 4.1, 4.2** — ETag and Last-Modified. ~half a day. Conditional GET works in browsers/curl.
-7. **Section 5.1, 5.2** — slowloris and resource exhaustion. ~1 day. Hardens the "must not crash" line.
+4. ~~**Chunked decoding (B7)** — subject-mandated for chunked CGI POSTs.~~ Done (20/20 incl. multipart upload).
+5. **Section 3.1–3.5 — CGI sandboxing implementation.** Harness already written (`webserv_cgi_tests.zsh`, 15 cases covering process limits, env hygiene, filesystem hygiene, body forwarding). Subject-mandated `chdir`. ~half to one day. **Next stop.**
+6. **HEAD method** — closes H6/H7. ~30 min.
+7. **Section 4.1, 4.2** — ETag and Last-Modified. ~half a day. Conditional GET works in browsers/curl.
+8. **Section 5.1, 5.2** — slowloris and resource exhaustion. ~1 day. Hardens the "must not crash" line.
+9. **Route precedence fix** — exact-match `POST /storage/` should beat wildcard `POST|DELETE /storage/*` when path has no extra segments. Currently worked around by duplicating `+>` directive. Cosmetic for submission, structural for defence.
+10. **A2/A5 synchronous 400 rejection** — see §1.2.1.
 
-Items 4–5 are submission-blocking; 6–7 are defence-strengthening.
+Items 5–6 are submission-blocking; 7–10 are defence-strengthening.
