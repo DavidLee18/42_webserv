@@ -170,6 +170,7 @@ private:
   Method method;       ///< The HTTP method (e.g., "GET").
   std::string path;    ///< The requested path (e.g., "/").
   std::string version; ///< The HTTP version (e.g., "HTTP/1.1").
+  std::string query;
   std::map<std::string, std::string> header; ///< Parsed HTTP headers.
   bool keep_alive; ///< Connection keep-alive status (HTTP/1.1 default: true).
   ssize_t content_length;
@@ -179,18 +180,30 @@ private:
   UnchunkState decode_chunk_state;
 
   Request()
-      : method(ERROR), path(), version(), header(), keep_alive(true),
+      : method(ERROR), path(), version(), query(), header(), keep_alive(true),
         content_length(-1), cookie(), body(), remnants(),
         decode_chunk_state(NOT_CHUNKED) {}
   Request(const Method method, std::string const &path,
           std::string const &version, const size_t content_length)
       : method(method), path(path), version(version), keep_alive(true),
         content_length(static_cast<ssize_t>(content_length)),
-        decode_chunk_state(NOT_CHUNKED) {}
+        decode_chunk_state(NOT_CHUNKED) {
+    const size_t query_pos = path.find('?');
+    if (query_pos != std::string::npos) {
+      query = path.substr(query_pos + 1);
+      this->path = path.substr(0, query_pos);
+    }
+  }
   Request(const Method method, std::string const &path,
           std::string const &version)
       : method(method), path(path), version(version), keep_alive(true),
-        content_length(0), decode_chunk_state(READING) {}
+        content_length(0), decode_chunk_state(READING) {
+    const size_t query_pos = path.find('?');
+    if (query_pos != std::string::npos) {
+      query = path.substr(query_pos + 1);
+      this->path = path.substr(0, query_pos);
+    }
+  }
 };
 
 #endif
