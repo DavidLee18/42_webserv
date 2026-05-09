@@ -1499,8 +1499,8 @@ CgiDelegate::CgiDelegate(const CgiDelegate &other)
     : _env(other._env), _script_path(other._script_path), _req(other._req),
       _epoll(other._epoll), _pid(other._pid), _stdin(other._stdin),
       _stdout(other._stdout), _total_written(other._total_written),
-      _output(other._output), _state(other._state), _start_time(),
-      _timeout_ns() {
+      _output(other._output), _state(other._state),
+      _start_time(other._start_time), _timeout_ns(other._timeout_ns) {
   const_cast<CgiDelegate &>(other)._env.mvars.clear();
   const_cast<CgiDelegate &>(other)._env.req_body.clear();
   const_cast<CgiDelegate &>(other)._script_path.clear();
