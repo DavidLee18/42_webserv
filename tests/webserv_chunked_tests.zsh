@@ -23,6 +23,7 @@ set -u
 HOST=${HOST:-127.0.0.1}
 PORT=${PORT:-8080}
 UPLOAD_URL=${UPLOAD_URL:-/upload}
+UPLOAD_PATH=${UPLOAD_PATH:-/storage/}
 LOGIN_URL=${LOGIN_URL:-/login.html}
 LOGIN_BODY=${LOGIN_BODY:-id=david&pw=david1234}
 ECHO_CGI_URL=${ECHO_CGI_URL:-}
@@ -331,6 +332,111 @@ integrity_test "C4 empty body" \
   integrity_test "C5 64×16-byte chunks (1 KiB total)" \
     "$big_chunked" \
     "$big_body"
+}
+
+# -----------------------------------------------------------------------------
+# Section D — chunked multipart/form-data file upload
+# -----------------------------------------------------------------------------
+
+print -- ""
+print -- "── D. chunked multipart/form-data file upload ──────────────────"
+
+# Send a chunked multipart upload and verify the response status.
+#   $1 name   $2 filename   $3 content   $4 chunk-size (0 = single chunk)
+#   $5 expected-status-regex
+upload_test() {
+  local name=$1 fname=$2 content=$3 chunk_sz=$4 expect=$5
+  local content_b64
+  content_b64=$(printf -- '%s' "$content" | "$PYTHON" -c 'import sys,base64; sys.stdout.write(base64.b64encode(sys.stdin.buffer.read()).decode())')
+  local err out
+  err=$(mktemp)
+  out=$("$PYTHON" - "$HOST" "$PORT" "$UPLOAD_PATH" "$fname" "$content_b64" "$chunk_sz" "$SESSION_COOKIE" 2>"$err" <<'PY'
+import socket, sys, base64
+host, port, path, fname, content_b64, chunk_sz, cookie = (
+    sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4],
+    sys.argv[5], int(sys.argv[6]), sys.argv[7])
+content = base64.b64decode(content_b64)
+boundary = "WebservTestBoundary42"
+multipart = (
+    f"--{boundary}\r\n"
+    f'Content-Disposition: form-data; name="file"; filename="{fname}"\r\n'
+    f"Content-Type: application/octet-stream\r\n\r\n"
+).encode() + content + f"\r\n--{boundary}--\r\n".encode()
+
+def chunkify(data, sz):
+    if sz <= 0:
+        sz = max(len(data), 1)
+    out, i = b"", 0
+    while i < len(data):
+        piece = data[i:i+sz]
+        out += f"{len(piece):x}\r\n".encode() + piece + b"\r\n"
+        i += sz
+    return out + b"0\r\n\r\n"
+
+chunked = chunkify(multipart, chunk_sz)
+headers = (
+    f"POST {path} HTTP/1.1\r\n"
+    f"Host: {host}\r\n"
+    f"Transfer-Encoding: chunked\r\n"
+    f"Content-Type: multipart/form-data; boundary={boundary}\r\n"
+    f"Connection: close\r\n"
+).encode()
+if cookie:
+    headers += f"Cookie: {cookie}\r\n".encode()
+headers += b"\r\n"
+req = headers + chunked
+try:
+    s = socket.create_connection((host, port), timeout=10)
+    s.sendall(req)
+    data = b""
+    while True:
+        chunk = s.recv(8192)
+        if not chunk: break
+        data += chunk
+    s.close()
+except Exception as e:
+    print("---", end="")
+    sys.stderr.write(f"send error: {e}\n")
+    sys.exit(0)
+line = data.split(b"\r\n", 1)[0].decode("latin-1", "replace")
+parts = line.split(" ")
+status = parts[1] if len(parts) >= 2 and parts[0].startswith("HTTP/") else "---"
+print(status, end="")
+sys.stderr.buffer.write(data)
+PY
+  )
+  if [[ $out =~ $expect ]]; then
+    print -- "${C_PASS}PASS${C_OFF} $name ${C_DIM}— status $out${C_OFF}"
+    (( PASS++ ))
+  else
+    print -- "${C_FAIL}FAIL${C_OFF} $name ${C_DIM}— status $out (expected $expect)${C_OFF}"
+    if (( VERBOSE )); then
+      print -- "${C_DIM}  raw response:${C_OFF}"
+      sed 's/^/    /' "$err" >&2
+    fi
+    FAILED+=("$name")
+    (( FAIL++ ))
+  fi
+  rm -f "$err"
+}
+
+# D1: small text file, single chunk
+upload_test "D1 small text file (single chunk)" \
+  "d1.txt" "hello world from D1" 0 '^[23][0-9][0-9]$'
+
+# D2: same content split into 32-byte chunks
+upload_test "D2 split into 32-byte chunks" \
+  "d2.txt" "hello world split into many smaller pieces today" 32 '^[23][0-9][0-9]$'
+
+# D3: 1 KiB body across 256-byte chunks
+{
+  local content=""
+  local i
+  for i in {1..64}; do
+    content+=$(printf '%016d' $i)
+  done
+  upload_test "D3 1 KiB file split into 256-byte chunks" \
+    "d3.bin" "$content" 256 '^[23][0-9][0-9]$'
 }
 
 # -----------------------------------------------------------------------------
