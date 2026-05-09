@@ -1,7 +1,7 @@
 CXX				:= c++
 CXXFLAGS_COMMON	:= -Wall -Werror -Wextra -Wconversion -std=c++98
 CXXFLAGS		:= -O2 -foptimize-sibling-calls
-DEBUG_CXXFLAGS	:= -g3 -O0 -fno-omit-frame-pointer -fno-inline
+DEBUG_CXXFLAGS	:= -fsanitize=address -g3 -O0 -fno-omit-frame-pointer -fno-inline
 NAME			:= webserv
 
 BUILD_DIR := build

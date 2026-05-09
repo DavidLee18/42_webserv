@@ -165,7 +165,7 @@ public:
   bool event_contains(const FileDescriptor *fd) const;
   static Result<EPoll> create(unsigned short);
   Result<Events> wait(int timeout_ms) const;
-  Result<FileDescriptor *> add_fd(const FileDescriptor &fd, const Event &,
+  Result<FileDescriptor *> add_fd(const FileDescriptor fd, const Event &,
                                   const Option &);
   Result<Void> modify_fd(const FileDescriptor *, const Event &,
                          const Option &) const;

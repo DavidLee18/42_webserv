@@ -80,8 +80,8 @@ Result<EPoll> EPoll::create(const unsigned short sz) {
   return OK(EPoll, ep);
 }
 
-Result<FileDescriptor *> EPoll::add_fd(const FileDescriptor &fd,
-                                       const Event &ev, const Option &op) {
+Result<FileDescriptor *> EPoll::add_fd(const FileDescriptor fd, const Event &ev,
+                                       const Option &op) {
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
