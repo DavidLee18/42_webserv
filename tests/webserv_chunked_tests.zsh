@@ -23,6 +23,8 @@ set -u
 HOST=${HOST:-127.0.0.1}
 PORT=${PORT:-8080}
 UPLOAD_URL=${UPLOAD_URL:-/upload}
+LOGIN_URL=${LOGIN_URL:-/login.html}
+LOGIN_BODY=${LOGIN_BODY:-id=david&pw=david1234}
 ECHO_CGI_URL=${ECHO_CGI_URL:-}
 VERBOSE=${VERBOSE:-0}
 PYTHON=${PYTHON:-$(command -v python3)}
@@ -41,6 +43,51 @@ print -- "target:    http://${HOST}:${PORT}"
 print -- "upload:    $UPLOAD_URL"
 print -- "echo-cgi:  ${ECHO_CGI_URL:-<not configured; integrity tests will be skipped>}"
 print -- "(VERBOSE=1 to dump raw responses on failure)"
+print -- ""
+
+# -----------------------------------------------------------------------------
+# Login once at startup; capture Set-Cookie for re-use in every chunked POST.
+# -----------------------------------------------------------------------------
+SESSION_COOKIE=""
+
+login() {
+  "$PYTHON" - "$HOST" "$PORT" "$LOGIN_URL" "$LOGIN_BODY" <<'PY'
+import socket, sys
+host, port, path, body = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
+body_b = body.encode("latin-1")
+req = (
+    f"POST {path} HTTP/1.1\r\n"
+    f"Host: {host}\r\n"
+    f"Content-Type: application/x-www-form-urlencoded\r\n"
+    f"Content-Length: {len(body_b)}\r\n"
+    f"Connection: close\r\n"
+    f"\r\n"
+).encode("latin-1") + body_b
+try:
+    s = socket.create_connection((host, port), timeout=5)
+    s.sendall(req); data = b""
+    while True:
+        chunk = s.recv(8192)
+        if not chunk: break
+        data += chunk
+    s.close()
+except Exception as e:
+    sys.stderr.write(f"login error: {e}\n"); sys.exit(0)
+for line in data.split(b"\r\n"):
+    low = line.lower()
+    if low.startswith(b"set-cookie:"):
+        # Take only the name=value pair, drop attributes after ';'.
+        val = line.split(b":", 1)[1].strip().split(b";", 1)[0]
+        sys.stdout.buffer.write(val); break
+PY
+}
+
+SESSION_COOKIE=$(login)
+if [[ -n $SESSION_COOKIE ]]; then
+  print -- "logged in: ${SESSION_COOKIE}"
+else
+  print -- "${C_FAIL}login failed${C_OFF} (B/C tests will likely 403)"
+fi
 print -- ""
 
 # -----------------------------------------------------------------------------
@@ -73,19 +120,22 @@ send_chunked() {
   local path=$1 body=$2  
   local body_b64
   body_b64=$(printf -- '%s' "$body" | "$PYTHON" -c 'import sys,base64; sys.stdout.write(base64.b64encode(sys.stdin.buffer.read()).decode())')
-  "$PYTHON" - "$HOST" "$PORT" "$path" "$body_b64" <<'PY' 2>/dev/null
+  "$PYTHON" - "$HOST" "$PORT" "$path" "$body_b64" "$SESSION_COOKIE" <<'PY' 2>/dev/null
 import socket, sys
 import base64
-host, port, path, body_b64 = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
+host, port, path, body_b64, cookie = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4], sys.argv[5]
 body = base64.b64decode(body_b64)
-req = (
+headers = (
     f"POST {path} HTTP/1.1\r\n"
     f"Host: {host}\r\n"
     f"Transfer-Encoding: chunked\r\n"
     f"Content-Type: application/octet-stream\r\n"
     f"Connection: close\r\n"
-    f"\r\n"
-).encode("latin-1") + body
+)
+if cookie:
+    headers += f"Cookie: {cookie}\r\n"
+headers += "\r\n"
+req = headers.encode("latin-1") + body
 try:
     s = socket.create_connection((host, port), timeout=5)
     s.sendall(req)
