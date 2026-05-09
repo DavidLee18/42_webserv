@@ -320,7 +320,7 @@ public:
 private:
   CgiInput _env;
   std::string _script_path;
-  const Request &_req;
+  const Request _req;
   EPoll &_epoll;
   pid_t _pid;
   FileDescriptor *_stdin;

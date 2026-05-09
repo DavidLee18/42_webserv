@@ -80,6 +80,12 @@ public:
 
   enum UnchunkState { NOT_CHUNKED, READING, DONE };
 
+  Request(Request const &other)
+      : method(other.method), path(other.path), version(other.version),
+        header(other.header), keep_alive(other.keep_alive),
+        content_length(other.content_length), cookie(other.cookie),
+        body(other.body), remnants(other.remnants),
+        decode_chunk_state(other.decode_chunk_state) {}
   static Result<Request *> from_buff(std::string &);
 
   /**
