@@ -543,7 +543,7 @@ Result<Void> Server::start() {
                 resp =
                     DefaultError::default_err_response(Response::BAD_GATEWAY);
             } else
-              return OKV;
+              continue;
             oss << resp;
             if (!resp.keep_alive)
               clients.at(client_fd).dropping = true;
