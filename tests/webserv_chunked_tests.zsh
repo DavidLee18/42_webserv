@@ -120,7 +120,7 @@ send_chunked() {
   local path=$1 body=$2  
   local body_b64
   body_b64=$(printf -- '%s' "$body" | "$PYTHON" -c 'import sys,base64; sys.stdout.write(base64.b64encode(sys.stdin.buffer.read()).decode())')
-  "$PYTHON" - "$HOST" "$PORT" "$path" "$body_b64" "$SESSION_COOKIE" <<'PY' 2>/dev/null
+  "$PYTHON" - "$HOST" "$PORT" "$path" "$body_b64" "$SESSION_COOKIE" <<'PY'
 import socket, sys
 import base64
 host, port, path, body_b64, cookie = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4], sys.argv[5]

@@ -236,7 +236,15 @@ Result<Request *> Request::from_buff(std::string &buff) {
       return ERR(Request *, "streampos error");
     }
     req->remnants = buff.substr(static_cast<size_t>(body_start));
-    const size_t chunk_end = req->remnants.find("0\r\n");
+    size_t chunk_end;
+
+    if (req->remnants.compare(0, 3, "0\r\n") == 0) {
+      chunk_end = 0;
+    } else {
+      const size_t crlf_zero = req->remnants.find("\r\n0\r\n");
+      chunk_end =
+          (crlf_zero == std::string::npos) ? std::string::npos : crlf_zero + 2;
+    }
     if (chunk_end != std::string::npos) {
       const Result<size_t> unchunked = req->unchunk(chunk_end);
       if (!unchunked.has_value()) {
@@ -272,7 +280,15 @@ Result<Void> Request::continue_parsing(std::string &buff) {
   } else if (decode_chunk_state != NOT_CHUNKED && decode_chunk_state != DONE) {
     remnants += buff;
     buff.clear();
-    const size_t chunk_end = remnants.find("0\r\n");
+    size_t chunk_end;
+
+    if (remnants.compare(0, 3, "0\r\n") == 0) {
+      chunk_end = 0;
+    } else {
+      const size_t crlf_zero = remnants.find("\r\n0\r\n");
+      chunk_end =
+          (crlf_zero == std::string::npos) ? std::string::npos : crlf_zero + 2;
+    }
     if (chunk_end != std::string::npos) {
       const Result<size_t> unchunked = unchunk(chunk_end);
       if (!unchunked.has_value())
