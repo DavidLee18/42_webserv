@@ -1660,10 +1660,8 @@ Result<Void> CgiDelegate::register_(
   }
 
   _pid = pid;
-  FileDescriptor &stdin =
-      const_cast<FileDescriptor &>(stdin_pipe_res.value().second);
-  FileDescriptor &stdout =
-      const_cast<FileDescriptor &>(stdout_pipe_res.value().first);
+  FileDescriptor stdin = stdin_pipe_res.value().second;
+  FileDescriptor stdout = stdout_pipe_res.value().first;
 
   // Non-blocking is mandatory: epoll readiness does not imply non-blocking
   // semantics of read/write, and partial IO is expected in the event loop.
@@ -1692,6 +1690,11 @@ Result<Void> CgiDelegate::register_(
       return ERR(Void, "Failed to add stdin to epoll");
     }
     _stdin = add_res.value();
+  } else {
+    {
+      FileDescriptor stdin_drop(stdin);
+    }
+    _stdin = NULL;
   }
 
   // Register stdout for EPOLLIN (plus err/hup so we notice child exit).

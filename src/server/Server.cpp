@@ -91,6 +91,11 @@ void Server::client_read(const FileDescriptor *client_fd) {
     if (!recv_res.has_value())
       break; // EWOULDBLOCK
 
+    if (clock_gettime(CLOCK_MONOTONIC,
+                      &clients.at(client_fd).last_activity_time) != 0) {
+      std::cerr << "ERROR: failed to update client activity time" << std::endl;
+      return;
+    }
     ssize_t bytes = recv_res.value();
     if (bytes == 0) { // (EOF)
       clients.at(client_fd).dropping = true;
@@ -393,7 +398,7 @@ Result<Void> Server::start() {
              clients.begin();
          it != clients.end(); ++it) {
       const FileDescriptor *client_fd = it->first;
-      const ClientSession &session = it->second;
+      ClientSession &session = it->second;
 
       if (session.config == NULL)
         continue;
@@ -409,10 +414,21 @@ Result<Void> Server::start() {
           std::cerr << "ERROR: client activity time in the future" << std::endl;
           continue;
         }
-        if (elapsed.tv_sec >= static_cast<time_t>(timeout_sec))
-          // Client has timed out
-          clients_to_disconnect.push_back(client_fd);
-        else {
+        if (elapsed.tv_sec >=
+            static_cast<time_t>(timeout_sec)) { // Client has timed out
+          if (session.req &&
+              (session.req->is_partial() || !session.in_buff.empty())) {
+            Response resp =
+                DefaultError::default_err_response(Response::REQUEST_TIMEOUT);
+            std::ostringstream oss;
+            oss << resp;
+            session.dropping = true; // ensures disconnect after flush
+            session.out_buff = oss.str();
+            client_write(client_fd); // try to flush now
+          } else {
+            clients_to_disconnect.push_back(client_fd);
+          }
+        } else {
           // Calculate remaining time until this client times out
           const long remaining = (timeout_sec - elapsed.tv_sec) / 1000;
           if (epoll_timeout == -1 || remaining < epoll_timeout)

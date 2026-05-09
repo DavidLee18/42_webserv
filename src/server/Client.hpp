@@ -158,7 +158,7 @@ public:
 
   Result<Void> continue_parsing(std::string &);
 
-  Result<Void> unchunk(size_t remnant_end);
+  Result<size_t> unchunk(size_t remnant_end);
 
 private:
   Method method;       ///< The HTTP method (e.g., "GET").

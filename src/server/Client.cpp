@@ -236,13 +236,16 @@ Result<Request *> Request::from_buff(std::string &buff) {
       return ERR(Request *, "streampos error");
     }
     req->remnants = buff.substr(static_cast<size_t>(body_start));
-    const size_t chunk_end = req->remnants.find("0\r\n\r\n");
+    const size_t chunk_end = req->remnants.find("\r\n0\r\n");
     if (chunk_end != std::string::npos) {
-      if (!req->unchunk(chunk_end).has_value()) {
+      const Result<size_t> unchunked = req->unchunk(chunk_end);
+      if (!unchunked.has_value()) {
         delete req;
         return ERR(Request *, Errors::bad_request);
       }
+      buff.erase(0, static_cast<size_t>(body_start) + 1 + unchunked.value());
     }
+    buff.erase(0, static_cast<size_t>(body_start) + 1);
     return OK(Request *, req);
   }
 }
@@ -268,9 +271,12 @@ Result<Void> Request::continue_parsing(std::string &buff) {
     }
   } else if (decode_chunk_state != NOT_CHUNKED && decode_chunk_state != DONE) {
     remnants += buff;
-    const size_t chunk_end = remnants.find("0\r\n\r\n");
-    if (chunk_end != std::string::npos && !unchunk(chunk_end).has_value()) {
-      return ERR(Void, Errors::bad_request);
+    buff.clear();
+    const size_t chunk_end = remnants.find("\r\n0\r\n");
+    if (chunk_end != std::string::npos) {
+      const Result<size_t> unchunked = unchunk(chunk_end);
+      if (!unchunked.has_value())
+        return ERR(Void, Errors::bad_request);
     }
     return OKV;
   }
@@ -283,20 +289,25 @@ bool Request::is_partial() const {
   return decode_chunk_state != DONE;
 }
 
-Result<Void> Request::unchunk(size_t remnant_end) {
+Result<size_t> Request::unchunk(size_t remnant_end) {
   if (remnant_end >= remnants.length())
-    return ERR(Void, Errors::bad_request);
-  std::string rems(remnants.substr(0, remnant_end + std::strlen("0\r\n\r\n")));
+    return ERR(size_t, Errors::bad_request);
+  const size_t last_pos =
+      remnants.find("\r\n", remnant_end + std::strlen("\r\n0\r\n") + 1);
+  if (last_pos == std::string::npos)
+    return ERR(size_t, Errors::bad_request);
+  std::string rems(remnants.substr(0, remnant_end + std::strlen("\r\n0\r\n")));
   size_t line_end = 0;
   if (rems.empty())
-    return ERR(Void, Errors::bad_request);
+    return ERR(size_t, Errors::bad_request);
+  rems.append("\r\n");
   std::string size_or_data;
   size_t chunk_size = 0;
   size_t size_line_semicolon_pos = 0;
   while (!rems.empty()) {
     line_end = rems.find("\r\n");
     if (line_end == std::string::npos)
-      return ERR(Void, Errors::bad_request);
+      return ERR(size_t, Errors::bad_request);
     size_or_data = rems.substr(0, line_end);
     rems = rems.substr(line_end + std::strlen("\r\n"));
     size_line_semicolon_pos = size_or_data.find(';');
@@ -312,30 +323,33 @@ Result<Void> Request::unchunk(size_t remnant_end) {
       else if (*it >= 'a' && *it <= 'f')
         chunk_size += static_cast<size_t>(*it - 'a') + 10;
       else
-        return ERR(Void, Errors::bad_request);
+        return ERR(size_t, Errors::bad_request);
     }
     if (chunk_size == 0) {
       if (rems.substr(0, 2) != "\r\n")
-        return ERR(Void, Errors::bad_request);
+        return ERR(size_t, Errors::bad_request);
       rems = rems.substr(std::strlen("\r\n"));
       if (!rems.empty())
-        return ERR(Void, Errors::bad_request);
+        return ERR(size_t, Errors::bad_request);
       else {
         content_length = static_cast<ssize_t>(body.length());
         decode_chunk_state = DONE;
         remnants.clear();
-        return OKV;
+        return OK(size_t, last_pos + 1);
       }
     } else if (chunk_size > 10 * 1024 * 1024 || chunk_size + 2 > rems.length())
-      return ERR(Void, Errors::bad_request);
+      return ERR(
+          size_t,
+          Errors::bad_request); // Safe only because caller ensures full body is
+                                // buffered (find("0\r\n\r\n") succeeded).
     body += rems.substr(0, chunk_size);
     if (rems.substr(chunk_size, 2) != "\r\n")
-      return ERR(Void, Errors::bad_request);
+      return ERR(size_t, Errors::bad_request);
     rems = rems.substr(chunk_size + std::strlen("\r\n"));
     chunk_size = 0;
   }
-  // 0\r\n\r\n not found yet remnant string empty
-  return ERR(Void, Errors::bad_request);
+  // \r\n0\r\n not found yet remnant string empty
+  return ERR(size_t, Errors::bad_request);
 }
 
 Result<size_t> Request::get_content_length() const {
