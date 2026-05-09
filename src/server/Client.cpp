@@ -236,16 +236,16 @@ Result<Request *> Request::from_buff(std::string &buff) {
       return ERR(Request *, "streampos error");
     }
     req->remnants = buff.substr(static_cast<size_t>(body_start));
-    const size_t chunk_end = req->remnants.find("\r\n0\r\n");
+    const size_t chunk_end = req->remnants.find("0\r\n");
     if (chunk_end != std::string::npos) {
       const Result<size_t> unchunked = req->unchunk(chunk_end);
       if (!unchunked.has_value()) {
         delete req;
         return ERR(Request *, Errors::bad_request);
       }
-      buff.erase(0, static_cast<size_t>(body_start) + 1 + unchunked.value());
-    }
-    buff.erase(0, static_cast<size_t>(body_start) + 1);
+      buff.erase(0, static_cast<size_t>(body_start) + unchunked.value());
+    } // else: chunked but not yet complete — leave buff untouched; remnants
+      // holds the partial
     return OK(Request *, req);
   }
 }
@@ -272,7 +272,7 @@ Result<Void> Request::continue_parsing(std::string &buff) {
   } else if (decode_chunk_state != NOT_CHUNKED && decode_chunk_state != DONE) {
     remnants += buff;
     buff.clear();
-    const size_t chunk_end = remnants.find("\r\n0\r\n");
+    const size_t chunk_end = remnants.find("0\r\n");
     if (chunk_end != std::string::npos) {
       const Result<size_t> unchunked = unchunk(chunk_end);
       if (!unchunked.has_value())
@@ -293,10 +293,10 @@ Result<size_t> Request::unchunk(size_t remnant_end) {
   if (remnant_end >= remnants.length())
     return ERR(size_t, Errors::bad_request);
   const size_t last_pos =
-      remnants.find("\r\n", remnant_end + std::strlen("\r\n0\r\n") + 1);
+      remnants.find("\r\n", remnant_end + std::strlen("0\r\n"));
   if (last_pos == std::string::npos)
     return ERR(size_t, Errors::bad_request);
-  std::string rems(remnants.substr(0, remnant_end + std::strlen("\r\n0\r\n")));
+  std::string rems(remnants.substr(0, remnant_end + std::strlen("0\r\n")));
   size_t line_end = 0;
   if (rems.empty())
     return ERR(size_t, Errors::bad_request);
@@ -335,7 +335,7 @@ Result<size_t> Request::unchunk(size_t remnant_end) {
         content_length = static_cast<ssize_t>(body.length());
         decode_chunk_state = DONE;
         remnants.clear();
-        return OK(size_t, last_pos + 1);
+        return OK(size_t, last_pos + 2);
       }
     } else if (chunk_size > 10 * 1024 * 1024 || chunk_size + 2 > rems.length())
       return ERR(

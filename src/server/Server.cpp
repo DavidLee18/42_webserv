@@ -414,20 +414,20 @@ Result<Void> Server::start() {
           std::cerr << "ERROR: client activity time in the future" << std::endl;
           continue;
         }
-        if (elapsed.tv_sec >=
-            static_cast<time_t>(timeout_sec)) { // Client has timed out
-          if (session.req &&
-              (session.req->is_partial() || !session.in_buff.empty())) {
-            Response resp =
-                DefaultError::default_err_response(Response::REQUEST_TIMEOUT);
-            std::ostringstream oss;
-            oss << resp;
-            session.dropping = true; // ensures disconnect after flush
-            session.out_buff = oss.str();
-            client_write(client_fd); // try to flush now
-          } else {
-            clients_to_disconnect.push_back(client_fd);
-          }
+        if (elapsed.tv_sec >= static_cast<time_t>(timeout_sec) &&
+            (session.req == NULL ||
+             (!session.req->is_partial() &&
+              session.in_buff.empty()))) { // Client has timed out
+          clients_to_disconnect.push_back(client_fd);
+        } else if (elapsed.tv_sec >= CHUNKED_PENDING_TIMEOUT && session.req &&
+                   (session.req->is_partial() || !session.in_buff.empty())) {
+          Response resp =
+              DefaultError::default_err_response(Response::REQUEST_TIMEOUT);
+          std::ostringstream oss;
+          oss << resp;
+          session.dropping = true; // ensures disconnect after flush
+          session.out_buff = oss.str();
+          client_write(client_fd); // try to flush now
         } else {
           // Calculate remaining time until this client times out
           const long remaining = (timeout_sec - elapsed.tv_sec) / 1000;
