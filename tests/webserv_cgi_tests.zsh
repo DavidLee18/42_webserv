@@ -28,6 +28,7 @@ VERBOSE=${VERBOSE:-0}
 PID=${PID:-}
 CGI_DIR=${CGI_DIR:-spool/www/cgi-bin}
 CGI_TIMEOUT_BOUND=${CGI_TIMEOUT_BOUND:-15}
+PYTHON=${PYTHON:-$(command -v python3)}
 
 # URL → CGI mapping (override via env if your routes differ)
 CGI_URL_HELLO=${CGI_URL_HELLO:-/cgi-test/hello}
@@ -92,7 +93,7 @@ http_request() {
   local method=$1 path=$2 timeout=${3:-10} body=${4:-} ct=${5:-}
   HOST=$HOST PORT=$PORT TIMEOUT=$timeout REQ_METHOD=$method REQ_PATH=$path \
   REQ_BODY=$body REQ_CT=$ct \
-    python3 - <<'PY'
+    "$PYTHON" - <<'PY'
 import os, socket, sys, time
 host = os.environ['HOST']
 port = int(os.environ['PORT'])
@@ -142,7 +143,7 @@ http_request_with_headers() {
   local extra_headers=("$@")
   HOST=$HOST PORT=$PORT TIMEOUT=$timeout REQ_METHOD=$method REQ_PATH=$path \
   EXTRA_HDRS="${(j:|:)extra_headers}" \
-    python3 - <<'PY'
+    "$PYTHON" - <<'PY'
 import os, socket, sys, time
 host = os.environ['HOST']
 port = int(os.environ['PORT'])
