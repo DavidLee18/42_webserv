@@ -20,7 +20,7 @@ Result<Events> Events::init(const std::list<FileDescriptor> &all_events,
       return ERR(Events, Errors::not_found);
     }
     new (static_cast<void *>(es._events + i)) Event(
-        *fd, (events[i].events & EPOLLIN) != 0,
+        fd, (events[i].events & EPOLLIN) != 0,
         (events[i].events & EPOLLOUT) != 0,
         (events[i].events & EPOLLRDHUP) != 0,
         (events[i].events & EPOLLPRI) != 0, (events[i].events & EPOLLERR) != 0,
@@ -80,7 +80,7 @@ Result<EPoll> EPoll::create(const unsigned short sz) {
   return OK(EPoll, ep);
 }
 
-Result<FileDescriptor *> EPoll::add_fd(const FileDescriptor fd, const Event &ev,
+Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, Event &ev,
                                        const Option &op) {
   epoll_event event = {};
   if (ev.in)
@@ -125,6 +125,7 @@ Result<FileDescriptor *> EPoll::add_fd(const FileDescriptor fd, const Event &ev,
     }
   }
   _events.push_back(fd);
+  ev.fd = &_events.back();
   return OK(FileDescriptor *, &_events.back());
 }
 

@@ -1681,7 +1681,7 @@ Result<Void> CgiDelegate::register_(
   // If there is no body, let the stdin_fd destructor close the pipe so the
   // CGI script sees EOF on its stdin.
   if (!_req.get_body().empty()) {
-    Event write_event(stdin, false, true, false, false, true, true);
+    Event write_event(NULL, false, true, false, false, true, true);
     Option write_option(false, false, false, false);
     Result<FileDescriptor *> add_res =
         _epoll.add_fd(stdin, write_event, write_option);
@@ -1698,7 +1698,7 @@ Result<Void> CgiDelegate::register_(
   }
 
   // Register stdout for EPOLLIN (plus err/hup so we notice child exit).
-  Event read_event(stdout, true, false, true, false, true, true);
+  Event read_event(NULL, true, false, true, false, true, true);
   Option read_option(false, false, false, false);
   Result<FileDescriptor *> add_out_res =
       _epoll.add_fd(stdout, read_event, read_option);
@@ -1730,7 +1730,7 @@ Result<Void> CgiDelegate::register_(
 // fds this delegate registered. Unknown events are ignored.
 Result<Void> CgiDelegate::handle_event(const Event *ev) {
   dprintf(2, "handle_event called: ev_fd=%d stdin=%d stdout=%d\n",
-          ev ? ev->fd._fd : -1, _stdin ? _stdin->_fd : -1,
+          ev ? ev->fd->_fd : -1, _stdin ? _stdin->_fd : -1,
           _stdout ? _stdout->_fd : -1);
   if (ev == NULL)
     return OKV;
@@ -1749,7 +1749,7 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
     _state = Failed;
     return ERR(Void, Errors::gateway_timeout);
   }
-  if (_stdin != NULL && ev->fd == *_stdin) {
+  if (_stdin != NULL && ev->fd == _stdin) {
     if (ev->err) {
       _state = Failed;
       return ERR(Void, Errors::bad_gateway);
@@ -1798,7 +1798,7 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       }
     }
   }
-  if (_stdout != NULL && ev->fd == *_stdout) {
+  if (_stdout != NULL && ev->fd == _stdout) {
     // is_stdout
     dprintf(2, "stdout event: in=%d hup=%d\n", ev->in, ev->hup);
     if (ev->in || ev->hup || ev->rdhup) {

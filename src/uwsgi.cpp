@@ -366,10 +366,10 @@ Result<Void> UwsgiDelegate::register_() {
   Void conn_res;
   TRY(Void, Void, conn_res, _sock->socket_connect(ad_info))
 
+  Event ev(NULL, false, true, false, false, true, true);
   // Monitor for writability (connect completion) and errors.
-  Result<FileDescriptor *> add_res = _epoll.add_fd(
-      *_sock, Event(*_sock, false, true, false, false, true, true),
-      Option(false, false, false, false));
+  Result<FileDescriptor *> add_res =
+      _epoll.add_fd(*_sock, ev, Option(false, false, false, false));
   if (!add_res.has_value()) {
     _error = "uwsgi: failed to add socket to epoll";
     return ERR(Void, _error);
@@ -381,7 +381,7 @@ Result<Void> UwsgiDelegate::register_() {
 
 // Phase 2: drive the state machine based on a single epoll event.
 Result<Void> UwsgiDelegate::handle_event(const Event *ev) {
-  if (ev == NULL || _sock == NULL || ev->fd != *_sock) {
+  if (ev == NULL || _sock == NULL || ev->fd != _sock) {
     return OKV;
   }
 
