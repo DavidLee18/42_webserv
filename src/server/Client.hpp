@@ -147,6 +147,8 @@ public:
     return header;
   }
 
+  const std::string &get_query() const { return query; }
+
   /**
    * @brief Gets the request body.
    *

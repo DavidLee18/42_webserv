@@ -63,6 +63,7 @@ Result<Request *> Request::from_buff(std::string &buff) {
     header_lower[i] = static_cast<char>(
         std::tolower(static_cast<unsigned char>(header_lower[i])));
   }
+  std::cerr << "[DEBUG] header_lower: [" << header_lower << "]" << std::endl;
   const size_t host_pos = header_lower.find("host:");
   // Check if there's only ONE host header (not counting it as a substring)
   // We look for it as a header name, which must be preceded by \r\n or be at

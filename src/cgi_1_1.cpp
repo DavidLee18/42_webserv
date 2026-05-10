@@ -1036,19 +1036,8 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
   input.mvars.push_back(CgiMetaVar::server_software(Webserv));
 
   // Parse path for SCRIPT_NAME, PATH_INFO, and QUERY_STRING
-  std::string path = req.get_path();
-  size_t query_pos = path.find('?');
-  std::string script_path;
-  std::string query_string;
-
-  if (query_pos != std::string::npos) {
-    script_path = path.substr(0, query_pos);
-    query_string = path.substr(query_pos + 1);
-  } else {
-    script_path = path;
-    query_string = "";
-  }
-
+  std::string script_path = req.get_path();
+  std::string query_string = req.get_query();
   // Build path segments list (shared by SCRIPT_NAME and PATH_INFO)
   std::list<std::string> path_parts;
   if (!script_path.empty()) {
