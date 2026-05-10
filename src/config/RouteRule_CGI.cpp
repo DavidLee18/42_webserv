@@ -25,7 +25,7 @@ std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
     return "on [" + line + "], [" + split[2] + "]: The CGI script reference does not start with the required $ prefix. (CGI syntax rule, the script identifier must begin with $ to be recognized as a valid CGI command, but the provided value does not follow this required format).";
   std::string file_line = utils::remove_char(split[2], '$');
 
-  err_meg = RouteRule_CGI::parse_executable(file_line, this->executable, this->env); // 1. 수정 중
+  err_meg = RouteRule_CGI::parse_executable(file_line, this->executable, this->env);
   if (err_meg != "")
     return "on [\t" + line + err_meg;
   err_meg = RouteRule_CGI::parse_cgi_params(*this, fd, "");
@@ -110,49 +110,49 @@ std::string RouteRule_CGI::is_executable_file(const std::string &path) {
   return "";
 }
 
-// bool RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
-//   if (line.empty() || line[0] != '$' || utils::has_space(line))
-//     return false;
-//   std::size_t i = 1;
-//   std::size_t pos = line.find(".cgi", i);
-//   if (pos != std::string::npos) {
-//     std::size_t exec_end = pos + 4;
+std::string RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
+  std::size_t i = 0;
+  std::size_t pos = line.find(".cgi", i);
+  if (pos != std::string::npos) {
+    std::size_t exec_end = pos + 4;
 
-//     if (exec_end < line.length() && line[exec_end] != '(')
-//       return false;
-//     std::string exec_path = line.substr(1, exec_end - 1);
-//     if (exec_path.empty() || RouteRule_CGI::is_executable_file(exec_path) != "")
-//       return false;
+    if (exec_end < line.length() && line[exec_end] != '(')
+      return "Invalid CGI environment variable syntax (violates the environment variable format rule, additional environment variables after the .cgi extension must start with '(' in the form '(key=value)').";
+    std::string exec_path = line.substr(0, exec_end);
+    if (RouteRule_CGI::is_executable_file(exec_path) != "")
+      return RouteRule_CGI::is_executable_file(exec_path);
 
-//     i = exec_end;
-//   } else {
-//     std::size_t start = i;
+    i = exec_end;
+  } else {
+    while (i < line.length() && line[i] != '(') {
+      if (!std::isdigit(static_cast<unsigned char>(line[i])))
+        return "Invalid uWSGI port format (violates the uWSGI port rule: the port number must be a numeric value).";
+      ++i;
+    }
+    if (line.size() != i) 
+      return "Invalid uWSGI environment variable syntax (violates the uWSGI configuration rule: environment variables must be defined in the global uWSGI configuration, not inline).";
+  }
 
-//     while (i < line.length() && line[i] != '(') {
-//       if (!std::isdigit(static_cast<unsigned char>(line[i])))
-//         return false;
-//       ++i;
-//     }
-//     if (start == i)
-//       return false;
-//   }
+  if (i == line.length())
+    return "";
+  if (line[i] != '(')
+    return "Invalid CGI environment variable syntax (violates the environment variable format rule: additional environment variables after the .cgi extension must start with '(' in the form '(key=value)').";
 
-//   if (i == line.length())
-//     return true;
-//   if (line[i] != '(')
-//     return false;
+  std::size_t equals = line.find('=', i + 1);
+  std::size_t end = line.find(')', i + 1);
 
-//   std::size_t equals = line.find('=', i + 1);
-//   std::size_t end = line.find(')', i + 1);
-
-//   if (equals == std::string::npos || end == std::string::npos)
-//     return false;
-//   if (equals <= i + 1 || equals + 1 >= end)
-//     return false;
-//   if (end + 1 != line.length())
-//     return false;
-//   return true;
-// }
+  if (line.find('=', equals + 1) != std::string::npos)
+    return "Invalid environment variable syntax (violates the environment variable rule: multiple environment variable declarations are not permitted; only a single '(key=value)' is allowed).";
+  else if (equals == std::string::npos)
+    return "Invalid environment variable syntax (violates the environment variable format rule: missing '=' in '(key=value)' declaration).";
+  else if(end == std::string::npos)
+    return "Invalid environment variable syntax (violates the environment variable format rule: missing closing ')' in '(key=value)' declaration).";
+  else if (equals <= i + 1 || equals + 1 >= end)
+    return "Invalid environment variable syntax (violates the key-value format rule: missing key or value in '(key=value)' declaration).";
+  else if (end + 1 != line.length())
+    return "Invalid environment variable syntax (violates the environment variable format rule: trailing characters found after the closing ')' in '(key=value)' declaration).";
+  return "";
+}
 
 bool RouteRule_CGI::is_valid_timeout(const std::string &line) {
   if (line.length() < 4 || line[0] != '.' || line[1] != '.' || line[2] != '.')
@@ -328,11 +328,10 @@ RouteRule_CGI::parse_executable(const std::string &line,
                                 std::string &executable,
                                 std::map<std::string, std::string> &map) {
   std::string err_msg = "";
-
-  // uwsgi 인지 cgi 인지 구분 추가
-  // 확장이 .cgi 인 경우, 실행할 수 있어야 합니다 추가. 
-  // 그게 아닌 경우에는 uWSGI로, 파일은 여러 가지가 올 수 있으니 실행 가능하기만 하면 될 것 같습니다 추가
   std::string file_line = utils::remove_char(line, '$');
+  err_msg = RouteRule_CGI::matches_cgi_syntax(file_line);
+  if (err_msg != "")
+    return "], ["+ file_line + "]: " + err_msg;
   std::size_t start = file_line.find('(');
   if (std::string::npos != start) {
     std::size_t end = file_line.find(')');

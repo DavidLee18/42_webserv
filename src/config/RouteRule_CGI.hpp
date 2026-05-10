@@ -80,6 +80,7 @@ private:
    * 읽는다.
    */
   std::string parse_cgi_block(FileDescriptor &fd, std::string line);
+  static std::string matches_cgi_syntax(const std::string &line);
   static std::string parse_cgi_params(RouteRule_CGI& cgi, FileDescriptor &fd, std::string line);
 public:
   RouteRule_CGI() : met(Request::GET), path(""), executable(""), env(), timeout_ms(3000), err_meg(""), count_line(0), worker_instance(5) {};

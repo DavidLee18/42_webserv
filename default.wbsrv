@@ -25,6 +25,9 @@ uwsgi =
 
 	...30
 
+	GET /cgi-test/hello     $9000
+		...6
+
 	GET /cgi-test/hello     $/spool/www/cgi-bin/hello.cgi
 
 	GET /cgi-test/sleep     $/spool/www/cgi-bin/sleep.cgi

@@ -50,7 +50,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
         return false;
       }
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
-      RouteRule_CGI temp(fd, line);  // 1. 수정 중
+      RouteRule_CGI temp(fd, line);
       count_line += temp.get_count_line();
       if (temp.get_err_meg() != "") {
         err_meg = temp.get_err_meg();

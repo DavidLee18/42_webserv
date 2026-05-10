@@ -42,7 +42,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
       if (!parse_server_config_entry(file, line))
         return false;
     } else if (line == "uwsgi =" || line == "uwsgi=") {
-      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi, count_line); //2. 수정 중
+      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi, count_line);
       if (err_meg != "")
         return false;
     } else if (line[0] == '!') {
