@@ -53,7 +53,7 @@ types =
 
 	GET|POST|DELETE /cgi-bin/* <- /spool/www/cgi-bin/*
 
-	GET * <- /spool/www/*
+	GET|POST|DELETE * <- /spool/www/*
 		? hello.html
 		@ auth_info
 		->{} 10MB
@@ -66,12 +66,13 @@ types =
 		! 413:/spool/www/error/413.html
 		! 500:/spool/www/error/500.html
 
-	POST *    $gen_html.cgi(DIST_DIR=/spool/files)
-		...10
-		AUTH_INFO=/spool/www/auth_info
+	POST /storage/ -> /spool/www/storage/
+		->{} 10MB
+		@ auth_info
 
-	DELETE *  $gen_html.cgi
-
+	POST|DELETE /storage/* <- /spool/www/storage/*
+		->{} 10MB
+		@ auth_info
 
 
 :4040 =
