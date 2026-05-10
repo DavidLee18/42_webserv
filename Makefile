@@ -87,3 +87,22 @@ cgiclean:
 -include $(UWSGI_DEPS)
 
 .PHONY: all clean fclean re bonus rebo uwsgi cgi integration-test test-cgi compile-commands
+
+# -----------------------------------------------------------------------------
+# Test suites
+# -----------------------------------------------------------------------------
+TESTS_DIR    := tests
+TEST_SUITES  := parsing headers cgi_framing cgi chunked disconnect \
+                conditional slowloris exhaustion
+
+# Run every suite in sequence. Assumes webserv is already running on
+# HOST:PORT (defaults 127.0.0.1:8080). Override via:
+#   make test HOST=... PORT=... PYTHON=...
+test: $(NAME)
+	@$(TESTS_DIR)/run_all.zsh
+
+# Run a single suite, e.g. `make test-chunked` or `make test-cgi_framing`.
+test-%: $(NAME)
+	@$(TESTS_DIR)/webserv_$*_tests.zsh
+
+.PHONY: test $(addprefix test-,$(TEST_SUITES))
