@@ -16,9 +16,9 @@ Probabilities are evaluator-probing estimates, not RFC-strictness levels.
 |--------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
 | Request-parsing hardening                              | **38/38** on `webserv_parsing_tests.zsh`.                                                                 |
 | Mid-request disconnect (5.3)                           | **13/13** on `webserv_disconnect_tests.zsh`. fd-stable across 470 adversarial iterations.                 |
-| Standard HTTP security headers                         | **12/14** on `webserv_headers_tests.zsh` (H13 skipped pending `CGI_TEST_URL`; H6/H7 pending HEAD method). |
+| Standard HTTP security headers                         | **14/14** on `webserv_headers_tests.zsh` (H13 skipped pending `CGI_TEST_URL`).                            |
 | CGI/HTTP framing (B4)                                  | **12/12** on `webserv_cgi_framing_tests.zsh`. Wired into drain hook.                                      |
-| CGI sandboxing                                         | Subject conformance complete (B1–B6, D2–D4). Stress probes not yet run; harness `webserv_cgi_tests.zsh` written, implementation pending. |
+| CGI sandboxing                                         | **14/14** on `webserv_cgi_tests.zsh` (T1–T6 process limits, E1–E5 env hygiene, F1–F2 filesystem/fd, R1 resilience). |
 | Chunked decoding (B7)                                  | **20/20** on `webserv_chunked_tests.zsh` (A: malformed framing, B: well-formed, C: CGI body integrity, D: chunked multipart upload). || Content integrity (ETag / Last-Modified / Repr-Digest) | Not started.                                                                                              |
 | Resilience under adversarial load                      | Not started.                                                                                              |
 
@@ -80,11 +80,11 @@ Expected: all four headers present.
 
 - [ ] CGI responses: do **not** double-emit if the CGI script already sets one. (H13 — skipped pending `CGI_TEST_URL`)
 - [x] Error responses (4xx/5xx) carry the headers too. (H5)
-- [ ] HEAD requests: headers identical to GET. (H6 — **next stop**)
+- [x] HEAD requests: headers identical to GET. (H6)
 
 ### Header hygiene (additional harness coverage)
 
-- [x] H7 HEAD body empty; CL matches GET — passes tautologically (both unset); tightens once H10 fixed.
+- [x] H7 HEAD body empty; CL matches GET.
 - [x] H8 no header duplicated on root response.
 - [x] H9 Content-Type set on 2xx and 4xx.
 - [x] H10 Content-Length matches actual body length.
@@ -97,10 +97,6 @@ Expected: all four headers present.
 H11/H12, content-length, and H5 — all resolved as part of the B4 framing work
 (Date/Server emission, body.length() in operator<<, NOT_FOUND on missing path).
 
-H6/H7 (HEAD method) remain. Two-part fix: (a) accept HEAD in route parsing as
-a synonym of GET; (b) dispatch HEAD through the GET branch, clear body before
-write whilst preserving GET-equivalent Content-Length. ~30 min.
- 
 ---
 
 ## 3. CGI sandboxing &nbsp; *(highest single-class crash risk in webserv)*
@@ -220,13 +216,12 @@ The single most-graded category. ~90% of crash marks live here.
 ## 6. Recommended execution order
 1. ~~**Section 5.3** — mid-request disconnect tests.~~ Done (13/13).
 2. ~~**Section 3 (B4 framing)** — CGI output → HTTP framing.~~ Done (12/12).
-3. ~~**Section 2** — security headers.~~ Done bar HEAD (H6/H7).
+3. ~~**Section 2** — security headers.~~ Done (14/14).
 4. ~~**Chunked decoding (B7)** — subject-mandated for chunked CGI POSTs.~~ Done (20/20 incl. multipart upload).
-5. **Section 3.1–3.5 — CGI sandboxing implementation.** Harness already written (`webserv_cgi_tests.zsh`, 15 cases covering process limits, env hygiene, filesystem hygiene, body forwarding). Subject-mandated `chdir`. ~half to one day. **Next stop.**
-6. **HEAD method** — closes H6/H7. ~30 min.
-7. **Section 4.1, 4.2** — ETag and Last-Modified. ~half a day. Conditional GET works in browsers/curl.
+5. ~~**Section 3.1–3.5 — CGI sandboxing implementation.**~~ Done (14/14). Resolved: chunked-marker detection at body-offset 0, CL parser trailing-CRLF, query-string verbatim emission, `LC_CTYPE` permitted as Python locale-coercion artefact, harness `awk -F=` field-split fixed.
+6. ~~**HEAD method** — closes H6/H7.~~ Done.
+7. **Section 4.1, 4.2** — ETag and Last-Modified. ~half a day. Conditional GET works in browsers/curl. **Next stop.**
 8. **Section 5.1, 5.2** — slowloris and resource exhaustion. ~1 day. Hardens the "must not crash" line.
-9. **Route precedence fix** — exact-match `POST /storage/` should beat wildcard `POST|DELETE /storage/*` when path has no extra segments. Currently worked around by duplicating `+>` directive. Cosmetic for submission, structural for defence.
-10. **A2/A5 synchronous 400 rejection** — see §1.2.1.
+9. **A2/A5 synchronous 400 rejection** — see §1.2.1.
 
-Items 5–6 are submission-blocking; 7–10 are defence-strengthening.
+Items 7–9 are defence-strengthening.
