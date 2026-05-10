@@ -268,8 +268,7 @@ CgiMetaVar::CgiMetaVar(const CgiMetaVar &other) : name(other.name), val() {
     val.path_translated = new std::string(*other.val.path_translated);
     break;
   case QUERY_STRING:
-    val.query_string =
-        new std::map<std::string, std::string>(*other.val.query_string);
+    val.query_string = new std::string(*other.val.query_string);
     break;
   case REMOTE_ADDR:
     val.remote_addr[0] = other.val.remote_addr[0];
@@ -371,8 +370,7 @@ CgiMetaVar &CgiMetaVar::operator=(const CgiMetaVar &other) {
       val.path_translated = new std::string(*other.val.path_translated);
       break;
     case QUERY_STRING:
-      val.query_string =
-          new std::map<std::string, std::string>(*other.val.query_string);
+      val.query_string = new std::string(*other.val.query_string);
       break;
     case REMOTE_ADDR:
       val.remote_addr[0] = other.val.remote_addr[0];
@@ -486,12 +484,10 @@ CgiMetaVar CgiMetaVar::path_translated(const std::string &path) {
       (CgiMetaVar::Val){.path_translated = new std::string(path)});
 }
 
-CgiMetaVar
-CgiMetaVar::query_string(const std::map<std::string, std::string> &query_map) {
+CgiMetaVar CgiMetaVar::query_string(const std::string &query_string) {
   return CgiMetaVar(
       QUERY_STRING,
-      (CgiMetaVar::Val){.query_string =
-                            new std::map<std::string, std::string>(query_map)});
+      (CgiMetaVar::Val){.query_string = new std::string(query_string)});
 }
 
 CgiMetaVar CgiMetaVar::remote_addr(const unsigned char a, const unsigned char b,
@@ -739,27 +735,7 @@ CgiMetaVar::Parser::parse_path_translated(const std::string &raw) {
 
 Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_query_string(const std::string &raw) {
-  std::map<std::string, std::string> query_map;
-
-  if (raw.empty()) {
-    return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::query_string(query_map), 0);
-  }
-
-  std::stringstream ss(raw);
-  std::string pair;
-
-  while (std::getline(ss, pair, '&')) {
-    const size_t eq_pos = pair.find('=');
-    if (eq_pos == std::string::npos) {
-      query_map[pair] = "";
-    } else {
-      std::string key = pair.substr(0, eq_pos);
-      const std::string value = pair.substr(eq_pos + 1);
-      query_map[key] = value;
-    }
-  }
-
-  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::query_string(query_map),
+  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::query_string(raw),
                  raw.length());
 }
 
@@ -1066,15 +1042,7 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
 
   // Add QUERY_STRING
   if (!query_string.empty()) {
-    std::map<std::string, std::string> query_map;
-    std::stringstream ss(query_string);
-    std::string pair;
-    while (std::getline(ss, pair, '&')) {
-      size_t eq_pos = pair.find('=');
-      if (eq_pos != std::string::npos)
-        query_map[pair.substr(0, eq_pos)] = pair.substr(eq_pos + 1);
-    }
-    input.mvars.push_back(CgiMetaVar::query_string(query_map));
+    input.mvars.push_back(CgiMetaVar::query_string(query_string));
   }
 
   // Add REMOTE_ADDR (127.0.0.1 — actual client IP is not available from
@@ -1311,18 +1279,7 @@ char **CgiInput::to_envp() const {
       break;
 
     case CgiMetaVar::QUERY_STRING:
-      env_str = "QUERY_STRING=";
-      if (var.get_val().query_string != NULL) {
-        bool first = true;
-        for (std::map<std::string, std::string>::const_iterator it =
-                 var.get_val().query_string->begin();
-             it != var.get_val().query_string->end(); ++it) {
-          if (!first)
-            env_str += "&";
-          env_str += it->first + "=" + it->second;
-          first = false;
-        }
-      }
+      env_str = "QUERY_STRING=" + *var.get_val().query_string;
       break;
 
     case CgiMetaVar::REMOTE_ADDR: {

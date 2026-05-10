@@ -58,12 +58,11 @@ Result<Request *> Request::from_buff(std::string &buff) {
     return ERR(Request *, Errors::incomplete_header);
   size_t content_length = 0;
 
-  std::string header_lower = buff.substr(0, header_end);
+  std::string header_lower = buff.substr(0, header_end + std::strlen("\r\n"));
   for (size_t i = 0; i < header_lower.length(); ++i) {
     header_lower[i] = static_cast<char>(
         std::tolower(static_cast<unsigned char>(header_lower[i])));
   }
-  std::cerr << "[DEBUG] header_lower: [" << header_lower << "]" << std::endl;
   const size_t host_pos = header_lower.find("host:");
   // Check if there's only ONE host header (not counting it as a substring)
   // We look for it as a header name, which must be preceded by \r\n or be at

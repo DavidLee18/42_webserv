@@ -161,7 +161,7 @@ public:
     GatewayInterface gateway_interface;
     std::list<std::string> *path_info;
     std::string *path_translated;
-    std::map<std::string, std::string> *query_string;
+    std::string *query_string;
     unsigned char remote_addr[4];
     std::list<std::string> *remote_host;
     std::string *remote_ident;
@@ -240,7 +240,7 @@ private:
   static CgiMetaVar gateway_interface(GatewayInterface);
   static CgiMetaVar path_info(const std::list<std::string> &);
   static CgiMetaVar path_translated(const std::string &);
-  static CgiMetaVar query_string(const std::map<std::string, std::string> &);
+  static CgiMetaVar query_string(const std::string &);
   static CgiMetaVar remote_addr(unsigned char, unsigned char, unsigned char,
                                 unsigned char);
   static CgiMetaVar remote_host(const std::list<std::string> &);
