@@ -1042,6 +1042,7 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
 
   // Add QUERY_STRING
   if (!query_string.empty()) {
+    std::cerr << "[QS-DEBUG] req.get_query()=[" << query_string << "]\n";
     input.mvars.push_back(CgiMetaVar::query_string(query_string));
   }
 
@@ -1280,6 +1281,7 @@ char **CgiInput::to_envp() const {
 
     case CgiMetaVar::QUERY_STRING:
       env_str = "QUERY_STRING=" + *var.get_val().query_string;
+      std::cerr << "[QS-ENV] env_str=[" << env_str << "]\n";
       break;
 
     case CgiMetaVar::REMOTE_ADDR: {

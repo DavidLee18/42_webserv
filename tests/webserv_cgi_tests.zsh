@@ -555,7 +555,7 @@ t_env_query_string() {
   local out body qs
   out=$(http_request GET "${CGI_URL_ENVDUMP}?name=alice&id=42" 5)
   body=$(body_of "$out")
-  qs=$(printf '%s\n' "$body" | awk -F= '/^QUERY_STRING=/{$1=""; sub(/^=/,""); print; exit}')
+  qs=$(printf '%s\n' "$body" | awk '/^QUERY_STRING=/{sub(/^QUERY_STRING=/,""); print; exit}')
   if [[ $qs != *"name=alice"* || $qs != *"id=42"* ]]; then
     print -r -- "QUERY_STRING=$qs missing expected pairs"; return 1
   fi
