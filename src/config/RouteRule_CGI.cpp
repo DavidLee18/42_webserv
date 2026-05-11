@@ -1,5 +1,44 @@
 #include "RouteRule_CGI.hpp"
 
+RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line) {
+  err_meg = "";
+  timeout_ms = 3000;
+  count_line = 0;
+  worker_instance = 0;
+
+  std::vector<std::string> temp = utils::string_split(line, " ");
+
+  if (temp[0] == "GET")
+    met = Request::GET;
+  else if (temp[0] == "POST")
+    met = Request::POST;
+  else if (temp[0] == "DELETE")
+    met = Request::DELETE;
+  path = PathPattern(temp[1]);
+  err_meg = parse_cgi_block(fd, line);
+}
+
+std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
+                                           std::string line) {
+  std::vector<std::string> split = utils::string_split(line, " ");
+  if (split[2][0] != '$')
+    return "on [" + line + "], [" + split[2] +
+           "]: The CGI script reference does not start with the required $ "
+           "prefix. (CGI syntax rule, the script identifier must begin with $ "
+           "to be recognized as a valid CGI command, but the provided value "
+           "does not follow this required format).";
+  std::string file_line = utils::remove_char(split[2], '$');
+
+  err_meg =
+      RouteRule_CGI::parse_executable(file_line, this->executable, this->env);
+  if (err_meg != "")
+    return "on [\t" + line + err_meg;
+  err_meg = RouteRule_CGI::parse_cgi_params(*this, fd, "");
+  if (err_meg != "")
+    return err_meg;
+  return "";
+}
+
 std::string RouteRule_CGI::parse_cgi_params(RouteRule_CGI &cgi,
                                             FileDescriptor &fd,
                                             std::string executable) {
@@ -103,7 +142,7 @@ std::string RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
   std::size_t i = 0;
   std::size_t pos = line.find(".cgi", i);
   if (pos != std::string::npos) {
-    const std::size_t exec_end = pos + 4;
+    std::size_t exec_end = pos + 4;
 
     if (exec_end < line.length() && line[exec_end] != '(')
       return "Invalid CGI environment variable syntax (violates the "
@@ -135,8 +174,8 @@ std::string RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
            "variable format rule: additional environment variables after the "
            ".cgi extension must start with '(' in the form '(key=value)').";
 
-  const std::size_t equals = line.find('=', i + 1);
-  const std::size_t end = line.find(')', i + 1);
+  std::size_t equals = line.find('=', i + 1);
+  std::size_t end = line.find(')', i + 1);
 
   if (line.find('=', equals + 1) != std::string::npos)
     return "Invalid environment variable syntax (violates the environment "
@@ -279,7 +318,7 @@ RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
     count_line++;
     if (temp.error() != "")
       return "FileDescriptor Error: " + temp.error();
-    else if (temp.value() == "\n" || temp.value().empty())
+    else if (temp.value() == "\n" || temp.value() == "")
       return "";
 
     line = utils::remove_char(temp.value(), '\n');
@@ -338,8 +377,8 @@ RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
   }
 }
 
-bool RouteRule_CGI::is_valid_cgi_config(const std::string &line) {
-  const std::vector<std::string> split_line = utils::string_split(line, " ");
+bool RouteRule_CGI::is_valid_cgi_config(std::string line) {
+  std::vector<std::string> split_line = utils::string_split(line, " ");
   if (split_line.size() != 3)
     return false;
   else if (split_line[0] != "POST" && split_line[0] != "GET" &&
@@ -352,6 +391,7 @@ bool RouteRule_CGI::is_valid_cgi_config(const std::string &line) {
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
   std::map<std::string, std::string> env = data.get_env();
+  std::map<std::string, std::string>::const_iterator env_it;
 
   if (data.get_worker_instance() == 0) {
     os << "\nCGI: ";
@@ -365,8 +405,7 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
   }
   os << "\tExecutable: " << data.get_executable();
   os << "\n\tEnv";
-  for (std::map<std::string, std::string>::const_iterator env_it = env.begin();
-       env_it != env.end(); ++env_it) {
+  for (env_it = env.begin(); env_it != env.end(); ++env_it) {
     os << "\n\t\tEnv key: " << env_it->first
        << ", Env value: " << env_it->second;
   }
@@ -388,7 +427,7 @@ RouteRule_CGI::parse_executable(const std::string &line,
     return "], [" + file_line + "]: " + err_msg;
   std::size_t start = file_line.find('(');
   if (std::string::npos != start) {
-    const std::size_t end = file_line.find(')');
+    std::size_t end = file_line.find(')');
     executable = file_line.substr(0, start);
     err_msg = is_executable_file(executable);
     if (err_msg != "")
