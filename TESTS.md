@@ -12,15 +12,17 @@ Probabilities are evaluator-probing estimates, not RFC-strictness levels.
 
 ## Status snapshot
 
-| Area                                                   | State                                                                                                     |
-|--------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| Request-parsing hardening                              | **38/38** on `webserv_parsing_tests.zsh`.                                                                 |
-| Mid-request disconnect (5.3)                           | **13/13** on `webserv_disconnect_tests.zsh`. fd-stable across 470 adversarial iterations.                 |
-| Standard HTTP security headers                         | **14/14** on `webserv_headers_tests.zsh` (H13 skipped pending `CGI_TEST_URL`).                            |
-| CGI/HTTP framing (B4)                                  | **12/12** on `webserv_cgi_framing_tests.zsh`. Wired into drain hook.                                      |
-| CGI sandboxing                                         | **14/14** on `webserv_cgi_tests.zsh` (T1–T6 process limits, E1–E5 env hygiene, F1–F2 filesystem/fd, R1 resilience). |
-| Chunked decoding (B7)                                  | **20/20** on `webserv_chunked_tests.zsh` (A: malformed framing, B: well-formed, C: CGI body integrity, D: chunked multipart upload). || Content integrity (ETag / Last-Modified / Repr-Digest) | Not started.                                                                                              |
-| Resilience under adversarial load                      | Not started.                                                                                              |
+| Area                                     | State                                                                                                                                                                                                                                                               |
+|------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Request-parsing hardening                | **37/38** on `webserv_parsing_tests.zsh`. Outstanding: **D1 — path-traversal leak via raw `../../../../etc/passwd`** (literal segments, no URL-encode). Reproducible with `nc`/`telnet`. **Submission-blocking.** B9 already cleared as 501.                        |
+| Mid-request disconnect (5.3)             | **13/13** on `webserv_disconnect_tests.zsh`. fd-stable across 470 adversarial iterations.                                                                                                                                                                           |
+| Standard HTTP security headers           | **14/14** on `webserv_headers_tests.zsh` (H13 skipped pending `CGI_TEST_URL`).                                                                                                                                                                                      |
+| CGI/HTTP framing (B4)                    | **12/12** on `webserv_cgi_framing_tests.zsh`. Build currently fails post-config-integration: harness shim doesn't supply `g_receivedSignal` from `main.cpp`. Server behaviour unchanged; harness `SOURCES` list needs updating.                                     |
+| CGI sandboxing                           | **14/14** on `webserv_cgi_tests.zsh` (T1–T6 process limits, E1–E5 env hygiene, F1–F2 filesystem/fd, R1 resilience).                                                                                                                                                 |
+| Chunked decoding (B7)                    | **20/20** on `webserv_chunked_tests.zsh` (A: malformed framing, B: well-formed, C: CGI body integrity, D: chunked multipart upload).                                                                                                                                |
+| Content integrity (ETag / Last-Modified) | **3/6** on `webserv_conditional_tests.zsh` (3 skipped because no ETag emitted). ETag and Last-Modified emission not implemented; `If-None-Match: *` not handled.                                                                                                    |
+| Resilience under adversarial load        | Slowloris **5/6** (SL3 half-open never dropped). Exhaustion **6/9** (EX4 10 GiB body bomb hangs without response; EX6 over-cap returns 200 instead of 413; EX8 only first of 5 pipelined requests served).                                                          |
+| Submission-blocking server crash         | **Bug 30 pending.** `std::out_of_range` from `std::map::at` at `Server.cpp:549` after `gen_html.cgi` post-response cleanup. Currently mitigated by config (catch-all `POST * $gen_html.cgi` removed from `default.wbsrv`). Underlying `.at()` audit still required. |
 
 ---
 
@@ -38,13 +40,21 @@ This is where real web servers get killed. Already largely covered by
 - [x] Reject obs-fold (deprecated header continuation).
 - [x] Reject whitespace before colon, empty header name.
 - [x] Cap header line length (~8 KiB) and total header count (~100).
-- [x] Path traversal: literal, nested, percent-encoded, mixed-case, double-encoded `../` all rejected; backslash not a separator; `%00` rejected.
+- [x] Path traversal — partially safe: percent-encoded, mixed-case, double-encoded `../` all 404; backslash not a
+  separator; `%00` rejected. **Literal `../` is NOT rejected** — see §1.2 D1.
 - [x] Method whitelist case-sensitive; version exact-match.
 - [x] Single Host header required (RFC 9112 §3.2).
 
 ### 1.2 Outstanding
 - [x] **B9 — non-hex chunk size in `Transfer-Encoding: chunked`** &nbsp; Harness `expect` relaxed to `^(400|501)$` per RFC 9112 §6.1; server returns 501 (chunked decoding unimplemented). Score: **38/38**.
 - [x] **B7 — chunked decoding before CGI hand-off** &nbsp; `Request::from_buff` + `Request::unchunk` decode `Transfer-Encoding: chunked` request bodies; CGI sees decoded body via stdin EOF. Verified end-to-end through `webserv_chunked_tests.zsh` (A1–A5 malformed-framing rejection, B1–B7 well-formed acceptance, C1–C5 body-integrity through CGI echo, D1–D3 chunked multipart upload). 20/20.
+- [ ] **D1 — path traversal via literal `../`** &nbsp; **SUBMISSION-BLOCKING.** `GET /../../../../etc/passwd` returns
+  200 with `/etc/passwd` body. Confirmed via
+  `printf 'GET /../../../../etc/passwd HTTP/1.1\r\nHost: x\r\n\r\n' | nc -q 1 127.0.0.1 8080`. Root cause:
+  path-resolution naively concatenates `root + req.path` without collapsing `..` segments; kernel resolves the dots
+  literally to escape `/spool/www/`. **Fix at parse time, not resolve time** (else routing rules can be bypassed too).
+  After URL-decode, walk path segments with a stack: empty/`.` ignored, `..` pops (rejects with 400/404 if stack empty),
+  else pushes. ~95% evaluator probes via telnet/nc per eval-sheet wording.
 
 ### 1.2.1 Known minor regressions from chunked work
 - [ ] **A2 / A5 return 408 instead of 400** &nbsp; The marker-detection tightening (`find("\r\n0\r\n")` + body-offset-0 special-case) means malformed framing where the zero-chunk marker is unreachable (e.g. `5\r\nhelloMISSING0\r\n\r\n` — no CRLF before the `0`) is no longer rejected synchronously; the request goes partial and is timed out by the chunked-pending sweep. Functionally accepted by the harness regex. Logically a regression: malformed framing should 400 immediately. Worth a closer look post-submission. ~30% probability of evaluator probe.
@@ -154,11 +164,17 @@ H11/H12, content-length, and H5 — all resolved as part of the B4 framing work
 Replaces the abandoned custom `X-Content-HMAC-SHA256` direction with mechanisms
 generic HTTP clients (curl, browsers, NGINX-as-upstream) actually consume.
 
+Harness `webserv_conditional_tests.zsh` covers ET1–ET12. Current score: **3/6** (3 skipped pending ETag emission).
+
 ### 4.1 ETag + conditional GET (RFC 9110 §8.8 / §13.1.2)
-- [ ] On every static-file response, emit `ETag: "<hash-or-mtime-size>"`.
+
+- [ ] **ET1** — emit `ETag: "<hash-or-mtime-size>"` on every static-file response.
   - Cheap form: `"<size>-<mtime>"` (NGINX default, weak ETag).
   - Strong form: `"<sha256-hex-prefix>"` if you want representational guarantees.
-- [ ] Honour `If-None-Match` → 304 Not Modified, no body.
+- [ ] **ET3 / ET7 / ET8 / ET9** — honour `If-None-Match` → 304 Not Modified, empty body, echo the ETag, value stable
+  across requests.
+- [ ] **ET10** — `If-None-Match: *` → 304 if resource exists, 412 if writing methods.
+- [ ] **ET11** — HEAD requests honour conditional headers identically to GET.
 - [ ] Test:
   ```zsh
   ETAG=$(curl -sI http://127.0.0.1:8080/index.html | awk -F'"' '/ETag/{print $2}')
@@ -167,9 +183,13 @@ generic HTTP clients (curl, browsers, NGINX-as-upstream) actually consume.
   ```
 
 ### 4.2 Last-Modified + If-Modified-Since
-- [ ] Emit `Last-Modified` from file `mtime` for static responses.
-- [ ] Honour `If-Modified-Since` → 304 if not modified.
-- [ ] Date format: RFC 7231 IMF-fixdate (`Sun, 06 Nov 1994 08:49:37 GMT`).
+
+- [ ] **ET2** — emit `Last-Modified` from file `mtime` for static responses. RFC 7231 IMF-fixdate (
+  `Sun, 06 Nov 1994 08:49:37 GMT`).
+- [ ] **ET5** — honour `If-Modified-Since` (≥ Last-Modified) → 304.
+- [x] **ET4 / ET6 / ET12** — fall-through cases pass already: mismatched `If-None-Match` → 200; old
+  `If-Modified-Since` → 200; malformed `If-Modified-Since` ignored → 200. Note: these pass tautologically because
+  ETag/Last-Modified aren't emitted, so conditional logic never triggers; real validation requires the emission first.
 
 ### 4.3 Repr-Digest (RFC 9530, optional)
 - [ ] If keeping any digest header, switch from custom `X-Content-SHA256` to `Repr-Digest: sha-256=:<base64>:` (note the colons — sf-binary syntax).
@@ -182,15 +202,32 @@ generic HTTP clients (curl, browsers, NGINX-as-upstream) actually consume.
 The single most-graded category. ~90% of crash marks live here.
 
 ### 5.1 Slow / partial clients
-- [ ] **Slowloris** — open connection, send `GET / HTTP/1.1\r\n`, send one byte every 10 seconds. Server must enforce a header-read timeout (e.g. 10 s total) and close cleanly.
-- [ ] **Half-open** — open, send nothing. Server must time out and reclaim fd.
-- [ ] **Write-stalled peer** — receive headers, then never read response. Server must not block other clients; eventually time out the write side.
+
+Harness `webserv_slowloris_tests.zsh` covers SL1–SL6. Current score: **5/6**.
+
+- [x] **SL1** Slowloris-style 1B/200ms header trickle → server responds in ~13s (header-read timeout fires; status 200
+  because trickle completes within budget).
+- [x] **SL2** Server stays responsive while a slow client is hung.
+- [ ] **SL3** Half-open connection — open, send nothing — **server never closes** (waited 15s). Add accept-to-first-byte
+  idle timeout.
+- [x] **SL4** Slow body trickle — server returns 408 after 17s; bounded.
+- [x] **SL5** 50 simultaneous slow clients — fast probe still served 200.
+- [x] **SL6** fd count recovers post-close (skipped on Docker — no `/proc/$pid/fd`).
 
 ### 5.2 Resource exhaustion
-- [ ] **Header bomb** — 10 MB of header bytes in single request. Already capped via C8/C9; verify behaviour at the boundary (exactly cap+1 → 400/431, not crash).
-- [ ] **Body bomb** — `Content-Length: 10737418240` (10 GiB). Reject before allocation if larger than `client_max_body_size`.
-- [ ] **Connection flood** — 10 000 concurrent connections opened, headers sent slowly. fd table must not exhaust; `accept()` must keep returning. Set `RLIMIT_NOFILE` appropriately and degrade gracefully (refuse new connections, do not crash).
-- [ ] **Pipelined burst** — single TCP segment with N back-to-back valid requests. Server should respond to each in order. (Currently handled by the `while (!in_buffer.empty())` loop.)
+
+Harness `webserv_exhaustion_tests.zsh` covers EX1–EX9. Current score: **6/9**.
+
+- [x] **EX1 / EX2 / EX3** — oversized header value (16 KiB), 1000 headers, oversized URI (8 KiB) all → 400.
+- [ ] **EX4** — `Content-Length: 10737418240` (10 GiB) **hangs** (no response within 5s). Server must reject pre-body
+  when CL exceeds `max_body_KB`. Looks like a hang to siege/load tests — eval-sheet "no hanging connections" risk.
+- [x] **EX5** — body exactly at cap accepted (200).
+- [ ] **EX6** — body cap+1 returns **200** instead of 413. Body-size cap not enforced; bytes silently truncated. Real
+  bug.
+- [x] **EX7** — 500-connection flood; server stays responsive afterwards.
+- [ ] **EX8** — 5 pipelined requests in one TCP segment: only **1/5** served. Pipelining not implemented (or buffer
+  flushed after first response). Eval sheet doesn't explicitly probe pipelining, but a peer might.
+- [x] **EX9** — post-exhaustion health probe → 200.
 
 ### 5.3 Mid-request disconnect
 - [x] Disconnect during headers — fd closed, ClientSession reaped, no leak. (D1–D4)
@@ -204,12 +241,29 @@ The single most-graded category. ~90% of crash marks live here.
   - Test: `ab -n 100000 -c 50 http://127.0.0.1:8080/` and watch `RSS`/`fd` count via `ls /proc/$(pidof webserv)/fd | wc -l` every 30 s.
 
 ### 5.5 Tooling
-- [ ] Each adversarial scenario above scripted in a separate zsh file under `tests/`:
-  - `tests/slowloris.py` — single-client, time-spaced bytes.
-  - `tests/halfopen.zsh` — open-and-hold-for-N-seconds.
-  - `tests/connflood.py` — concurrent connection storm.
-  - `tests/disconnect-mid.py` — staged disconnect at each phase.
-- [ ] Smoke harness `tests/run-all.zsh` — runs them in sequence, captures `RSS`/`fd` count before and after, fails the run if either grew.
+
+- [x] Per-suite zsh harnesses under `tests/`:
+  - `webserv_parsing_tests.zsh`, `webserv_headers_tests.zsh`, `webserv_cgi_framing_tests.zsh`, `webserv_cgi_tests.zsh`,
+    `webserv_chunked_tests.zsh`, `webserv_disconnect_tests.zsh`, `webserv_conditional_tests.zsh`,
+    `webserv_slowloris_tests.zsh`, `webserv_exhaustion_tests.zsh`.
+- [x] Aggregator `tests/run_all.zsh` — runs all suites in sequence, parses pass/fail, prints aggregate, exits non-zero
+  on any failure.
+- [x] Makefile targets: `make test` (all), `make test-<suite>` (one).
+- [ ] **24h stability run** — see §5.4.
+
+---
+
+## 5.6 Submission-blocking server bugs (track-2)
+
+These do not block test-suite progress but will crash or mis-behave during a defence.
+
+- [ ] **Bug 30 — `std::out_of_range` at `Server.cpp:549`** &nbsp; `std::map::at` on a `ClientSession` key already
+  removed in the response-write path. Triggered by `POST *` catch-all → `gen_html.cgi` in original `default.wbsrv`.
+  Currently mitigated by removing that catch-all, but the underlying `.at()` is a landmine for any unexpected key. *
+  *Spec**: `grep -nE '\.at\(' src/`, convert each call site to `find() != end()` guarded access. ~30 min.
+- [ ] **`Content-Type:` empty value on extensionless paths** &nbsp; Small bug surfaced by D1 probe: 200 response carried
+  `Content-Type: ` (empty). MIME map has no fallback. Spec: default to `application/octet-stream` when extension not in
+  `types` table.
 
 ---
 
@@ -220,8 +274,17 @@ The single most-graded category. ~90% of crash marks live here.
 4. ~~**Chunked decoding (B7)** — subject-mandated for chunked CGI POSTs.~~ Done (20/20 incl. multipart upload).
 5. ~~**Section 3.1–3.5 — CGI sandboxing implementation.**~~ Done (14/14). Resolved: chunked-marker detection at body-offset 0, CL parser trailing-CRLF, query-string verbatim emission, `LC_CTYPE` permitted as Python locale-coercion artefact, harness `awk -F=` field-split fixed.
 6. ~~**HEAD method** — closes H6/H7.~~ Done.
-7. **Section 4.1, 4.2** — ETag and Last-Modified. ~half a day. Conditional GET works in browsers/curl. **Next stop.**
-8. **Section 5.1, 5.2** — slowloris and resource exhaustion. ~1 day. Hardens the "must not crash" line.
-9. **A2/A5 synchronous 400 rejection** — see §1.2.1.
+7. **§1.2 D1 — path-traversal fix.** ~1h. **SUBMISSION-BLOCKING. Highest priority.** Parse-time path normalisation;
+   reject `..` that escapes root. Until done, `curl --path-as-is` / `nc` / `telnet` probe leaks `/etc/passwd`.
+8. **§5.6 Bug 30 — `map::at` audit.** ~30 min. Hardens against any `gen_html.cgi`-style key-miss crash.
+9. **§5.2 EX6 — enforce body-size cap with 413.** ~30 min. Currently bodies over cap silently accepted (200).
+10. **§5.2 EX4 — pre-body rejection of oversized `Content-Length`.** ~30 min. Hangs look like crashes to siege.
+11. **§5.1 SL3 — accept-to-first-byte idle timeout.** ~1h. Eval-sheet "no hanging connections" line.
+12. **§4.1 / §4.2** — ETag + Last-Modified emission. ~half a day. Defence-strengthening.
+13. **§1.2.1 A2/A5 synchronous 400 rejection.** Cosmetic; ~30 min.
+14. **§5.6 Content-Type fallback.** ~10 min.
+15. **§5.2 EX8 — HTTP pipelining.** Skip unless time permits.
+16. **Harness — `g_receivedSignal` linker fix** for `webserv_cgi_framing_tests.zsh`. Add `main.cpp` to harness
+    `SOURCES`. ~10 min.
 
-Items 7–9 are defence-strengthening.
+Items 7–10 are submission-blocking or near-blocking. 11–16 are defence-strengthening.

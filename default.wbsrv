@@ -43,6 +43,9 @@ types =
 
 	POST /cgi-test/envdump-post   $/spool/www/cgi-bin/envdump.cgi
 
+	POST /cgi-test/echo     $/spool/www/cgi-bin/echo.cgi
+		...10
+
 	GET /old_stuff/ =301> /new_stuff/
 
 	GET /old_stuff/* =301> /new_stuff/*
