@@ -119,6 +119,11 @@ Response ServerResponse::http_response(
     response = DefaultError::default_err_response(Response::NOT_FOUND);
     response.headers = config->get_header();
     return response;
+  } else if (request->get_path().find("../")) {
+    std::cout << "request path: " << request->get_path() << std::endl;
+    response = DefaultError::default_err_response(Response::BAD_REQUEST);
+    response.headers = config->get_header();
+    return response;
   }
   response.headers = config->get_header();
   const Target target = resolve_target(rule, config, request);
