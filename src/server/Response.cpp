@@ -904,9 +904,9 @@ Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
   if (resp.status_code == Response::MOVED_PERMANENTLY ||
       resp.status_code == Response::FOUND) {
     if (resp.headers.find("location") != resp.headers.end())
-      resp.redir = resp.headers.at("location");
+      resp.redir = get_string_from_map(resp.headers, "location");
     else if (resp.headers.find("Location") != resp.headers.end())
-      resp.redir = resp.headers.at("Location");
+      resp.redir = get_string_from_map(resp.headers, "Location");
     else
       return ERR(Response, Errors::bad_gateway);
     resp.headers.erase("location");
