@@ -7,18 +7,9 @@ NAME			:= webserv
 BUILD_DIR := build
 SRC_DIR := src
 
-UWSGI_NAME     := uwsgi_server
-UWSGI_SRC_DIR  := src/uwsgi_server
-UWSGI_BUILD_DIR := build/uwsgi_server
-UWSGI_SRC_FILES := uwsgi_server.cpp main.cpp
-UWSGI_SRCS     := $(addprefix $(UWSGI_SRC_DIR)/, $(UWSGI_SRC_FILES))
-UWSGI_OBJS     := $(addprefix $(UWSGI_BUILD_DIR)/, $(UWSGI_SRC_FILES:.cpp=.o))
-UWSGI_DEPS     := $(addprefix $(UWSGI_BUILD_DIR)/, $(UWSGI_SRC_FILES:.cpp=.d))
-
 
 SRC_FILES	:= errors.cpp epoll_kqueue.cpp file_descriptor.cpp \
-	utils.cpp json.cpp cgi_1_1.cpp uwsgi.cpp uwsgi_client.cpp \
-	main.cpp
+	utils.cpp json.cpp cgi_1_1.cpp main.cpp
 SERVER		:= Server.cpp Client.cpp Response.cpp DefaultError.cpp Session.cpp
 CONFIG		:= WebserverConfig.cpp ServerConfig.cpp RouteRule_CGI.cpp PathPattern.cpp
 
@@ -33,7 +24,7 @@ vpath %.cpp $(addprefix $(SRC_DIR)/,$(SRC_DIRS)) $(SRC_DIR)
 CGI_NAME      := spool/www/cgi-bin/gen_html.cgi
 CGI_SRC       := src/cgi/cgi_html_gen.cpp
 
-all: $(NAME) uwsgi cgi
+all: $(NAME) cgi
 
 integration-test: all
 	bash tests/integration/cgi_uwsgi_full_suite.sh
@@ -68,15 +59,6 @@ fclean:	clean cgiclean
 
 re:	fclean all
 
-uwsgi: $(UWSGI_NAME)
-
-$(UWSGI_NAME): $(UWSGI_OBJS)
-	$(CXX) $(UWSGI_OBJS) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(UWSGI_NAME)
-
-$(UWSGI_BUILD_DIR)/%.o: $(UWSGI_SRC_DIR)/%.cpp
-	mkdir -p $(UWSGI_BUILD_DIR)
-	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -MMD -MP -c $< -o $@
-
 compile-commands:
 	bear -- make re
 
@@ -86,7 +68,7 @@ cgiclean:
 -include $(DEPS)
 -include $(UWSGI_DEPS)
 
-.PHONY: all clean fclean re bonus rebo uwsgi cgi integration-test test-cgi compile-commands
+.PHONY: all clean fclean re bonus rebo cgi integration-test test-cgi compile-commands
 
 # -----------------------------------------------------------------------------
 # Test suites

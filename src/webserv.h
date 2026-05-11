@@ -15,7 +15,6 @@
 #include "json.h"
 #include "server/Client.hpp"
 #include "server/Server.hpp"
-#include "uwsgi.h"
 
 #include <algorithm>
 #include <arpa/inet.h>
