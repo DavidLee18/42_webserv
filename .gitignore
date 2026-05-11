@@ -55,4 +55,4 @@ postman/
 .vscode/
 
 # CGI executables
-spool/www/cgi-bin/
+www-files/cgi-bin/

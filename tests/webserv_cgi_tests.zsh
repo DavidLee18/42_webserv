@@ -12,7 +12,7 @@
 #   3. runs the tests once you confirm the server is reloaded
 #
 # Usage:
-#   PORT=8080 PID=$(pidof webserv) CGI_DIR=spool/www/cgi-bin \
+#   PORT=8080 PID=$(pidof webserv) CGI_DIR=www-files/cgi-bin \
 #     ./webserv_cgi_tests.zsh
 #
 # Override any test URL via env (CGI_URL_HELLO, CGI_URL_SLEEP, ...).
@@ -26,7 +26,7 @@ HOST=${HOST:-127.0.0.1}
 PORT=${PORT:-8080}
 VERBOSE=${VERBOSE:-0}
 PID=${PID:-}
-CGI_DIR=${CGI_DIR:-spool/www/cgi-bin}
+CGI_DIR=${CGI_DIR:-spool/www-files/cgi-bin}
 CGI_TIMEOUT_BOUND=${CGI_TIMEOUT_BOUND:-15}
 PYTHON=${PYTHON:-$(command -v python3)}
 
