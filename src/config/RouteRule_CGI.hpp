@@ -137,7 +137,7 @@ public:
    * - 첫 번째 원소는 실행 가능한 파일 경로여야 하고,
    * 두 번째 원소는 포트 번호를 나타내는 숫자 문자열이어야 한다.
    */
-  static std::string is_valid_uwsgi_config(std::vector<std::string> data);
+  // static std::string is_valid_uwsgi_config(std::vector<std::string> data);
   /**
    * @brief CGI 설정 한 줄의 기본 형식을 검사하는 함수
    * @param line 검사할 문자열

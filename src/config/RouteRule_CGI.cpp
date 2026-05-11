@@ -37,14 +37,6 @@ std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
 std::string RouteRule_CGI::parse_cgi_params(RouteRule_CGI& cgi, FileDescriptor &fd, std::string executable) {
   std::string file_line = "";
   std::string err_format = "on [\t\t";
-  bool is_server = true;
-  bool is_server_uwsgi = false;
-  if (executable != "") {
-    is_server = false;
-    err_format = "on [\t";
-    cgi.executable = executable;
-  } else if (std::isdigit(static_cast<unsigned char>(cgi.executable[0])))
-    is_server_uwsgi = true;
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
@@ -53,8 +45,6 @@ std::string RouteRule_CGI::parse_cgi_params(RouteRule_CGI& cgi, FileDescriptor &
       return "FileDescriptor Error: " + temp.error();
     else if (temp.value() == "\n" || temp.value() == "")
       return  "";
-    else if (is_server_uwsgi)
-      return err_format + utils::remove_char(temp.value(), '\n') + "], [" + utils::remove_char(temp.value(), '\n') + "]:Invalid RouteRule (uWSGI mode does not support additional information in RouteRule)";
     
     file_line = utils::remove_char(temp.value(), '\n');
     cgi.err_meg = utils::get_indent_whitespace_error(file_line, 2);
@@ -73,19 +63,6 @@ std::string RouteRule_CGI::parse_cgi_params(RouteRule_CGI& cgi, FileDescriptor &
       cgi.err_meg = RouteRule_CGI::parse_env_entry(file_line, cgi.env);
       if (cgi.err_meg != "")
         return err_format + file_line + cgi.err_meg;
-    } else if (file_line[0] == '*') {
-      if (cgi.worker_instance == 0 || is_server)
-        return err_format + file_line + "], [" + file_line + "]:Invalid worker_instance (this parameter can only be configured in the server-side global uWSGI configuration and is not allowed in CGI or server-side uWSGI additional parameters).";
-      char* end;
-      std::string worker_instance_data = file_line.substr(1);
-      unsigned long num = std::strtoul(worker_instance_data.c_str(), &end, 10);
-
-      if (*end != '\0')
-        return err_format + file_line + "], [" + worker_instance_data + "]:Invalid worker_instance (must contain only digits (0-9), but non-numeric characters were found).";
-      else if (num > 4096 || num < 1)
-        return err_format + file_line + "], [" + worker_instance_data + "]: Invalid worker_instance (must be within the range 1 ~ 4096, but the provided value is outside this range).";
-      else
-        cgi.worker_instance = static_cast<int>(num);
     } else
         return err_format + file_line + "], [" + file_line + "]: The CGI extended information line does not match any of the allowed formats. (CGI extension rule, the line must follow either key=value or ...<numeric string> format, but the provided line does not conform to either pattern).";
   }
@@ -211,24 +188,6 @@ RouteRule_CGI::parse_env_entry(const std::string &line,
   return "";
 }
 
-std::string RouteRule_CGI::is_valid_uwsgi_config(std::vector<std::string> data) {
-  if (data.size() != 2)
-    return ": Invalid format(expected \"file_path:port\". The value must follow the required pattern with a Python file path and a numeric port separated by a colon.).";
-  else if (RouteRule_CGI::is_executable_file(data[0]) != "")
-    return  ", [" + data[0] + "]: " + RouteRule_CGI::is_executable_file(data[0]);
-  
-  for (std::size_t i = 0; i < data[1].size(); ++i) {
-    if (!std::isdigit(static_cast<unsigned char>(data[1][i])))
-    return ", [" + data[1] + "]: " + "Violates port numeric rule (the port must consist only of digits).";
-  }
-
-  char* end;
-  unsigned long port = std::strtoul(data[1].c_str(), &end, 10);
-  if (port > 65535)
-    return ", [" + data[1] + "]: " + "Violates port range rule (port must be between 0 and 65535).";
-  return "";
-}
-
 std::string
 RouteRule_CGI::parse_global_cgi_block(FileDescriptor &fd,
                                  std::map<std::string, std::string> &global_cgi, std::size_t &count_line) {
@@ -257,7 +216,6 @@ RouteRule_CGI::parse_global_cgi_block(FileDescriptor &fd,
 
     std::string key = utils::trim_whitespace(key_and_value[0]);
     std::string value = utils::trim_whitespace(key_and_value[1]);
-    // 추가 해야함 : value가 실행파일이고 접근 가능한지 확인
     if (utils::has_space(key))
       return "on [\t" + line + "],[" + key + "]: Invalid file extension in global CGI mapping the global CGI configuration must follow the \"file extension -> executable path\" format (the global CGI file extension rule is violated because the file extension contains whitespace).";
     else if (utils::has_space(value))
