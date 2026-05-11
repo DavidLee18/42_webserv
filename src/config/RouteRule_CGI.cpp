@@ -107,7 +107,9 @@ std::string RouteRule_CGI::is_executable_file(const std::string &path) {
     return "Violates executable permission rule (the file does not have execute permission).";
   return "";
 }
-
+// 추가 해야함
+// 확장자만 확인하게 바꾸기
+// 확장자 들은 글러벌 cgi에 키들(기본으로는 .cgi를 가지고 있음)
 std::string RouteRule_CGI::matches_cgi_syntax(const std::string &line) {
   std::size_t i = 0;
   std::size_t pos = line.find(".cgi", i);
@@ -254,7 +256,11 @@ RouteRule_CGI::parse_global_cgi_block(FileDescriptor &fd,
 
     std::string key = utils::trim_whitespace(key_and_value[0]);
     std::string value = utils::trim_whitespace(key_and_value[1]);
-    if (global_cgi.find(key_and_value[1]) != global_cgi.end())
+    if (utils::has_space(key))
+      return "on [\t" + line + "],[" + key + "]: Invalid file extension in global CGI mapping the global CGI configuration must follow the \"file extension -> executable path\" format (the global CGI file extension rule is violated because the file extension contains whitespace).";
+    else if (utils::has_space(value))
+      return "on [\t" + line + "],[" + value + "]: Invalid executable path in global CGI mapping the global CGI configuration must follow the \"file extension -> executable path\" format (the global CGI executable path rule is violated because the executable path contains whitespace).";
+    else if (global_cgi.find(key_and_value[1]) != global_cgi.end())
       return "on [\t" + line + "], [" + key + "]: Duplicate global CGI mapping definition (the duplicate global CGI mapping rule is violated because the same file extension is already assigned to another executable path).";
      
     if (err != "")
