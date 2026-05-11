@@ -69,18 +69,9 @@ types =
 		! 413:/www-files/error/413.html
 		! 500:/www-files/error/500.html
 
-<<<<<<< HEAD
 	POST /storage/ -> /www-files/storage/
 		->{} 10MB
 		@ auth_info
-=======
-	POST *    $gen_html.cgi(DIST_DIR=/spool/files)
-		+>/wwww/path
-		...10
-		AUTH_INFO=/spool/www/auth_info
-
-	DELETE *    $gen_html.cgi(AUTH_INFO=/spool/www/auth_info)
->>>>>>> origin/jaejo
 
 	POST|DELETE /storage/* <- /www-files/storage/*
 		->{} 10MB
