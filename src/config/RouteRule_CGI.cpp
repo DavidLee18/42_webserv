@@ -92,21 +92,19 @@ std::string RouteRule_CGI::parse_cgi_params(RouteRule_CGI& cgi, FileDescriptor &
 }
 
 std::string RouteRule_CGI::is_executable_file(const std::string &path) {
-  // char cwd[4096];
-  // getcwd(cwd, sizeof(cwd));
+  char cwd[4096];
+  getcwd(cwd, sizeof(cwd));
 
-  // std::string real_path = std::string(cwd) + path;
-  // struct stat st;
+  std::string real_path = std::string(cwd) + "/" + path;
+  struct stat st;
+  if (stat(real_path.c_str(), &st) != 0)
+    return "Violates file existence rule (the specified path does not exist or cannot be accessed).";
 
-  // if (stat(real_path.c_str(), &st) != 0)
-  //   return "Violates file existence rule (the specified path does not exist or cannot be accessed).";
+  if (!S_ISREG(st.st_mode))
+    return "Violates regular file rule (the given path is not a regular file).";
 
-  // if (!S_ISREG(st.st_mode))
-  //   return "Violates regular file rule (the given path is not a regular file).";
-
-  // if (access(path.c_str(), X_OK) != 0)
-  //   return "Violates executable permission rule (the file does not have execute permission).";
-  (void)path;
+  if (access(path.c_str(), X_OK) != 0)
+    return "Violates executable permission rule (the file does not have execute permission).";
   return "";
 }
 
@@ -229,9 +227,8 @@ std::string RouteRule_CGI::is_valid_uwsgi_config(std::vector<std::string> data) 
 }
 
 std::string
-RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
-                                 std::map<int, RouteRule_CGI> &uwsgi, std::size_t &count_line) {
-  std::vector<std::string> value_and_key;
+RouteRule_CGI::parse_global_cgi_block(FileDescriptor &fd,
+                                 std::map<std::string, std::string> &global_cgi, std::size_t &count_line) {
   std::string line = "";
   std::string err = "";
 
@@ -241,48 +238,31 @@ RouteRule_CGI::parse_uwsgi_block(FileDescriptor &fd,
     if (temp.error() != "")
       return "FileDescriptor Error: " + temp.error();
     else if (temp.value() == "\n" || temp.value() == "")
-      return "";
-    
+      break;
+
     line = utils::remove_char(temp.value(), '\n');
     err = utils::get_indent_whitespace_error(line, 1);
     if (err != "")
       return err;
     line = utils::trim_whitespace(line);
 
-    std::vector<std::string> split = utils::string_split(line, " ");
-    if (split.size() != 1) {
-      for (std::size_t i = 1; i < split.size(); ++i)
-        err += " " + split[i]; 
-      return "on [\t" + line + "], [" + err + "]: Violates uwsgi entry rule (each line must contain exactly one configuration entry).";
-    } else if (utils::count_occurrences(line, ":") != 1) {
-      std::size_t pos = line.find(':');
-      pos = line.find(':', pos + 1);
-      return "on [\t" + line + "], [" + &line[pos] + "]: Violates uwsgi format rule (expected \"<file>:<port>\" without trailing ':' or extra delimiters).";
-    }
+    if (utils::count_occurrences(line, "->") != 1)
+      return "on [\t" + line + "]: Invalid \"->\" count in global CGI mapping the global CGI configuration must follow the \"file extension -> executable path\" format with exactly one \"->\" operator (the global CGI mapping syntax rule is violated because the number of \"->\" operators is not exactly one).";
+    std::vector<std::string> key_and_value = utils::string_split(line, "->");
+    if (key_and_value.size() != 2)
+      return "on [\t" + line + "]: Invalid global CGI mapping value the global CGI configuration must follow the \"file extension -> executable path\" format (the global CGI mapping format rule is violated because the value before or after \"->\" is missing).";
 
-    value_and_key = utils::string_split(line, ":");
-    err = RouteRule_CGI::is_valid_uwsgi_config(value_and_key);
-    if (err != "")
-      return  "on [\t" + line + "]" + err;
-    else if (value_and_key[0].length() < 3 ||
-        value_and_key[0].substr(value_and_key[0].length() - 3) != ".py") {
-      return "on [\t" + line + "], [" + value_and_key[0] + "]: Violates python file extension rule (the file must have a .py extension).";
-      }
-    char* end;
-    unsigned long num = std::strtoul(value_and_key[1].c_str(), &end, 10);
-
-    if (uwsgi.find(static_cast<int>(num)) != uwsgi.end())
-      return "on [\t" + line + "], [" + value_and_key[1] + "]: Violates duplicate port rule (the port is already assigned to another file).";
-    else if (*end != '\0')
-      return "[" + line + "], [" + value_and_key[1] + "]: The port value must contain only numeric characters (the port value syntax rule is violated because the provided value contains non-numeric characters or cannot be fully converted to a number).";
-    else if (num > 65535)
-      return "[" + line + "], [" + value_and_key[1] + "]: Violates port range rule (port must be between 0 and 65535).";
-  
-    err = RouteRule_CGI::parse_cgi_params(uwsgi[static_cast<int>(num)], fd, value_and_key[0]);
-    count_line += uwsgi[static_cast<int>(num)].get_count_line(); 
+    std::string key = utils::trim_whitespace(key_and_value[0]);
+    std::string value = utils::trim_whitespace(key_and_value[1]);
+    if (global_cgi.find(key_and_value[1]) != global_cgi.end())
+      return "on [\t" + line + "], [" + key + "]: Duplicate global CGI mapping definition (the duplicate global CGI mapping rule is violated because the same file extension is already assigned to another executable path).";
+     
     if (err != "")
       return err;
+    
+    global_cgi[key] = value;
   }
+  return err;
 }
 
 bool RouteRule_CGI::is_valid_cgi_config(std::string line) {

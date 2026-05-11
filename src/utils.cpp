@@ -163,9 +163,8 @@ std::string utils::check_html_file(const std::string &path)
     char cwd[4096];
     getcwd(cwd, sizeof(cwd));
 
-    std::string real_path = std::string(cwd) + path;
+    std::string real_path = std::string(cwd) + "/" + path;
     struct stat st;
-
     if (stat(real_path.c_str(), &st) != 0)
         return "Invalid HTML file (file does not exist or cannot be accessed).";
 

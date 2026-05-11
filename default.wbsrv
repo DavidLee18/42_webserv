@@ -8,7 +8,9 @@ types =
 	mp3      -> audio/mpeg
 	_        -> application/octet-stream
 
-
+cgi =
+	php -> /usr/bin/php-cgi
+	py  -> /usr/bin/python3
 
 :8080 =
 	[] +<= X-Content-Type-Options: nosniff
@@ -17,34 +19,6 @@ types =
 	[] +<= Content-Security-Policy: default-src 'self'
 
 	...30
-
-	GET /cgi-test/hello     $/www-files/cgi-bin/hello.cgi
-
-	GET /cgi-test/sleep     $/www-files/cgi-bin/sleep.cgi
-		...5
-
-	GET /cgi-test/burncpu   $/www-files/cgi-bin/burncpu.cgi
-		...5
-
-	GET /cgi-test/memhog    $/www-files/cgi-bin/memhog.cgi
-		...10
-
-	GET /cgi-test/fbomb     $/www-files/cgi-bin/fbomb.cgi
-		...10
-
-	GET /cgi-test/fdhog     $/www-files/cgi-bin/fdhog.cgi
-		...10
-
-	GET /cgi-test/envdump   $/www-files/cgi-bin/envdump.cgi
-
-	GET /cgi-test/cwd       $/www-files/cgi-bin/cwd.cgi
-
-	GET /cgi-test/fddump    $/www-files/cgi-bin/fddump.cgi
-
-	POST /cgi-test/envdump-post   $/www-files/cgi-bin/envdump.cgi
-
-	POST /cgi-test/echo     $/www-files/cgi-bin/echo.cgi
-		...10
 
 	GET /old_stuff/ =301> /new_stuff/
 
@@ -57,8 +31,8 @@ types =
 	GET|POST|DELETE /cgi-bin/* <- /www-files/cgi-bin/*
 
 	GET|POST|DELETE * <- /www-files/*
-		? hello.html
-		@ auth_info
+		? /www-files/hello.html
+		@ /www-files/auth_info
 		->{} 10MB
 		! 400:/www-files/error/400.html
 		! 401:/www-files/error/401.html
@@ -71,11 +45,11 @@ types =
 
 	POST /storage/ -> /www-files/storage/
 		->{} 10MB
-		@ auth_info
+		@ /www-files/auth_info
 
 	POST|DELETE /storage/* <- /www-files/storage/*
 		->{} 10MB
-		@ auth_info
+		@ /www-files/auth_info
 
 
 :4040 =
@@ -95,6 +69,6 @@ types =
 	GET *.(jpg|jpeg|gif) <- /www-files/*
 
 	GET|POST|DELETE * <- /www-files/*
-		? index2.html
-		@ auth_info
+		? /www-files/index2.html
+		@ /www-files/auth_info
 		->{} 10MB

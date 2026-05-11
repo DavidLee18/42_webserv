@@ -395,7 +395,11 @@ bool ServerConfig::apply_route_rule_entry(
       }
       routes[targetRouteIndex].index = rule[1];
     } else if (rule[0] == "@") {
-      if (access(rule[1].c_str(), F_OK) != 0) {
+      char cwd[4096];
+      getcwd(cwd, sizeof(cwd));
+
+      std::string real_path = std::string(cwd) + "/" + rule[1];
+      if (access(real_path.c_str(), F_OK) != 0) {
         err_meg = "on [\t\t" + line + "], [" + rule[1] + "]: the value after \"@\" must refer to an existing file (the \"@\" keyword file path rule is violated because the provided value does not exist or is not a valid file).";
         return false;
       }
@@ -414,6 +418,7 @@ bool ServerConfig::apply_route_rule_entry(
         return false;
       }
     } else {
+      std::cout << "in" <<std::endl;
       err_meg = "on [\t\t" + line + "], [" + line +  "]: Invalid RouteRule additional information syntax: this line does not match the RouteRule additional information format (the RouteRule additional information syntax rule is violated because the line cannot be parsed as valid additional information; allowed keywords are \"!\", \"@\", \"->{}\", and \"?\").";
       return false;
     }
@@ -541,13 +546,11 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
 
     line = utils::remove_char(temp.value(), '\n');
     err_meg = utils::get_indent_whitespace_error(line, 2);
+    line = utils::trim_whitespace(line);
     if (err_meg != "")
       return false;
-    else if (apply_route_rule_entry(mets, route_line_data[1], line)) {
-      if (err_meg != "")
-        return false;
-      continue;
-    }
+    else if (!apply_route_rule_entry(mets, route_line_data[1], line))
+      return false;
   }
   err_meg = "";
   return true;

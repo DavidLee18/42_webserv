@@ -193,8 +193,8 @@ public:
    * 가져야 한다.
    */
   static std::string
-  parse_uwsgi_block(FileDescriptor &fd,
-                    std::map<int, RouteRule_CGI> &uwsgi, std::size_t &count_line);
+  parse_global_cgi_block(FileDescriptor &fd,
+                    std::map<std::string, std::string> &global_cgi, std::size_t &count_line);
 };
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data);

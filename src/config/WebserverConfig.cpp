@@ -41,8 +41,8 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     } else if (WebserverConfig::is_server_config_header(line)) {
       if (!parse_server_config_entry(file, line))
         return false;
-    } else if (line == "uwsgi =" || line == "uwsgi=") {
-      err_meg = RouteRule_CGI::parse_uwsgi_block(file, uwsgi, count_line);
+    } else if (line == "cgi =" || line == "cgi=") {
+      err_meg = RouteRule_CGI::parse_global_cgi_block(file, global_cgi, count_line);
       if (err_meg != "")
         return false;
     } else if (line[0] == '!') {
@@ -152,7 +152,7 @@ bool WebserverConfig::parse_type_mapping(const std::string &line,
   }
   std::vector<std::string> type_data = utils::string_split(line, "->");
   if (type_data.size() != 2) {
-    err_meg = "on [\t" + line + "]: Too many elements in header (violates the 'extension -> MIME type' format by including extra tokens beyond the required two components).";
+    err_meg = "on [\t" + line + "]: Missing value in header mapping the header configuration must follow the \"file extension -> MIME type\" format (the header mapping format rule is violated because either the file extension before \"->\" or the MIME type after \"->\" is missing).";
     return false;
   }
 
@@ -238,12 +238,12 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
                                                 const std::string &line) {
   unsigned int key;
   std::string temp(line);
-  ServerConfig sever(file);
+  ServerConfig server(file);
 
   key = WebserverConfig::parse_server_port(temp);
-  if (sever.get_err_meg() != "") {
-    err_meg = sever.get_err_meg();
-    count_line += sever.get_count_line();
+  if (server.get_err_meg() != "") {
+    err_meg = server.get_err_meg();
+    count_line += server.get_count_line();
     return false;
   }
   if (serverconfig_map.find(key) != serverconfig_map.end()) {
@@ -253,7 +253,8 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
     err_meg = "on [\t" + line + "], [" + oss.str() + "]:Violates configuration rule (server block is declared more than once).";
     return false;
   }
-  serverconfig_map[key] = sever;
+  serverconfig_map[key] = server;
+  count_line += server.get_count_line();
   return true;
 }
 
@@ -269,10 +270,10 @@ unsigned int WebserverConfig::parse_server_port(const std::string &key) {
 
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.get_type_map();
-  const std::map<int, RouteRule_CGI> &uw = data.get_uwsgi();
+  const std::map<std::string, std::string> &cgi = data.get_global_cgi();
   const std::map<int, std::string> &d_e = data.get_default_err_page();
   std::map<std::string, std::string>::const_iterator ty_it;
-  std::map<int, RouteRule_CGI>::const_iterator uw_it;
+  std::map<std::string, std::string>::const_iterator cgi_it;
 
   os << "========================================================" << std::endl;
   os << "<<Type_map>>\n" << std::endl;
@@ -284,10 +285,10 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   os << "========================================================" << std::endl;
   os << "\n\n\n========================================================"
      << std::endl;
-  os << "<<Uwsgi>>\n" << std::endl;
-  for (uw_it = uw.begin(); uw_it != uw.end(); ++uw_it) {
-    os << "Uwsgi key: " << uw_it->first << "\nUwsgi value:\n" << uw_it->second
-       << std::endl;
+  os << "<<Global CGI>>\n" << std::endl;
+  for (cgi_it = cgi.begin(); cgi_it != cgi.end(); ++cgi_it) {
+    os << "Global CGI key: " << cgi_it->first << " Global CGI value: " << cgi_it->second
+    << " " << std::endl;
   }
   os << "========================================================" << std::endl;
   os << "\n\n\n========================================================"

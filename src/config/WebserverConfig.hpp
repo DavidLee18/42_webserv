@@ -39,7 +39,7 @@ private:
    *
    * - 포트 번호를 키로 하고, 실행 파일의 경로를 값으로 저장한다.
    */
-  std::map<int, RouteRule_CGI> uwsgi;
+  std::map<std::string, std::string> global_cgi;
   /**
    * @var type_map
    * @brief 파일 확장자와 MIME type의 매핑 정보를 저장하는 멤버 변수
@@ -163,7 +163,7 @@ public:
     if (this != &other) {
       this->err_meg = other.err_meg;
       this->default_mime = other.default_mime;
-      this->uwsgi = other.uwsgi;
+      this->global_cgi = other.global_cgi;
       this->type_map = other.type_map;
       this->serverconfig_map = other.serverconfig_map;
       this->count_line = other.count_line;
@@ -172,8 +172,8 @@ public:
   }
 
   const std::string &get_default_mime(void) const { return default_mime; }
-  const std::map<int, RouteRule_CGI> &get_uwsgi(void) const {
-    return uwsgi;
+  const std::map<std::string, std::string> &get_global_cgi(void) const {
+    return global_cgi;
   }
   const std::map<std::string, std::string> &get_type_map(void) const {
     return type_map;
