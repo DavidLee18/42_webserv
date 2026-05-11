@@ -95,7 +95,7 @@ print -- ""
 # Auto-deploy the echo CGI script if ECHO_CGI_URL is set.
 # Adjust ECHO_CGI_PATH to match your server's CGI document root.
 # -----------------------------------------------------------------------------
-ECHO_CGI_PATH=${ECHO_CGI_PATH:-./spool/www/cgi-bin/echo.cgi}
+ECHO_CGI_PATH=${ECHO_CGI_PATH:-./www-files/cgi-bin/echo.cgi}
 
 if [[ -n $ECHO_CGI_URL ]]; then
   mkdir -p "${ECHO_CGI_PATH:h}"

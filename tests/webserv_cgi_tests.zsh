@@ -26,7 +26,7 @@ HOST=${HOST:-127.0.0.1}
 PORT=${PORT:-8080}
 VERBOSE=${VERBOSE:-0}
 PID=${PID:-}
-CGI_DIR=${CGI_DIR:-spool/www-files/cgi-bin}
+CGI_DIR=${CGI_DIR:-www-files/cgi-bin}
 CGI_TIMEOUT_BOUND=${CGI_TIMEOUT_BOUND:-15}
 PYTHON=${PYTHON:-$(command -v python3)}
 
