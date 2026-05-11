@@ -26,7 +26,6 @@ uwsgi =
 	...30
 
 	GET /cgi-test/hello     $9000
-		...6
 
 	GET /cgi-test/hello     $/spool/www/cgi-bin/hello.cgi
 
@@ -77,6 +76,7 @@ uwsgi =
 		! 500:/spool/www/error/500.html
 
 	POST *    $gen_html.cgi(DIST_DIR=/spool/files)
+		+>/wwww/path
 		...10
 		AUTH_INFO=/spool/www/auth_info
 
