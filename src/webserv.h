@@ -6,6 +6,7 @@
 #define LONG_DOUBLE_DIGITS 37
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
+#define CHUNKED_PENDING_TIMEOUT 3
 
 #include "cgi_1_1.h"
 #include "config/WebserverConfig.hpp"
@@ -14,7 +15,6 @@
 #include "json.h"
 #include "server/Client.hpp"
 #include "server/Server.hpp"
-#include "uwsgi.h"
 
 #include <algorithm>
 #include <arpa/inet.h>

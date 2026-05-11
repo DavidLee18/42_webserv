@@ -31,8 +31,8 @@ Result<Events> Events::init(const std::list<FileDescriptor> &all_events,
 }
 
 Events::~Events() {
-  // for (size_t i = 0; i < _len; i++)
-  // _events[i].~Event();
+  for (size_t i = 0; i < _len; i++)
+    _events[i].~Event();
   operator delete((void *)_events);
 }
 
@@ -80,8 +80,8 @@ Result<EPoll> EPoll::create(const unsigned short sz) {
   return OK(EPoll, ep);
 }
 
-Result<FileDescriptor *> EPoll::add_fd(const FileDescriptor &fd,
-                                       const Event &ev, const Option &op) {
+Result<FileDescriptor *> EPoll::add_fd(FileDescriptor fd, Event &ev,
+                                       const Option &op) {
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -125,11 +125,14 @@ Result<FileDescriptor *> EPoll::add_fd(const FileDescriptor &fd,
     }
   }
   _events.push_back(fd);
+  ev.fd = &_events.back();
   return OK(FileDescriptor *, &_events.back());
 }
 
-Result<Void> EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,
+Result<Void> EPoll::modify_fd(const FileDescriptor *fd, const Event &ev,
                               const Option &op) const {
+  if (!event_contains(fd))
+    return OKV;
   epoll_event event = {};
   if (ev.in)
     event.events |= EPOLLIN;
@@ -151,8 +154,8 @@ Result<Void> EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,
     event.events |= EPOLLWAKEUP;
   if (op.exclusive)
     event.events |= EPOLLEXCLUSIVE;
-  event.data.fd = fd._fd;
-  if (epoll_ctl(_fd._fd, EPOLL_CTL_MOD, fd._fd, &event) == -1) {
+  event.data.fd = fd->_fd;
+  if (epoll_ctl(_fd._fd, EPOLL_CTL_MOD, fd->_fd, &event) == -1) {
     switch (errno) {
     case EINVAL:
       return ERR(Void, Errors::invalid_operation);
@@ -169,9 +172,11 @@ Result<Void> EPoll::modify_fd(const FileDescriptor &fd, const Event &ev,
   return OKV;
 }
 
-Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
+Result<Void> EPoll::del_fd(const FileDescriptor *fd) {
+  if (!event_contains(fd))
+    return OKV;
   epoll_event event = {};
-  const int raw = fd._fd;
+  const int raw = fd->_fd;
   event.data.fd = raw;
   if (epoll_ctl(_fd._fd, EPOLL_CTL_DEL, raw, &event) == -1) {
     switch (errno) {
@@ -187,13 +192,7 @@ Result<Void> EPoll::del_fd(const FileDescriptor &fd) {
       return ERR(Void, "an unknown error occured during EPOLL_CTL_DEL");
     }
   }
-  for (std::list<FileDescriptor>::iterator it = _events.begin();
-       it != _events.end(); ++it) {
-    if (*it == fd) {
-      _events.erase(it);
-      break;
-    }
-  }
+  _events.remove(*fd);
   return OKV;
 }
 
@@ -207,4 +206,13 @@ Result<Events> EPoll::wait(const int timeout_ms) const {
     return ERR(Events, std::string("epoll_wait failed: ") + strerror(errno));
   }
   return Events::init(_events, static_cast<size_t>(n), events);
+}
+
+bool EPoll::event_contains(const FileDescriptor *fd) const {
+  for (std::list<FileDescriptor>::const_iterator it = _events.begin();
+       it != _events.end(); ++it) {
+    if (&*it == fd)
+      return true;
+  }
+  return false;
 }

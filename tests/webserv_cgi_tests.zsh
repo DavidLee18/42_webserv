@@ -12,7 +12,7 @@
 #   3. runs the tests once you confirm the server is reloaded
 #
 # Usage:
-#   PORT=8080 PID=$(pidof webserv) CGI_DIR=spool/www/cgi-bin \
+#   PORT=8080 PID=$(pidof webserv) CGI_DIR=www-files/cgi-bin \
 #     ./webserv_cgi_tests.zsh
 #
 # Override any test URL via env (CGI_URL_HELLO, CGI_URL_SLEEP, ...).
@@ -26,8 +26,9 @@ HOST=${HOST:-127.0.0.1}
 PORT=${PORT:-8080}
 VERBOSE=${VERBOSE:-0}
 PID=${PID:-}
-CGI_DIR=${CGI_DIR:-spool/www/cgi-bin}
+CGI_DIR=${CGI_DIR:-spool/www-files/cgi-bin}
 CGI_TIMEOUT_BOUND=${CGI_TIMEOUT_BOUND:-15}
+PYTHON=${PYTHON:-$(command -v python3)}
 
 # URL → CGI mapping (override via env if your routes differ)
 CGI_URL_HELLO=${CGI_URL_HELLO:-/cgi-test/hello}
@@ -92,7 +93,7 @@ http_request() {
   local method=$1 path=$2 timeout=${3:-10} body=${4:-} ct=${5:-}
   HOST=$HOST PORT=$PORT TIMEOUT=$timeout REQ_METHOD=$method REQ_PATH=$path \
   REQ_BODY=$body REQ_CT=$ct \
-    python3 - <<'PY'
+    "$PYTHON" - <<'PY'
 import os, socket, sys, time
 host = os.environ['HOST']
 port = int(os.environ['PORT'])
@@ -142,7 +143,7 @@ http_request_with_headers() {
   local extra_headers=("$@")
   HOST=$HOST PORT=$PORT TIMEOUT=$timeout REQ_METHOD=$method REQ_PATH=$path \
   EXTRA_HDRS="${(j:|:)extra_headers}" \
-    python3 - <<'PY'
+    "$PYTHON" - <<'PY'
 import os, socket, sys, time
 host = os.environ['HOST']
 port = int(os.environ['PORT'])
@@ -554,7 +555,7 @@ t_env_query_string() {
   local out body qs
   out=$(http_request GET "${CGI_URL_ENVDUMP}?name=alice&id=42" 5)
   body=$(body_of "$out")
-  qs=$(printf '%s\n' "$body" | awk -F= '/^QUERY_STRING=/{$1=""; sub(/^=/,""); print; exit}')
+  qs=$(printf '%s\n' "$body" | awk '/^QUERY_STRING=/{sub(/^QUERY_STRING=/,""); print; exit}')
   if [[ $qs != *"name=alice"* || $qs != *"id=42"* ]]; then
     print -r -- "QUERY_STRING=$qs missing expected pairs"; return 1
   fi

@@ -1,6 +1,11 @@
 #include "Client.hpp"
 #include "../errors.h"
 
+ClientSession::~ClientSession() {
+  if (req != NULL)
+    delete req;
+}
+
 std::string Request::get_method_string() const {
   if (method == GET)
     return "GET";
@@ -53,7 +58,7 @@ Result<Request *> Request::from_buff(std::string &buff) {
     return ERR(Request *, Errors::incomplete_header);
   size_t content_length = 0;
 
-  std::string header_lower = buff.substr(0, header_end);
+  std::string header_lower = buff.substr(0, header_end + std::strlen("\r\n"));
   for (size_t i = 0; i < header_lower.length(); ++i) {
     header_lower[i] = static_cast<char>(
         std::tolower(static_cast<unsigned char>(header_lower[i])));
@@ -202,10 +207,10 @@ Result<Request *> Request::from_buff(std::string &buff) {
     req->keep_alive = false;
 
   req->cookie = get_string_from_map(req->header, "Cookie");
-  if (!decode_chunked) {
-    // check body if body not full break to get more event
-    const size_t total_request_len =
-        header_end + std::strlen("\r\n\r\n") + req->content_length;
+  if (req->decode_chunk_state == NOT_CHUNKED) {
+    // check body; if body is not full, break to get more event
+    const size_t total_request_len = header_end + std::strlen("\r\n\r\n") +
+                                     static_cast<size_t>(req->content_length);
     if (buff.length() < total_request_len) {
       req->remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
       buff.erase(0, total_request_len);
@@ -219,8 +224,9 @@ Result<Request *> Request::from_buff(std::string &buff) {
     }
     req->body = buff.substr(static_cast<size_t>(pos));
 
-    if (req->body.empty() || req->body.size() == req->content_length)
-      req->remnants = "";
+    if (req->body.empty() ||
+        req->body.size() == static_cast<size_t>(req->content_length))
+      req->remnants.clear();
     buff.erase(0, total_request_len);
     return OK(Request *, req);
   } else {
@@ -230,26 +236,145 @@ Result<Request *> Request::from_buff(std::string &buff) {
       return ERR(Request *, "streampos error");
     }
     req->remnants = buff.substr(static_cast<size_t>(body_start));
-    if (req->remnants.find("0\r\n\r\n") != std::string::npos) {
-      // TODO: decode chunked
+    size_t chunk_end;
+
+    if (req->remnants.compare(0, 3, "0\r\n") == 0) {
+      chunk_end = 0;
+    } else {
+      const size_t crlf_zero = req->remnants.find("\r\n0\r\n");
+      chunk_end =
+          (crlf_zero == std::string::npos) ? std::string::npos : crlf_zero + 2;
     }
+    if (chunk_end != std::string::npos) {
+      const Result<size_t> unchunked = req->unchunk(chunk_end);
+      if (!unchunked.has_value()) {
+        delete req;
+        return ERR(Request *, Errors::bad_request);
+      }
+      buff.erase(0, static_cast<size_t>(body_start) + unchunked.value());
+    } // else: chunked but not yet complete — leave buff untouched; remnants
+      // holds the partial
     return OK(Request *, req);
   }
 }
 
-void Request::continue_parsing(std::string &buff) {
+Result<Void> Request::continue_parsing(std::string &buff) {
   if (remnants.empty())
-    return;
-  else if (remnants.length() < content_length) {
-    if (remnants.length() + buff.length() >= content_length) {
-      const size_t diff = content_length - remnants.length();
+    return OKV;
+  else if (decode_chunk_state == NOT_CHUNKED &&
+           remnants.length() < static_cast<size_t>(content_length)) {
+    if (remnants.length() + buff.length() >=
+        static_cast<size_t>(content_length)) {
+      const size_t diff =
+          static_cast<size_t>(content_length) - remnants.length();
       remnants += buff.substr(0, diff);
       buff.erase(0, diff);
       body = remnants;
       remnants.clear();
+      return OKV;
     } else {
       remnants += buff;
       buff.clear();
+      return OKV;
     }
+  } else if (decode_chunk_state != NOT_CHUNKED && decode_chunk_state != DONE) {
+    remnants += buff;
+    buff.clear();
+    size_t chunk_end;
+
+    if (remnants.compare(0, 3, "0\r\n") == 0) {
+      chunk_end = 0;
+    } else {
+      const size_t crlf_zero = remnants.find("\r\n0\r\n");
+      chunk_end =
+          (crlf_zero == std::string::npos) ? std::string::npos : crlf_zero + 2;
+    }
+    if (chunk_end != std::string::npos) {
+      const Result<size_t> unchunked = unchunk(chunk_end);
+      if (!unchunked.has_value())
+        return ERR(Void, Errors::bad_request);
+    }
+    return OKV;
   }
+  return ERR(Void, Errors::bad_request);
+}
+
+bool Request::is_partial() const {
+  if (decode_chunk_state == NOT_CHUNKED)
+    return !remnants.empty();
+  return decode_chunk_state != DONE;
+}
+
+Result<size_t> Request::unchunk(size_t remnant_end) {
+  if (remnant_end >= remnants.length())
+    return ERR(size_t, Errors::bad_request);
+  const size_t last_pos =
+      remnants.find("\r\n", remnant_end + std::strlen("0\r\n"));
+  if (last_pos == std::string::npos)
+    return ERR(size_t, Errors::bad_request);
+  std::string rems(remnants.substr(0, remnant_end + std::strlen("0\r\n")));
+  size_t line_end = 0;
+  if (rems.empty())
+    return ERR(size_t, Errors::bad_request);
+  rems.append("\r\n");
+  std::string size_or_data;
+  size_t chunk_size = 0;
+  size_t size_line_semicolon_pos = 0;
+  while (!rems.empty()) {
+    line_end = rems.find("\r\n");
+    if (line_end == std::string::npos)
+      return ERR(size_t, Errors::bad_request);
+    size_or_data = rems.substr(0, line_end);
+    rems = rems.substr(line_end + std::strlen("\r\n"));
+    size_line_semicolon_pos = size_or_data.find(';');
+    if (size_line_semicolon_pos != std::string::npos)
+      size_or_data = size_or_data.substr(0, size_line_semicolon_pos);
+    for (std::string::const_iterator it = size_or_data.begin();
+         it != size_or_data.end(); ++it) {
+      chunk_size *= 16;
+      if (*it >= '0' && *it <= '9')
+        chunk_size += static_cast<size_t>(*it - '0');
+      else if (*it >= 'A' && *it <= 'F')
+        chunk_size += static_cast<size_t>(*it - 'A') + 10;
+      else if (*it >= 'a' && *it <= 'f')
+        chunk_size += static_cast<size_t>(*it - 'a') + 10;
+      else
+        return ERR(size_t, Errors::bad_request);
+    }
+    if (chunk_size == 0) {
+      if (rems.substr(0, 2) != "\r\n")
+        return ERR(size_t, Errors::bad_request);
+      rems = rems.substr(std::strlen("\r\n"));
+      if (!rems.empty())
+        return ERR(size_t, Errors::bad_request);
+      else {
+        content_length = static_cast<ssize_t>(body.length());
+        decode_chunk_state = DONE;
+        remnants.clear();
+        return OK(size_t, last_pos + 2);
+      }
+    } else if (chunk_size > 10 * 1024 * 1024 || chunk_size + 2 > rems.length())
+      return ERR(
+          size_t,
+          Errors::bad_request); // Safe only because caller ensures full body is
+                                // buffered (find("0\r\n\r\n") succeeded).
+    body += rems.substr(0, chunk_size);
+    if (rems.substr(chunk_size, 2) != "\r\n")
+      return ERR(size_t, Errors::bad_request);
+    rems = rems.substr(chunk_size + std::strlen("\r\n"));
+    chunk_size = 0;
+  }
+  // \r\n0\r\n not found yet remnant string empty
+  return ERR(size_t, Errors::bad_request);
+}
+
+Result<size_t> Request::get_content_length() const {
+  if (content_length < 0)
+    return ERR(size_t, Errors::access_denied);
+  else
+    return OK(size_t, static_cast<size_t>(content_length));
+}
+
+bool Request::is_chunked() const {
+  return decode_chunk_state != NOT_CHUNKED && decode_chunk_state != DONE;
 }

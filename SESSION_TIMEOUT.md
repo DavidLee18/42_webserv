@@ -93,7 +93,7 @@ The `30` sets both socket and session timeout to 30 seconds.
 
 ### Quick Test (No Setup)
 ```bash
-1. Start server: ./webserv siyoung.wbsrv
+1. Start server: ./webserv default.wbsrv
 2. Open browser: http://localhost:8080/session-info.html
 3. Watch 30-second countdown
 4. See progress bar turn red at 0 seconds

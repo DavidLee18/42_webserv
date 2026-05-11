@@ -55,7 +55,9 @@ class Server {
   std::set<const FileDescriptor *>
       server_fds; ///< Set of active server listening socket FileDescriptors.
 
-  std::map<const FileDescriptor *, CgiDelegate> cgis;
+  std::map<const FileDescriptor *,
+           std::pair<const FileDescriptor *, CgiDelegate *> >
+      cgis;
 
   /**
    * @brief Map tying server listening sockets to their specific ServerConfig
@@ -109,6 +111,8 @@ class Server {
    */
   void client_write(const FileDescriptor *client_fd);
 
+  void reap_cgi(CgiDelegate *cgi);
+
 public:
   /**
    * @brief Constructs a new Server based on the parsed WebserverConfig.
@@ -120,6 +124,17 @@ public:
     mime_type["default"] = config.get_default_mime();
   }
 
+  ~Server() {
+    std::set<CgiDelegate *> cgi_set;
+    for (std::map<FileDescriptor const *,
+                  std::pair<FileDescriptor const *,
+                            CgiDelegate *> >::const_iterator it = cgis.begin();
+         it != cgis.end(); ++it)
+      cgi_set.insert(it->second.second);
+    for (std::set<CgiDelegate *>::iterator it = cgi_set.begin();
+         it != cgi_set.end(); ++it)
+      delete *it;
+  }
   /**
    * @brief Initializes server state, binding sockets and registering them to
    * the polling queue.

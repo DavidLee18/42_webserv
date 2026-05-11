@@ -37,8 +37,6 @@
 *.out
 *.app
 webserv
-/uwsgi_server
-/gen_html.cgi
 
 # debug information files
 *.dwo
@@ -57,4 +55,4 @@ postman/
 .vscode/
 
 # CGI executables
-spool/www/cgi-bin/
+www-files/cgi-bin/

@@ -77,6 +77,8 @@ DefaultError::int_to_status_code(unsigned short status_code) {
     return Response::NOT_FOUND;
   case 405:
     return Response::METHOD_NOT_ALLOWED;
+  case 408:
+    return Response::REQUEST_TIMEOUT;
   case 409:
     return Response::CONFLICT;
   case 413:
@@ -113,6 +115,8 @@ DefaultError::status_code_to_string(const Response::StatusCode status_code) {
     return "404 Not Found";
   case Response::METHOD_NOT_ALLOWED:
     return "405 Method Not Allowed";
+  case Response::REQUEST_TIMEOUT:
+    return "408 Request Timeout";
   case Response::CONFLICT:
     return "409 Conflict";
   case Response::PAYLOAD_TOO_LARGE:

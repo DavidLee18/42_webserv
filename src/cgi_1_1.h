@@ -161,7 +161,7 @@ public:
     GatewayInterface gateway_interface;
     std::list<std::string> *path_info;
     std::string *path_translated;
-    std::map<std::string, std::string> *query_string;
+    std::string *query_string;
     unsigned char remote_addr[4];
     std::list<std::string> *remote_host;
     std::string *remote_ident;
@@ -240,7 +240,7 @@ private:
   static CgiMetaVar gateway_interface(GatewayInterface);
   static CgiMetaVar path_info(const std::list<std::string> &);
   static CgiMetaVar path_translated(const std::string &);
-  static CgiMetaVar query_string(const std::map<std::string, std::string> &);
+  static CgiMetaVar query_string(const std::string &);
   static CgiMetaVar remote_addr(unsigned char, unsigned char, unsigned char,
                                 unsigned char);
   static CgiMetaVar remote_host(const std::list<std::string> &);
@@ -299,7 +299,10 @@ public:
   // Phase 1: create pipes, fork, register the pipe fds with epoll.
   // After this returns OK, the main event loop will deliver events on the
   // registered fds; the caller must route them to handle_event().
-  Result<Void> register_();
+  Result<Void>
+  register_(std::map<FileDescriptor const *,
+                     std::pair<FileDescriptor const *, CgiDelegate *> > &cgis,
+            FileDescriptor const *client_fd);
 
   // Phase 2: process a single epoll event for this CGI. Performs
   // non-blocking IO only; never calls epoll->wait(). Returns an error if
@@ -317,7 +320,7 @@ public:
 private:
   CgiInput _env;
   std::string _script_path;
-  const Request &_req;
+  const Request _req;
   EPoll &_epoll;
   pid_t _pid;
   FileDescriptor *_stdin;

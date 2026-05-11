@@ -1,4 +1,6 @@
 #include "webserv.h"
+#include <cstdio>
+#include <fcntl.h>
 
 CgiAuthType::CgiAuthType(const CgiAuthType::Type type)
     : _type(type), _other(NULL) {}
@@ -266,8 +268,7 @@ CgiMetaVar::CgiMetaVar(const CgiMetaVar &other) : name(other.name), val() {
     val.path_translated = new std::string(*other.val.path_translated);
     break;
   case QUERY_STRING:
-    val.query_string =
-        new std::map<std::string, std::string>(*other.val.query_string);
+    val.query_string = new std::string(*other.val.query_string);
     break;
   case REMOTE_ADDR:
     val.remote_addr[0] = other.val.remote_addr[0];
@@ -369,8 +370,7 @@ CgiMetaVar &CgiMetaVar::operator=(const CgiMetaVar &other) {
       val.path_translated = new std::string(*other.val.path_translated);
       break;
     case QUERY_STRING:
-      val.query_string =
-          new std::map<std::string, std::string>(*other.val.query_string);
+      val.query_string = new std::string(*other.val.query_string);
       break;
     case REMOTE_ADDR:
       val.remote_addr[0] = other.val.remote_addr[0];
@@ -484,12 +484,10 @@ CgiMetaVar CgiMetaVar::path_translated(const std::string &path) {
       (CgiMetaVar::Val){.path_translated = new std::string(path)});
 }
 
-CgiMetaVar
-CgiMetaVar::query_string(const std::map<std::string, std::string> &query_map) {
+CgiMetaVar CgiMetaVar::query_string(const std::string &query_string) {
   return CgiMetaVar(
       QUERY_STRING,
-      (CgiMetaVar::Val){.query_string =
-                            new std::map<std::string, std::string>(query_map)});
+      (CgiMetaVar::Val){.query_string = new std::string(query_string)});
 }
 
 CgiMetaVar CgiMetaVar::remote_addr(const unsigned char a, const unsigned char b,
@@ -737,27 +735,7 @@ CgiMetaVar::Parser::parse_path_translated(const std::string &raw) {
 
 Result<std::pair<CgiMetaVar, size_t> >
 CgiMetaVar::Parser::parse_query_string(const std::string &raw) {
-  std::map<std::string, std::string> query_map;
-
-  if (raw.empty()) {
-    return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::query_string(query_map), 0);
-  }
-
-  std::stringstream ss(raw);
-  std::string pair;
-
-  while (std::getline(ss, pair, '&')) {
-    const size_t eq_pos = pair.find('=');
-    if (eq_pos == std::string::npos) {
-      query_map[pair] = "";
-    } else {
-      std::string key = pair.substr(0, eq_pos);
-      const std::string value = pair.substr(eq_pos + 1);
-      query_map[key] = value;
-    }
-  }
-
-  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::query_string(query_map),
+  return OK_PAIR(CgiMetaVar, size_t, CgiMetaVar::query_string(raw),
                  raw.length());
 }
 
@@ -1034,19 +1012,8 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
   input.mvars.push_back(CgiMetaVar::server_software(Webserv));
 
   // Parse path for SCRIPT_NAME, PATH_INFO, and QUERY_STRING
-  std::string path = req.get_path();
-  size_t query_pos = path.find('?');
-  std::string script_path;
-  std::string query_string;
-
-  if (query_pos != std::string::npos) {
-    script_path = path.substr(0, query_pos);
-    query_string = path.substr(query_pos + 1);
-  } else {
-    script_path = path;
-    query_string = "";
-  }
-
+  std::string script_path = req.get_path();
+  std::string query_string = req.get_query();
   // Build path segments list (shared by SCRIPT_NAME and PATH_INFO)
   std::list<std::string> path_parts;
   if (!script_path.empty()) {
@@ -1075,15 +1042,8 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
 
   // Add QUERY_STRING
   if (!query_string.empty()) {
-    std::map<std::string, std::string> query_map;
-    std::stringstream ss(query_string);
-    std::string pair;
-    while (std::getline(ss, pair, '&')) {
-      size_t eq_pos = pair.find('=');
-      if (eq_pos != std::string::npos)
-        query_map[pair.substr(0, eq_pos)] = pair.substr(eq_pos + 1);
-    }
-    input.mvars.push_back(CgiMetaVar::query_string(query_map));
+    std::cerr << "[QS-DEBUG] req.get_query()=[" << query_string << "]\n";
+    input.mvars.push_back(CgiMetaVar::query_string(query_string));
   }
 
   // Add REMOTE_ADDR (127.0.0.1 — actual client IP is not available from
@@ -1320,18 +1280,8 @@ char **CgiInput::to_envp() const {
       break;
 
     case CgiMetaVar::QUERY_STRING:
-      env_str = "QUERY_STRING=";
-      if (var.get_val().query_string != NULL) {
-        bool first = true;
-        for (std::map<std::string, std::string>::const_iterator it =
-                 var.get_val().query_string->begin();
-             it != var.get_val().query_string->end(); ++it) {
-          if (!first)
-            env_str += "&";
-          env_str += it->first + "=" + it->second;
-          first = false;
-        }
-      }
+      env_str = "QUERY_STRING=" + *var.get_val().query_string;
+      std::cerr << "[QS-ENV] env_str=[" << env_str << "]\n";
       break;
 
     case CgiMetaVar::REMOTE_ADDR: {
@@ -1497,8 +1447,8 @@ CgiDelegate::CgiDelegate(const CgiDelegate &other)
     : _env(other._env), _script_path(other._script_path), _req(other._req),
       _epoll(other._epoll), _pid(other._pid), _stdin(other._stdin),
       _stdout(other._stdout), _total_written(other._total_written),
-      _output(other._output), _state(other._state), _start_time(),
-      _timeout_ns() {
+      _output(other._output), _state(other._state),
+      _start_time(other._start_time), _timeout_ns(other._timeout_ns) {
   const_cast<CgiDelegate &>(other)._env.mvars.clear();
   const_cast<CgiDelegate &>(other)._env.req_body.clear();
   const_cast<CgiDelegate &>(other)._script_path.clear();
@@ -1548,7 +1498,10 @@ CgiDelegate::operator=(const CgiDelegate &other) throw(std::logic_error) {
 // pipe ends with the shared epoll instance. No epoll_wait() is performed
 // here - the caller's main loop is the sole owner of epoll_wait() and
 // will drive handle_event() for each event delivered.
-Result<Void> CgiDelegate::register_() {
+Result<Void> CgiDelegate::register_(
+    std::map<FileDescriptor const *,
+             std::pair<FileDescriptor const *, CgiDelegate *> > &cgis,
+    FileDescriptor const *client_fd) {
   if (_pid != -1 || _state != NotRegistered)
     return ERR(Void, Errors::cgi_invalid_state);
 
@@ -1604,25 +1557,22 @@ Result<Void> CgiDelegate::register_() {
       FileDescriptor stdout0 = stdout_pipe_res.value().first;
     }
 
-    _stdin = new FileDescriptor(stdin_pipe_res.value().first);
-    _stdout = new FileDescriptor(stdout_pipe_res.value().second);
+    FileDescriptor &stdin =
+        const_cast<FileDescriptor &>(stdin_pipe_res.value().first);
+    FileDescriptor &stdout =
+        const_cast<FileDescriptor &>(stdout_pipe_res.value().second);
 
-    Result<Void> res = _stdin->dup2stdin();
+    Result<Void> res = stdin.dup2stdin();
     if (!res.has_value()) {
       std::cerr << res.error() << std::endl;
       std::exit(1);
     }
 
-    res = _stdout->dup2stdout();
+    res = stdout.dup2stdout();
     if (!res.has_value()) {
       std::cerr << res.error() << std::endl;
       std::exit(1);
     }
-
-    delete _stdin;
-    _stdin = NULL;
-    delete _stdout;
-    _stdout = NULL;
 
     char **envp = _env.to_envp();
     char *argv[2] = {const_cast<char *>(_script_path.c_str()), NULL};
@@ -1658,18 +1608,18 @@ Result<Void> CgiDelegate::register_() {
   }
 
   _pid = pid;
-  _stdin = new FileDescriptor(stdin_pipe_res.value().second);
-  _stdout = new FileDescriptor(stdout_pipe_res.value().first);
+  FileDescriptor stdin = stdin_pipe_res.value().second;
+  FileDescriptor stdout = stdout_pipe_res.value().first;
 
   // Non-blocking is mandatory: epoll readiness does not imply non-blocking
   // semantics of read/write, and partial IO is expected in the event loop.
-  Result<Void> res = _stdin->set_nonblocking();
+  Result<Void> res = stdin.set_nonblocking();
   if (!res.has_value()) {
     _state = Failed;
     return ERR(Void, "Failed to set stdin pipe to non-blocking mode");
   }
 
-  res = _stdout->set_nonblocking();
+  res = stdout.set_nonblocking();
   if (!res.has_value()) {
     _state = Failed;
     return ERR(Void, "Failed to set stdout pipe to non-blocking mode");
@@ -1679,27 +1629,34 @@ Result<Void> CgiDelegate::register_() {
   // If there is no body, let the stdin_fd destructor close the pipe so the
   // CGI script sees EOF on its stdin.
   if (!_req.get_body().empty()) {
-    Event write_event(_stdin, false, true, false, false, true, true);
+    Event write_event(NULL, false, true, false, false, true, true);
     Option write_option(false, false, false, false);
     Result<FileDescriptor *> add_res =
-        _epoll.add_fd(*_stdin, write_event, write_option);
+        _epoll.add_fd(stdin, write_event, write_option);
     if (!add_res.has_value()) {
       _state = Failed;
       return ERR(Void, "Failed to add stdin to epoll");
     }
-    delete _stdin;
     _stdin = add_res.value();
+  } else {
+    {
+      FileDescriptor stdin_drop(stdin);
+    }
+    _stdin = NULL;
   }
 
   // Register stdout for EPOLLIN (plus err/hup so we notice child exit).
-  Event read_event(_stdout, true, false, true, false, true, true);
+  Event read_event(NULL, true, false, true, false, true, true);
   Option read_option(false, false, false, false);
   Result<FileDescriptor *> add_out_res =
-      _epoll.add_fd(*_stdout, read_event, read_option);
+      _epoll.add_fd(stdout, read_event, read_option);
   if (!add_out_res.has_value()) {
     if (_stdin != NULL) {
-      _epoll.del_fd(*_stdin);
-      delete _stdin;
+      dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+      const int stdin = _stdin->_fd;
+      _epoll.del_fd(_stdin);
+      const int r = fcntl(stdin, F_GETFD);
+      dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
       _stdin = NULL;
     }
     _state = Failed;
@@ -1710,6 +1667,8 @@ Result<Void> CgiDelegate::register_() {
     _state = Failed;
     return ERR(Void, "Failed to get start time for CGI process");
   }
+  cgis[_stdin] = std::make_pair(client_fd, this);
+  cgis[_stdout] = std::make_pair(client_fd, this);
   _state = Waiting;
   return OKV;
 }
@@ -1718,7 +1677,10 @@ Result<Void> CgiDelegate::register_() {
 // Caller is expected to filter events and only forward those belonging to
 // fds this delegate registered. Unknown events are ignored.
 Result<Void> CgiDelegate::handle_event(const Event *ev) {
-  if (ev == NULL || ev->fd == NULL)
+  dprintf(2, "handle_event called: ev_fd=%d stdin=%d stdout=%d\n",
+          ev ? ev->fd->_fd : -1, _stdin ? _stdin->_fd : -1,
+          _stdout ? _stdout->_fd : -1);
+  if (ev == NULL)
     return OKV;
   if (_state == Failed)
     return ERR(Void, Errors::bad_gateway);
@@ -1735,7 +1697,7 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
     _state = Failed;
     return ERR(Void, Errors::gateway_timeout);
   }
-  if (_stdin != NULL && *ev->fd == *_stdin) {
+  if (_stdin != NULL && ev->fd == _stdin) {
     if (ev->err) {
       _state = Failed;
       return ERR(Void, Errors::bad_gateway);
@@ -1746,8 +1708,12 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
         return ERR(Void, Errors::bad_gateway);
       }
       // All data was already written; close stdin and continue.
-      _epoll.del_fd(*_stdin);
-      delete _stdin;
+
+      dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+      const int stdin = _stdin->_fd;
+      _epoll.del_fd(_stdin);
+      const int r = fcntl(stdin, F_GETFD);
+      dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
       _stdin = NULL;
       return OKV;
     }
@@ -1770,15 +1736,19 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       } else {
         // Done writing: drop stdin from epoll, which also closes the pipe,
         // signalling EOF to the CGI script.
-        _epoll.del_fd(*_stdin);
-        delete _stdin;
+        dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+        const int stdin = _stdin->_fd;
+        _epoll.del_fd(_stdin);
+        const int r = fcntl(stdin, F_GETFD);
+        dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
         _stdin = NULL;
         return OKV;
       }
     }
   }
-  if (_stdout != NULL && *ev->fd == *_stdout) {
+  if (_stdout != NULL && ev->fd == _stdout) {
     // is_stdout
+    dprintf(2, "stdout event: in=%d hup=%d\n", ev->in, ev->hup);
     if (ev->in || ev->hup || ev->rdhup) {
       char buffer[4096];
       const Result<ssize_t> bytes_read =
@@ -1795,12 +1765,14 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       }
 
       // bytes_read == 0: EOF, drain any remaining IO bookkeeping.
-      _epoll.del_fd(*_stdout);
-      delete _stdout;
+      _epoll.del_fd(_stdout);
       _stdout = NULL;
       if (_stdin != NULL) {
-        _epoll.del_fd(*_stdin);
-        delete _stdin;
+        dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+        const int stdin = _stdin->_fd;
+        _epoll.del_fd(_stdin);
+        const int r = fcntl(stdin, F_GETFD);
+        dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
         _stdin = NULL;
       }
       _state = Done;
@@ -1871,13 +1843,11 @@ size_t CgiDelegate::remaining_ns() const {
 
 CgiDelegate::~CgiDelegate() {
   if (_stdin != NULL) {
-    _epoll.del_fd(*_stdin);
-    delete _stdin;
+    _epoll.del_fd(_stdin);
     _stdin = NULL;
   }
   if (_stdout != NULL) {
-    _epoll.del_fd(*_stdout);
-    delete _stdout;
+    _epoll.del_fd(_stdout);
     _stdout = NULL;
   }
   if (_pid > 0) {
