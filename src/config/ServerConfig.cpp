@@ -47,7 +47,7 @@ bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
         return false;
       }
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
-      RouteRule_CGI _temp2(fd, line);
+      RouteRule_CGI _temp2(const_cast<FileDescriptor &>(fd), line);
       count_line += _temp2.get_count_line();
       if (_temp2.get_err_meg() != "") {
         err_meg = _temp2.get_err_meg();

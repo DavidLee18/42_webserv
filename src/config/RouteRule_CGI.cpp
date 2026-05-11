@@ -365,7 +365,8 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
   }
   os << "\tExecutable: " << data.get_executable();
   os << "\n\tEnv";
-  for (env_it = env.begin(); env_it != env.end(); ++env_it) {
+  for (std::map<std::string, std::string>::const_iterator env_it = env.begin();
+       env_it != env.end(); ++env_it) {
     os << "\n\t\tEnv key: " << env_it->first
        << ", Env value: " << env_it->second;
   }
