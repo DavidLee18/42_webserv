@@ -625,11 +625,11 @@ Response ServerResponse::post_method(const Target &target, Response response,
   }
 
   // Handle file uploads
-  std::cout << "matched rule path: '" << rule->path << "' upload_dir = '"
-            << rule->upload_dir << "'" << std::endl;
-  if (rule->upload_dir.empty())
-    const_cast<RouteRule *>(rule)->upload_dir = rule->root.to_string();
-  if (!rule->upload_dir.empty()) {
+  std::cout << "matched rule path: '" << rule->path << "' root = '"
+            << rule->root << "'" << std::endl;
+  if (rule->root.to_string().empty())
+    const_cast<RouteRule *>(rule)->root = rule->root.to_string();
+  if (!rule->root.to_string().empty()) {
     const std::string &body = request->get_body();
     const std::map<std::string, std::string> &headers = request->get_headers();
 
@@ -659,7 +659,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
     std::cout << "Boundary: " << boundary << std::endl;
 
     // Create upload directory if it doesn't exist
-    std::string upload_path = get_pwd() + "/" + rule->upload_dir;
+    std::string upload_path = get_pwd() + "/" + rule->root.to_string();
     if (mkdir(upload_path.c_str(), 0755) != 0 && errno != EEXIST) {
       std::cout << "Failed to create upload directory: " << upload_path
                 << std::endl;
