@@ -38,7 +38,7 @@ class RouteRule_CGI {
    * @var timeout
    * @brief CGI 실행의 제한 시간을 저장하는 멤버 변수
    */
-  double timeout;
+  int timeout_ms;
   /**
    * @var err
    * @brief CGI 규칙 파싱 또는 처리 중 발생한 오류 정보를 저장하는 멤버 변수
@@ -47,7 +47,7 @@ class RouteRule_CGI {
    */
   std::string err_meg;
   std::size_t count_line;
-
+  int worker_instance;
   /**
    * @brief 문자열이 timeout 문법과 값 범위에 맞는지 확인하는 함수
    * @param line 검사할 문자열
@@ -66,7 +66,7 @@ class RouteRule_CGI {
    * - 입력 문자열은 is_valid_timeout(const std::string &line) 함수로
    * 유효성이 확인된 상태여야 한다.
    */
-  std::string parse_timeout_value(std::string &line);
+  static std::string parse_timeout_value(RouteRule_CGI &cgi, std::string &line);
   /**
    * @brief CGI 설정 블록을 파싱하여 실행 파일, 환경 변수, timeout 정보를
    * 저장하는 함수
@@ -79,12 +79,16 @@ class RouteRule_CGI {
    * - 이후 들여쓰기 2단계의 하위 줄에서 timeout 또는 추가 환경 변수 정보를
    * 읽는다.
    */
-  std::string parse_cgi_block(const FileDescriptor &fd,
-                              const std::string &line);
+  std::string parse_cgi_block(FileDescriptor &fd, std::string line);
+  static std::string matches_cgi_syntax(const std::string &line);
+  static std::string parse_cgi_params(RouteRule_CGI &cgi, FileDescriptor &fd,
+                                      std::string line);
 
 public:
   RouteRule_CGI()
-      : met(Request::ERROR), timeout(-1), err_meg("No parse"), count_line() {}
+      : met(Request::GET), path(""), executable(""), env(), timeout_ms(3000),
+        err_meg(""), count_line(0), worker_instance(5) {};
+
   /**
    * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
    * 생성자
@@ -94,15 +98,28 @@ public:
    * - 요청 메서드와 경로를 설정한 뒤, 하위 CGI 블록을 파싱하여
    * 실행 파일, 환경 변수, timeout 정보를 초기화한다.
    */
-  RouteRule_CGI(const FileDescriptor &fd, const std::string &line);
-
-  PathPattern get_path() const { return path; }
-  Request::Method get_method() const { return met; }
-  std::string get_err_meg() const { return err_meg; }
-  std::string get_executable() const { return executable; }
-  std::map<std::string, std::string> get_env() const { return env; }
-  std::size_t get_count_line() const { return count_line; }
-  double get_timeout() const { return timeout; }
+  RouteRule_CGI(FileDescriptor &fd, const std::string &line);
+  RouteRule_CGI &operator=(const RouteRule_CGI &other) {
+    if (this != &other) {
+      met = other.met;
+      path = other.path;
+      executable = other.executable;
+      env = other.env;
+      timeout_ms = other.timeout_ms;
+      err_meg = other.err_meg;
+      count_line = other.count_line;
+      worker_instance = other.worker_instance;
+    }
+    return *this;
+  }
+  const PathPattern get_path(void) const { return path; }
+  Request::Method get_method(void) const { return met; }
+  const std::string get_err_meg(void) const { return err_meg; }
+  const std::string get_executable(void) const { return executable; }
+  const std::map<std::string, std::string> get_env(void) const { return env; }
+  std::size_t get_count_line(void) const { return count_line; }
+  int get_worker_instance(void) const { return worker_instance; };
+  int get_timeout_ms() const { return timeout_ms; }
 
   /**
    * @brief 문자열이 환경 변수 이름 문법에 맞는지 검사하는 함수
@@ -137,17 +154,6 @@ public:
    */
   static bool is_valid_cgi_config(const std::string &line);
   /**
-   * @brief 문자열이 유효한 CGI 설정 형식인지 검사하는 함수
-   * @param line 검사할 문자열
-   * @return 유효한 CGI 설정 형식이면 true, 그렇지 않으면 false
-   *
-   * - 입력 문자열은 '$'로 시작해야 하며 공백을 포함할 수 없다.
-   *
-   * - "$<숫자 문자열>" 또는 "$<확장자가 .cgi인 실행 파일>" 뒤에
-   * 선택적으로 "(키=값)" 형식의 문자열이 올 수 있다.
-   */
-  static bool matches_cgi_syntax(const std::string &line);
-  /**
    * @brief 주어진 경로가 실행 가능한 파일인지 검사하는 함수
    * @param path 검사할 실행 파일 경로
    * @return 실행 가능하면 true, 그렇지 않으면 false
@@ -175,8 +181,6 @@ public:
    * @return 성공하면 빈 문자열, 실패하면 오류 메시지
    *
    * - 입력 문자열은 is_valid_cgi_config(const std::string &line) 또는
-   * matches_cgi_syntax(const std::string &line) 함수로 유효성이 확인된 상태여야
-   * 한다.
    */
   static std::string parse_executable(const std::string &line,
                                       std::string &executable,
@@ -193,9 +197,9 @@ public:
    * - 각 항목은 유효한 uwsgi 설정 형식을 따라야 하며, 실행 파일은 .py 확장자를
    * 가져야 한다.
    */
-  static std::string
-  parse_uwsgi_block(FileDescriptor &fd,
-                    std::map<std::string, std::string> &uwsgi, std::size_t &count_line);
+  static std::string parse_uwsgi_block(FileDescriptor &fd,
+                                       std::map<int, RouteRule_CGI> &uwsgi,
+                                       std::size_t &count_line);
 };
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data);

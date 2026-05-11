@@ -34,33 +34,16 @@ bool ServerConfig::parse_server_block(const FileDescriptor &fd) {
     line = utils::trim_whitespace(line);
 
     if (is_header_block(line)) {
-      if (!parse_header_entry(fd, line)) { // 수정해야 함
+      if (!parse_header_entry(fd, line)) { // 마지막에 수정해야 함
         err_meg = "Header syntax Error: " + err_meg;
         return false;
       }
-    } else if (RouteRule_CGI::matches_cgi_syntax(line)) {
-      std::string key;
-      std::map<std::string, std::string> _temp;
-      err_meg = RouteRule_CGI::parse_executable(line, key, _temp);
-      if (err_meg != "") {
-        err_meg = "on [\t" + line + err_meg;
-        return false;
-      }
-      if (S_CGI.find(key) != S_CGI.end()) {
-        err_meg = "on [\t" + line + "], [" + key +
-                  "]: The CGI server block configuration is duplicated. (CGI "
-                  "server block rule, each CGI path must be declared only once "
-                  "per server context, but the same CGI definition appears "
-                  "multiple times, causing a configuration conflict).";
-        return false;
-      }
-      S_CGI[key] = _temp;
     } else if (is_valid_server_response_time(line)) {
       parse_server_response_time(line);
       if (err_meg != "")
         return false;
     } else if (matches_route_rule_syntax(line)) {
-      if (!parse_route_rule_block(line, fd)) { // 수정 중
+      if (!parse_route_rule_block(line, fd)) {
         return false;
       }
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
@@ -275,77 +258,107 @@ bool ServerConfig::has_valid_wildcard_usage(const std::string &url) {
 
 bool ServerConfig::matches_route_rule_syntax(const std::string &line) {
   if (line.empty())
-    return (false);
+    return false;
   if (std::isspace(static_cast<unsigned char>(line[line.size() - 1])))
-    return (false);
-  const std::vector<std::string> split = utils::string_split(line, " ");
+    return false;
+  std::vector<std::string> split = utils::string_split(line, " ");
   if (split.size() != 4 || parse_rule_operator(split[2]) == UNDEFINED ||
       !has_valid_wildcard_usage(split[1]) ||
       !has_valid_wildcard_usage(split[3]))
-    return (false);
+    return false;
 
   const std::vector<std::string> method = utils::string_split(split[0], "|");
   for (std::size_t i = 0; i < method.size(); ++i) {
-    if (method[i] != "GET" && method[i] != "POST" && method[i] != "DELETE")
+    if (method[i] == "GET")
+      continue;
+    else if (method[i] == "POST")
+      continue;
+    else if (method[i] == "DELETE")
+      continue;
+    else
       return false;
   }
   return true;
 }
 
-int ServerConfig::parse_max_body_size(std::string line) {
+std::string ServerConfig::parse_max_body_size(std::string line, int &maxbody) {
   size_t i = 0;
-  int maxbody = 0;
+  maxbody = 0;
   for (; i < line.size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(line[i])))
       break;
     maxbody = maxbody * 10 + (line[i] - '0');
   }
+  std::string res = "], [";
   if (i == 0)
-    return (-1);
+    return err_meg =
+               res + line +
+               "]: Invalid max_body_size value syntax: the value after "
+               "\"->{}\" must be a numeric string optionally followed by one "
+               "of the allowed units: \"MB\", \"MiB\", \"KB\", or \"KiB\" (the "
+               "max_body_size additional information value rule is violated "
+               "because the provided value does not match the required format: "
+               "<numeric string><optional unit>).";
   line = line.substr(i);
   if (line.empty() || line == "KB" || line == "KiB")
-    return (maxbody);
+    ;
   else if (line == "MB")
-    return (maxbody * 1000);
+    maxbody = maxbody * 1000;
   else if (line == "MiB")
-    return (maxbody * 1024);
-  return (-1);
-}
-
-std::string ServerConfig::get_valid_index_file(const std::string &line) {
-  size_t i = 0;
-  for (; i < line.size(); ++i) {
-    if (line[i] == '.')
-      break;
-  }
-  const std::string extension = line.substr(i);
-  if (extension.empty())
-    return ("");
-  else if (extension == ".html" || extension == ".htm")
-    return (line);
+    maxbody = maxbody * 1024;
   else
-    return ("");
+    return err_meg =
+               res + line +
+               "]: Invalid max_body_size value syntax: the value after "
+               "\"->{}\" must be a numeric string optionally followed by one "
+               "of the allowed units: \"MB\", \"MiB\", \"KB\", or \"KiB\" (the "
+               "max_body_size additional information value rule is violated "
+               "because the provided value does not match the required format: "
+               "<numeric string><optional unit>).";
+  return "";
 }
 
-std::string ServerConfig::parse_upload_dir(const std::string &line) {
-  if (line.empty())
-    return ("");
-  return (line);
-}
+std::string ServerConfig::apply_default_err_page_entry(
+    const std::string &line, std::map<int, std::string> &err_map) {
+  std::vector<std::string> split = utils::string_split(line, " ");
 
-int ServerConfig::parse_error_page_entry(std::string &line) {
-  int key = 0;
-  const std::vector<std::string> key_and_value = utils::string_split(line, ":");
-
-  if (key_and_value.size() != 2)
-    return (0);
-  for (std::size_t i = 0; i < key_and_value[0].size(); ++i) {
-    if (!std::isdigit(static_cast<unsigned char>(key_and_value[0][i])))
-      return (0);
-    key = key * 10 + (key_and_value[0][i] - '0');
+  if (split.size() != 2) {
+    if (split.size() == 1)
+      return "], []: Violates default error page format (must be \"! "
+             "<status>:<path>\").";
+    std::string res = "";
+    for (std::size_t i = 2; i < split.size(); ++i)
+      res += " " + split[i];
+    return "], [" + res +
+           "]: Violates default error page format (invalid format for \"! "
+           "<status>:<path>\").";
   }
-  line = key_and_value[1];
-  return (key);
+  std::string path = split[1];
+  split = utils::string_split(split[1], ":");
+  if (split.size() != 2 || utils::count_occurrences(path, ":") != 1) {
+    std::size_t pos = line.find(':');
+    std::string res = "], [";
+    pos = line.find(':', pos + 1);
+    return res + &line[pos] +
+           "]: Violates error page mapping rule (expected \"status:path\" with "
+           "no trailing ':' or extra fields).";
+  }
+  for (std::size_t i = 0; i < split[0].size(); ++i) {
+    if (!std::isdigit(static_cast<unsigned char>(split[0][i])))
+      return "], [" + split[0] +
+             "]: Violates status format rule (status must consist only of "
+             "digits).";
+  }
+  if (split[0][0] != '4' && split[0][0] != '5' && split[0].size() != 3)
+    return "], [" + split[0] +
+           "]: Violates status range rule (status must start with 4xx or 5xx).";
+  else if (utils::check_html_file(split[1]) != "")
+    return "], [" + split[1] + "]: " + utils::check_html_file(split[1]);
+  char *end;
+  unsigned long num = std::strtoul(split[0].c_str(), &end, 10);
+  err_map[static_cast<int>(num)] = split[1];
+
+  return "";
 }
 
 bool ServerConfig::apply_route_rule_entry(
@@ -356,25 +369,27 @@ bool ServerConfig::apply_route_rule_entry(
   std::size_t size = rule.size();
   PathPattern key(key_data);
 
-  if (size != 2)
+  if (size != 2) {
+    if (size > 2) {
+      std::size_t pos = line.find(" ");
+      pos = line.find(" ", pos);
+      err_meg = "on [\t\t" + line + "], [" + &line[pos] +
+                "]: RouteRule additional information must contain exactly 2 "
+                "elements (the RouteRule additional information rule is "
+                "violated because the number of provided elements is not 2).";
+    } else if (size == 1)
+      err_meg = "on [\t\t" + line +
+                "], []: RouteRule additional information must contain exactly "
+                "2 elements (the RouteRule additional information rule is "
+                "violated because the number of provided elements is not 2).";
     return false;
+  }
 
-  // Strip whitespace from the rule operator (first element)
-  rule[0] = utils::trim_whitespace(rule[0]);
-
-  // Find or create routes for each method with this path pattern
   for (std::size_t i = 0; i < mets.size(); ++i) {
-    std::size_t targetRouteIndex =
-        routes.size(); // Will be set to existing route index or stay as size
-                       // (indicating new route)
+    std::size_t targetRouteIndex = routes.size();
 
-    // Find existing route with matching method and path (exact match for
-    // updating properties)
     for (std::size_t j = 0; j < routes.size(); ++j) {
-      // For updating route properties, we need exact path match, not wildcard
-      // match
       if (routes[j].method == mets[i]) {
-        // Compare path segments for exact match
         const std::vector<std::string> &routePath = routes[j].path.get_path();
         const std::vector<std::string> &keyPath = key.get_path();
         if (routePath.size() == keyPath.size()) {
@@ -393,7 +408,6 @@ bool ServerConfig::apply_route_rule_entry(
       }
     }
 
-    // If not found, create a new route
     if (targetRouteIndex == routes.size()) {
       RouteRule newRoute;
       newRoute.method = mets[i];
@@ -402,36 +416,50 @@ bool ServerConfig::apply_route_rule_entry(
       newRoute.max_body_KB = 1;
       newRoute.upload_dir = "";
       routes.push_back(newRoute);
-      // targetRouteIndex is already set to the correct value (old size, which
-      // is the new index)
     }
 
-    // Update the route based on rule type (using index to avoid pointer
-    // invalidation)
     if (rule[0] == "?") {
-      std::string index = get_valid_index_file(rule[1]);
-      if (index == "")
+      err_meg = utils::check_html_file(rule[1]);
+      if (err_meg != "") {
+        err_meg = "on [\t\t" + line + "], [" + rule[1] + "]: " + err_meg;
         return false;
-      routes[targetRouteIndex].index = index;
+      }
+      routes[targetRouteIndex].index = rule[1];
     } else if (rule[0] == "@") {
+      if (access(rule[1].c_str(), F_OK) != 0) {
+        err_meg = "on [\t\t" + line + "], [" + rule[1] +
+                  "]: the value after \"@\" must refer to an existing file "
+                  "(the \"@\" keyword file path rule is violated because the "
+                  "provided value does not exist or is not a valid file).";
+        return false;
+      }
       routes[targetRouteIndex].auth_info = rule[1];
     } else if (rule[0] == "->{}") {
-      int max = parse_max_body_size(rule[1]);
-      if (max == -1)
+      err_meg =
+          parse_max_body_size(rule[1], routes[targetRouteIndex].max_body_KB);
+      if (err_meg != "") {
+        err_meg = "on [\t\t" + line + err_meg;
         return false;
-      routes[targetRouteIndex].max_body_KB = max;
+      }
     } else if (rule[0] == "!") {
-      std::string errPageLine = rule[1]; // Make a copy to avoid modification
-      int err_key = parse_error_page_entry(
-          errPageLine); // WebserverConfig::apply_default_err_page_entry
-                        // 함수로 수정 해야함
-      if (err_key == 0)
+      std::string errPageLine = rule[1];
+      err_meg = ServerConfig::apply_default_err_page_entry(
+          line, routes[targetRouteIndex].error_pages);
+      if (err_meg != "") {
+        err_meg = "on [\t\t" + line + err_meg;
         return false;
-      routes[targetRouteIndex].error_pages[err_key] = errPageLine;
-    } else
+      }
+    } else {
+      err_meg =
+          "on [\t\t" + line + "], [" + line +
+          "]: Invalid RouteRule additional information syntax: this line does "
+          "not match the RouteRule additional information format (the "
+          "RouteRule additional information syntax rule is violated because "
+          "the line cannot be parsed as valid additional information; allowed "
+          "keywords are \"!\", \"@\", \"->{}\", and \"?\").";
       return false;
+    }
   }
-
   return true;
 }
 
@@ -564,8 +592,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
     err_meg = utils::get_indent_whitespace_error(line, 2);
     if (err_meg != "")
       return false;
-    else if (apply_route_rule_entry(mets, route_line_data[1],
-                                    line)) { // 수정해야 함
+    else if (apply_route_rule_entry(mets, route_line_data[1], line)) {
       if (err_meg != "")
         return false;
       continue;
@@ -647,21 +674,6 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
        header_it != header.end(); ++header_it) {
     os << "\n\tkey: " << header_it->first << ", value: " << header_it->second
        << std::endl;
-  }
-
-  os << "\n\n\n<<Server CGI>>";
-  const CGI &s = data.get_serve_cgi();
-  if (s.empty())
-    os << "\n\tEmpty" << std::endl;
-  for (CGI::const_iterator s_it = s.begin(); s_it != s.end(); ++s_it) {
-    os << "\n\tkey: " << s_it->first << std::endl;
-    if (s_it->second.empty())
-      os << "\tvalue: nosniff" << std::endl;
-    else {
-      std::map<std::string, std::string>::const_iterator temp;
-      for (temp = s_it->second.begin(); temp != s_it->second.end(); ++temp)
-        os << "\tvalue: " << temp->first << " " << temp->second << std::endl;
-    }
   }
 
   const std::vector<RouteRule> &routes = data.get_routes();

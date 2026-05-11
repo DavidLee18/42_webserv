@@ -3,8 +3,6 @@
 
 #include "ServerConfig.hpp"
 
-
-
 /**
  * @class WebserverConfig
  * @brief 웹서버 설정 파일을 파싱하고 그 결과를 멤버 변수에 저장하는 클래스
@@ -38,7 +36,7 @@ class WebserverConfig {
    *
    * - 포트 번호를 키로 하고, 실행 파일의 경로를 값으로 저장한다.
    */
-  std::map<std::string, std::string> uwsgi;
+  std::map<int, RouteRule_CGI> uwsgi;
   /**
    * @var type_map
    * @brief 파일 확장자와 MIME type의 매핑 정보를 저장하는 멤버 변수
@@ -172,15 +170,17 @@ public:
     return *this;
   }
 
-  const std::string &get_default_mime() const { return default_mime; }
-  const std::map<std::string, std::string> &get_uwsgi() const { return uwsgi; }
-  const std::map<std::string, std::string> &get_type_map() const {
+  const std::string &get_default_mime(void) const { return default_mime; }
+  const std::map<int, RouteRule_CGI> &get_uwsgi(void) const { return uwsgi; }
+  const std::map<std::string, std::string> &get_type_map(void) const {
     return type_map;
   }
   const std::map<unsigned int, ServerConfig> &get_serverconfig_map() const {
     return serverconfig_map;
   }
-  const std::map<int, std::string> &get_default_err_page(void) const { return default_err_page; }
+  const std::map<int, std::string> &get_default_err_page(void) const {
+    return default_err_page;
+  }
   /**
    * @brief 설정 파일을 파싱한 결과를 Result<WebserverConfig> 형태로 반환하는
    * 함수
@@ -209,7 +209,6 @@ public:
    *
    * - `$...` 형식이면 CGI 실행 정보로 처리한다.
    */
-  static std::string apply_default_err_page_entry(const std::string &line, std::map<int, std::string>& err_map);
 };
 
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data);
