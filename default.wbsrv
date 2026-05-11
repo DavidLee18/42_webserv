@@ -58,7 +58,7 @@ types =
 
 	GET|POST|DELETE * <- /www-files/*
 		? hello.html
-		@ /www-files/storage/auth_info
+		@ auth_info
 		->{} 10MB
 		! 400:/www-files/error/400.html
 		! 401:/www-files/error/401.html
@@ -71,11 +71,11 @@ types =
 
 	POST /storage/ -> /www-files/storage/
 		->{} 10MB
-		@ /www-files/storage/auth_info
+		@ auth_info
 
 	POST|DELETE /storage/* <- /www-files/storage/*
 		->{} 10MB
-		@ /www-files/storage/auth_info
+		@ auth_info
 
 
 :4040 =
@@ -96,5 +96,5 @@ types =
 
 	GET|POST|DELETE * <- /www-files/*
 		? index2.html
-		@ /www-files/storage/auth_info
+		@ auth_info
 		->{} 10MB

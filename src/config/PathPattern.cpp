@@ -66,10 +66,10 @@ bool PathPattern::matches(const std::string &pathStr) const {
 // Convert PathPattern to string for debugging/display
 std::string PathPattern::to_string() const {
   if (path.empty()) {
-    return "";
+    return "/";
   }
   if (path.size() == 1)
-    return path[0];
+    return "/" + path[0];
   std::string result;
   for (size_t i = 0; i < path.size(); ++i) {
     if (i != 0)
