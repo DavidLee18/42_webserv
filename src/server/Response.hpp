@@ -129,10 +129,10 @@ public:
 
 private:
   /**
-   * @enum Type
+   * @enum PathType
    * @brief Enum for internal target path typing.
    */
-  enum Type { IS_DIR, IS_FILE, PATH_ERROR };
+  enum PathType { IS_DIR, IS_FILE, PATH_ERROR };
 
   /**
    * @brief Checks the file system to determine what kind of resource exists at

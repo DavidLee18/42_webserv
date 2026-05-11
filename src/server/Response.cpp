@@ -249,8 +249,13 @@ int ServerResponse::check_path_type(const std::string &path) {
     return Response::FORBIDDEN;
   else if (S_ISDIR(info.st_mode))
     return IS_DIR;
-  else if (S_ISREG(info.st_mode))
+  else if (S_ISREG(info.st_mode)) {
+    const size_t cgi_pos = path.find_last_of(".cgi");
+    if (cgi_pos != std::string::npos && cgi_pos == path.length() - 4) {
+      return Response::NOT_FOUND;
+    }
     return IS_FILE;
+  }
   return PATH_ERROR;
 }
 
