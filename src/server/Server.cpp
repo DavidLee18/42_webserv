@@ -147,7 +147,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
 
-          if (clients.at(client_fd).dropping &&
+          if (clients.find(client_fd) != clients.end() &&
+              clients.at(client_fd).dropping &&
               clients.at(client_fd).out_buff.empty())
             disconnect(client_fd);
 
