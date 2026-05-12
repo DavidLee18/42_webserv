@@ -1,6 +1,5 @@
 #include "PathPattern.hpp"
 
-
 bool PathPattern::wildcard_match(const std::string &pattern,
                                  const std::string &target) const {
   std::size_t p = 0;
@@ -20,14 +19,16 @@ bool PathPattern::wildcard_match(const std::string &pattern,
       last_match = t;
       ++p;
       ++t; // '*'는 최소 1글자 이상
-    } // 패턴의 위치가 *인 상태 : 현재의 *위치 기억 및 타겟의 *의 위치 업데이트, *이 최소 한글자 이상이기에 패턴, 타겟 한글자 이동
+    } // 패턴의 위치가 *인 상태 : 현재의 *위치 기억 및 타겟의 *의 위치 업데이트,
+      // *이 최소 한글자 이상이기에 패턴, 타겟 한글자 이동
     else if (last_star != std::string::npos) {
       ++last_match;
       if (last_match >= target.size())
         return false;
       p = last_star + 1;
       t = last_match + 1;
-    } // 현재 패턴의 위치가 *의 안인 경우: 타겟의 *위치 업데이트 후 타겟은 한글자 상승, 패턴은 *다음 글자위치에 고정
+    } // 현재 패턴의 위치가 *의 안인 경우: 타겟의 *위치 업데이트 후 타겟은
+      // 한글자 상승, 패턴은 *다음 글자위치에 고정
     else {
       return false;
     }
@@ -45,7 +46,7 @@ bool PathPattern::matches(const PathPattern &other) const {
 
   // std::cout << "\n\nmatches pattern: " << pattern << std::endl;
   // std::cout << "matches target: " << target << std::endl;
-  // root의 규칙에 wildcard가 존재 하면 경우 
+  // root의 규칙에 wildcard가 존재 하면 경우
   if (pattern.find('*') != std::string::npos)
     return wildcard_match(pattern, target);
 
@@ -56,7 +57,6 @@ bool PathPattern::matches(const PathPattern &other) const {
   // 그외에 완전히 매칭이 같아 하는 경우
   return pattern == target;
 }
-
 
 // Check if this pattern matches a path string
 bool PathPattern::matches(const std::string &pathStr) const {
@@ -89,8 +89,9 @@ static std::size_t count_wildcards(const std::string &str) {
   return count;
 }
 
-std::string PathPattern::extract_relative_path(const std::string &pattern,
-                                               const std::string &target) const {
+std::string
+PathPattern::extract_relative_path(const std::string &pattern,
+                                   const std::string &target) const {
   if (pattern == "*") {
     if (target == "/")
       return "/";
@@ -224,9 +225,9 @@ bool PathPattern::extract_wildcards(const std::string &pattern,
   return true;
 }
 
-std::string PathPattern::apply_wildcards(
-    const std::string &to_pattern,
-    const std::vector<std::string> &wildcards) const {
+std::string
+PathPattern::apply_wildcards(const std::string &to_pattern,
+                             const std::vector<std::string> &wildcards) const {
   std::string result;
   std::size_t wild_index = 0;
 
@@ -236,8 +237,7 @@ std::string PathPattern::apply_wildcards(
         return "";
 
       if (!result.empty() && result[result.size() - 1] == '/' &&
-          !wildcards[wild_index].empty() &&
-          wildcards[wild_index][0] == '/') {
+          !wildcards[wild_index].empty() && wildcards[wild_index][0] == '/') {
         result += wildcards[wild_index].substr(1);
       } else {
         result += wildcards[wild_index];
@@ -260,7 +260,7 @@ std::string PathPattern::rewrite_path(const PathPattern &request_path,
   std::string target = request_path.to_string();
   std::string dest = to_pattern.to_string();
 
-  // from과 dest에 있는 wildcard 수 확인 
+  // from과 dest에 있는 wildcard 수 확인
   std::size_t from_wc = count_wildcards(from);
   std::size_t dest_wc = count_wildcards(dest);
 
@@ -289,7 +289,8 @@ std::string PathPattern::rewrite_path(const PathPattern &request_path,
     // wildcard 개수가 같으면 캡처값 그대로 삽입
     if (from_wc == dest_wc) {
       std::vector<std::string> wildcards;
-      // from을 기준으로 target의 wildcard원소들을 추출 후 wildcards에 담아서 나온다.
+      // from을 기준으로 target의 wildcard원소들을 추출 후 wildcards에 담아서
+      // 나온다.
       if (!extract_wildcards(from, target, wildcards))
         return "";
       // apply_wildcards를 통해 추출한 원소들을 넣어서 만들어진 new path를 반환
@@ -305,7 +306,8 @@ std::string PathPattern::rewrite_path(const PathPattern &request_path,
     if (target.find(from) != 0)
       return "";
 
-    // from에서 뒤 부부만 추출 ex) from = /download/, target = /download/file.txt, suffix = file.txt
+    // from에서 뒤 부부만 추출 ex) from = /download/, target =
+    // /download/file.txt, suffix = file.txt
     std::string suffix = target.substr(from.size());
 
     // '/'가 중복으로 붙지 않게 new path를 생성후 반한.

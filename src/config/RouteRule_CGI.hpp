@@ -54,7 +54,7 @@ private:
    * @return timeout 문법과 값 범위에 맞으면 true, 그렇지 않으면 false
    *
    * - 문법은 "...<숫자 문자열>" 형식이다.
-   * 
+   *
    * - 숫자 문자열의 값은 0.05보다 크고 15.0 이하여야 한다.
    */
   static bool is_valid_timeout(const std::string &line);
@@ -75,15 +75,19 @@ private:
    * @return 성공하면 빈 문자열, 실패하면 오류 메시지
    *
    * - 첫 줄에서는 실행 파일 경로와 선택적인 환경 변수 정보를 파싱한다.
-   * 
+   *
    * - 이후 들여쓰기 2단계의 하위 줄에서 timeout 또는 추가 환경 변수 정보를
    * 읽는다.
    */
   std::string parse_cgi_block(FileDescriptor &fd, std::string line);
   static std::string matches_cgi_syntax(const std::string &line);
-  static std::string parse_cgi_params(RouteRule_CGI& cgi, FileDescriptor &fd, std::string line);
+  static std::string parse_cgi_params(RouteRule_CGI &cgi, FileDescriptor &fd,
+                                      std::string line);
+
 public:
-  RouteRule_CGI() : met(Request::GET), path(""), executable(""), env(), timeout_ms(3000), err_meg(""), count_line(0), worker_instance(5) {};
+  RouteRule_CGI()
+      : met(Request::GET), path(""), executable(""), env(), timeout_ms(3000),
+        err_meg(""), count_line(0), worker_instance(5){};
   /**
    * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
    * 생성자
@@ -108,12 +112,12 @@ public:
     return *this;
   }
   const PathPattern get_path(void) const { return path; }
-  Request::Method get_method (void) const { return met; }
+  Request::Method get_method(void) const { return met; }
   const std::string get_err_meg(void) const { return err_meg; }
   const std::string get_executable(void) const { return executable; }
   const std::map<std::string, std::string> get_env(void) const { return env; }
   std::size_t get_count_line(void) const { return count_line; }
-  int get_worker_instance (void) const { return worker_instance; };
+  int get_worker_instance(void) const { return worker_instance; };
   int get_timeout_ms() const { return timeout_ms; }
 
   /**
@@ -123,7 +127,7 @@ public:
    *
    * - 문자열은 비어 있을 수 없으며,
    * 첫 번째 문자는 대문자 또는 '_'이어야 한다.
-   * 
+   *
    * - 나머지 문자는 대문자, 숫자, '_'만 허용한다.
    */
   static bool is_valid_env_key(const std::string &key);
@@ -133,7 +137,7 @@ public:
    * @return 유효한 uwsgi 설정 값이면 true, 그렇지 않으면 false
    *
    * - 입력 벡터의 크기는 2여야 한다.
-   * 
+   *
    * - 첫 번째 원소는 실행 가능한 파일 경로여야 하고,
    * 두 번째 원소는 포트 번호를 나타내는 숫자 문자열이어야 한다.
    */
@@ -144,7 +148,7 @@ public:
    * @return 기본 형식이 유효하면 true, 그렇지 않으면 false
    *
    * - 입력 문자열은 공백 기준으로 세 개의 항목으로 나뉘어야 한다.
-   * 
+   *
    * - 첫 번째 항목은 HTTP 메서드, 두 번째 항목은 공백이 없는 URL이어야 한다.
    */
   static bool is_valid_cgi_config(std::string line);
@@ -188,13 +192,13 @@ public:
    * @return 성공하면 빈 문자열, 실패하면 오류 메시지
    *
    * - 빈 줄 또는 파일 끝을 만나면 파싱을 종료한다.
-   * 
+   *
    * - 각 항목은 유효한 uwsgi 설정 형식을 따라야 하며, 실행 파일은 .py 확장자를
    * 가져야 한다.
    */
-  static std::string
-  parse_uwsgi_block(FileDescriptor &fd,
-                    std::map<int, RouteRule_CGI> &uwsgi, std::size_t &count_line);
+  static std::string parse_uwsgi_block(FileDescriptor &fd,
+                                       std::map<int, RouteRule_CGI> &uwsgi,
+                                       std::size_t &count_line);
 };
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data);

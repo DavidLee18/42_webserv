@@ -3,8 +3,6 @@
 
 #include "ServerConfig.hpp"
 
-
-
 /**
  * @class WebserverConfig
  * @brief 웹서버 설정 파일을 파싱하고 그 결과를 멤버 변수에 저장하는 클래스
@@ -16,7 +14,7 @@
  * - 이 클래스는 일반적인 방식으로 직접 인스턴스화할 수 없으며,
  * 정적 함수 parse(FileDescriptor &file)가 반환하는
  * Result<WebserverConfig> 를 통해 객체를 획득할 수 있다.
- * 
+ *
  * - 획득한 객체는 복사 또는 대입하여 사용할 수 있다.
  */
 class WebserverConfig {
@@ -46,7 +44,7 @@ private:
    *
    * - 파일 확장자를 키로 하고, 해당 확장자에 대응하는 MIME type을 값으로
    * 저장한다.
-   * 
+   *
    * - 매핑되지 않은 확장자에 대해서는 멤버 변수 default_mime에 저장된
    * 기본 MIME type을 사용한다.
    */
@@ -74,8 +72,9 @@ private:
    * @return 파싱에 성공하면 true, 실패하면 false
    *
    * - types, server, uwsgi 항목을 순차적으로 읽어 각 멤버 변수에 저장한다.
-   * 
-   * - 유효하지 않은 줄이나 파싱 오류가 발생하면 err_meg에 오류 메시지를 저장한다.
+   *
+   * - 유효하지 않은 줄이나 파싱 오류가 발생하면 err_meg에 오류 메시지를
+   * 저장한다.
    */
   bool file_parsing(FileDescriptor &file);
   /**
@@ -85,7 +84,7 @@ private:
    * @return 파싱에 성공하면 true, 실패하면 false
    *
    * - '_' 키는 기본 MIME type으로 처리된다.
-   * 
+   *
    * - 그 외의 키는 type_map에 확장자별 MIME type으로 저장된다.
    */
   bool parse_types_block(FileDescriptor &file);
@@ -97,9 +96,9 @@ private:
    * @return 파싱에 성공하면 true, 실패하면 false
    *
    * - 입력 문자열은 정확히 하나의 "->"를 포함해야 한다.
-   * 
+   *
    * - 키와 값은 각각 유효한 type key, MIME type 형식이어야 한다.
-   * 
+   *
    * - 함수 자체는 인스턴스에 의존하지 않으나, 내부 인스턴스 함수들의 의존한다.
    */
   bool parse_type_mapping(const std::string &line,
@@ -119,7 +118,7 @@ private:
    * @return MIME type 문법에 맞으면 true, 그렇지 않으면 false
    *
    * - 값은 정확히 하나의 '/'를 포함해야 한다.
-   * 
+   *
    * - type과 subtype은 비어 있을 수 없다.
    */
   bool is_valid_mime_type(const std::string &value);
@@ -130,7 +129,7 @@ private:
    *
    * - 문자열은 ':'로 시작해야 하며, 그 뒤에는 하나 이상의 숫자로 이루어진 포트
    * 번호가 와야 한다.
-   * 
+   *
    * - 포트 번호 뒤에는 선택적으로 하나의 공백이 올 수 있고,
    * 마지막에는 '='가 와야 한다.
    */
@@ -143,7 +142,7 @@ private:
    * @return 저장에 성공하면 true, 실패하면 false
    *
    * - 이미 같은 포트 번호가 등록되어 있으면 실패한다.
-   * 
+   *
    * - 파싱 중 오류가 발생하면 err_meg에 오류 메시지를 저장한다.
    */
   bool parse_server_config_entry(FileDescriptor &file, const std::string &line);
@@ -152,7 +151,8 @@ private:
    * @param line 포트 번호를 추출할 server 설정 문자열
    * @return 추출한 포트 번호
    *
-   * - 입력 문자열은 사전에 server 설정 헤더 문법 검사를 통과한 문자열이어야 한다.
+   * - 입력 문자열은 사전에 server 설정 헤더 문법 검사를 통과한 문자열이어야
+   * 한다.
    */
   static unsigned int parse_server_port(const std::string &line);
 
@@ -172,16 +172,16 @@ public:
   }
 
   const std::string &get_default_mime(void) const { return default_mime; }
-  const std::map<int, RouteRule_CGI> &get_uwsgi(void) const {
-    return uwsgi;
-  }
+  const std::map<int, RouteRule_CGI> &get_uwsgi(void) const { return uwsgi; }
   const std::map<std::string, std::string> &get_type_map(void) const {
     return type_map;
   }
   const std::map<unsigned int, ServerConfig> &get_serverconfig_map(void) const {
     return serverconfig_map;
   }
-  const std::map<int, std::string> &get_default_err_page(void) const { return default_err_page; }
+  const std::map<int, std::string> &get_default_err_page(void) const {
+    return default_err_page;
+  }
   /**
    * @brief 설정 파일을 파싱한 결과를 Result<WebserverConfig> 형태로 반환하는
    * 함수
@@ -193,7 +193,7 @@ public:
    */
   static Result<WebserverConfig> parse(FileDescriptor &file) {
     WebserverConfig temp(file);
-    
+
     if (temp.err_meg == "")
       return OK(WebserverConfig, temp);
     return ERR(WebserverConfig, temp.err_meg);
@@ -207,7 +207,7 @@ public:
    * CGI 기반 에러 처리 정보를 `default_err_page`에 저장한다.
    *
    * - `key:value` 형식이면 정적 에러 페이지로 처리한다.
-   * 
+   *
    * - `$...` 형식이면 CGI 실행 정보로 처리한다.
    */
 };
