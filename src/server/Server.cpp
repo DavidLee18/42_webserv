@@ -185,6 +185,12 @@ void Server::client_read(const FileDescriptor *client_fd) {
       else
         std::cout << "(non-existent)";
       std::cout << " bytes)" << std::endl;
+      for (std::map<std::string, std::string>::const_iterator it =
+               clients.at(client_fd).req->get_headers().begin();
+           it != clients.at(client_fd).req->get_headers().end(); ++it) {
+        std::cout << utils::info << "[Request]" << it->first << ": "
+                  << it->second << std::endl;
+      }
 
       RouteRule_CGI const *cgi_path =
           clients.at(client_fd).config->find_route_cgi(
@@ -245,6 +251,12 @@ void Server::client_read(const FileDescriptor *client_fd) {
       else
         std::cout << "(non-existent)";
       std::cout << " bytes)" << std::endl;
+      for (std::map<std::string, std::string>::const_iterator it =
+               clients.at(client_fd).req->get_headers().begin();
+           it != clients.at(client_fd).req->get_headers().end(); ++it) {
+        std::cout << utils::info << "[Request]" << it->first << ": "
+                  << it->second << std::endl;
+      }
 
       RouteRule_CGI const *cgi_path =
           clients.at(client_fd).config->find_route_cgi(
