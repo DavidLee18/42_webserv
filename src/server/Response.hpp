@@ -83,6 +83,7 @@ struct Response {
         content_length(0), content_type(), cookie(), body(), redir(),
         keep_alive(false), headers() {}
   static Result<Response> from_cgi_outbuff(std::string const &);
+  void print_simple(std::ostream &) const;
 };
 
 std::ostream &operator<<(std::ostream &, Response const &);

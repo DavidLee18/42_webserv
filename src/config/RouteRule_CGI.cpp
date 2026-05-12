@@ -394,7 +394,7 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
   std::map<std::string, std::string>::const_iterator env_it;
 
   if (data.get_worker_instance() == 0) {
-    os << "\nCGI: ";
+    os << "\n" << utils::debug << "CGI: ";
     if (data.get_method() == Request::GET)
       os << "GET";
     else if (data.get_method() == Request::POST)
@@ -403,15 +403,17 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
       os << "DELETE";
     os << " " << data.get_path().to_string() << "\n";
   }
-  os << "\tExecutable: " << data.get_executable();
-  os << "\n\tEnv";
+  os << utils::debug << "\tExecutable: " << data.get_executable();
+  os << "\n" << utils::debug << "\tEnv";
   for (env_it = env.begin(); env_it != env.end(); ++env_it) {
-    os << "\n\t\tEnv key: " << env_it->first
+    os << "\n"
+       << utils::debug << "\t\tEnv key: " << env_it->first
        << ", Env value: " << env_it->second;
   }
-  os << "\n\tTimeout: " << data.get_timeout_ms() << "\n";
+  os << "\n" << utils::debug << "\tTimeout: " << data.get_timeout_ms() << "\n";
   if (data.get_worker_instance() != 0)
-    os << "\tworker_instance: " << data.get_worker_instance() << "\n";
+    os << utils::debug << "\tworker_instance: " << data.get_worker_instance()
+       << "\n";
 
   return (os);
 }

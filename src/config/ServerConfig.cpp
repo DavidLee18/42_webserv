@@ -645,8 +645,7 @@ ServerConfig::find_route_cgi(Request::Method method,
 }
 
 std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
-
-  os << data.to_string();
+  os << utils::debug << data.to_string();
   return (os);
 }
 
@@ -674,22 +673,24 @@ static std::string what_RuleOperator(const RuleOperator op) {
 }
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
-  os << "Server Response Time(s): " << data.get_server_response_time()
+  os << utils::debug
+     << "Server Response Time(s): " << data.get_server_response_time()
      << std::endl;
 
   const std::map<std::string, std::string> &header = data.get_header();
   std::map<std::string, std::string>::const_iterator header_it;
-  os << "\n\n\n<<Header>>";
+  os << "\n\n\n" << utils::debug << "<<Header>>";
   for (header_it = header.begin(); header_it != header.end(); ++header_it) {
-    os << "\n\tkey: " << header_it->first << ", value: " << header_it->second
-       << std::endl;
+    os << "\n"
+       << utils::debug << "\tkey: " << header_it->first
+       << ", value: " << header_it->second << std::endl;
   }
 
   const std::vector<RouteRule> &routes = data.get_routes();
-  os << "\n\n\n<<Routes>>";
+  os << "\n\n\n" << utils::debug << "<<Routes>>";
   for (size_t i = 0; i < routes.size(); ++i) {
     const RouteRule &route = routes[i];
-    os << "\n\nRoute: ";
+    os << "\n\n" << utils::debug << "Route: ";
     if (route.method == Request::GET)
       os << "GET";
     else if (route.method == Request::POST)
@@ -698,32 +699,40 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
       os << "DELETE";
     os << " " << route.path << std::endl;
 
-    os << "\n\tRuleOperator: " << what_RuleOperator(route.op) << std::endl;
-    os << "\tRedirect Target: " << route.redirect_target << std::endl;
+    os << "\n"
+       << utils::debug << "\tRuleOperator: " << what_RuleOperator(route.op)
+       << std::endl;
+    os << utils::debug << "\tRedirect Target: " << route.redirect_target
+       << std::endl;
 
-    os << "\n\tRoot: " << route.root << std::endl;
-    os << "\tIndex: " << route.index << std::endl;
-    os << "\tAuth Info: " << route.auth_info << std::endl;
-    os << "\tMax Body(KB): " << route.max_body_KB;
+    os << "\n" << utils::debug << "\tRoot: " << route.root << std::endl;
+    os << utils::debug << "\tIndex: " << route.index << std::endl;
+    os << utils::debug << "\tAuth Info: " << route.auth_info << std::endl;
+    os << utils::debug << "\tMax Body(KB): " << route.max_body_KB;
     if (route.error_pages.empty())
-      os << "\n\tError Page: "
+      os << "\n"
+         << utils::debug << "\tError Page: "
          << "empty map";
     else {
       std::map<int, std::string>::const_iterator err_it;
       for (err_it = route.error_pages.begin();
            err_it != route.error_pages.end(); ++err_it)
-        os << "\n\tError Page: " << err_it->first << " " << err_it->second;
+        os << "\n"
+           << utils::debug << "\tError Page: " << err_it->first << " "
+           << err_it->second;
     }
   }
 
   std::vector<RouteRule_CGI> cgi = data.get_route_rule_cgi();
-  os << "\n\n\n\n<<Route CGI>>\n";
+  os << "\n\n\n\n" << utils::debug << "<<Route CGI>>\n";
   for (std::size_t i = 0; i < cgi.size(); ++i) {
-    os << cgi[i];
+    os << utils::debug << cgi[i];
   }
   if (cgi.size() == 0)
-    os << "\n\tEmpty";
-  os << "\n========================================================";
+    os << "\n" << utils::debug << "\tEmpty";
+  os << "\n"
+     << utils::debug
+     << "========================================================";
   return (os);
 }
 
