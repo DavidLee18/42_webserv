@@ -9,7 +9,7 @@ types =
 	_        -> application/octet-stream
 
 cgi =
-	php -> /usr/bin/php-cgi
+	.php -> /usr/bin/php-cgi
 	py  -> /usr/bin/python3
 
 :8080 =
@@ -29,6 +29,12 @@ cgi =
 	GET *.(jpg|jpeg|gif) <- /www-files/*
 
 	GET|POST|DELETE /cgi-bin/* <- /www-files/cgi-bin/*
+
+	GET /cgi-bin/* $/www-files/cgi-bin/gen_html.cgi
+
+	GET /cgi-bin/* $/www-files/cgi-bin/test.py
+
+	GET /cgi-bin/* $/www-files/cgi-bin/test.php
 
 	GET|POST|DELETE * <- /www-files/*
 		? /www-files/hello.html

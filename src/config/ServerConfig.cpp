@@ -1,10 +1,13 @@
 #include "ServerConfig.hpp"
 
-ServerConfig::ServerConfig(FileDescriptor &file) {
+ServerConfig::ServerConfig(FileDescriptor &file, std::map<std::string, std::string> &global_cgi) {
   err_meg = "";
   server_response_time = 3;
   end_flag = 0;
   count_line = 0;
+  for (std::map<std::string, std::string>::const_iterator it = global_cgi.begin(); it != global_cgi.end(); ++it)
+    file_extension.push_back("." + it->first);
+  file_extension.push_back(".cgi");
   if (!parse_server_block(file)) {
     return;
   }
@@ -50,7 +53,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
         return false;
       }
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
-      RouteRule_CGI temp(fd, line);
+      RouteRule_CGI temp(fd, line, file_extension);
       count_line += temp.get_count_line();
       if (temp.get_err_meg() != "") {
         err_meg = temp.get_err_meg();
@@ -654,9 +657,17 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
         os << "\n\tError Page: " << err_it->first << " " << err_it->second;
     }
   }
+  std::vector<std::string> file_extension = data.get_file_extension();
+  os << "\n\n\n\n<<File_extension>>\n";
+  os << "\textension: ";
+  for (std::size_t i = 0; i < file_extension.size(); ++i) {
+    os << &file_extension[i][1];
+    if (i + 1 < file_extension.size())
+      os << ", ";
+  }
 
   std::vector<RouteRule_CGI> cgi = data.get_route_rule_cgi();
-  os << "\n\n\n\n<<Route CGI>>\n";
+  os << "\n\n<<Route CGI>>\n";
   for (std::size_t i = 0; i < cgi.size(); ++i) {
     os << cgi[i];
   }

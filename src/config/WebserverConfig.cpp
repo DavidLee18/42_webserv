@@ -238,7 +238,7 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
                                                 const std::string &line) {
   unsigned int key;
   std::string temp(line);
-  ServerConfig server(file);
+  ServerConfig server(file, global_cgi);
 
   key = WebserverConfig::parse_server_port(temp);
   if (server.get_err_meg() != "") {
