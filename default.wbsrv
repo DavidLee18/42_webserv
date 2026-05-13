@@ -70,7 +70,7 @@ cgi =
 		! 409:/www-files/error/409.html
 		! 413:/www-files/error/413.html
 		! 500:/www-files/error/500.html
-	
+
 	POST /storage/ -> /www-files/storage/
 		->{} 10MB
 		@ /www-files/auth_info
