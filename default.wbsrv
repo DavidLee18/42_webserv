@@ -18,7 +18,7 @@ cgi =
 	[] +<= Referrer-Policy: no-referrer
 	[] +<= Content-Security-Policy: default-src 'self'
 
-	...30
+	...300000
 
 	GET /old_stuff/ =301> /new_stuff/
 

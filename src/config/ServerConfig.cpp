@@ -2,7 +2,7 @@
 
 ServerConfig::ServerConfig(FileDescriptor &file, std::map<std::string, std::string> &global_cgi) {
   err_meg = "";
-  server_response_time = 3;
+  server_response_time_ms = 3;
   end_flag = 0;
   count_line = 0;
   for (std::map<std::string, std::string>::const_iterator it = global_cgi.begin(); it != global_cgi.end(); ++it)
@@ -62,12 +62,12 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
         err_meg = "on [\t" + line + "]: Duplicate timeout definition in server block (the duplicate server timeout rule is violated because the timeout has already been defined in the same server block).";
         return false;
       }
-      err_meg = utils::string_to_unsigned_int(&line[3], server_response_time);
+      err_meg = utils::string_to_unsigned_int(&line[3], server_response_time_ms);
       if (err_meg != "") {
         err_meg = "on [\t" + line + "],[ " + &line[3] + "]: " + err_meg;
         return false;
-      } else if (server_response_time  > 900 || 0 >= server_response_time) {
-        err_meg = "on [\t" + line + "], [" + &line[3] + "]: The response time configuration is out of the allowed range. (response time rule, the value must be between 0 and 900 inclusive, but the provided value falls outside this range).";
+      } else if (server_response_time_ms > 60000 || 1 > server_response_time_ms) {
+        err_meg = "on [\t" + line + "], [" + &line[3] + "]: The response time configuration is out of the allowed range. (response time rule, the value must be between 1 and 60000 inclusive, but the provided value falls outside this range).";
         return false;
       }
       is_timeout_parse = true;
@@ -526,7 +526,7 @@ bool ServerConfig::create_route_rules(
     }
     route.index = "";
     route.auth_info = "";
-    route.max_body_KB = 1;
+    route.max_body_KB = 0;
 
     for (size_t j = 0; j < path_url.size(); ++j) {
       route.path = path_url[j];
