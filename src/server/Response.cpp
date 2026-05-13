@@ -567,9 +567,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
   if (request->get_path() == "/login" || request->get_path() == "/login.html") {
     const std::string &body = request->get_body();
 
-    std::string auth_target =
-        get_pwd() +
-        config->get_rewritten_path(request->get_method(), rule->auth_info);
+    std::string auth_target = get_pwd() + rule->auth_info;
     std::cout << "\n"
               << utils::debug << "auth info: " << auth_target << "\n"
               << std::endl;
