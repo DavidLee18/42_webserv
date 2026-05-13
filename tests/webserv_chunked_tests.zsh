@@ -26,7 +26,7 @@ UPLOAD_URL=${UPLOAD_URL:-/storage}
 UPLOAD_PATH=${UPLOAD_PATH:-/storage/}
 LOGIN_URL=${LOGIN_URL:-/login}
 LOGIN_BODY=${LOGIN_BODY:-id=david&pw=david1234}
-ECHO_CGI_URL=${ECHO_CGI_URL:-}
+ECHO_CGI_URL=${ECHO_CGI_URL:-/cgi-test/echo}
 VERBOSE=${VERBOSE:-0}
 PYTHON=${PYTHON:-$(command -v python3)}
 
