@@ -39,7 +39,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
     line = utils::trim_whitespace(line);
     
     if (is_header_block(line)) {
-      if (!parse_header_entry(fd, line)) { // 마지막에 수정해야 함
+      if (!parse_header_entry(fd, line)) { // 수정 중
         err_meg = "Header syntax Error: " + err_meg;
         return false;
       }
@@ -71,19 +71,23 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
 // header method
 bool ServerConfig::is_header_block(const std::string &line) {
   std::vector<std::string> temp = utils::string_split(line, " ");
-  if (temp.size() < 4)
+  if (temp.size() < 3)
     return false;
   else if (temp[0] != "[]")
     return false;
   else if (temp[1] != "+<=")
     return false;
-  else if (temp[2][temp[2].length() - 1] != ':')
-    return false;
-  else if (temp[3].length() < 1)
+  else if (temp[2].length() < 1 || temp[2].find(':') == std::string::npos)
     return false;
   return true;
 }
 
+// : 개수가 1개인지 확인
+// :로 split후 size가 2개 인지 확인 -> 아니면 에러처리들 하기( : 기준 key, value 확인)
+// 2개이면 0번 배열을 다시 " " 기준으로 split후에 2번 배열이 키값으로 사용
+// 키를 utils::is_header_name 사용하여 키값 확인
+// value들은 : 기준으로 한 split의 배열이 value 값 
+// value는 utils::is_header_value 사용하여 값 확인
 bool ServerConfig::parse_header_entry(FileDescriptor &fd,
                                       const std::string &line) {
   std::string temp(line);
