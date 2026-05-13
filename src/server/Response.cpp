@@ -188,8 +188,10 @@ Response ServerResponse::http_response(
   if (request->get_method() == Request::HEAD)
     response.body.clear();
 
-  response.content_type =
-      get_string_from_map(mime_type, find_file_type(target.path));
+  // Only set content_type from mime_type map if not already set by method handler
+  if (response.content_type.empty())
+    response.content_type =
+        get_string_from_map(mime_type, find_file_type(target.path));
   // Special API endpoint for session info
   if (request->get_path() == "/api/session-info") {
     if (request->get_method() == Request::GET) {
@@ -795,7 +797,7 @@ Response ServerResponse::get_method(Target target, Response response,
         return error_response(config, rule, Response::NOT_FOUND);
     }
     target.type = Response::OK;
-    response.content_type = "html";
+    response.content_type = "text/html";
     response.body = make_autoindex_page(target.path, request->get_path(), dir);
     response.status_code = Response::OK;
   } else {

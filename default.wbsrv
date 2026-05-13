@@ -54,6 +54,8 @@ cgi =
 
 	GET /download/*/mp3/*.mp3 =301> /*/mp3/*
 
+	GET /download/ <i- /www-files
+
 	GET *.(jpg|jpeg|gif) <- /www-files/*
 
 	GET|POST|DELETE /cgi-bin/* <- /www-files/cgi-bin/*
