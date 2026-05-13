@@ -188,8 +188,10 @@ Response ServerResponse::http_response(
   if (request->get_method() == Request::HEAD)
     response.body.clear();
 
-  response.content_type =
-      get_string_from_map(mime_type, find_file_type(target.path));
+  // Only set content_type from mime_type map if not already set by method handler
+  if (response.content_type.empty())
+    response.content_type =
+        get_string_from_map(mime_type, find_file_type(target.path));
   // Special API endpoint for session info
   if (request->get_path() == "/api/session-info") {
     if (request->get_method() == Request::GET) {
@@ -567,9 +569,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
   if (request->get_path() == "/login" || request->get_path() == "/login.html") {
     const std::string &body = request->get_body();
 
-    std::string auth_target =
-        get_pwd() +
-        config->get_rewritten_path(request->get_method(), rule->auth_info);
+    std::string auth_target = get_pwd() + rule->auth_info;
     std::cout << "\n"
               << utils::debug << "auth info: " << auth_target << "\n"
               << std::endl;
@@ -615,7 +615,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
         // 1. 브라우저에게 "이 주소로 가라"고 알리는 상태 코드 설정
         // 일반적으로 다른 페이지 이동 시 302 혹은 303을 사용
         response.status_code = Response::FOUND;
-        response.redir = rule->index;
+        response.redir = "/";
         response.content_type = "text/html";
         response.body = "<html><body>Redirecting...</body></html>";
         response.cookie =
@@ -797,7 +797,7 @@ Response ServerResponse::get_method(Target target, Response response,
         return error_response(config, rule, Response::NOT_FOUND);
     }
     target.type = Response::OK;
-    response.content_type = "html";
+    response.content_type = "text/html";
     response.body = make_autoindex_page(target.path, request->get_path(), dir);
     response.status_code = Response::OK;
   } else {
@@ -930,9 +930,9 @@ Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
   if (resp.status_code == Response::MOVED_PERMANENTLY ||
       resp.status_code == Response::FOUND) {
     if (resp.headers.find("location") != resp.headers.end())
-      resp.redir = resp.headers.at("location");
+      resp.redir = get_string_from_map(resp.headers, "location");
     else if (resp.headers.find("Location") != resp.headers.end())
-      resp.redir = resp.headers.at("Location");
+      resp.redir = get_string_from_map(resp.headers, "Location");
     else
       return ERR(Response, Errors::bad_gateway);
     resp.headers.erase("location");
