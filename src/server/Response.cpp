@@ -774,21 +774,24 @@ Response ServerResponse::get_method(Target target, Response response,
                                     const ServerConfig *config,
                                     const RouteRule *rule,
                                     const Request *request) {
-  // Handle error responses (NOT_FOUND_ERR, FORBIDDEN_ERR)
-  if (target.type == Response::NOT_FOUND)
-    return error_response(config, rule, Response::NOT_FOUND);
-  if (target.type == Response::FORBIDDEN)
-    return error_response(config, rule, Response::FORBIDDEN);
-
+  // Handle redirects FIRST, before checking if target exists on filesystem
   if (rule->op == REDIRECT) {
-    std::cout << utils::info << "=== redirection ===" << std::endl;
     target.type = Response::MOVED_PERMANENTLY;
     response.redir =
         config->get_rewritten_path(request->get_method(), request->get_path());
     response.status_code = Response::MOVED_PERMANENTLY;
     response.content_type = "text/html";
     response.body = "<html><body><h1>301 Moved Permanently</h1></body></html>";
-  } else if (target.type == IS_DIR && rule->op == AUTOINDEX) {
+    return response;
+  }
+
+  // Then handle error responses (NOT_FOUND_ERR, FORBIDDEN_ERR)
+  if (target.type == Response::NOT_FOUND)
+    return error_response(config, rule, Response::NOT_FOUND);
+  if (target.type == Response::FORBIDDEN)
+    return error_response(config, rule, Response::FORBIDDEN);
+
+  if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     DIR *dir = opendir(target.path.c_str());
     if (dir == NULL) {
       if (errno == EACCES) // access denied
