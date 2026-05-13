@@ -764,5 +764,4 @@ std::string ServerConfig::get_rewritten_path(Request::Method method,
   if (!route)
     return "";
   return normalize_slashes(route->path.rewrite_path(path, route->root));
-  // return route->path.rewrite_path(path, route->root);
 }

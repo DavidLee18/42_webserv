@@ -288,7 +288,7 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   if (type == IS_DIR) {
     target.path += root;
     if (rule->op == SERVE_FROM && request->get_path() == "/") {
-      target.path += rule->index;
+      target.path = get_pwd() + rule->index;
     }
     target.type = check_path_type(target.path);
   } else if (type == Response::NOT_FOUND) {
