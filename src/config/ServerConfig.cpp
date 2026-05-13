@@ -68,7 +68,6 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
   return true;
 }
 
-// header method
 bool ServerConfig::is_header_block(const std::string &line) {
   std::vector<std::string> temp = utils::string_split(line, " ");
   if (temp.size() < 3)
@@ -82,9 +81,8 @@ bool ServerConfig::is_header_block(const std::string &line) {
   return true;
 }
 
-// : 개수가 1개인지 확인
 // :로 split후 size가 2개 인지 확인 -> 아니면 에러처리들 하기( : 기준 key, value 확인)
-// 2개이면 0번 배열을 다시 " " 기준으로 split후에 2번 배열이 키값으로 사용
+// 2개이면 0번 배열을 다시 " " 기준으로 split후에 2번 배열이 값을 utils::trim_whitespace 사용 후 값 사용
 // 키를 utils::is_header_name 사용하여 키값 확인
 // value들은 : 기준으로 한 split의 배열이 value 값 
 // value는 utils::is_header_value 사용하여 값 확인
@@ -127,7 +125,6 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
   return true;
 }
 
-// server_response_time method
 bool ServerConfig::is_valid_server_response_time(const std::string &line) {
   if (line.length() < 4 || line[0] != '.' || line[1] != '.' || line[2] != '.')
     return (false);
@@ -151,7 +148,6 @@ void ServerConfig::parse_server_response_time(std::string line) {
   server_response_time = data;
 }
 
-// RouteRule method
 bool ServerConfig::is_path_pattern_segment(const std::string &line) {
   std::size_t pos = line.find("*.");
   if (pos == std::string::npos)
@@ -563,13 +559,10 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
   return true;
 }
 
-// Find a route that matches the given method and path
-// 리다이렉션, 오토인덱스가 rule의 wildcard 상관없이 매칭이 가능
 RouteRule const *ServerConfig::find_route(Request::Method method,
                                           const std::string &path) const {
   PathPattern pathPattern(path);
 
-  // Iterate through all routes to find a match
   for (size_t i = 0; i < routes.size(); ++i) {
     if (routes[i].method == method && routes[i].path.matches(pathPattern)) {
       return &routes[i];
@@ -705,5 +698,4 @@ std::string ServerConfig::get_rewritten_path(Request::Method method,
   if (!route)
     return "";
   return normalize_slashes(route->path.rewrite_path(path, route->root));
-  // return route->path.rewrite_path(path, route->root);
 }

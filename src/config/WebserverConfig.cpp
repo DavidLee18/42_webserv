@@ -1,4 +1,3 @@
-// #include "webserv.h"
 #include "WebserverConfig.hpp"
 
 WebserverConfig::WebserverConfig(FileDescriptor &file) {
@@ -67,7 +66,6 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
 }
 
 
-// type_map method
 std::vector<std::string>
 WebserverConfig::parse_type_keys(const std::string &key) {
   int number_of_key = 0;
@@ -211,7 +209,6 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
   return true;
 }
 
-// ServerConfig method
 bool WebserverConfig::is_server_config_header(const std::string &line) {
   std::size_t i = 1;
 

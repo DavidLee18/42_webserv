@@ -61,59 +61,6 @@ enum RuleOperator {
   UNDEFINED,
 };
 
-// /**
-//  * @enum RuleOperator
-//  * @brief rewrite 규칙에서 사용되는 연산자 종류를 정의한 열거형
-//  *
-//  * - 리다이렉트 상태 코드와 경로 변환 규칙을 구분하기 위해 사용한다.
-//  */
-// enum RuleOperator {
-//   /**
-//    * @brief 300 Multiple Choices 상태 코드를 나타낸다.
-//    */
-//   MULTIPLECHOICES,
-//   /**
-//    * @brief 301 Moved Permanently 리다이렉트를 나타낸다.
-//    */
-//   REDIRECT,
-//   /**
-//    * @brief 302 Found 리다이렉트를 나타낸다.
-//    */
-//   FOUND,
-//   /**
-//    * @brief 303 See Other 리다이렉트를 나타낸다.
-//    */
-//   SEEOTHER,
-//   /**
-//    * @brief 304 Not Modified 상태 코드를 나타낸다.
-//    */
-//   NOTMODIFIED,
-//   /**
-//    * @brief 307 Temporary Redirect 리다이렉트를 나타낸다.
-//    */
-//   TEMPORARYREDIRECT,
-//   /**
-//    * @brief 308 Permanent Redirect 리다이렉트를 나타낸다.
-//    */
-//   PERMANENTREDIRECT,
-//   /**
-//    * @brief 디렉토리의 autoindex 동작을 나타낸다.
-//    */
-//   AUTOINDEX,
-//   /**
-//    * @brief 현재 경로를 기준으로 연결하는 규칙을 나타낸다.
-//    */
-//   POINT,
-//   /**
-//    * @brief 특정 경로로부터 파일을 제공하는 규칙을 나타낸다.
-//    */
-//   SERVEFROM,
-//   /**
-//    * @brief 정의되지 않은 연산자 상태를 나타낸다.
-//    */
-//   UNDEFINED,
-// };
-
 /**
  * @struct RouteRule
  * @brief 설정 파일에 정의된 경로 처리 규칙과 하위 설정 정보를 저장하는 구조체
