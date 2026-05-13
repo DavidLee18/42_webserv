@@ -35,6 +35,7 @@ test-cgi: $(NAME) cgi
 	@cd tests && zsh ./webserv_cgi_tests.zsh
 
 cgi: $(CGI_NAME)
+	$(TESTS_DIR)/cgi_setup.zsh
 
 $(CGI_NAME): $(CGI_SRC)
 	mkdir -p www-files/cgi-bin/
