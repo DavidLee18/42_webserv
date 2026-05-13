@@ -233,6 +233,28 @@ void Server::client_read(const FileDescriptor *client_fd) {
       }
     } else {
       clients.at(client_fd).req->continue_parsing(in_buffer);
+      const Result<size_t> content_len =
+          clients.at(client_fd).req->get_content_length();
+      const RouteRule *const rule = clients.at(client_fd).config->find_route(
+          clients.at(client_fd).req->get_method(),
+          clients.at(client_fd).req->get_path());
+      if (content_len.has_value() &&
+          (static_cast<size_t>(rule->max_body_KB) < content_len.value() ||
+           (clients.at(client_fd).req->is_partial() &&
+            content_len.value() <
+                clients.at(client_fd).req->get_body().size()) ||
+           (!clients.at(client_fd).req->is_partial() &&
+            content_len.value() < clients.at(client_fd).in_buff.size()))) {
+        const Response resp(
+            DefaultError::default_err_response(Response::PAYLOAD_TOO_LARGE));
+        std::ostringstream oss;
+        oss << resp;
+        clients.at(client_fd).out_buff = oss.str();
+        clients.at(client_fd).dropping = false;
+        delete clients.at(client_fd).req;
+        clients.at(client_fd).req = NULL;
+        break;
+      }
       if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
         return;
 
