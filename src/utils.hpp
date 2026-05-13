@@ -9,6 +9,8 @@
 #include <vector>
 
 namespace utils {
+
+enum LogLevel { DEBUG, INFO, WARNING, ERROR };
 /**
  * @brief 문자열 내에 공백이 존재하는지 확인하는 함수
  * @param line 검사할 문자열
@@ -65,9 +67,13 @@ std::string remove_char(std::string s, char ch);
 std::string join(const std::vector<std::string> &elements,
                  const std::string &delimiter);
 std::size_t return_indent_level(std::string line);
-bool has_leading_space(const std::string& str);
-bool has_trailing_space(const std::string& str);
-std::string get_indent_whitespace_error(const std::string& line, size_t level);
+
+bool has_leading_space(const std::string &str);
+
+bool has_trailing_space(const std::string &str);
+
+std::string get_indent_whitespace_error(const std::string &line, size_t level);
+
 std::string check_html_file(const std::string &path);
 
 bool is_header_name(const std::string &name);
@@ -75,5 +81,15 @@ bool is_header_name(const std::string &name);
 bool is_header_value(const std::string &value);
 
 char tolower(char c);
+
+std::ostream &debug(std::ostream &);
+
+std::ostream &info(std::ostream &);
+
+std::ostream &warning(std::ostream &);
+
+std::ostream &error(std::ostream &);
+
+std::ostream &crlf(std::ostream &);
 } // namespace utils
 #endif

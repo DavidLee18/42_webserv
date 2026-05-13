@@ -37,44 +37,52 @@ static std::string get_http_date() {
 
 std::ostream &operator<<(std::ostream &os, Response const &resp) {
   os << "HTTP/1.1 " << DefaultError::status_code_to_string(resp.status_code)
-     << "\r\n";
-  std::cout << "HTTP/1.1 "
-            << DefaultError::status_code_to_string(resp.status_code) << "\r\n";
-  os << "Date: " << get_http_date() << "\r\n";
-  std::cout << "Date: " << get_http_date() << "\r\n";
-  os << "Server: webserv\r\n";
-  std::cout << "Server: webserv\r\n";
+     << utils::crlf;
+  os << "Date: " << get_http_date() << utils::crlf;
+  os << "Server: webserv" << utils::crlf;
   if ((resp.status_code == Response::MOVED_PERMANENTLY ||
        resp.status_code == Response::FOUND) &&
-      !resp.redir.empty()) {
-    os << "Location: " << resp.redir << "\r\n";
-    std::cout << "Location: " << resp.redir << "\r\n";
-  }
-  os << "Content-Type: " << resp.content_type << "\r\n";
-  std::cout << "Content-Type: " << resp.content_type << "\r\n";
-  if (!resp.cookie.empty()) {
-    os << "Set-Cookie:" << resp.cookie << "\r\n";
-    std::cout << "Set-Cookie:" << resp.cookie << "\r\n";
-  }
+      !resp.redir.empty())
+    os << "Location: " << resp.redir << utils::crlf;
+  os << "Content-Type: " << resp.content_type << utils::crlf;
+  if (!resp.cookie.empty())
+    os << "Set-Cookie:" << resp.cookie << utils::crlf;
   for (std::map<std::string, std::string>::const_iterator it =
            resp.headers.begin();
-       it != resp.headers.end(); ++it) {
-    os << it->first << ": " << it->second << "\r\n";
-    std::cout << it->first << ": " << it->second << "\r\n";
-  }
-  os << "Content-Length: " << resp.content_length << "\r\n";
-  std::cout << "Content-Length: " << resp.content_length << "\r\n";
-  if (resp.keep_alive) {
-    os << "Connection: keep-alive\r\n";
-    std::cout << "Connection: keep-alive\r\n";
-  } else {
-    os << "Connection: close\r\n";
-    std::cout << "Connection: close\r\n";
-  }
-  os << "\r\n";
+       it != resp.headers.end(); ++it)
+    os << it->first << ": " << it->second << utils::crlf;
+  os << "Content-Length: " << resp.content_length << utils::crlf;
+  if (resp.keep_alive)
+    os << "Connection: keep-alive" << utils::crlf;
+  else
+    os << "Connection: close" << utils::crlf;
+  os << utils::crlf;
   if (!resp.body.empty())
     os << resp.body;
   return os;
+}
+
+void Response::print_simple(std::ostream &os) const {
+  os << utils::info << "HTTP/1.1 "
+     << DefaultError::status_code_to_string(status_code) << utils::crlf;
+  os << utils::info << "Date: " << get_http_date() << utils::crlf;
+  os << utils::info << "Server: webserv" << utils::crlf;
+  if ((status_code == Response::MOVED_PERMANENTLY ||
+       status_code == Response::FOUND) &&
+      !redir.empty())
+    os << utils::info << "Location: " << redir << utils::crlf;
+  os << utils::info << "Content-Type: " << content_type << utils::crlf;
+  if (!cookie.empty())
+    os << utils::info << "Set-Cookie:" << cookie << utils::crlf;
+  for (std::map<std::string, std::string>::const_iterator it = headers.begin();
+       it != headers.end(); ++it)
+    os << utils::info << it->first << ": " << it->second << utils::crlf;
+  os << utils::info << "Content-Length: " << content_length << utils::crlf;
+  if (keep_alive)
+    os << utils::info << "Connection: keep-alive" << utils::crlf;
+  else
+    os << utils::info << "Connection: close" << utils::crlf;
+  os << utils::crlf;
 }
 
 std::string ServerResponse::find_file_type(const std::string &path) {
@@ -119,8 +127,9 @@ Response ServerResponse::http_response(
     response = DefaultError::default_err_response(Response::NOT_FOUND);
     response.headers = config->get_header();
     return response;
-  } else if (request->get_path().find("../")) {
-    std::cout << "request path: " << request->get_path() << std::endl;
+  } else if (request->get_path().find("../") != std::string::npos) {
+    std::cout << utils::info << "request path: " << request->get_path()
+              << std::endl;
     response = DefaultError::default_err_response(Response::BAD_REQUEST);
     response.headers = config->get_header();
     return response;
@@ -137,18 +146,21 @@ Response ServerResponse::http_response(
   }
 
   if (user_session) {
-    std::cout << "[Authentication] Valid user session found! User ID: "
+    std::cout << utils::info
+              << "[Authentication] Valid user session found! User ID: "
               << user_session->user_id << std::endl;
   } else {
     // 세션이 없는데 보호된 자원(예: DELETE 명령)을 요청하면 401 에러를 반환
     if (request->get_method() == Request::DELETE) {
-      std::cout << "[Authentication] Blocked DELETE request. No valid session."
+      std::cout << utils::info
+                << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
       response = error_response(config, rule, Response::UNAUTHORIZED);
       response.headers = config->get_header();
       return response;
     } else {
-      std::cout << "[Authentication] No valid session. Guest user."
+      std::cout << utils::info
+                << "[Authentication] No valid session. Guest user."
                 << std::endl;
     }
   }
@@ -249,8 +261,13 @@ int ServerResponse::check_path_type(const std::string &path) {
     return Response::FORBIDDEN;
   else if (S_ISDIR(info.st_mode))
     return IS_DIR;
-  else if (S_ISREG(info.st_mode))
+  else if (S_ISREG(info.st_mode)) {
+    const size_t cgi_pos = path.find_last_of(".cgi");
+    if (cgi_pos != std::string::npos && cgi_pos == path.length() - 4) {
+      return Response::NOT_FOUND;
+    }
     return IS_FILE;
+  }
   return PATH_ERROR;
 }
 
@@ -271,7 +288,7 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   if (type == IS_DIR) {
     target.path += root;
     if (rule->op == SERVE_FROM && request->get_path() == "/") {
-      target.path += rule->index;
+      target.path = get_pwd() + rule->index;
     }
     target.type = check_path_type(target.path);
   } else if (type == Response::NOT_FOUND) {
@@ -553,7 +570,9 @@ Response ServerResponse::post_method(const Target &target, Response response,
     std::string auth_target =
         get_pwd() +
         config->get_rewritten_path(request->get_method(), rule->auth_info);
-    std::cout << "\nauth info: " << auth_target << "\n" << std::endl;
+    std::cout << "\n"
+              << utils::debug << "auth info: " << auth_target << "\n"
+              << std::endl;
     std::ifstream file(auth_target.c_str());
     if (file.is_open()) {
       std::string pw;
@@ -590,7 +609,8 @@ Response ServerResponse::post_method(const Target &target, Response response,
       file.close();
 
       if (is_authenticated) {
-        std::cout << "Authentication SUCCESS for: " << id << std::endl;
+        std::cout << utils::info << "Authentication SUCCESS for: " << id
+                  << std::endl;
 
         // 1. 브라우저에게 "이 주소로 가라"고 알리는 상태 코드 설정
         // 일반적으로 다른 페이지 이동 시 302 혹은 303을 사용
@@ -603,7 +623,8 @@ Response ServerResponse::post_method(const Target &target, Response response,
             "; Path=/; HttpOnly";
         return response;
       } else {
-        std::cout << "Authentication FAILED for: " << id << std::endl;
+        std::cout << utils::info << "Authentication FAILED for: " << id
+                  << std::endl;
 
         response.status_code = Response::OK;
         response.content_type = "text/html";
@@ -620,11 +641,11 @@ Response ServerResponse::post_method(const Target &target, Response response,
   }
 
   // Handle file uploads
-  std::cout << "matched rule path: '" << rule->path << "' upload_dir = '"
-            << rule->upload_dir << "'" << std::endl;
-  if (rule->upload_dir.empty())
-    const_cast<RouteRule *>(rule)->upload_dir = rule->root.to_string();
-  if (!rule->upload_dir.empty()) {
+  std::cout << utils::info << "matched rule path: '" << rule->path << "' upload_dir = '"
+            << rule->root.to_string() << "'" << std::endl;
+  if (rule->root.to_string().empty())
+    const_cast<RouteRule *>(rule)->root.to_string() = rule->root.to_string();
+  if (!rule->root.to_string().empty()) {
     const std::string &body = request->get_body();
     const std::map<std::string, std::string> &headers = request->get_headers();
 
@@ -641,8 +662,9 @@ Response ServerResponse::post_method(const Target &target, Response response,
     // Check body size limit
     int max_body_KB = rule->max_body_KB;
     if (static_cast<int>(body.length()) > max_body_KB * 1024) {
-      std::cout << "Upload rejected: body size " << body.length()
-                << " exceeds limit " << (max_body_KB * 1024) << std::endl;
+      std::cout << utils::warning << "Upload rejected: body size "
+                << body.length() << " exceeds limit " << (max_body_KB * 1024)
+                << std::endl;
       return error_response(config, rule, Response::PAYLOAD_TOO_LARGE);
     }
 
@@ -651,12 +673,13 @@ Response ServerResponse::post_method(const Target &target, Response response,
     if (boundary.empty())
       return error_response(config, rule, Response::BAD_REQUEST);
 
-    std::cout << "Boundary: " << boundary << std::endl;
+    std::cout << utils::info << "Boundary: " << boundary << std::endl;
 
     // Create upload directory if it doesn't exist
-    std::string upload_path = get_pwd() + "/" + rule->upload_dir;
+    std::string upload_path = get_pwd() + "/" + rule->root.to_string();
     if (mkdir(upload_path.c_str(), 0755) != 0 && errno != EEXIST) {
-      std::cout << "Failed to create upload directory: " << upload_path
+      std::cout << utils::warning
+                << "Failed to create upload directory: " << upload_path
                 << std::endl;
       return error_response(config, rule, Response::FORBIDDEN);
     }
@@ -679,7 +702,8 @@ Response ServerResponse::post_method(const Target &target, Response response,
         if (filename.find("..") != std::string::npos ||
             filename.find('/') != std::string::npos ||
             filename.find('\\') != std::string::npos) {
-          std::cout << "Rejected filename with path traversal: " << filename
+          std::cout << utils::info
+                    << "Rejected filename with path traversal: " << filename
                     << std::endl;
           error_msg = "Invalid filename";
           break;
@@ -687,9 +711,9 @@ Response ServerResponse::post_method(const Target &target, Response response,
 
         std::string file_path = upload_path + "/";
         file_path += filename;
-        std::cout << "Uploading file: " << file_path
+        std::cout << utils::info << "Uploading file: " << file_path
                   << " (size: " << part_data.length() << ")" << std::endl;
-        std::cout << "First 20 bytes (hex): ";
+        std::cout << utils::info << "First 20 bytes (hex): ";
         for (size_t i = 0;
              i < std::min(static_cast<size_t>(20), part_data.length()); i++) {
           printf("%02x ", static_cast<unsigned char>(part_data[i]));
@@ -699,7 +723,8 @@ Response ServerResponse::post_method(const Target &target, Response response,
         // Try to open file for writing
         std::ofstream outfile(file_path.c_str(), std::ios::binary);
         if (!outfile.is_open()) {
-          std::cout << "Failed to open file for writing: " << file_path
+          std::cout << utils::warning
+                    << "Failed to open file for writing: " << file_path
                     << std::endl;
           return error_response(config, rule, Response::FORBIDDEN);
         }
@@ -708,7 +733,8 @@ Response ServerResponse::post_method(const Target &target, Response response,
         outfile.write(part_data.c_str(),
                       static_cast<std::streamsize>(part_data.length()));
         if (outfile.fail()) {
-          std::cout << "Failed to write file: " << file_path << std::endl;
+          std::cout << utils::warning << "Failed to write file: " << file_path
+                    << std::endl;
           outfile.close();
           return error_response(config, rule, Response::FORBIDDEN);
         }
@@ -755,7 +781,7 @@ Response ServerResponse::get_method(Target target, Response response,
     return error_response(config, rule, Response::FORBIDDEN);
 
   if (rule->op == REDIRECT) {
-    std::cout << "=== redirection ===" << std::endl;
+    std::cout << utils::info << "=== redirection ===" << std::endl;
     target.type = Response::MOVED_PERMANENTLY;
     response.redir =
         config->get_rewritten_path(request->get_method(), request->get_path());

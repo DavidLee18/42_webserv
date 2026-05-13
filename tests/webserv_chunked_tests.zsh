@@ -22,9 +22,9 @@ set -u
 
 HOST=${HOST:-127.0.0.1}
 PORT=${PORT:-8080}
-UPLOAD_URL=${UPLOAD_URL:-/upload}
+UPLOAD_URL=${UPLOAD_URL:-/storage}
 UPLOAD_PATH=${UPLOAD_PATH:-/storage/}
-LOGIN_URL=${LOGIN_URL:-/login.html}
+LOGIN_URL=${LOGIN_URL:-/login}
 LOGIN_BODY=${LOGIN_BODY:-id=david&pw=david1234}
 ECHO_CGI_URL=${ECHO_CGI_URL:-}
 VERBOSE=${VERBOSE:-0}
@@ -95,7 +95,7 @@ print -- ""
 # Auto-deploy the echo CGI script if ECHO_CGI_URL is set.
 # Adjust ECHO_CGI_PATH to match your server's CGI document root.
 # -----------------------------------------------------------------------------
-ECHO_CGI_PATH=${ECHO_CGI_PATH:-./spool/www/cgi-bin/echo.cgi}
+ECHO_CGI_PATH=${ECHO_CGI_PATH:-./www-files/cgi-bin/echo.cgi}
 
 if [[ -n $ECHO_CGI_URL ]]; then
   mkdir -p "${ECHO_CGI_PATH:h}"

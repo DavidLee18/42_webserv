@@ -138,7 +138,7 @@ struct Void {};
 
 #define PANIC(e)                                                               \
   if (!(e).error().empty()) {                                                  \
-    std::cerr << (e).error() << std::endl;                                     \
+    std::cerr << utils::error << (e).error() << std::endl;                     \
     return 1;                                                                  \
   }
 

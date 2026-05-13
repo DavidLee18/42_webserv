@@ -14,7 +14,7 @@ HOST=${HOST:-127.0.0.1}
 PORT=${PORT:-8080}
 TARGET_URL=${TARGET_URL:-/}
 UPLOAD_URL=${UPLOAD_URL:-/cgi-test/echo}
-MAX_BODY=${MAX_BODY:-10485760}      # 10 MiB; matches "->{} 10MB" config default
+MAX_BODY=${MAX_BODY:-10000000}      # 10 MB; matches "->{} 10MB" config default
 VERBOSE=${VERBOSE:-0}
 PYTHON=${PYTHON:-$(command -v python3)}
 

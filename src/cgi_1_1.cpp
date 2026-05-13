@@ -1432,9 +1432,9 @@ Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
     return ERR(CgiDelegate, "getting PWD failed");
   del._script_path = pwd + std::string("/");
   del._script_path += rule.get_executable();
-  if (rule.get_timeout() <= 0)
+  if (rule.get_timeout_ms() <= 0)
     return ERR(CgiDelegate, "timeout must be positive");
-  del._timeout_ns = static_cast<size_t>(rule.get_timeout() * 1e9);
+  del._timeout_ns = static_cast<size_t>(rule.get_timeout_ms() * 1e9);
   std::map<std::string, std::string> vars(rule.get_env());
   for (std::map<std::string, std::string>::const_iterator it = vars.begin();
        it != vars.end(); ++it) {
@@ -1639,9 +1639,7 @@ Result<Void> CgiDelegate::register_(
     }
     _stdin = add_res.value();
   } else {
-    {
-      FileDescriptor stdin_drop(stdin);
-    }
+    { FileDescriptor stdin_drop(stdin); }
     _stdin = NULL;
   }
 

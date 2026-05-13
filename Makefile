@@ -21,13 +21,10 @@ DEPS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.d))
 
 vpath %.cpp $(addprefix $(SRC_DIR)/,$(SRC_DIRS)) $(SRC_DIR)
 
-CGI_NAME      := spool/www/cgi-bin/gen_html.cgi
+CGI_NAME      := www-files/cgi-bin/gen_html.cgi
 CGI_SRC       := src/cgi/cgi_html_gen.cpp
 
 all: $(NAME) cgi
-
-integration-test: all
-	bash tests/integration/cgi_uwsgi_full_suite.sh
 
 test-cgi: $(NAME) cgi
 	@echo "── CGI framing parser unit tests ──────────────────────────────"
@@ -38,9 +35,10 @@ test-cgi: $(NAME) cgi
 	@cd tests && zsh ./webserv_cgi_tests.zsh
 
 cgi: $(CGI_NAME)
+	$(TESTS_DIR)/cgi_setup.zsh
 
 $(CGI_NAME): $(CGI_SRC)
-	mkdir -p spool/www/cgi-bin/
+	mkdir -p www-files/cgi-bin/
 	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(CGI_NAME) $(CGI_SRC)
 
 $(NAME): $(OBJS)
@@ -55,7 +53,6 @@ clean:
 
 fclean:	clean cgiclean
 	rm -f $(NAME)
-	rm -f $(UWSGI_NAME)
 
 re:	fclean all
 
@@ -63,12 +60,11 @@ compile-commands:
 	bear -- make re
 
 cgiclean:
-	rm -rf spool/www/cgi-bin/
+	rm -rf www-files/cgi-bin/
 
 -include $(DEPS)
--include $(UWSGI_DEPS)
 
-.PHONY: all clean fclean re bonus rebo cgi integration-test test-cgi compile-commands
+.PHONY: all clean fclean re bonus rebo cgi test-cgi compile-commands
 
 # -----------------------------------------------------------------------------
 # Test suites
