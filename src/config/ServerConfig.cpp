@@ -1,11 +1,14 @@
 #include "ServerConfig.hpp"
 
-ServerConfig::ServerConfig(FileDescriptor &file, std::map<std::string, std::string> &global_cgi) {
+ServerConfig::ServerConfig(FileDescriptor &file,
+                           std::map<std::string, std::string> &global_cgi) {
   err_meg = "";
   server_response_time = 3;
   end_flag = 0;
   count_line = 0;
-  for (std::map<std::string, std::string>::const_iterator it = global_cgi.begin(); it != global_cgi.end(); ++it)
+  for (std::map<std::string, std::string>::const_iterator it =
+           global_cgi.begin();
+       it != global_cgi.end(); ++it)
     file_extension.push_back("." + it->first);
   file_extension.push_back(".cgi");
   if (!parse_server_block(file)) {
@@ -16,6 +19,9 @@ ServerConfig::ServerConfig(FileDescriptor &file, std::map<std::string, std::stri
 
 bool ServerConfig::parse_server_block(FileDescriptor &fd) {
   std::string line;
+  bool is_route_parse = false;
+  bool is_header_parse = false;
+  bool is_timeout_parse = false;
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
@@ -39,18 +45,51 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
     line = utils::trim_whitespace(line);
 
     if (is_header_block(line)) {
-      if (!parse_header_entry(fd, line)) { // 수정 중
+      if (is_route_parse == true) {
+        err_meg =
+            "on [" + line +
+            "]: Invalid header definition location in server block (the server "
+            "header definition order rule is violated because header must be "
+            "defined before any RouteRule or RouteRule_CGI).";
+        return false;
+      } else if (is_header_parse == true &&
+                 (is_route_parse || is_timeout_parse)) {
+        err_meg =
+            "on [" + line +
+            "]: Duplicate header block definition in server block (the "
+            "duplicate server header block rule is violated because the header "
+            "block has already been defined in the same server block).";
+        return false;
+      }
+      if (!parse_header_entry(fd, line)) {
         err_meg = "Header syntax Error: " + err_meg;
         return false;
       }
+      is_header_parse = true;
     } else if (is_valid_server_response_time(line)) {
+      if (is_route_parse == true) {
+        err_meg =
+            "on [" + line +
+            "]: Invalid timeout definition location in server block (the "
+            "server timeout definition order rule is violated because timeout "
+            "must be defined before any RouteRule or RouteRule_CGI).";
+        return false;
+      } else if (is_timeout_parse == true) {
+        err_meg = "on [" + line +
+                  "]: Duplicate timeout definition in server block (the "
+                  "duplicate server timeout rule is violated because the "
+                  "timeout has already been defined in the same server block).";
+        return false;
+      }
       parse_server_response_time(line);
       if (err_meg != "")
         return false;
+      is_timeout_parse = true;
     } else if (matches_route_rule_syntax(line)) {
       if (!parse_route_rule_block(line, fd)) {
         return false;
       }
+      is_route_parse = true;
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
       RouteRule_CGI temp(fd, line, file_extension);
       count_line += temp.get_count_line();
@@ -59,6 +98,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
         return false;
       }
       R_CGI.push_back(temp);
+      is_route_parse = true;
     } else {
       err_meg =
           "on [\t" + line +
@@ -85,17 +125,19 @@ bool ServerConfig::is_header_block(const std::string &line) {
   return true;
 }
 
-// :로 split후 size가 2개 인지 확인 -> 아니면 에러처리들 하기( : 기준 key, value 확인)
-// 2개이면 0번 배열을 다시 " " 기준으로 split후에 2번 배열이 값을 utils::trim_whitespace 사용 후 값 사용
-// 키를 utils::is_header_name 사용하여 키값 확인
-// value들은 : 기준으로 한 split의 배열이 value 값
-// value는 utils::is_header_value 사용하여 값 확인
+// :로 split후 size가 2개 인지 확인 -> 아니면 에러처리들 하기( : 기준 key, value
+// 확인) 2개이면 0번 배열을 다시 " " 기준으로 split후에 2번 배열이 값을
+// utils::trim_whitespace 사용 후 값 사용 키를 utils::is_header_name 사용하여
+// 키값 확인 value들은 : 기준으로 한 split의 배열이 value 값 value는
+// utils::is_header_value 사용하여 값 확인
 bool ServerConfig::parse_header_entry(FileDescriptor &fd,
                                       const std::string &line) {
   std::string temp(line);
   if (temp.find(':') == std::string::npos) {
     std::size_t pos = temp.find("+<=") + 3;
-    err_meg = "on [\t" + temp + "], [" + &temp[pos] + "]: Invalid header format (missing ':' separator between header name and value).";
+    err_meg = "on [\t" + temp + "], [" + &temp[pos] +
+              "]: Invalid header format (missing ':' separator between header "
+              "name and value).";
     return false;
   } else if (utils::count_occurrences(temp, ":") != 1) {
     std::size_t pos = temp.find(":");
@@ -111,12 +153,18 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
   std::vector<std::string> key_value = utils::string_split(temp, ":");
   std::string key = utils::string_split(key_value[0], " ")[2];
   if (!utils::is_header_name(key)) {
-    err_meg = "on [\t" + temp + "], [" + key + "]: Invalid HTTP header name (reason: contains illegal characters or is empty; only alphanumeric characters and !#$%&'*+-.^_`|~ are allowed).";
+    err_meg = "on [\t" + temp + "], [" + key +
+              "]: Invalid HTTP header name (reason: contains illegal "
+              "characters or is empty; only alphanumeric characters and "
+              "!#$%&'*+-.^_`|~ are allowed).";
     return false;
   }
   std::string value = utils::trim_whitespace(key_value[1]);
   if (!utils::is_header_value(value)) {
-    err_meg = "on [\t" + temp + "], [" + value + "]: Invalid HTTP header value (reason: contains non-printable or control characters such as CR/LF or non-ASCII characters; only ASCII 0x20-0x7E and TAB are allowed).";
+    err_meg = "on [\t" + temp + "], [" + value +
+              "]: Invalid HTTP header value (reason: contains non-printable or "
+              "control characters such as CR/LF or non-ASCII characters; only "
+              "ASCII 0x20-0x7E and TAB are allowed).";
     return false;
   }
   while (temp[temp.length() - 1] == ';') {
@@ -134,7 +182,10 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
     if (err_meg != "")
       return false;
     if (!utils::is_header_value(temp)) {
-      err_meg = "on [\t" + temp + "], [" + temp + "]: Invalid HTTP header value (reason: contains non-printable or control characters such as CR/LF or non-ASCII characters; only ASCII 0x20-0x7E and TAB are allowed).";
+      err_meg = "on [\t" + temp + "], [" + temp +
+                "]: Invalid HTTP header value (reason: contains non-printable "
+                "or control characters such as CR/LF or non-ASCII characters; "
+                "only ASCII 0x20-0x7E and TAB are allowed).";
       return false;
     }
     value += " " + utils::trim_whitespace(temp);
@@ -452,7 +503,10 @@ bool ServerConfig::apply_route_rule_entry(
 
       std::string real_path = std::string(cwd) + "/" + rule[1];
       if (access(real_path.c_str(), F_OK) != 0) {
-        err_meg = "on [\t\t" + line + "], [" + rule[1] + "]: the value after \"@\" must refer to an existing file (the \"@\" keyword file path rule is violated because the provided value does not exist or is not a valid file).";
+        err_meg = "on [\t\t" + line + "], [" + rule[1] +
+                  "]: the value after \"@\" must refer to an existing file "
+                  "(the \"@\" keyword file path rule is violated because the "
+                  "provided value does not exist or is not a valid file).";
         return false;
       }
       routes[targetRouteIndex].auth_info = rule[1];
@@ -472,8 +526,14 @@ bool ServerConfig::apply_route_rule_entry(
         return false;
       }
     } else {
-      std::cout << "in" <<std::endl;
-      err_meg = "on [\t\t" + line + "], [" + line +  "]: Invalid RouteRule additional information syntax: this line does not match the RouteRule additional information format (the RouteRule additional information syntax rule is violated because the line cannot be parsed as valid additional information; allowed keywords are \"!\", \"@\", \"->{}\", and \"?\").";
+      std::cout << "in" << std::endl;
+      err_meg =
+          "on [\t\t" + line + "], [" + line +
+          "]: Invalid RouteRule additional information syntax: this line does "
+          "not match the RouteRule additional information format (the "
+          "RouteRule additional information syntax rule is violated because "
+          "the line cannot be parsed as valid additional information; allowed "
+          "keywords are \"!\", \"@\", \"->{}\", and \"?\").";
       return false;
     }
   }
@@ -501,6 +561,8 @@ RuleOperator ServerConfig::parse_rule_operator(const std::string &indicator) {
     return (TEMPORARY_REDIRECT);
   else if (indicator == "=308>")
     return (PERMANENT_REDIRECT);
+  else if (indicator == "#")
+    return (LOGIN_USING);
   else
     return (UNDEFINED);
 }
@@ -622,7 +684,9 @@ RouteRule const *ServerConfig::find_route(Request::Method method,
   PathPattern pathPattern(path);
 
   for (size_t i = 0; i < routes.size(); ++i) {
-    if (routes[i].method == method && routes[i].path.matches(pathPattern)) {
+    if (((method == Request::HEAD && routes[i].method == Request::GET) ||
+         routes[i].method == method) &&
+        routes[i].path.matches(pathPattern)) {
       return &routes[i];
     }
   }
@@ -667,6 +731,8 @@ static std::string what_RuleOperator(const RuleOperator op) {
     return ("AUTOINDEX (<i-)");
   else if (op == UPLOAD_TO)
     return ("UPLOAD_TO (->)");
+  else if (op == LOGIN_USING)
+    return ("LOGIN_USING (#)");
   else
     return ("SERVEFROM (<-)");
 }
