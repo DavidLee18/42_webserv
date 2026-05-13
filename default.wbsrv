@@ -32,10 +32,6 @@ cgi =
 
 	GET /cgi-bin/* $/www-files/cgi-bin/gen_html.cgi
 
-	GET /cgi-bin/* $/www-files/cgi-bin/test.py
-
-	GET /cgi-bin/* $/www-files/cgi-bin/test.php
-
 	GET|POST|DELETE * <- /www-files/*
 		? /www-files/hello.html
 		@ /www-files/auth_info
@@ -48,7 +44,7 @@ cgi =
 		! 409:/www-files/error/409.html
 		! 413:/www-files/error/413.html
 		! 500:/www-files/error/500.html
-	
+
 	POST /storage/ -> /www-files/storage/
 		->{} 10MB
 		@ /www-files/auth_info

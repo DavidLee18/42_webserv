@@ -14,7 +14,7 @@ int main(const int argc, char *argv[]) {
   const Result<WebserverConfig> result_config =
       WebserverConfig::parse(fd.value_mut());
   PANIC(result_config)
-  // std::cout << result_config.value() << std::endl;
+  std::cout << result_config.value() << std::endl;
   // const WebserverConfig &config = result_config.value();
   // Server server(config);
   // const Result<Void> init_result = server.init();

@@ -7,9 +7,9 @@
 #include <cerrno>
 #include <ctime>
 
-std::string get_string_from_map(const std::map<int, std::string> &map,
+std::string get_string_from_map(const std::map<unsigned int, std::string> &map,
                                 const int key) {
-  const std::map<int, std::string>::const_iterator it = map.find(key);
+  const std::map<unsigned int, std::string>::const_iterator it = map.find(key);
 
   if (it != map.end())
     return it->second;

@@ -4,7 +4,6 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line, const 
   err_meg = "";
   timeout_ms = 3000;
   count_line = 0;
-  worker_instance = 0;
 
   this->file_extension = file_extension;
   std::vector<std::string> temp = utils::string_split(line, " ");
@@ -56,9 +55,11 @@ std::string RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
     if (utils::has_space(file_line))
       return err_format + file_line + "], [" + file_line + "]: The CGI extended information line does not match any of the allowed formats. (CGI extension rule, the line must follow either key=value or ...<numeric string> format, but the provided line does not conform to either pattern).";
     else if (is_valid_timeout(file_line)) {
-      err_meg = parse_timeout_value(file_line);
+      err_meg = utils::string_to_unsigned_int(&file_line[3], timeout_ms);
       if (err_meg != "")
-        return err_meg;
+        return "on [\t" + file_line + "], [" + &file_line[3] + "]: " + err_meg;
+      else if (timeout_ms > 3600000 || 1 > timeout_ms)
+        return "on [\t" + file_line + "], [" + &file_line[3] + "]: The CGI response time configuration is out of the allowed range. (CGI response time rule, the value must be between 1ms and 3600000ms inclusive, but the provided value falls outside this range).";
     }
     else if (std::string::npos != file_line.find("=")) {
       err_meg = parse_env_entry(file_line, env);
@@ -133,21 +134,6 @@ bool RouteRule_CGI::is_valid_timeout(const std::string &line) {
   return true;
 }
 
-std::string RouteRule_CGI::parse_timeout_value(std::string &line) {
-  int data = 0;
-  for (size_t i = 3; i < line.length(); ++i) {
-    if (!std::isdigit(static_cast<unsigned char>(line[i])))
-      return "on [\t" + line + "], [" + &line[3] + "]: The CGI response time configuration contains an invalid value type after the delimiter. (CGI response time rule, the value after ... must consist only of numeric characters, but non-numeric characters are present, making it invalid for parsing).";
-  }
-  std::stringstream ss(line.substr(3));
-  ss >> data;
-
-  if (data > 3600000 || 1 > data)
-    return "on [\t" + line + "], [" + &line[3] + "]: The CGI response time configuration is out of the allowed range. (CGI response time rule, the value must be between 1ms and 3600000ms inclusive, but the provided value falls outside this range).";
-  timeout_ms = data;
-  return "";
-}
-
 bool RouteRule_CGI::is_valid_env_key(const std::string &key) {
   std::size_t i = 0;
 
@@ -168,17 +154,17 @@ std::string
 RouteRule_CGI::parse_env_entry(const std::string &line,
                                std::map<std::string, std::string> &env) {
   std::vector<std::string> key_and_value = utils::string_split(line, "=");
-  std::string res = "], [";
+  std::string prefix = "], [";
   if (utils::count_occurrences(line, "=") != 1) {
     std::size_t pos = line.find("=");
     pos = line.find("=", pos); 
-    return  res + &line[pos] + "]: The CGI environment variable assignment contains multiple = characters. (environment variable rule, each assignment must follow a single key=value format, but multiple = symbols are present, making the format invalid).";
+    return prefix + &line[pos] + "]: The CGI environment variable assignment contains multiple = characters. (environment variable rule, each assignment must follow a single key=value format, but multiple = symbols are present, making the format invalid).";
   } else if (key_and_value.size() != 2)
-    return res + &line[line.find("=")] + "]: The CGI environment variable assignment contains an invalid key-value format. (environment variable rule, each assignment must follow key=value, but either the key or value is missing, making the format invalid)";
+    return prefix + &line[line.find("=")] + "]: The CGI environment variable assignment contains an invalid key-value format. (environment variable rule, each assignment must follow key=value, but either the key or value is missing, making the format invalid)";
   else if (!RouteRule_CGI::is_valid_env_key(key_and_value[0]))
-    return res + key_and_value[0] + "]: The CGI extended information key contains invalid characters or format. (CGI extension rule, the key must consist of uppercase letters, underscores, and digits not allowed at the first position, but the provided key violates these constraints, making it invalid).";
+    return prefix + key_and_value[0] + "]: The CGI extended information key contains invalid characters or format. (CGI extension rule, the key must consist of uppercase letters, underscores, and digits not allowed at the first position, but the provided key violates these constraints, making it invalid).";
   else if (env.find(key_and_value[0]) != env.end())
-    return res + key_and_value[0] + "]: The CGI extended information contains a duplicate key definition. (CGI extension rule, each key in a key=value pair must be unique within the same request context, but the same key appears more than once, causing a conflict in value assignment).";
+    return prefix + key_and_value[0] + "]: The CGI extended information contains a duplicate key definition. (CGI extension rule, each key in a key=value pair must be unique within the same request context, but the same key appears more than once, causing a conflict in value assignment).";
   env[key_and_value[0]] = key_and_value[1];
   return "";
 }
@@ -246,24 +232,12 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
   std::map<std::string, std::string> env = data.get_env();
   std::map<std::string, std::string>::const_iterator env_it;
 
-  if (data.get_worker_instance() == 0) {
-    os << "\nCGI: ";
-    if (data.get_method() == Request::GET)
-      os << "GET";
-    else if (data.get_method() == Request::POST)
-      os << "POST";
-    else if (data.get_method() == Request::DELETE)
-      os << "DELETE";
-    os << " " << data.get_path().to_string() << "\n";
-  }
   os << "\tExecutable: " << data.get_executable();
   os << "\n\tEnv";
   for (env_it = env.begin(); env_it != env.end(); ++env_it) {
     os << "\n\t\tEnv key: " << env_it->first << ", Env value: " << env_it->second;
   }
   os << "\n\tTimeout: " << data.get_timeout_ms() << "\n";
-  if (data.get_worker_instance() != 0)
-    os << "\tworker_instance: " << data.get_worker_instance() << "\n";
 
   return (os);
 }

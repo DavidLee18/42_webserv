@@ -114,7 +114,7 @@ struct RouteRule {
    * @brief 해당 규칙에서 허용하는 최대 요청 바디 크기를 KB 단위로 저장하는 멤버
    * 변수
    */
-  int max_body_KB;
+  unsigned int max_body_KB;
   /**
    * @var error_pages
    * @brief HTTP 상태 코드별 오류 페이지 경로를 저장하는 멤버 변수
@@ -122,7 +122,7 @@ struct RouteRule {
    * - 상태 코드를 키로 하고, 해당 상태 코드에 대응하는 오류 페이지 경로를 값으로
    * 저장한다.
    */
-  std::map<int, std::string> error_pages;
+  std::map<unsigned int, std::string> error_pages;
 };
 
 /**
@@ -144,7 +144,7 @@ private:
    * @var server_response_time
    * @brief 서버의 응답 시간을 저장하는 멤버 변수
    */
-  int server_response_time;
+  unsigned int server_response_time;
   /**
    * @var routes
    * @brief 일반 요청에 대한 경로 처리 규칙들을 저장하는 멤버 변수
@@ -283,7 +283,7 @@ private:
    * 
    * - MB와 MiB는 각각 1000배, 1024배로 변환한다.
    */
-  std::string parse_max_body_size(std::string line, int &maxbody);
+  std::string parse_max_body_size(std::string line, unsigned int &maxbody);
   /**
    * @brief 문자열이 RouteRule 시작 줄 형식에 맞는지 검사하는 함수
    * @param line 검사할 문자열
@@ -392,7 +392,7 @@ public:
   int get_server_response_time(void) const {
     return server_response_time;
   }
-  static std::string apply_default_err_page_entry(const std::string &line, std::map<int, std::string> &err_map);
+  static std::string apply_default_err_page_entry(const std::string &line, std::map<unsigned int, std::string> &err_map);
 
 };
 
