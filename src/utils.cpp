@@ -25,9 +25,9 @@ bool utils::has_invalid_char(const std::string &line,
       continue;
     if (allowed.find(static_cast<char>(c)) != std::string::npos)
       continue;
-    return (true);
+    return true;
   }
-  return (false);
+  return false;
 }
 
 bool utils::has_space(const std::string &line) {
