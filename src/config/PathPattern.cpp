@@ -182,7 +182,7 @@ bool PathPattern::extract_wildcards(const std::string &pattern,
     if (found == std::string::npos)
       return false;
     if (found == pos)
-      return false;  '*'는 최소 1글자 이상
+      return false;
 
     wildcards.push_back(target.substr(pos, found - pos));
     pos = found + parts[i].size();

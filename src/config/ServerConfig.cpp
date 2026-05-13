@@ -76,7 +76,7 @@ bool ServerConfig::is_header_block(const std::string &line) {
     return false;
   else if (temp[1] != "+<=")
     return false;
-  else if (temp[2].length() < 1 || temp[2].find(':') == std::string::npos)
+  else if (temp[2].length() < 1)
     return false;
   return true;
 }
@@ -89,22 +89,27 @@ bool ServerConfig::is_header_block(const std::string &line) {
 bool ServerConfig::parse_header_entry(FileDescriptor &fd,
                                       const std::string &line) {
   std::string temp(line);
-  std::vector<std::string> key_value = utils::string_split(temp, ":");
-  std::string key;
-  
-  if (utils::count_occurrences(temp, ":") != 1) {
+  if (temp.find(':') == std::string::npos) {
+    std::size_t pos = temp.find("+<=") + 3;
+    err_meg = "on [\t" + temp + "], [" + &temp[pos] + "]: Invalid header format (missing ':' separator between header name and value).";
+    return false;
+  } else if (utils::count_occurrences(temp, ":") != 1) {
     std::size_t pos = temp.find(":");
     pos = temp.find(":", pos);
     err_meg = "on [\t" + temp + "], [" + &temp[pos] + "]: The HTTP header contains an invalid format due to extra delimiter characters. (HTTP header structure, a header must follow the key: value format with only one : separator, but additional : characters are present, making parsing ambiguous and invalid).";
     return false;
-  } else if (key_value.size() != 2) {
-    err_meg = "The HTTP header value is missing, so the request cannot be processed. (HTTP header structure, a key must have an associated value, but it is empty, making the header invalid).";
-    // if () 키가 없는 경우
-      err_meg = "The HTTP header key is missing, so the request cannot be processed. (HTTP header structure, a header must include a key to be identifiable, but the key is empty).";
+  }
+  std::vector<std::string> key_value = utils::string_split(temp, ":");
+  std::string key = utils::string_split(key_value[0], " ")[2];
+  if (!utils::is_header_name(key)) {
+    err_meg = "on [\t" + temp + "], [" + key + "]: Invalid HTTP header name (reason: contains illegal characters or is empty; only alphanumeric characters and !#$%&'*+-.^_`|~ are allowed).";
     return false;
   }
-  key = utils::string_split(key_value[0], " ")[2];
   std::string value = utils::trim_whitespace(key_value[1]);
+  if (!utils::is_header_value(value)) {
+    err_meg = "on [\t" + temp + "], [" + value + "]: Invalid HTTP header value (reason: contains non-printable or control characters such as CR/LF or non-ASCII characters; only ASCII 0x20-0x7E and TAB are allowed).";
+    return false;
+  }
   while (temp[temp.length() - 1] == ';') {
     Result<std::string> fd_line = fd.read_file_line();
     count_line++;
@@ -119,6 +124,10 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
     err_meg = utils::get_indent_whitespace_error(temp, 2);
     if (err_meg != "")
       return false;
+    if (!utils::is_header_value(temp)) {
+      err_meg = "on [\t" + temp + "], [" + temp + "]: Invalid HTTP header value (reason: contains non-printable or control characters such as CR/LF or non-ASCII characters; only ASCII 0x20-0x7E and TAB are allowed).";
+      return false;
+    }
     value += " " + utils::trim_whitespace(temp);
   }
   header[key] = utils::remove_char(value, ';');
