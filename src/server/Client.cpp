@@ -59,10 +59,9 @@ Result<Request *> Request::from_buff(std::string &buff) {
   size_t content_length = 0;
 
   std::string header_lower = buff.substr(0, header_end + std::strlen("\r\n"));
-  for (size_t i = 0; i < header_lower.length(); ++i) {
+  for (size_t i = 0; i < header_lower.length(); ++i)
     header_lower[i] = static_cast<char>(
         std::tolower(static_cast<unsigned char>(header_lower[i])));
-  }
   const size_t host_pos = header_lower.find("host:");
   // Check if there's only ONE host header (not counting it as a substring)
   // We look for it as a header name, which must be preceded by \r\n or be at
@@ -199,12 +198,12 @@ Result<Request *> Request::from_buff(std::string &buff) {
   std::string connection_header =
       get_string_from_map(req->header, "Connection");
   // If empty (no Connection header), HTTP/1.1 defaults to keep-alive
-  if (connection_header.empty())
-    req->header["Connection"] = "keep-alive";
   // keep_alive defaults to true; only set false if client explicitly requests
   // close
   if (connection_header == "close")
     req->keep_alive = false;
+  if (!connection_header.empty())
+    req->header.erase(req->header.find("Connection"));
 
   req->cookie = get_string_from_map(req->header, "Cookie");
   if (req->decode_chunk_state == NOT_CHUNKED) {

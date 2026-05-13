@@ -199,7 +199,7 @@ private:
   Request(const Method method, std::string const &path,
           std::string const &version)
       : method(method), path(path), version(version), keep_alive(true),
-        content_length(0), decode_chunk_state(READING) {
+        content_length(-1), decode_chunk_state(READING) {
     const size_t query_pos = path.find('?');
     if (query_pos != std::string::npos) {
       query = path.substr(query_pos + 1);

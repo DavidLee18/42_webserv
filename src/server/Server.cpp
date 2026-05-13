@@ -242,10 +242,11 @@ void Server::client_read(const FileDescriptor *client_fd) {
       if (content_len.has_value() &&
           (static_cast<size_t>(rule->max_body_KB) < content_len.value() ||
            (clients.at(client_fd).req->is_partial() &&
-            content_len.value() <
+            content_len.value() <=
                 clients.at(client_fd).req->get_body().size()) ||
            (!clients.at(client_fd).req->is_partial() &&
-            content_len.value() < clients.at(client_fd).in_buff.size()))) {
+            content_len.value() <
+                clients.at(client_fd).req->get_body().size()))) {
         const Response resp(
             DefaultError::default_err_response(Response::PAYLOAD_TOO_LARGE));
         std::ostringstream oss;
