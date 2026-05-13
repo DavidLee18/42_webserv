@@ -16,6 +16,10 @@ WebserverConfig::WebserverConfig(FileDescriptor &file) {
 
 bool WebserverConfig::file_parsing(FileDescriptor &file) {
   std::string line;
+  bool is_type_parse = false;
+  bool is_cgi_parse = false;
+  bool is_server_parse = false;
+  bool is_err_page_parse = false;
 
   while (true) {
     Result<std::string> temp = file.read_file_line();
@@ -35,21 +39,48 @@ bool WebserverConfig::file_parsing(FileDescriptor &file) {
     line = utils::trim_whitespace(line);
   
     if (line == "types =" || line == "types=") {
-      if (!parse_types_block(file))
+      if (is_type_parse == true) {
+        err_meg = "on [" + line + "]: Duplicate type block definition (the duplicate type block rule is violated because the type block has already been defined).";
         return false;
+      } else if (is_server_parse == true) {
+        err_meg = "on [" + line + "]: Invalid block definition location (the global block definition order rule is violated because non-server blocks must be defined before any server block).";
+        return false;
+      } else if (!parse_types_block(file))
+        return false;
+      is_type_parse = true;
     } else if (WebserverConfig::is_server_config_header(line)) {
-      if (!parse_server_config_entry(file, line))
+      if (is_type_parse == false) {
+        err_meg = "1 on [], []: Required type block is missing (the 'types' block is not defined at indentation level 0, so no MIME type mapping rules can be processed).";
         return false;
+      } else if (!parse_server_config_entry(file, line))
+        return false;
+      is_server_parse = true;
     } else if (line == "cgi =" || line == "cgi=") {
+      if (is_cgi_parse == true) {
+        err_meg = "on [" + line + "]: Duplicate global CGI block definition (the duplicate global CGI block rule is violated because the global CGI block has already been defined).";
+        return false;
+      } else if (is_server_parse == true) {
+        err_meg = "on [" + line + "]: Invalid block definition location (the global block definition order rule is violated because non-server blocks must be defined before any server block).";
+        return false;
+      }
       err_meg = RouteRule_CGI::parse_global_cgi_block(file, global_cgi, count_line);
       if (err_meg != "")
         return false;
+      is_cgi_parse = true;
     } else if (line[0] == '!') {
+      if (is_err_page_parse == true) {
+        err_meg = "on [" + line + "]: Duplicate default error page block definition (the duplicate default error page block rule is violated because the default error page block has already been defined).";
+        return false;
+      } else if (is_server_parse == true) {
+        err_meg = "on [" + line + "]: Invalid block definition location (the global block definition order rule is violated because non-server blocks must be defined before any server block).";
+        return false;
+      }
       err_meg = ServerConfig::apply_default_err_page_entry(line, default_err_page);
       if (err_meg != "") {
         err_meg = "on [" + line + err_meg;
         return false;
       }
+      is_err_page_parse = true;
     } else {
       err_meg = "on [" + line + "]: Invalid configuration format (the line does not correspond to a valid grammar rule at indentation level 0).";
       return false;
@@ -236,22 +267,24 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   unsigned int key;
   std::string temp(line);
   ServerConfig server(file, global_cgi);
+  std::ostringstream oss;
 
+  oss << count_line + 1;
   key = WebserverConfig::parse_server_port(temp);
+  count_line += server.get_count_line();
   if (server.get_err_meg() != "") {
     err_meg = server.get_err_meg();
-    count_line += server.get_count_line();
     return false;
-  }
-  if (serverconfig_map.find(key) != serverconfig_map.end()) {
-    std::ostringstream oss;
+  } else if (server.get_routes().size() == 0 && server.get_route_rule_cgi().size() == 0) {
+    err_meg = oss.str() + " on [], []: Invalid empty server block (the server block route rule requirement is violated because each server block must contain at least one RouteRule or one RouteRule_CGI).";
+    return false;
+  } else if (serverconfig_map.find(key) != serverconfig_map.end()) {
     oss << key;
 
-    err_meg = "on [\t" + line + "], [" + oss.str() + "]:Violates configuration rule (server block is declared more than once).";
+    err_meg = "on [\t" + line + "], [" + oss.str() + "]: Violates configuration rule (server block is declared more than once).";
     return false;
   }
   serverconfig_map[key] = server;
-  count_line += server.get_count_line();
   return true;
 }
 

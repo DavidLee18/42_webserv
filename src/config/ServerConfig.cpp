@@ -16,6 +16,9 @@ ServerConfig::ServerConfig(FileDescriptor &file, std::map<std::string, std::stri
 
 bool ServerConfig::parse_server_block(FileDescriptor &fd) {
   std::string line;
+  bool is_route_parse = false;
+  bool is_header_parse = false;
+  bool is_timeout_parse = false;
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
@@ -39,19 +42,36 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
     line = utils::trim_whitespace(line);
     
     if (is_header_block(line)) {
-      if (!parse_header_entry(fd, line)) { // 수정 중
+      if (is_route_parse == true) {
+        err_meg = "on [" + line + "]: Invalid header definition location in server block (the server header definition order rule is violated because header must be defined before any RouteRule or RouteRule_CGI).";
+        return false;
+      } else if (is_header_parse == true && (is_route_parse || is_timeout_parse)) {
+        err_meg = "on [" + line + "]: Duplicate header block definition in server block (the duplicate server header block rule is violated because the header block has already been defined in the same server block).";
+        return false;
+      }
+      if (!parse_header_entry(fd, line)) {
         err_meg = "Header syntax Error: " + err_meg;
         return false;
       }
+      is_header_parse = true;
     } else if (is_valid_server_response_time(line)) {
+      if (is_route_parse == true) {
+        err_meg = "on [" + line + "]: Invalid timeout definition location in server block (the server timeout definition order rule is violated because timeout must be defined before any RouteRule or RouteRule_CGI).";
+        return false;
+      } else if (is_timeout_parse == true) {
+        err_meg = "on [" + line + "]: Duplicate timeout definition in server block (the duplicate server timeout rule is violated because the timeout has already been defined in the same server block).";
+        return false;
+      }
       parse_server_response_time(line);
       if (err_meg != "")
         return false;
+      is_timeout_parse = true;
     }
     else if (matches_route_rule_syntax(line)) {
       if (!parse_route_rule_block(line, fd)) {
         return false;
       }
+      is_route_parse = true;
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
       RouteRule_CGI temp(fd, line, file_extension);
       count_line += temp.get_count_line();
@@ -60,6 +80,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
         return false;
       }
       R_CGI.push_back(temp);
+      is_route_parse = true;
     } else {
       err_meg = "on [\t" + line + "], []: The configuration line does not conform to the required server configuration syntax. (server configuration rule, each line must follow the defined config format specification, but the provided line does not match any valid syntax pattern).";
       return false;
@@ -459,6 +480,8 @@ RuleOperator ServerConfig::parse_rule_operator(const std::string &indicator) {
     return (TEMPORARY_REDIRECT);
   else if (indicator == "=308>")
     return (PERMANENT_REDIRECT);
+  else if (indicator == "#")
+    return (LOGIN_USING);
   else
     return (UNDEFINED);
 }
@@ -573,7 +596,7 @@ RouteRule const *ServerConfig::find_route(Request::Method method,
   PathPattern pathPattern(path);
 
   for (size_t i = 0; i < routes.size(); ++i) {
-    if (routes[i].method == method && routes[i].path.matches(pathPattern)) {
+    if (((method == Request::HEAD && routes[i].method == Request::GET) || routes[i].method == method) && routes[i].path.matches(pathPattern)) {
       return &routes[i];
     }
   }
@@ -617,6 +640,8 @@ static std::string what_RuleOperator(const RuleOperator op) {
     return ("AUTOINDEX (<i-)");
   else if (op == UPLOAD_TO)
     return ("UPLOAD_TO (->)");
+  else if (op == LOGIN_USING)
+    return ("LOGIN_USING (#)");
   else
     return ("SERVEFROM (<-)");
 }

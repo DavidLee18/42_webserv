@@ -55,6 +55,7 @@ enum RuleOperator {
    * @brief 특정 경로로부터 파일을 제공하는 규칙을 나타낸다.
    */
   SERVE_FROM,
+  LOGIN_USING,
   /**
    * @brief 정의되지 않은 연산자 상태를 나타낸다.
    */
