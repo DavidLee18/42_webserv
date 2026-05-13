@@ -22,9 +22,9 @@ set -u
 
 HOST=${HOST:-127.0.0.1}
 PORT=${PORT:-8080}
-UPLOAD_URL=${UPLOAD_URL:-/upload}
+UPLOAD_URL=${UPLOAD_URL:-/storage}
 UPLOAD_PATH=${UPLOAD_PATH:-/storage/}
-LOGIN_URL=${LOGIN_URL:-/login.html}
+LOGIN_URL=${LOGIN_URL:-/login}
 LOGIN_BODY=${LOGIN_BODY:-id=david&pw=david1234}
 ECHO_CGI_URL=${ECHO_CGI_URL:-}
 VERBOSE=${VERBOSE:-0}
