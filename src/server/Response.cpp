@@ -613,7 +613,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
         // 1. 브라우저에게 "이 주소로 가라"고 알리는 상태 코드 설정
         // 일반적으로 다른 페이지 이동 시 302 혹은 303을 사용
         response.status_code = Response::FOUND;
-        response.redir = rule->index;
+        response.redir = "/";
         response.content_type = "text/html";
         response.body = "<html><body>Redirecting...</body></html>";
         response.cookie =
