@@ -1434,7 +1434,7 @@ Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
   del._script_path += rule.get_executable();
   if (rule.get_timeout_ms() <= 0)
     return ERR(CgiDelegate, "timeout must be positive");
-  del._timeout_ns = static_cast<size_t>(rule.get_timeout_ms() * 1e9);
+  del._timeout_ns = static_cast<size_t>(rule.get_timeout_ms() * 1e6);
   std::map<std::string, std::string> vars(rule.get_env());
   for (std::map<std::string, std::string>::const_iterator it = vars.begin();
        it != vars.end(); ++it) {
