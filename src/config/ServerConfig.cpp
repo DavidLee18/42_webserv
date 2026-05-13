@@ -1,10 +1,13 @@
 #include "ServerConfig.hpp"
 
-ServerConfig::ServerConfig(FileDescriptor &file) {
+ServerConfig::ServerConfig(FileDescriptor &file, std::map<std::string, std::string> &global_cgi) {
   err_meg = "";
   server_response_time = 3;
   end_flag = 0;
   count_line = 0;
+  for (std::map<std::string, std::string>::const_iterator it = global_cgi.begin(); it != global_cgi.end(); ++it)
+    file_extension.push_back("." + it->first);
+  file_extension.push_back(".cgi");
   if (!parse_server_block(file)) {
     return;
   }
@@ -49,7 +52,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
         return false;
       }
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
-      RouteRule_CGI temp(fd, line);
+      RouteRule_CGI temp(fd, line, file_extension);
       count_line += temp.get_count_line();
       if (temp.get_err_meg() != "") {
         err_meg = temp.get_err_meg();
@@ -439,11 +442,12 @@ bool ServerConfig::apply_route_rule_entry(
       }
       routes[targetRouteIndex].index = rule[1];
     } else if (rule[0] == "@") {
-      if (access(rule[1].c_str(), F_OK) != 0) {
-        err_meg = "on [\t\t" + line + "], [" + rule[1] +
-                  "]: the value after \"@\" must refer to an existing file "
-                  "(the \"@\" keyword file path rule is violated because the "
-                  "provided value does not exist or is not a valid file).";
+      char cwd[4096];
+      getcwd(cwd, sizeof(cwd));
+
+      std::string real_path = std::string(cwd) + "/" + rule[1];
+      if (access(real_path.c_str(), F_OK) != 0) {
+        err_meg = "on [\t\t" + line + "], [" + rule[1] + "]: the value after \"@\" must refer to an existing file (the \"@\" keyword file path rule is violated because the provided value does not exist or is not a valid file).";
         return false;
       }
       routes[targetRouteIndex].auth_info = rule[1];
@@ -463,13 +467,8 @@ bool ServerConfig::apply_route_rule_entry(
         return false;
       }
     } else {
-      err_meg =
-          "on [\t\t" + line + "], [" + line +
-          "]: Invalid RouteRule additional information syntax: this line does "
-          "not match the RouteRule additional information format (the "
-          "RouteRule additional information syntax rule is violated because "
-          "the line cannot be parsed as valid additional information; allowed "
-          "keywords are \"!\", \"@\", \"->{}\", and \"?\").";
+      std::cout << "in" <<std::endl;
+      err_meg = "on [\t\t" + line + "], [" + line +  "]: Invalid RouteRule additional information syntax: this line does not match the RouteRule additional information format (the RouteRule additional information syntax rule is violated because the line cannot be parsed as valid additional information; allowed keywords are \"!\", \"@\", \"->{}\", and \"?\").";
       return false;
     }
   }
@@ -603,13 +602,11 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
 
     line = utils::remove_char(temp.value(), '\n');
     err_meg = utils::get_indent_whitespace_error(line, 2);
+    line = utils::trim_whitespace(line);
     if (err_meg != "")
       return false;
-    else if (apply_route_rule_entry(mets, route_line_data[1], line)) {
-      if (err_meg != "")
-        return false;
-      continue;
-    }
+    else if (!apply_route_rule_entry(mets, route_line_data[1], line))
+      return false;
   }
   err_meg = "";
   return true;
@@ -721,6 +718,14 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
            << utils::debug << "\tError Page: " << err_it->first << " "
            << err_it->second;
     }
+  }
+  std::vector<std::string> file_extension = data.get_file_extension();
+  os << "\n\n\n\n<<File_extension>>\n";
+  os << "\textension: ";
+  for (std::size_t i = 0; i < file_extension.size(); ++i) {
+    os << &file_extension[i][1];
+    if (i + 1 < file_extension.size())
+      os << ", ";
   }
 
   std::vector<RouteRule_CGI> cgi = data.get_route_rule_cgi();

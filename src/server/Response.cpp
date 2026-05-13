@@ -641,10 +641,10 @@ Response ServerResponse::post_method(const Target &target, Response response,
   }
 
   // Handle file uploads
-  std::cout << utils::info << "matched rule path: '" << rule->path
-            << "' root = '" << rule->root << "'" << std::endl;
+  std::cout << utils::info << "matched rule path: '" << rule->path << "' upload_dir = '"
+            << rule->root.to_string() << "'" << std::endl;
   if (rule->root.to_string().empty())
-    const_cast<RouteRule *>(rule)->root = rule->root.to_string();
+    const_cast<RouteRule *>(rule)->root.to_string() = rule->root.to_string();
   if (!rule->root.to_string().empty()) {
     const std::string &body = request->get_body();
     const std::map<std::string, std::string> &headers = request->get_headers();

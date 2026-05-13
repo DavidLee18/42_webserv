@@ -7,7 +7,7 @@
  * @class WebserverConfig
  * @brief 웹서버 설정 파일을 파싱하고 그 결과를 멤버 변수에 저장하는 클래스
  *
- * - 설정 파일에서 Server, Type, Uwsgi 등의 항목을 읽어들인 뒤
+ * - 설정 파일에서 Server, Type, global cgi 등의 항목을 읽어들인 뒤
  * 각 설정값을 내부 멤버 변수에 저장하고, 이후 웹서버가 해당
  * 설정 정보를 사용할 수 있도록 제공한다.
  *
@@ -31,13 +31,7 @@ private:
    * @brief 설정 파일의 기본 MIME type 값을 저장하는 멤버 변수
    */
   std::string default_mime;
-  /**
-   * @var uwsgi
-   * @brief 설정 파일의 uwsgi 항목 정보를 저장하는 멤버 변수
-   *
-   * - 포트 번호를 키로 하고, 실행 파일의 경로를 값으로 저장한다.
-   */
-  std::map<int, RouteRule_CGI> uwsgi;
+  std::map<std::string, std::string> global_cgi;
   /**
    * @var type_map
    * @brief 파일 확장자와 MIME type의 매핑 정보를 저장하는 멤버 변수
@@ -71,10 +65,9 @@ private:
    * @param file 파싱할 설정 파일
    * @return 파싱에 성공하면 true, 실패하면 false
    *
-   * - types, server, uwsgi 항목을 순차적으로 읽어 각 멤버 변수에 저장한다.
-   *
-   * - 유효하지 않은 줄이나 파싱 오류가 발생하면 err_meg에 오류 메시지를
-   * 저장한다.
+   * - types, server, global 항목을 순차적으로 읽어 각 멤버 변수에 저장한다.
+   * 
+   * - 유효하지 않은 줄이나 파싱 오류가 발생하면 err_meg에 오류 메시지를 저장한다.
    */
   bool file_parsing(FileDescriptor &file);
   /**
@@ -163,7 +156,7 @@ public:
     if (this != &other) {
       this->err_meg = other.err_meg;
       this->default_mime = other.default_mime;
-      this->uwsgi = other.uwsgi;
+      this->global_cgi = other.global_cgi;
       this->type_map = other.type_map;
       this->serverconfig_map = other.serverconfig_map;
       this->count_line = other.count_line;
@@ -172,7 +165,9 @@ public:
   }
 
   const std::string &get_default_mime(void) const { return default_mime; }
-  const std::map<int, RouteRule_CGI> &get_uwsgi(void) const { return uwsgi; }
+  const std::map<std::string, std::string> &get_global_cgi(void) const {
+    return global_cgi;
+  }
   const std::map<std::string, std::string> &get_type_map(void) const {
     return type_map;
   }
