@@ -82,6 +82,8 @@ bool is_header_value(const std::string &value);
 
 char tolower(char c);
 
+std::string string_to_unsigned_int(const std::string &str, unsigned int &num);
+
 std::ostream &debug(std::ostream &);
 
 std::ostream &info(std::ostream &);

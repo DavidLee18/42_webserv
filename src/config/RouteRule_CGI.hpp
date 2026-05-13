@@ -38,7 +38,7 @@ private:
    * @var timeout
    * @brief CGI 실행의 제한 시간을 저장하는 멤버 변수
    */
-  int timeout_ms;
+  unsigned int timeout_ms;
   /**
    * @var err
    * @brief CGI 규칙 파싱 또는 처리 중 발생한 오류 정보를 저장하는 멤버 변수
@@ -47,7 +47,6 @@ private:
    */
   std::string err_meg;
   std::size_t count_line;
-  int worker_instance;
   std::vector<std::string> file_extension;
 
   /**
@@ -110,9 +109,7 @@ private:
   std::string matches_route_cgi_syntax(const std::string &line);
   std::string parse_cgi_params(FileDescriptor &fd);
 public:
-  RouteRule_CGI()
-      : met(Request::GET), path(""), executable(""), env(), timeout_ms(3000),
-        err_meg(""), count_line(0), worker_instance(5){};
+  RouteRule_CGI() : met(Request::GET), path(""), executable(""), env(), timeout_ms(3000), err_meg(""), count_line(0) {};
   /**
    * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
    * 생성자
@@ -132,7 +129,6 @@ public:
       timeout_ms = other.timeout_ms;
       err_meg = other.err_meg;
       count_line = other.count_line;
-      worker_instance = other.worker_instance;
       file_extension = other.file_extension;
     }
     return *this;
@@ -143,8 +139,7 @@ public:
   const std::string get_executable(void) const { return executable; }
   const std::map<std::string, std::string> get_env(void) const { return env; }
   std::size_t get_count_line(void) const { return count_line; }
-  int get_worker_instance(void) const { return worker_instance; };
-  int get_timeout_ms() const { return timeout_ms; }
+  unsigned int get_timeout_ms() const { return timeout_ms; }
 
   /**
    * @brief 문자열이 환경 변수 이름 문법에 맞는지 검사하는 함수

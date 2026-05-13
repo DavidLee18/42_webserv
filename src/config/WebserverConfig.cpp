@@ -334,13 +334,17 @@ bool WebserverConfig::is_server_config_header(const std::string &line) {
 
 bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
                                                 const std::string &line) {
-  unsigned int key;
+  unsigned int key = 0;
   std::string temp(line);
   ServerConfig server(file, global_cgi);
   std::ostringstream oss;
 
   oss << count_line + 1;
-  key = WebserverConfig::parse_server_port(temp);
+  utils::string_to_unsigned_int(WebserverConfig::parse_server_port(temp), key);
+  if (1024 > key || key > 49151) {
+    err_meg = "on [\t" + line + "], [" + WebserverConfig::parse_server_port(temp) + "]: Invalid value (the port registered range rule is violated because the port value must be between 1024 and 49151).";
+    return false;
+  }
   count_line += server.get_count_line();
   if (server.get_err_meg() != "") {
     err_meg = server.get_err_meg();
@@ -364,20 +368,19 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   return true;
 }
 
-unsigned int WebserverConfig::parse_server_port(const std::string &key) {
+std::string WebserverConfig::parse_server_port(const std::string &key) {
   std::size_t i = 1;
   std::size_t start = i;
 
   while (i < key.size() && std::isdigit(static_cast<unsigned char>(key[i])))
     ++i;
-  return static_cast<unsigned int>(
-      std::atoi(key.substr(start, i - start).c_str()));
+  return key.substr(start, i - start);
 }
 
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.get_type_map();
   const std::map<std::string, std::string> &cgi = data.get_global_cgi();
-  const std::map<int, std::string> &d_e = data.get_default_err_page();
+  const std::map<unsigned int, std::string> &d_e = data.get_default_err_page();
   std::map<std::string, std::string>::const_iterator ty_it;
   std::map<std::string, std::string>::const_iterator cgi_it;
 
@@ -395,17 +398,15 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
     os << "Global CGI key: " << cgi_it->first
        << " Global CGI value: " << cgi_it->second << " " << std::endl;
   }
-  os << utils::debug
-     << "========================================================" << std::endl;
-  os << "\n\n\n"
-     << utils::debug
-     << "========================================================" << std::endl;
-
-  os << utils::debug << "<<DefaultErrPage>>\n" << std::endl;
-
-  std::map<int, std::string>::const_iterator er_it;
-
-  os << "\n" << utils::debug << "err_page\n";
+  os << "========================================================" << std::endl;
+  os << "\n\n\n========================================================"
+     << std::endl;
+  
+  os << "<<DefaultErrPage>>\n" << std::endl;
+  
+  std::map<unsigned int, std::string>::const_iterator er_it;
+  
+  os << "\nerr_page\n";
   for (er_it = d_e.begin(); er_it != d_e.end(); ++er_it) {
     os << utils::debug << "\terr_page key: " << er_it->first
        << ", err_page value: " << er_it->second << std::endl;

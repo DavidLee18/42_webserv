@@ -57,7 +57,7 @@ private:
    * - 정적 에러 페이지 매핑과 CGI 기반 에러 처리 정보를 포함하는
    * 기본 에러 페이지 설정 객체이다.
    */
-  std::map<int, std::string> default_err_page;
+  std::map<unsigned int, std::string> default_err_page;
   std::size_t count_line;
 
   /**
@@ -147,7 +147,7 @@ private:
    * - 입력 문자열은 사전에 server 설정 헤더 문법 검사를 통과한 문자열이어야
    * 한다.
    */
-  static unsigned int parse_server_port(const std::string &line);
+  static std::string parse_server_port(const std::string &line);
 
   WebserverConfig(FileDescriptor &file);
 
@@ -174,9 +174,7 @@ public:
   const std::map<unsigned int, ServerConfig> &get_serverconfig_map(void) const {
     return serverconfig_map;
   }
-  const std::map<int, std::string> &get_default_err_page(void) const {
-    return default_err_page;
-  }
+  const std::map<unsigned int, std::string> &get_default_err_page(void) const { return default_err_page; }
   /**
    * @brief 설정 파일을 파싱한 결과를 Result<WebserverConfig> 형태로 반환하는
    * 함수
