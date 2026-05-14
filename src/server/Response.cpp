@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <ctime>
+#include <sys/stat.h>
 
 std::string get_string_from_map(const std::map<int, std::string> &map,
                                 const int key) {
@@ -188,6 +189,34 @@ Response ServerResponse::http_response(
   if (request->get_method() == Request::HEAD)
     response.body.clear();
 
+  // Handle conditional requests (If-None-Match, If-Modified-Since)
+  if (response.status_code == Response::OK ||
+      response.status_code == Response::MOVED_PERMANENTLY ||
+      response.status_code == Response::FOUND) {
+    // Check If-None-Match (ETag)
+    std::string if_none_match = get_string_from_map(request->get_headers(), "If-None-Match");
+    if (!if_none_match.empty() && !response.headers["ETag"].empty()) {
+      // ETag match ("*" or exact match)
+      if (if_none_match == "*" || if_none_match == response.headers["ETag"]) {
+        response.status_code = Response::NOT_MODIFIED;
+        response.body.clear();
+        response.content_length = 0;
+        return response;
+      }
+    }
+    // Check If-Modified-Since
+    std::string if_modified_since = get_string_from_map(request->get_headers(), "If-Modified-Since");
+    if (!if_modified_since.empty() && !response.headers["Last-Modified"].empty()) {
+      // Simple comparison: if Last-Modified <= If-Modified-Since, return 304
+      if (response.headers["Last-Modified"] <= if_modified_since) {
+        response.status_code = Response::NOT_MODIFIED;
+        response.body.clear();
+        response.content_length = 0;
+        return response;
+      }
+    }
+  }
+
   // Only set content_type from mime_type map if not already set by method handler
   if (response.content_type.empty())
     response.content_type =
@@ -313,6 +342,28 @@ std::string ServerResponse::get_pwd() {
     return std::string(buffer);
   }
   return "";
+}
+
+std::string ServerResponse::compute_etag(const std::string &path) {
+  struct stat st;
+  if (stat(path.c_str(), &st) == -1)
+    return "";
+
+  std::ostringstream oss;
+  oss << "\"" << st.st_ino << "-" << st.st_size << "-" << st.st_mtime << "\"";
+  return oss.str();
+}
+
+std::string ServerResponse::get_last_modified(const std::string &path) {
+  struct stat st;
+  if (stat(path.c_str(), &st) == -1)
+    return "";
+
+  // Format time as RFC 7231 date
+  char buf[100];
+  struct tm *tm_info = gmtime(&st.st_mtime);
+  strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", tm_info);
+  return std::string(buf);
 }
 
 Response ServerResponse::error_response(const ServerConfig *config,
@@ -814,6 +865,9 @@ Response ServerResponse::get_method(Target target, Response response,
       response.body = ss.str();
       response.status_code = Response::OK;
       file.close();
+      // Add ETag and Last-Modified headers
+      response.headers["ETag"] = compute_etag(target.path);
+      response.headers["Last-Modified"] = get_last_modified(target.path);
     } else {
       return error_response(config, rule, Response::NOT_FOUND);
     }
