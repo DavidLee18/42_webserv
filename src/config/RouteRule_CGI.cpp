@@ -1,6 +1,7 @@
 #include "RouteRule_CGI.hpp"
 
-RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line, const std::vector<std::string> &file_extension) {
+RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line,
+                             const std::vector<std::string> &file_extension) {
   err_meg = "";
   timeout_ms = 3000;
   count_line = 0;
@@ -49,7 +50,7 @@ std::string RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
     if (temp.error() != "")
       return "FileDescriptor Error: " + temp.error();
     else if (temp.value() == "\n" || temp.value() == "")
-      return  "";
+      return "";
 
     file_line = utils::remove_char(temp.value(), '\n');
     err_meg = utils::get_indent_whitespace_error(file_line, 2);
@@ -68,9 +69,12 @@ std::string RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
       if (err_meg != "")
         return "on [\t" + file_line + "], [" + &file_line[3] + "]: " + err_meg;
       else if (timeout_ms > 3600000 || 1 > timeout_ms)
-        return "on [\t" + file_line + "], [" + &file_line[3] + "]: The CGI response time configuration is out of the allowed range. (CGI response time rule, the value must be between 1ms and 3600000ms inclusive, but the provided value falls outside this range).";
-    }
-    else if (std::string::npos != file_line.find("=")) {
+        return "on [\t" + file_line + "], [" + &file_line[3] +
+               "]: The CGI response time configuration is out of the allowed "
+               "range. (CGI response time rule, the value must be between 1ms "
+               "and 3600000ms inclusive, but the provided value falls outside "
+               "this range).";
+    } else if (std::string::npos != file_line.find("=")) {
       err_meg = parse_env_entry(file_line, env);
       if (err_meg != "")
         return err_format + file_line + err_meg;
@@ -90,13 +94,15 @@ std::string RouteRule_CGI::is_executable_file(const std::string &path) {
   std::string real_path = std::string(cwd) + path;
   struct stat st;
   if (stat(real_path.c_str(), &st) != 0)
-    return "Violates file existence rule (the specified path does not exist or cannot be accessed).";
+    return "Violates file existence rule (the specified path does not exist or "
+           "cannot be accessed).";
 
   if (!S_ISREG(st.st_mode))
     return "Violates regular file rule (the given path is not a regular file).";
 
   if (access(real_path.c_str(), X_OK) != 0)
-    return "Violates executable permission rule (the file does not have execute permission).";
+    return "Violates executable permission rule (the file does not have "
+           "execute permission).";
   return "";
 }
 
@@ -112,9 +118,13 @@ std::string RouteRule_CGI::matches_route_cgi_syntax(const std::string &line) {
     }
   }
   if (exec_end == 0)
-    return "Undefined file extension in global CGI mapping (the global CGI file extension rule is violated because the provided file extension is not defined in the allowed extension list).";
+    return "Undefined file extension in global CGI mapping (the global CGI "
+           "file extension rule is violated because the provided file "
+           "extension is not defined in the allowed extension list).";
   else if (exec_end < line.length() && line[exec_end] != '(')
-    return "Invalid CGI environment variable syntax (violates the environment variable format rule, additional environment variables after the .cgi extension must start with '(' in the form '(key=value)').";
+    return "Invalid CGI environment variable syntax (violates the environment "
+           "variable format rule, additional environment variables after the "
+           ".cgi extension must start with '(' in the form '(key=value)').";
   std::string exec_path = line.substr(0, exec_end);
   if (RouteRule_CGI::is_executable_file(exec_path) != "")
     return RouteRule_CGI::is_executable_file(exec_path);
@@ -180,21 +190,38 @@ RouteRule_CGI::parse_env_entry(const std::string &line,
   std::string prefix = "], [";
   if (utils::count_occurrences(line, "=") != 1) {
     std::size_t pos = line.find("=");
-    pos = line.find("=", pos); 
-    return prefix + &line[pos] + "]: The CGI environment variable assignment contains multiple = characters. (environment variable rule, each assignment must follow a single key=value format, but multiple = symbols are present, making the format invalid).";
+    pos = line.find("=", pos);
+    return prefix + &line[pos] +
+           "]: The CGI environment variable assignment contains multiple = "
+           "characters. (environment variable rule, each assignment must "
+           "follow a single key=value format, but multiple = symbols are "
+           "present, making the format invalid).";
   } else if (key_and_value.size() != 2)
-    return prefix + &line[line.find("=")] + "]: The CGI environment variable assignment contains an invalid key-value format. (environment variable rule, each assignment must follow key=value, but either the key or value is missing, making the format invalid)";
+    return prefix + &line[line.find("=")] +
+           "]: The CGI environment variable assignment contains an invalid "
+           "key-value format. (environment variable rule, each assignment must "
+           "follow key=value, but either the key or value is missing, making "
+           "the format invalid)";
   else if (!RouteRule_CGI::is_valid_env_key(key_and_value[0]))
-    return prefix + key_and_value[0] + "]: The CGI extended information key contains invalid characters or format. (CGI extension rule, the key must consist of uppercase letters, underscores, and digits not allowed at the first position, but the provided key violates these constraints, making it invalid).";
+    return prefix + key_and_value[0] +
+           "]: The CGI extended information key contains invalid characters or "
+           "format. (CGI extension rule, the key must consist of uppercase "
+           "letters, underscores, and digits not allowed at the first "
+           "position, but the provided key violates these constraints, making "
+           "it invalid).";
   else if (env.find(key_and_value[0]) != env.end())
-    return prefix + key_and_value[0] + "]: The CGI extended information contains a duplicate key definition. (CGI extension rule, each key in a key=value pair must be unique within the same request context, but the same key appears more than once, causing a conflict in value assignment).";
+    return prefix + key_and_value[0] +
+           "]: The CGI extended information contains a duplicate key "
+           "definition. (CGI extension rule, each key in a key=value pair must "
+           "be unique within the same request context, but the same key "
+           "appears more than once, causing a conflict in value assignment).";
   env[key_and_value[0]] = key_and_value[1];
   return "";
 }
 
-std::string
-RouteRule_CGI::parse_global_cgi_block(FileDescriptor &fd,
-                                 std::map<std::string, std::string> &global_cgi, std::size_t &count_line) {
+std::string RouteRule_CGI::parse_global_cgi_block(
+    FileDescriptor &fd, std::map<std::string, std::string> &global_cgi,
+    std::size_t &count_line) {
   std::string line = "";
   std::string err = "";
 
@@ -213,23 +240,47 @@ RouteRule_CGI::parse_global_cgi_block(FileDescriptor &fd,
     line = utils::trim_whitespace(line);
 
     if (utils::count_occurrences(line, "->") != 1)
-      return "on [\t" + line + "]: Invalid \"->\" count in global CGI mapping the global CGI configuration must follow the \"file extension -> executable path\" format with exactly one \"->\" operator (the global CGI mapping syntax rule is violated because the number of \"->\" operators is not exactly one).";
+      return "on [\t" + line +
+             "]: Invalid \"->\" count in global CGI mapping the global CGI "
+             "configuration must follow the \"file extension -> executable "
+             "path\" format with exactly one \"->\" operator (the global CGI "
+             "mapping syntax rule is violated because the number of \"->\" "
+             "operators is not exactly one).";
     std::vector<std::string> key_and_value = utils::string_split(line, "->");
     if (key_and_value.size() != 2)
-      return "on [\t" + line + "]: Invalid global CGI mapping value the global CGI configuration must follow the \"file extension -> executable path\" format (the global CGI mapping format rule is violated because the value before or after \"->\" is missing).";
+      return "on [\t" + line +
+             "]: Invalid global CGI mapping value the global CGI configuration "
+             "must follow the \"file extension -> executable path\" format "
+             "(the global CGI mapping format rule is violated because the "
+             "value before or after \"->\" is missing).";
 
     std::string key = utils::trim_whitespace(key_and_value[0]);
     std::string value = utils::trim_whitespace(key_and_value[1]);
     if (utils::has_space(key))
-      return "on [\t" + line + "],[" + key + "]: Invalid file extension in global CGI mapping the global CGI configuration must follow the \"file extension -> executable path\" format (the global CGI file extension rule is violated because the file extension contains whitespace).";
+      return "on [\t" + line + "],[" + key +
+             "]: Invalid file extension in global CGI mapping the global CGI "
+             "configuration must follow the \"file extension -> executable "
+             "path\" format (the global CGI file extension rule is violated "
+             "because the file extension contains whitespace).";
     else if (utils::has_invalid_char(key, "-_"))
-      return "on [\t" + line + "],[" + key + "]: Invalid file extension in global CGI mapping (only alphanumeric characters, '-' and '_' are allowed; all other special characters, including '.', are not permitted).";
+      return "on [\t" + line + "],[" + key +
+             "]: Invalid file extension in global CGI mapping (only "
+             "alphanumeric characters, '-' and '_' are allowed; all other "
+             "special characters, including '.', are not permitted).";
     else if (utils::has_space(value))
-      return "on [\t" + line + "],[" + value + "]: Invalid executable path in global CGI mapping the global CGI configuration must follow the \"file extension -> executable path\" format (the global CGI executable path rule is violated because the executable path contains whitespace).";
+      return "on [\t" + line + "],[" + value +
+             "]: Invalid executable path in global CGI mapping the global CGI "
+             "configuration must follow the \"file extension -> executable "
+             "path\" format (the global CGI executable path rule is violated "
+             "because the executable path contains whitespace).";
     else if (global_cgi.find(key_and_value[1]) != global_cgi.end())
-      return "on [\t" + line + "], [" + key + "]: Duplicate global CGI mapping definition (the duplicate global CGI mapping rule is violated because the same file extension is already assigned to another executable path).";
+      return "on [\t" + line + "], [" + key +
+             "]: Duplicate global CGI mapping definition (the duplicate global "
+             "CGI mapping rule is violated because the same file extension is "
+             "already assigned to another executable path).";
     // else if (is_executable_file(value) != "")
-      // return "on [\t" + line + "], [" + value + "]: " + is_executable_file(value);
+    // return "on [\t" + line + "], [" + value + "]: " +
+    // is_executable_file(value);
 
     if (err != "")
       return err;
@@ -291,7 +342,7 @@ RouteRule_CGI::parse_executable(const std::string &line,
     executable = file_line;
     err_msg = is_executable_file(executable);
     if (err_msg != "")
-      return "], ["+ file_line + "]: " +  err_msg;
+      return "], [" + file_line + "]: " + err_msg;
   }
   return err_msg;
 }

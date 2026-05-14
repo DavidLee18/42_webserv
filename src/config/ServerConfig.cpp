@@ -46,10 +46,19 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
 
     if (is_header_block(line)) {
       if (is_route_parse == true) {
-        err_meg = "on [\t" + line + "]: Invalid header definition location in server block (the server header definition order rule is violated because header must be defined before any RouteRule or RouteRule_CGI).";
+        err_meg =
+            "on [\t" + line +
+            "]: Invalid header definition location in server block (the server "
+            "header definition order rule is violated because header must be "
+            "defined before any RouteRule or RouteRule_CGI).";
         return false;
-      } else if (is_header_parse == true && (is_route_parse || is_timeout_parse)) {
-        err_meg = "on [\t" + line + "]: Duplicate header block definition in server block (the duplicate server header block rule is violated because the header block has already been defined in the same server block).";
+      } else if (is_header_parse == true &&
+                 (is_route_parse || is_timeout_parse)) {
+        err_meg =
+            "on [\t" + line +
+            "]: Duplicate header block definition in server block (the "
+            "duplicate server header block rule is violated because the header "
+            "block has already been defined in the same server block).";
         return false;
       }
       if (!parse_header_entry(fd, line)) {
@@ -59,18 +68,31 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
       is_header_parse = true;
     } else if (is_valid_server_response_time(line)) {
       if (is_route_parse == true) {
-        err_meg = "on [\t" + line + "]: Invalid timeout definition location in server block (the server timeout definition order rule is violated because timeout must be defined before any RouteRule or RouteRule_CGI).";
+        err_meg =
+            "on [\t" + line +
+            "]: Invalid timeout definition location in server block (the "
+            "server timeout definition order rule is violated because timeout "
+            "must be defined before any RouteRule or RouteRule_CGI).";
         return false;
       } else if (is_timeout_parse == true) {
-        err_meg = "on [\t" + line + "]: Duplicate timeout definition in server block (the duplicate server timeout rule is violated because the timeout has already been defined in the same server block).";
+        err_meg = "on [\t" + line +
+                  "]: Duplicate timeout definition in server block (the "
+                  "duplicate server timeout rule is violated because the "
+                  "timeout has already been defined in the same server block).";
         return false;
       }
-      err_meg = utils::string_to_unsigned_int(&line[3], server_response_time_ms);
+      err_meg =
+          utils::string_to_unsigned_int(&line[3], server_response_time_ms);
       if (err_meg != "") {
         err_meg = "on [\t" + line + "],[ " + &line[3] + "]: " + err_meg;
         return false;
-      } else if (server_response_time_ms > 60000 || 1 > server_response_time_ms) {
-        err_meg = "on [\t" + line + "], [" + &line[3] + "]: The response time configuration is out of the allowed range. (response time rule, the value must be between 1 and 60000 inclusive, but the provided value falls outside this range).";
+      } else if (server_response_time_ms > 60000 ||
+                 1 > server_response_time_ms) {
+        err_meg =
+            "on [\t" + line + "], [" + &line[3] +
+            "]: The response time configuration is out of the allowed range. "
+            "(response time rule, the value must be between 1 and 60000 "
+            "inclusive, but the provided value falls outside this range).";
         return false;
       }
       is_timeout_parse = true;
@@ -313,52 +335,74 @@ bool ServerConfig::matches_route_rule_syntax(const std::string &line) {
   return true;
 }
 
-std::string ServerConfig::parse_max_body_size(std::string line, unsigned int &maxbody) {
+std::string ServerConfig::parse_max_body_size(std::string line,
+                                              unsigned int &maxbody) {
   size_t i = 0;
   maxbody = 0;
   std::string prefix = "], [";
   if (line[0] == '0') {
     if (line.size() != 0)
-      return prefix + line + "]: Invalid value (the unsigned integer leading zero rule is violated because the value must not contain leading zeros).";
+      return prefix + line +
+             "]: Invalid value (the unsigned integer leading zero rule is "
+             "violated because the value must not contain leading zeros).";
   }
   for (; i < line.size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(line[i])))
       break;
     maxbody = maxbody * 10 + (line[i] - '0');
     if (maxbody > 1048576)
-      return prefix + line + "]: Invalid value (the max body size range rule is violated because the max body size must not exceed 1024MiB or 1048576KB).";
+      return prefix + line +
+             "]: Invalid value (the max body size range rule is violated "
+             "because the max body size must not exceed 1024MiB or 1048576KB).";
   }
   if (i == 0)
-    return prefix + line + "]: Invalid max_body_size value syntax: the value after \"->{}\" must be a numeric string optionally followed by one of the allowed units: \"MB\", \"MiB\", \"KB\", or \"KiB\" (the max_body_size additional information value rule is violated because the provided value does not match the required format: <numeric string><optional unit>).";
+    return prefix + line +
+           "]: Invalid max_body_size value syntax: the value after \"->{}\" "
+           "must be a numeric string optionally followed by one of the allowed "
+           "units: \"MB\", \"MiB\", \"KB\", or \"KiB\" (the max_body_size "
+           "additional information value rule is violated because the provided "
+           "value does not match the required format: <numeric "
+           "string><optional unit>).";
   std::string temp = line.substr(i);
   if (temp.empty() || temp == "KB" || temp == "KiB")
     return "";
   else if (temp == "MB") {
     if (static_cast<std::size_t>(maxbody) * 1000 > 1048576)
-      return prefix + line + "]: Invalid value (the max body size range rule is violated because the max body size must not exceed 1024MiB or 1048576KB)";
+      return prefix + line +
+             "]: Invalid value (the max body size range rule is violated "
+             "because the max body size must not exceed 1024MiB or 1048576KB)";
     maxbody = maxbody * 1000;
-  }
-  else if (temp == "MiB") {
+  } else if (temp == "MiB") {
     if (static_cast<std::size_t>(maxbody) * 1024 > 1048576)
-      return prefix + line + "]: Invalid value (the max body size range rule is violated because the max body size must not exceed 1024MiB or 1048576KB).";
+      return prefix + line +
+             "]: Invalid value (the max body size range rule is violated "
+             "because the max body size must not exceed 1024MiB or 1048576KB).";
     maxbody = maxbody * 1024;
-  }
-  else
-    return prefix + line + "]: Invalid max_body_size value syntax: the value after \"->{}\" must be a numeric string optionally followed by one of the allowed units: \"MB\", \"MiB\", \"KB\", or \"KiB\" (the max_body_size additional information value rule is violated because the provided value does not match the required format: <numeric string><optional unit>).";
+  } else
+    return prefix + line +
+           "]: Invalid max_body_size value syntax: the value after \"->{}\" "
+           "must be a numeric string optionally followed by one of the allowed "
+           "units: \"MB\", \"MiB\", \"KB\", or \"KiB\" (the max_body_size "
+           "additional information value rule is violated because the provided "
+           "value does not match the required format: <numeric "
+           "string><optional unit>).";
   return "";
 }
 
-std::string ServerConfig::apply_default_err_page_entry(const std::string &line, std::map<unsigned int, std::string> &err_map)
-{
+std::string ServerConfig::apply_default_err_page_entry(
+    const std::string &line, std::map<unsigned int, std::string> &err_map) {
   std::vector<std::string> split = utils::string_split(line, " ");
 
   if (split.size() != 2) {
     if (split.size() == 1)
-      return "], []: Violates default error page format (must be \"! <status>:<path>\").";
+      return "], []: Violates default error page format (must be \"! "
+             "<status>:<path>\").";
     std::string prefix = "";
     for (std::size_t i = 2; i < split.size(); ++i)
       prefix += " " + split[i];
-    return "], [" + prefix + "]: Violates default error page format (invalid format for \"! <status>:<path>\").";
+    return "], [" + prefix +
+           "]: Violates default error page format (invalid format for \"! "
+           "<status>:<path>\").";
   }
   std::string path = split[1];
   split = utils::string_split(split[1], ":");
@@ -366,14 +410,19 @@ std::string ServerConfig::apply_default_err_page_entry(const std::string &line, 
     std::size_t pos = line.find(':');
     std::string prefix = "], [";
     pos = line.find(':', pos + 1);
-    return prefix + &line[pos] + "]: Violates error page mapping rule (expected \"status:path\" with no trailing ':' or extra fields).";
+    return prefix + &line[pos] +
+           "]: Violates error page mapping rule (expected \"status:path\" with "
+           "no trailing ':' or extra fields).";
   }
   for (std::size_t i = 0; i < split[0].size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(split[0][i])))
-      return "], [" + split[0] + "]: Violates status format rule (status must consist only of digits).";
+      return "], [" + split[0] +
+             "]: Violates status format rule (status must consist only of "
+             "digits).";
   }
   if (split[0][0] != '4' && split[0][0] != '5' && split[0].size() != 3)
-    return "], [" + split[0] + "]: Violates status range rule (status must start with 4xx or 5xx).";
+    return "], [" + split[0] +
+           "]: Violates status range rule (status must start with 4xx or 5xx).";
   else if (utils::check_html_file(split[1]) != "")
     return "], [" + split[1] + "]: " + utils::check_html_file(split[1]);
 
@@ -382,7 +431,9 @@ std::string ServerConfig::apply_default_err_page_entry(const std::string &line, 
   if (err != "")
     return "], [" + split[0] + "]:" + err;
   else if (num < 400 || num > 599)
-    return "], [" + split[0] + "]: Invalid value (the HTTP status code range rule is violated because the value must be between 400 and 599).";
+    return "], [" + split[0] +
+           "]: Invalid value (the HTTP status code range rule is violated "
+           "because the value must be between 400 and 599).";
   err_map[num] = split[1];
 
   return "";
@@ -480,7 +531,13 @@ bool ServerConfig::apply_route_rule_entry(
         return false;
       }
     } else {
-      err_meg = "on [\t\t" + line + "], [" + line +  "]: Invalid RouteRule additional information syntax: this line does not match the RouteRule additional information format (the RouteRule additional information syntax rule is violated because the line cannot be parsed as valid additional information; allowed keywords are \"!\", \"@\", \"->{}\", and \"?\").";
+      err_meg =
+          "on [\t\t" + line + "], [" + line +
+          "]: Invalid RouteRule additional information syntax: this line does "
+          "not match the RouteRule additional information format (the "
+          "RouteRule additional information syntax rule is violated because "
+          "the line cannot be parsed as valid additional information; allowed "
+          "keywords are \"!\", \"@\", \"->{}\", and \"?\").";
       return false;
     }
   }

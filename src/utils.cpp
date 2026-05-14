@@ -166,10 +166,10 @@ std::string utils::check_html_file(const std::string &path) {
   char cwd[4096];
   getcwd(cwd, sizeof(cwd));
 
-    std::string real_path = std::string(cwd) + "/" + path;
-    struct stat st;
-    if (stat(real_path.c_str(), &st) != 0)
-        return "Invalid HTML file (file does not exist or cannot be accessed).";
+  std::string real_path = std::string(cwd) + "/" + path;
+  struct stat st;
+  if (stat(real_path.c_str(), &st) != 0)
+    return "Invalid HTML file (file does not exist or cannot be accessed).";
 
   if (!S_ISREG(st.st_mode))
     return "Invalid HTML file (path is not a regular file).";
@@ -213,19 +213,23 @@ char utils::tolower(const char c) {
   return static_cast<char>(std::tolower(static_cast<int>(c)));
 }
 
-std::string utils::string_to_unsigned_int(const std::string &str, unsigned int &num)
-{
+std::string utils::string_to_unsigned_int(const std::string &str,
+                                          unsigned int &num) {
   errno = 0;
-  char* end;
+  char *end;
   unsigned long temp = std::strtoul(str.c_str(), &end, 10);
 
   if (str[0] == '0') {
     if (str.size() != 1)
-      return "Invalid value (the unsigned integer leading zero rule is violated because the value must not contain leading zeros).";
+      return "Invalid value (the unsigned integer leading zero rule is "
+             "violated because the value must not contain leading zeros).";
   } else if (*end != '\0')
-    return "Invalid value (the unsigned integer conversion rule is violated because the value cannot be fully converted as a base-10 unsigned integer)";
+    return "Invalid value (the unsigned integer conversion rule is violated "
+           "because the value cannot be fully converted as a base-10 unsigned "
+           "integer)";
   else if (errno == ERANGE || temp > UINT_MAX)
-    return "Invalid value (the unsigned integer range rule is violated because the value is outside the range of unsigned int).";
+    return "Invalid value (the unsigned integer range rule is violated because "
+           "the value is outside the range of unsigned int).";
   num = static_cast<unsigned int>(temp);
   return "";
 }

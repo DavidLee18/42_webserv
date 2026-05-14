@@ -81,7 +81,7 @@ private:
    * 읽는다.
    */
   std::string parse_cgi_block(FileDescriptor &fd, std::string line);
-    /**
+  /**
    * @brief 환경 변수 한 줄을 파싱하여 env 맵에 추가하는 함수
    * @param line 파싱할 문자열
    * @param env 파싱 결과를 저장할 환경 변수 맵
@@ -91,8 +91,8 @@ private:
    * key는 유효한 환경 변수 이름이어야 하고 중복될 수 없다.
    */
   std::string parse_env_entry(const std::string &line,
-                                     std::map<std::string, std::string> &env);
-   /**
+                              std::map<std::string, std::string> &env);
+  /**
    * @brief CGI 실행 문자열에서 실행 파일 경로와 선택적인 환경 변수 정보를
    * 추출하는 함수
    * @param line 파싱할 문자열
@@ -102,14 +102,16 @@ private:
    *
    * - 입력 문자열은 is_valid_cgi_config(const std::string &line) 또는
    */
-  std::string parse_executable(const std::string &line,
-                                      std::string &executable,
-                                      std::map<std::string, std::string> &env);
+  std::string parse_executable(const std::string &line, std::string &executable,
+                               std::map<std::string, std::string> &env);
 
   std::string matches_route_cgi_syntax(const std::string &line);
   std::string parse_cgi_params(FileDescriptor &fd);
+
 public:
-  RouteRule_CGI() : met(Request::GET), path(""), executable(""), env(), timeout_ms(3000), err_meg(""), count_line(0) {};
+  RouteRule_CGI()
+      : met(Request::GET), path(""), executable(""), env(), timeout_ms(3000),
+        err_meg(""), count_line(0){};
   /**
    * @brief 검증된 CGI 설정 한 줄을 바탕으로 RouteRule_CGI 객체를 생성하는
    * 생성자
@@ -119,7 +121,8 @@ public:
    * - 요청 메서드와 경로를 설정한 뒤, 하위 CGI 블록을 파싱하여
    * 실행 파일, 환경 변수, timeout 정보를 초기화한다.
    */
-  RouteRule_CGI(FileDescriptor &fd, const std::string &line, const std::vector<std::string> &file_extension);
+  RouteRule_CGI(FileDescriptor &fd, const std::string &line,
+                const std::vector<std::string> &file_extension);
   RouteRule_CGI &operator=(const RouteRule_CGI &other) {
     if (this != &other) {
       met = other.met;
@@ -172,7 +175,8 @@ public:
   static std::string is_executable_file(const std::string &path);
   static std::string
   parse_global_cgi_block(FileDescriptor &fd,
-                    std::map<std::string, std::string> &global_cgi, std::size_t &count_line);
+                         std::map<std::string, std::string> &global_cgi,
+                         std::size_t &count_line);
 };
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data);

@@ -168,7 +168,6 @@ private:
   std::size_t count_line;
   std::vector<std::string> file_extension;
 
-
   /**
    * @brief server 블록의 최상위 설정 항목들을 파싱하는 함수
    * @param fd 설정 파일을 읽기 위한 FileDescriptor
@@ -353,9 +352,11 @@ private:
   RuleOperator parse_rule_operator(const std::string &indicator);
 
 public:
-  ServerConfig(FileDescriptor &, std::map<std::string, std::string> &global_cgi);
+  ServerConfig(FileDescriptor &,
+               std::map<std::string, std::string> &global_cgi);
   ServerConfig()
-      : header(), server_response_time_ms(3), routes(), err_meg(""), end_flag(0), count_line(0), file_extension() {}
+      : header(), server_response_time_ms(3), routes(), err_meg(""),
+        end_flag(0), count_line(0), file_extension() {}
   /**
    * @brief Request method와 path에 일치하는 route를 찾는다.
    * @param method 요청 HTTP 메서드
@@ -384,7 +385,9 @@ public:
   const std::map<std::string, std::string> &get_header(void) const {
     return header;
   }
-  const std::vector<std::string> &get_file_extension(void) const { return file_extension; }
+  const std::vector<std::string> &get_file_extension(void) const {
+    return file_extension;
+  }
   const std::string &get_err_meg(void) const { return err_meg; }
   const std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
   const std::vector<RouteRule> &get_routes(void) const { return routes; }
@@ -392,8 +395,9 @@ public:
   unsigned int get_server_response_time(void) const {
     return server_response_time_ms;
   }
-  static std::string apply_default_err_page_entry(const std::string &line, std::map<unsigned int, std::string> &err_map);
-
+  static std::string
+  apply_default_err_page_entry(const std::string &line,
+                               std::map<unsigned int, std::string> &err_map);
 };
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data);

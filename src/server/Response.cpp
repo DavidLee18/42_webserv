@@ -188,7 +188,8 @@ Response ServerResponse::http_response(
   if (request->get_method() == Request::HEAD)
     response.body.clear();
 
-  // Only set content_type from mime_type map if not already set by method handler
+  // Only set content_type from mime_type map if not already set by method
+  // handler
   if (response.content_type.empty())
     response.content_type =
         get_string_from_map(mime_type, find_file_type(target.path));
@@ -641,8 +642,8 @@ Response ServerResponse::post_method(const Target &target, Response response,
   }
 
   // Handle file uploads
-  std::cout << utils::info << "matched rule path: '" << rule->path << "' upload_dir = '"
-            << rule->root.to_string() << "'" << std::endl;
+  std::cout << utils::info << "matched rule path: '" << rule->path
+            << "' upload_dir = '" << rule->root.to_string() << "'" << std::endl;
   if (rule->root.to_string().empty())
     const_cast<RouteRule *>(rule)->root.to_string() = rule->root.to_string();
   if (!rule->root.to_string().empty()) {

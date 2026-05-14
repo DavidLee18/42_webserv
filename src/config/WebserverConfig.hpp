@@ -66,8 +66,9 @@ private:
    * @return 파싱에 성공하면 true, 실패하면 false
    *
    * - types, server, global 항목을 순차적으로 읽어 각 멤버 변수에 저장한다.
-   * 
-   * - 유효하지 않은 줄이나 파싱 오류가 발생하면 err_meg에 오류 메시지를 저장한다.
+   *
+   * - 유효하지 않은 줄이나 파싱 오류가 발생하면 err_meg에 오류 메시지를
+   * 저장한다.
    */
   bool file_parsing(FileDescriptor &file);
   /**
@@ -174,7 +175,9 @@ public:
   const std::map<unsigned int, ServerConfig> &get_serverconfig_map(void) const {
     return serverconfig_map;
   }
-  const std::map<unsigned int, std::string> &get_default_err_page(void) const { return default_err_page; }
+  const std::map<unsigned int, std::string> &get_default_err_page(void) const {
+    return default_err_page;
+  }
   /**
    * @brief 설정 파일을 파싱한 결과를 Result<WebserverConfig> 형태로 반환하는
    * 함수

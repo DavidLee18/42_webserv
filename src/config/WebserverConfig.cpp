@@ -342,7 +342,10 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   oss << count_line + 1;
   utils::string_to_unsigned_int(WebserverConfig::parse_server_port(temp), key);
   if (1024 > key || key > 49151) {
-    err_meg = "on [\t" + line + "], [" + WebserverConfig::parse_server_port(temp) + "]: Invalid value (the port registered range rule is violated because the port value must be between 1024 and 49151).";
+    err_meg = "on [\t" + line + "], [" +
+              WebserverConfig::parse_server_port(temp) +
+              "]: Invalid value (the port registered range rule is violated "
+              "because the port value must be between 1024 and 49151).";
     return false;
   }
   count_line += server.get_count_line();
@@ -401,11 +404,11 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   os << "========================================================" << std::endl;
   os << "\n\n\n========================================================"
      << std::endl;
-  
+
   os << "<<DefaultErrPage>>\n" << std::endl;
-  
+
   std::map<unsigned int, std::string>::const_iterator er_it;
-  
+
   os << "\nerr_page\n";
   for (er_it = d_e.begin(); er_it != d_e.end(); ++er_it) {
     os << utils::debug << "\terr_page key: " << er_it->first
