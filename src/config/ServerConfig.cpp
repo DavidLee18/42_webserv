@@ -293,6 +293,8 @@ bool ServerConfig::matches_route_rule_syntax(const std::string &line) {
   for (std::size_t i = 0; i < method.size(); ++i) {
     if (method[i] == "GET")
       continue;
+    else if (method[i] == "HEAD")
+      continue;
     else if (method[i] == "POST")
       continue;
     else if (method[i] == "DELETE")
@@ -582,6 +584,8 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
   for (std::size_t i = 0; i < method.size(); ++i) {
     if (method[i] == "GET")
       mets.push_back(Request::GET);
+    else if (method[i] == "HEAD")
+      mets.push_back(Request::HEAD);
     else if (method[i] == "POST")
       mets.push_back(Request::POST);
     else if (method[i] == "DELETE")
@@ -692,6 +696,8 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
     os << "\n\n" << utils::debug << "Route: ";
     if (route.method == Request::GET)
       os << "GET";
+    else if (route.method == Request::HEAD)
+      os << "HEAD";
     else if (route.method == Request::POST)
       os << "POST";
     else if (route.method == Request::DELETE)
