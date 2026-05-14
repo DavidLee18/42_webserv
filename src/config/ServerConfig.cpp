@@ -712,7 +712,7 @@ ServerConfig::find_route_cgi(Request::Method method,
 }
 
 std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
-  os << utils::debug << data.to_string();
+  os << data.to_string();
   return (os);
 }
 

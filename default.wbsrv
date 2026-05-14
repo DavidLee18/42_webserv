@@ -10,7 +10,7 @@ types =
 
 cgi =
 	php -> /usr/bin/php-cgi
-	py  -> /usr/bin/python3
+	py  -> /opt/pyenv/versions/3.13.1/bin/python3
 
 :8080 =
 	[] +<= X-Content-Type-Options: nosniff
@@ -59,6 +59,8 @@ cgi =
 	GET *.(jpg|jpeg|gif) <- /www-files/*
 
 	GET|POST|DELETE /cgi-bin/* <- /www-files/cgi-bin/*
+
+	POST /login    # /www-files/auth_info
 
 	POST /storage/ -> /www-files/storage/
 		->{} 10MB

@@ -567,10 +567,11 @@ Response ServerResponse::post_method(const Target &target, Response response,
   const ServerConfig *config = client->config;
 
   // Handle login/authentication
-  if (request->get_path() == "/login" || request->get_path() == "/login.html") {
+  if (request->get_path() == rule->path.to_string() &&
+      rule->op == LOGIN_USING) {
     const std::string &body = request->get_body();
 
-    std::string auth_target = get_pwd() + rule->auth_info;
+    std::string auth_target = get_pwd() + rule->root.to_string();
     std::cout << "\n"
               << utils::debug << "auth info: " << auth_target << "\n"
               << std::endl;
