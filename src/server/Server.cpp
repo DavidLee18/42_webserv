@@ -240,7 +240,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
           clients.at(client_fd).req->get_method(),
           clients.at(client_fd).req->get_path());
       if (content_len.has_value() &&
-          (static_cast<size_t>(rule->max_body_KB) < content_len.value() ||
+          (static_cast<size_t>(rule->max_body_KB) * 1024 <
+               content_len.value() ||
            (clients.at(client_fd).req->is_partial() &&
             content_len.value() <=
                 clients.at(client_fd).req->get_body().size()) ||
@@ -457,7 +458,7 @@ Result<Void> Server::start() {
         continue;
 
       const long timeout_sec =
-          static_cast<long>(session.config->get_server_response_time());
+          static_cast<long>(session.config->get_server_response_time()) / 1000;
       if (timeout_sec > 0) {
         const timespec elapsed = {
             .tv_sec = now.tv_sec - session.last_activity_time.tv_sec,
@@ -473,8 +474,10 @@ Result<Void> Server::start() {
              (!session.req->is_partial() &&
               session.in_buff.empty()))) { // Client has timed out
           clients_to_disconnect.push_back(client_fd);
-        } else if (elapsed.tv_sec >= CHUNKED_PENDING_TIMEOUT && session.req &&
-                   (session.req->is_partial() || !session.in_buff.empty())) {
+        } else if (elapsed.tv_sec >= CHUNKED_PENDING_TIMEOUT &&
+                   ((session.req &&
+                     (session.req->is_partial() || !session.in_buff.empty())) ||
+                    (session.req == NULL && session.in_buff.empty()))) {
           Response resp =
               DefaultError::default_err_response(Response::REQUEST_TIMEOUT);
           resp.print_simple(std::cout);
@@ -500,10 +503,10 @@ Result<Void> Server::start() {
 
     // Clean expired sessions (use the first server's timeout as default)
     if (clients.begin() != clients.end()) {
-      const int session_timeout =
+      const unsigned int session_timeout =
           clients.begin()->second.config->get_server_response_time();
       if (session_timeout > 0)
-        sessions.clean_expired_sessions(session_timeout);
+        sessions.clean_expired_sessions(static_cast<int>(session_timeout));
     }
 
     // apply CGI timeout

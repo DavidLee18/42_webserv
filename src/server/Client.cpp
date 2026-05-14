@@ -212,7 +212,7 @@ Result<Request *> Request::from_buff(std::string &buff) {
                                      static_cast<size_t>(req->content_length);
     if (buff.length() < total_request_len) {
       req->remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
-      buff.erase(0, total_request_len);
+      buff.clear();
       return OK(Request *, req);
     }
 
@@ -300,7 +300,8 @@ Result<Void> Request::continue_parsing(std::string &buff) {
 
 bool Request::is_partial() const {
   if (decode_chunk_state == NOT_CHUNKED)
-    return !remnants.empty();
+    return content_length > 0 &&
+           body.length() < static_cast<size_t>(content_length);
   return decode_chunk_state != DONE;
 }
 
