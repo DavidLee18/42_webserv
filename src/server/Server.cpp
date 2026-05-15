@@ -612,8 +612,8 @@ Result<Void> Server::start() {
           } else {
             Result<std::string> output = cgi->poll();
             if (output.has_value()) {
-              const Result<Response> res_ =
-                  Response::from_cgi_outbuff(output.value());
+              const Result<Response> res_ = Response::from_cgi_outbuff(
+                  output.value(), clients.at(client_fd).config->get_header());
               if (res_.has_value())
                 resp = res_.value();
               else

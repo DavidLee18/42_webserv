@@ -82,7 +82,9 @@ struct Response {
       : version("HTTP/1.1"), status_code(INTERNAL_SERVER_ERR),
         content_length(0), content_type(), cookie(), body(), redir(),
         keep_alive(false), headers() {}
-  static Result<Response> from_cgi_outbuff(std::string const &);
+  static Result<Response>
+  from_cgi_outbuff(std::string const &,
+                   std::map<std::string, std::string> const &);
   void print_simple(std::ostream &) const;
 };
 

@@ -9,7 +9,8 @@
 
 std::string get_string_from_map(const std::map<unsigned int, std::string> &map,
                                 const int key) {
-  const std::map<unsigned int, std::string>::const_iterator it = map.find(key);
+  const std::map<unsigned int, std::string>::const_iterator it =
+      map.find(static_cast<unsigned int>(key));
 
   if (it != map.end())
     return it->second;
@@ -662,8 +663,8 @@ Response ServerResponse::post_method(const Target &target, Response response,
       return error_response(config, rule, Response::BAD_REQUEST);
 
     // Check body size limit
-    int max_body_KB = rule->max_body_KB;
-    if (static_cast<int>(body.length()) > max_body_KB * 1024) {
+    const unsigned int max_body_KB = rule->max_body_KB;
+    if (body.length() > static_cast<size_t>(max_body_KB) * 1024) {
       std::cout << utils::warning << "Upload rejected: body size "
                 << body.length() << " exceeds limit " << (max_body_KB * 1024)
                 << std::endl;
@@ -824,7 +825,9 @@ Response ServerResponse::get_method(Target target, Response response,
   return response;
 }
 
-Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
+Result<Response>
+Response::from_cgi_outbuff(std::string const &cgi_out,
+                           std::map<std::string, std::string> const &headers) {
   size_t bound_pos = cgi_out.find("\r\n\r\n");
   size_t bound_len = 4;
 
@@ -838,6 +841,7 @@ Result<Response> Response::from_cgi_outbuff(std::string const &cgi_out) {
   std::string header_part(cgi_out.substr(0, bound_pos));
   Response resp;
 
+  resp.headers = headers;
   resp.body = cgi_out.substr(bound_pos + bound_len);
 
   std::istringstream iss(header_part);
