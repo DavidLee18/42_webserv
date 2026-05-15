@@ -227,11 +227,15 @@ RouteRule_CGI::parse_global_cgi_block(FileDescriptor &fd,
     std::string key = utils::trim_whitespace(key_and_value[0]);
     std::string value = utils::trim_whitespace(key_and_value[1]);
     if (utils::has_space(key))
-      return "on [\t" + line + "],[" + key + "]: Invalid file extension in global CGI mapping the global CGI configuration must follow the \"file extension -> executable path\" format (the global CGI file extension rule is violated because the file extension contains whitespace).";
+      return "on [\t" + line + "], [" + key + "]: Invalid file extension in global CGI mapping "
+                                              "(the global CGI file extension rule is violated because the file "
+                                              "extension contains whitespace).";
     else if (utils::has_invalid_char(key, "-_"))
-      return "on [\t" + line + "],[" + key + "]: Invalid file extension in global CGI mapping (only alphanumeric characters, '-' and '_' are allowed; all other special characters, including '.', are not permitted).";
+      return "on [\t" + line + "], [" + key + "]: Invalid file extension in global CGI mapping (only alphanumeric characters, '-' and '_' are allowed; all other special characters, including '.', are not permitted).";
     else if (utils::has_space(value))
-      return "on [\t" + line + "],[" + value + "]: Invalid executable path in global CGI mapping the global CGI configuration must follow the \"file extension -> executable path\" format (the global CGI executable path rule is violated because the executable path contains whitespace).";
+      return "on [\t" + line + "], [" + value + "]: Invalid executable path in global CGI mapping "
+                                                "(the global CGI executable path rule is violated because the executable "
+                                                "path contains whitespace).";
     else if (global_cgi.find(key) != global_cgi.end())
       return "on [\t" + line + "], [" + key + "]: Duplicate global CGI mapping definition (the duplicate global CGI mapping rule is violated because the same file extension is already assigned to another executable path).";
     else if (is_executable_file(value) != "")

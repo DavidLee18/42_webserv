@@ -112,6 +112,8 @@ cgi =
 - 전역 CGI 블록은 최대 한 번만 정의할 수 있다.
 - 전역 CGI 확장자는 Route CGI executable 검사에 사용된다.
 - 전역 CGI 확장자와 별개로 `.cgi` 확장자는 기본 허용된다.
+- Route CGI executable은 허용된 확장자로 끝나야 한다. 경로 중간에 같은 확장자 문자열이 있어도 executable 끝 확장자가 아니면 인정하지 않는다.
+- CGI executable 경로가 OS 절대 경로인지, 실행 위치 기준 경로인지는 별도 정책 결정 대상이다. 이 문서에서는 경로 해석 정책을 확정하지 않는다.
 
 ---
 
@@ -128,6 +130,7 @@ cgi =
 ### 규칙
 
 - 형식은 `! <status>:<path>` 이다.
+- status는 3자리 HTTP error status code여야 한다.
 - status는 `400 ~ 599` 범위여야 한다.
 - path는 존재하고 읽기 가능한 regular file이어야 한다.
 - path 확장자는 `.html` 이어야 한다.
@@ -306,10 +309,25 @@ inline env 없이 작성할 수도 있다.
 - 공백 기준 토큰은 정확히 3개여야 한다.
 - METHOD는 `GET`, `POST`, `DELETE` 만 허용한다.
 - 세 번째 토큰은 반드시 `$` 로 시작해야 한다.
-- CGI executable path는 `.cgi` 또는 전역 `cgi =` 블록에 등록된 확장자를 포함해야 한다.
-- inline env는 executable 뒤에 `(KEY=VALUE)` 형식으로 최대 한 개만 작성할 수 있다.
+- CGI executable path는 `.cgi` 또는 전역 `cgi =` 블록에 등록된 확장자로 끝나야 한다.
+- 경로 중간에 허용 확장자 문자열이 포함되어 있어도, executable path의 끝 확장자가 아니면 허용되지 않는다.
+- inline env는 executable path 바로 뒤에 `(KEY=VALUE)` 형식으로 최대 한 개만 작성할 수 있다.
+- inline env를 작성하는 경우 `(KEY=VALUE)`는 해당 CGI 설정 문자열의 마지막에 위치해야 하며, `)` 뒤에 다른 문자를 붙일 수 없다.
 - Route CGI 하위 block에서는 timeout과 env 설정을 작성할 수 있다.
 - 다른 Route Rule 또는 Route CGI를 이어 작성하려면 CGI block 뒤에 반드시 빈 줄 하나를 넣어야 한다.
+
+### CGI executable과 inline env
+
+```conf
+	GET /run $/cgi-bin/run.cgi
+	GET /run $/cgi-bin/run.cgi(MODE=prod)
+```
+
+- `$` 뒤에는 CGI executable path가 온다.
+- executable path는 `.cgi` 또는 전역 `cgi =` 블록에 등록된 확장자로 끝나야 한다.
+- inline env가 있다면 executable path 바로 뒤에 `(KEY=VALUE)` 형식으로 작성한다.
+- inline env는 최대 한 개만 허용된다.
+- `(KEY=VALUE)` 뒤에는 다른 문자가 올 수 없다.
 
 ### CGI timeout
 
@@ -411,7 +429,7 @@ inline env 없이 작성할 수도 있다.
 
 실제 파일 경로 또는 대상 경로 계산에는 `PathPattern::rewrite_path()`가 사용된다.
 
-### 예시
+### 예시 1: 확장자 패턴과 하위 경로 보존
 
 ```conf
 	GET /images/*.png <- /static/*
@@ -421,6 +439,15 @@ inline env 없이 작성할 수도 있다.
 request: /images/logo.png
 result:  /static/logo.png
 ```
+
+```text
+request: /images/a/b/c.png
+result:  /static/a/b/c.png
+```
+
+위 예시에서 `*` 는 단일 파일명만 의미하지 않는다. `*` 는 `/` 를 포함한 하위 경로까지 매칭할 수 있으며, rewrite 결과에서도 해당 relative path가 오른쪽 TARGET의 독립된 `*` segment 위치에 들어간다.
+
+### 예시 2: directory prefix mapping
 
 ```conf
 	GET /docs/ <- /var/www/docs/
@@ -433,13 +460,22 @@ result:  /var/www/docs/a/b.html
 
 ### 규칙
 
-- 왼쪽 PATH에 wildcard가 있으면 요청 path에서 상대 경로 또는 wildcard 값을 추출해 오른쪽 TARGET의 `*` 에 삽입한다.
+- 왼쪽 PATH에 wildcard가 있으면 요청 path에서 추출한 relative path를 오른쪽 TARGET의 `*` 에 삽입한다.
 - 오른쪽 TARGET의 wildcard는 단일 `*` segment로만 작성해야 한다.
+- 왼쪽 PATH의 `*` 는 `/` 를 포함한 여러 path segment를 매칭할 수 있다.
+- 따라서 `/images/*.png` 는 `/images/a/b/c.png` 와 매칭될 수 있다.
 - 왼쪽 PATH가 `/` 로 끝나는 prefix pattern이면 요청 path의 suffix를 TARGET 뒤에 이어붙인다.
 - 왼쪽 PATH와 요청 path가 exact match이면 TARGET을 그대로 반환한다.
 - rewrite 결과는 연속된 `/` 를 하나로 정규화한다.
 
----
+### 주의: 중간 wildcard 사용
+
+```conf
+	GET /user/*/profile <- /profiles/*
+```
+
+위와 같은 중간 wildcard 패턴은 순수 capture 치환 방식으로 해석되지 않을 수 있다. 현재 rewrite 정책은 wildcard capture 하나만 치환하는 방식이 아니라, 요청 path의 relative path를 오른쪽 TARGET의 `*` 에 넣는 방식에 가깝다. 따라서 rewrite가 필요한 route에서는 wildcard를 path 끝부분의 파일 또는 하위 경로 매핑 용도로 사용하는 것을 기준으로 한다.
+
 
 ## 14. Route 매칭 정책
 
@@ -539,4 +575,7 @@ cgi =
 - 더 구체적인 route를 먼저 작성해야 한다.
 - 오른쪽 TARGET의 wildcard는 반드시 독립된 `*` segment여야 한다.
 - `*` 는 빈 문자열과 매칭되지 않고 최소 1글자 이상과 매칭된다.
+- `*` 는 `/` 를 포함한 하위 경로까지 매칭할 수 있다.
+- rewrite 시 TARGET의 `*` 에는 단일 파일명뿐 아니라 relative path가 들어갈 수 있다.
+- CGI executable 경로 해석 정책은 별도 결정 대상이다.
 - HTML 파일 검사는 `.html` 만 허용한다.

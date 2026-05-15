@@ -73,6 +73,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
         err_meg = "on [\t" + line + "], [" + &line[3] + "]: Invalid server response time "
                                                         "(the server response time rule is violated because the value must "
                                                         "be between 1ms and 60000ms inclusive).";
+        return false;
       }
       is_timeout_parse = true;
     } else if (matches_route_rule_syntax(line)) {
@@ -89,6 +90,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
       }
       R_CGI.push_back(temp);
       is_route_parse = true;
+      end_flag += 1;
     } else {
       err_meg =
           "on [\t" + line +
@@ -377,7 +379,8 @@ std::string ServerConfig::apply_default_err_page_entry(const std::string &line, 
       return "], [" + split[0] + "]: Violates status format rule (status must consist only of digits).";
   }
   if (split[0].size() != 3 || (split[0][0] != '4' && split[0][0] != '5'))
-    return "], [" + split[0] + "]: Violates status range rule (status must start with 4xx or 5xx).";
+    return "], [" + split[0] + "]: Violates status range rule "
+                               "(status must be a 3-digit HTTP error code between 400 and 599).";
   else if (utils::check_html_file(split[1]) != "")
     return "], [" + split[1] + "]: " + utils::check_html_file(split[1]);
 
@@ -401,7 +404,7 @@ bool ServerConfig::apply_route_rule_entry(
   if (size != 2) {
     if (size > 2) {
       std::size_t pos = line.find(" ");
-      pos = line.find(" ", pos);
+      pos = line.find(" ", pos + 1);
       err_meg = "on [\t\t" + line + "], [" + &line[pos] +
                 "]: Invalid RouteRule additional information format "
                 "(the RouteRule additional information rule is violated because "

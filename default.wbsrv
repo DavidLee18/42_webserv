@@ -11,7 +11,12 @@ types =
 :8080 =
 
 	GET *.(jpg|jpeg|gif) <- /www-files/*
-		->{} 10MB
+
+	GET /cgi-bin/test $/www-files/cgi-bin/gen_html.cgi
+		...3000
+
+
+:4040 =
 
 	GET|POST|DELETE * <- /www-files/*
 		? /www-files/index.html
