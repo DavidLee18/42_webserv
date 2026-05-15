@@ -58,6 +58,8 @@ cgi =
 
 	GET *.(jpg|jpeg|gif) <- /www-files/*
 
+	GET /storage/* <- /www-files/storage/*
+
 	GET|POST|DELETE /cgi-bin/* <- /www-files/cgi-bin/*
 
 	POST /login    # /www-files/auth_info

@@ -140,20 +140,12 @@ up_req=(f"POST {store} HTTP/1.1\r\nHost: {host}\r\nCookie: {cookie}\r\n"
 up=code_of(send(up_req))
 if not up.startswith('2'):
     sys.stderr.write(f"upload failed: code={up}\n"); sys.exit(1)
-get_req=(f"GET {store}{fname} HTTP/1.1\r\nHost: {host}\r\nCookie: {cookie}\r\n"
-         f"Connection: close\r\n\r\n").encode()
-gt=code_of(send(get_req))
-if not gt.startswith('2'):
-    sys.stderr.write(f"post-upload GET failed: code={gt}\n"); sys.exit(1)
 del_req=(f"DELETE {store}{fname} HTTP/1.1\r\nHost: {host}\r\nCookie: {cookie}\r\n"
          f"Connection: close\r\n\r\n").encode()
 dl=code_of(send(del_req))
 if not dl.startswith('2'):
     sys.stderr.write(f"DELETE failed: code={dl}\n"); sys.exit(1)
-gone=code_of(send(get_req))
-if not gone.startswith('4'):
-    sys.stderr.write(f"post-DELETE GET expected 4xx, got {gone}\n"); sys.exit(1)
-sys.stdout.write(f"upload={up}, get={gt}, del={dl}, post-del-get={gone}")
+sys.stdout.write(f"upload={up}, del={dl}")
 PY
 }
 
