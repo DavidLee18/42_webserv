@@ -169,9 +169,9 @@ bool WebserverConfig::is_valid_mime_type(const std::string &value) {
 
   if (utils::has_invalid_char(value, "/-")) {
     err_meg += value +
-               "]: Invalid character in MIME type part of header (only '/' "
-               "and '_' are allowed as special characters within the MIME "
-               "type, the MIME type contains disallowed characters).";
+            "]: Invalid character in MIME type "
+            "(the MIME type rule is violated because only alphanumeric "
+            "characters, '/' and '-' are allowed).";
     return false;
   } else if (value[0] == '-') {
     err_meg += value +
@@ -211,18 +211,18 @@ bool WebserverConfig::is_valid_mime_type(const std::string &value) {
       if (i == value.size() - 1) {
         err_meg +=
             value +
-            "]: Invalid MIME type format (the type part of the MIME type must "
-            "not end with '-', as it violates the rule that the type/subtype "
-            "structure must start with a valid type name).";
+            "]: Invalid MIME type format "
+            "(the MIME type rule is violated because '-' must not appear at "
+            "the beginning or end of a MIME type component).";
         return false;
       }
       if (!std::isalnum(static_cast<unsigned char>(value[i - 1])) ||
           !std::isalnum(static_cast<unsigned char>(value[i + 1]))) {
         err_meg +=
             value +
-            "]: Invalid MIME type format (the type part must consist only of "
-            "letters and digits; hyphens, whitespace, underscores, and other "
-            "special characters are not allowed).";
+            "]: Invalid MIME type format "
+            "(the MIME type rule is violated because '-' must be placed "
+            "between alphanumeric characters).";
         return false;
       }
     }

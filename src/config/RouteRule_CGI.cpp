@@ -182,7 +182,7 @@ RouteRule_CGI::parse_env_entry(const std::string &line,
   std::string prefix = "], [";
   if (utils::count_occurrences(line, "=") != 1) {
     std::size_t pos = line.find("=");
-    pos = line.find("=", pos); 
+    pos = line.find("=", pos + 1); 
     return prefix + &line[pos] + "]: The CGI environment variable assignment contains multiple = characters. (environment variable rule, each assignment must follow a single key=value format, but multiple = symbols are present, making the format invalid).";
   } else if (key_and_value.size() != 2)
     return prefix + &line[line.find("=")] + "]: The CGI environment variable assignment contains an invalid key-value format. (environment variable rule, each assignment must follow key=value, but either the key or value is missing, making the format invalid)";
@@ -215,10 +215,14 @@ RouteRule_CGI::parse_global_cgi_block(FileDescriptor &fd,
     line = utils::trim_whitespace(line);
 
     if (utils::count_occurrences(line, "->") != 1)
-      return "on [\t" + line + "]: Invalid \"->\" count in global CGI mapping the global CGI configuration must follow the \"file extension -> executable path\" format with exactly one \"->\" operator (the global CGI mapping syntax rule is violated because the number of \"->\" operators is not exactly one).";
+      return "on [\t" + line +  "]: Invalid global CGI mapping syntax "
+                                "(the global CGI mapping rule is violated because the mapping must "
+                                "contain exactly one '->' operator in the form 'extension -> executable').";
     std::vector<std::string> key_and_value = utils::string_split(line, "->");
     if (key_and_value.size() != 2)
-      return "on [\t" + line + "]: Invalid global CGI mapping value the global CGI configuration must follow the \"file extension -> executable path\" format (the global CGI mapping format rule is violated because the value before or after \"->\" is missing).";
+      return "on [\t" + line + "]: Invalid global CGI mapping value "
+                                "(the global CGI mapping rule is violated because both the extension "
+                                "and executable path are required in the form 'extension -> executable').";
 
     std::string key = utils::trim_whitespace(key_and_value[0]);
     std::string value = utils::trim_whitespace(key_and_value[1]);

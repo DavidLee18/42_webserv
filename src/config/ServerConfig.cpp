@@ -70,8 +70,9 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
         err_meg = "on [\t" + line + "],[ " + &line[3] + "]: " + err_meg;
         return false;
       } else if (server_response_time_ms > 60000 || 1 > server_response_time_ms) {
-        err_meg = "on [\t" + line + "], [" + &line[3] + "]: The response time configuration is out of the allowed range. (response time rule, the value must be between 1 and 60000 inclusive, but the provided value falls outside this range).";
-        return false;
+        err_meg = "on [\t" + line + "], [" + &line[3] + "]: Invalid server response time "
+                                                        "(the server response time rule is violated because the value must "
+                                                        "be between 1ms and 60000ms inclusive).";
       }
       is_timeout_parse = true;
     } else if (matches_route_rule_syntax(line)) {
@@ -125,10 +126,12 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
     return false;
   } else if (utils::count_occurrences(temp, ":") != 1) {
     std::size_t pos = temp.find(":");
-    pos = temp.find(":", pos);
+    pos = temp.find(":", pos + 1);
     err_meg =
         "on [\t" + temp + "], [" + &temp[pos] +
-        "]: The HTTP header contains an invalid format due to extra delimiter characters. (HTTP header structure, a header must follow the key: value format with only one : separator, but additional : characters are present, making parsing ambiguous and invalid).";
+        "]: Invalid HTTP header format "
+        "(the header rule is violated because a header must contain exactly one "
+        "':' separator in the form 'Header-Name: value').";
     return false;
   }
   std::vector<std::string> key_value = utils::string_split(temp.substr(temp.find("+<=") + 4), ":");
@@ -400,10 +403,14 @@ bool ServerConfig::apply_route_rule_entry(
       std::size_t pos = line.find(" ");
       pos = line.find(" ", pos);
       err_meg = "on [\t\t" + line + "], [" + &line[pos] +
-                "]: RouteRule additional information must contain exactly 2 elements (the RouteRule additional information rule is violated because the number of provided elements is not 2).";
+                "]: Invalid RouteRule additional information format "
+                "(the RouteRule additional information rule is violated because "
+                "the line must contain exactly 2 tokens: KEY VALUE).";
     } else if (size == 1)
       err_meg = "on [\t\t" + line +
-                "], []: RouteRule additional information must contain exactly 2 elements (the RouteRule additional information rule is violated because the number of provided elements is not 2).";
+                "], []: Invalid RouteRule additional information format "
+                "(the RouteRule additional information rule is violated because "
+                "the line must contain exactly 2 tokens: KEY VALUE).";
     return false;
   }
 
