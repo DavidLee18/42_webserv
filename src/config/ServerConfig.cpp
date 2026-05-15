@@ -318,7 +318,7 @@ std::string ServerConfig::parse_max_body_size(std::string line, unsigned int &ma
   maxbody = 0;
   std::string prefix = "], [";
   if (line[0] == '0') {
-    if (line.size() != 0)
+    if (line.size() != 1)
       return prefix + line + "]: Invalid value (the unsigned integer leading zero rule is violated because the value must not contain leading zeros).";
   }
   for (; i < line.size(); ++i) {
@@ -564,11 +564,11 @@ bool ServerConfig::create_route_rules(
       route.root = root_url;
       if (!has_compatible_wildcards(route.path, route.root)) {
         err_meg = route.path.to_string() + ", " + route.root.to_string() +
-                  "]: The route rule has a mismatch in wildcard usage around "
-                  "the operator. (route rule, the number of wildcard * "
-                  "occurrences in the left-hand and right-hand expressions "
-                  "must match, but the provided rule has inconsistent wildcard "
-                  "counts, making the mapping invalid).";
+          "]: Invalid wildcard mapping in route rule "
+          "(the wildcard mapping rule is violated because each wildcard used "
+          "on the left-hand path must be mapped to an independent '*' segment "
+          "on the right-hand path; patterns such as '/static/*.png' are not "
+          "allowed as a destination wildcard target. Use '/static/*' instead).";
         return false;
       }
       if (route.op == REDIRECT)

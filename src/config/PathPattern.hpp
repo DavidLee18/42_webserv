@@ -38,7 +38,7 @@ private:
 public:
   PathPattern() : path() {}
   PathPattern(const std::string &pathStr) {
-    if (pathStr == "/") {
+    if (pathStr == "/" || pathStr.empty()) {
       path.push_back("/");
       return;
     }

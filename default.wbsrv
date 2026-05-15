@@ -10,6 +10,7 @@ types =
 
 cgi =
 	php -> /usr/bin/php-cgi
+	php -> /usr/bin/php-cgi
 	py  -> /usr/bin/python3
 
 :8080 =
@@ -60,6 +61,14 @@ cgi =
 
 	GET|POST|DELETE /cgi-bin/* <- /www-files/cgi-bin/*
 
+	POST /storage/ -> /www-files/storage/
+		->{} 10MB
+		@ /www-files/auth_info
+
+	POST|DELETE /storage/* <- /www-files/storage/*
+		->{} 10MB
+		@ /www-files/auth_info
+
 	GET|POST|DELETE * <- /www-files/*
 		? /www-files/index.html
 		@ /www-files/auth_info
@@ -73,13 +82,6 @@ cgi =
 		! 413:/www-files/error/413.html
 		! 500:/www-files/error/500.html
 
-	POST /storage/ -> /www-files/storage/
-		->{} 10MB
-		@ /www-files/auth_info
-
-	POST|DELETE /storage/* <- /www-files/storage/*
-		->{} 10MB
-		@ /www-files/auth_info
 
 
 :4040 =

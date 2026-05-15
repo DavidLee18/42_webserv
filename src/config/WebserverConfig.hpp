@@ -159,6 +159,7 @@ public:
       this->global_cgi = other.global_cgi;
       this->type_map = other.type_map;
       this->serverconfig_map = other.serverconfig_map;
+      this->default_err_page = other.default_err_page;
       this->count_line = other.count_line;
     }
     return *this;
