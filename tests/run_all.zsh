@@ -17,7 +17,7 @@ PYTHON=${PYTHON:-$(command -v python3)}
 export HOST PORT PYTHON
 export UPLOAD_URL=${UPLOAD_URL:-/cgi-test/echo}
 export ECHO_CGI_URL=${ECHO_CGI_URL:-/cgi-test/echo}
-export UPLOAD_PATH=${UPLOAD_PATH:-/www-file/storage/}
+export UPLOAD_PATH=${UPLOAD_PATH:-/storage/}
 export CGI_EXTRA_ENV_KEYS=${CGI_EXTRA_ENV_KEYS:-LC_CTYPE}
 export SKIP_CONFIRM=1
 

@@ -257,7 +257,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
       const RouteRule *const rule = clients.at(client_fd).config->find_route(
           clients.at(client_fd).req->get_method(),
           clients.at(client_fd).req->get_path());
-      if (content_len.has_value() &&
+      if (content_len.has_value() && rule != NULL &&
           (static_cast<size_t>(rule->max_body_KB) * 1024 <
                content_len.value() ||
            (clients.at(client_fd).req->is_partial() &&

@@ -564,7 +564,13 @@ Response ServerResponse::post_method(const Target &target, Response response,
                                      const ClientSession *client,
                                      const RouteRule *rule,
                                      const Request *request, Session *session) {
-  (void)target;
+  std::cout << utils::debug << "target path: " << target.path << std::endl;
+  std::cout << utils::debug << "POST request path: " << request->get_path()
+            << std::endl;
+  std::cout << utils::debug << "rewritten path: "
+            << client->config->get_rewritten_path(request->get_method(),
+                                                  request->get_path())
+            << std::endl;
   const ServerConfig *config = client->config;
 
   // Handle login/authentication

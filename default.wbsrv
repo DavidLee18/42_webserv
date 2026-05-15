@@ -69,11 +69,10 @@ cgi =
 		->{} 10MiB
 		@ /www-files/auth_info
 
-	POST|DELETE /storage/* <- /www-files/storage/*
-		->{} 10MiB
+	DELETE /storage/* <- /www-files/storage/*
 		@ /www-files/auth_info
 
-	GET|POST|DELETE * <- /www-files/*
+	GET * <- /www-files/*
 		? /www-files/index.html
 		@ /www-files/auth_info
 		->{} 10MiB
