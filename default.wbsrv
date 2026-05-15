@@ -61,6 +61,7 @@ cgi =
 	GET|POST|DELETE /cgi-bin/* <- /www-files/cgi-bin/*
 
 	POST /login    # /www-files/auth_info
+		->{} 10MiB
 
 	POST /storage/ -> /www-files/storage/
 		->{} 10MiB

@@ -497,13 +497,13 @@ t_h13_cgi_passthrough() {
     print -r -- "CGI_TEST_URL not set; skipping"
     return 2
   fi
-  local raw headers status
+  local raw headers http_status
   raw=$(http_raw GET "$CGI_TEST_URL" 10)
   headers=$(headers_section "$raw")
-  status=$(status_code "$raw")
-  if [[ $status != 200 ]]; then
+  http_status=$(status_code "$raw")
+  if [[ $http_status != 200 ]]; then
     dump_if_verbose "$headers"
-    print -r -- "CGI URL returned $status; expected 200"
+    print -r -- "CGI URL returned $http_status; expected 200"
     return 1
   fi
 
