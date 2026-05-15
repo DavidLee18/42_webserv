@@ -833,7 +833,17 @@ std::string normalize_slashes(const std::string &path) {
 std::string ServerConfig::get_rewritten_path(Request::Method method,
                                              const std::string &path) const {
   const RouteRule *route = find_route(method, path);
-  if (!route)
+  if (!route) {
+    std::cout << utils::debug << "get_rewritten_path: NO ROUTE for " << path
+              << std::endl;
     return "";
-  return normalize_slashes(route->path.rewrite_path(path, route->root));
+  }
+  std::cout << utils::debug << "route.path='" << route->path.to_string()
+            << "' route.root='" << route->root.to_string() << "' req_path='"
+            << PathPattern(path).to_string() << "'" << std::endl;
+  const std::string result = normalize_slashes(
+      route->path.rewrite_path(PathPattern(path), route->root));
+  std::cout << utils::debug << "rewrite_path returned: '" << result << "'"
+            << std::endl;
+  return result;
 }

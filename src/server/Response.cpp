@@ -266,8 +266,7 @@ int ServerResponse::check_path_type(const std::string &path) {
   else if (S_ISDIR(info.st_mode))
     return IS_DIR;
   else if (S_ISREG(info.st_mode)) {
-    const size_t cgi_pos = path.find_last_of(".cgi");
-    if (cgi_pos != std::string::npos && cgi_pos == path.length() - 4) {
+    if (path.rfind(".cgi") == path.length() - 4) {
       return Response::NOT_FOUND;
     }
     return IS_FILE;
@@ -777,6 +776,7 @@ Response ServerResponse::get_method(Target target, Response response,
                                     const ServerConfig *config,
                                     const RouteRule *rule,
                                     const Request *request) {
+  std::cout << utils::debug << "target path: " << target.path << std::endl;
   // Handle redirects FIRST, before checking if target exists on filesystem
   if (rule->op == REDIRECT) {
     target.type = Response::MOVED_PERMANENTLY;
