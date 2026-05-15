@@ -184,6 +184,7 @@ Response ServerResponse::http_response(
   }
 
   response.headers = config->get_header();
+  response.keep_alive = request->has_keep_alive();
   response.content_length = response.body.length();
   if (request->get_method() == Request::HEAD)
     response.body.clear();

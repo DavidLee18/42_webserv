@@ -164,6 +164,24 @@ void Server::client_read(const FileDescriptor *client_fd) {
       }
 
       clients.at(client_fd).req = req_.value();
+      const Result<size_t> req_cl =
+          clients.at(client_fd).req->get_content_length();
+      const RouteRule *rule = clients.at(client_fd).config->find_route(
+          clients.at(client_fd).req->get_method(),
+          clients.at(client_fd).req->get_path());
+      if (rule != NULL && req_cl.has_value() &&
+          req_cl.value() > rule->max_body_KB * 1024) {
+        Response resp(
+            DefaultError::default_err_response(Response::PAYLOAD_TOO_LARGE));
+        resp.headers = clients.at(client_fd).config->get_header();
+        resp.keep_alive = false;
+        std::ostringstream oss;
+        oss << resp;
+        clients.at(client_fd).out_buff = oss.str();
+        clients.at(client_fd).dropping = true;
+        client_write(client_fd);
+        return;
+      }
       if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
       {
         if (clients.at(client_fd).dropping)

@@ -40,6 +40,7 @@ public:
   const static std::string bad_gateway;
   const static std::string gateway_timeout;
   const static std::string cgi_invalid_state;
+  const static std::string payload_too_large;
 };
 
 #endif // ERRORS_H
