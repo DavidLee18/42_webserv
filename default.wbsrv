@@ -63,17 +63,17 @@ cgi =
 	POST /login    # /www-files/auth_info
 
 	POST /storage/ -> /www-files/storage/
-		->{} 10MB
+		->{} 10MiB
 		@ /www-files/auth_info
 
 	POST|DELETE /storage/* <- /www-files/storage/*
-		->{} 10MB
+		->{} 10MiB
 		@ /www-files/auth_info
 
 	GET|POST|DELETE * <- /www-files/*
 		? /www-files/index.html
 		@ /www-files/auth_info
-		->{} 10MB
+		->{} 10MiB
 		! 400:/www-files/error/400.html
 		! 401:/www-files/error/401.html
 		! 403:/www-files/error/403.html
@@ -103,4 +103,4 @@ cgi =
 	GET|POST|DELETE * <- /www-files/*
 		? /www-files/index2.html
 		@ /www-files/auth_info
-		->{} 10MB
+		->{} 10MiB

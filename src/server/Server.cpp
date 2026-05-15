@@ -170,7 +170,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
           clients.at(client_fd).req->get_method(),
           clients.at(client_fd).req->get_path());
       if (rule != NULL && req_cl.has_value() &&
-          req_cl.value() > rule->max_body_KB * 1024) {
+          req_cl.value() > static_cast<size_t>(rule->max_body_KB) * 1024) {
         Response resp(
             DefaultError::default_err_response(Response::PAYLOAD_TOO_LARGE));
         resp.headers = clients.at(client_fd).config->get_header();

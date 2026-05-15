@@ -251,8 +251,20 @@ Result<Request *> Request::from_buff(std::string &buff) {
         return ERR(Request *, Errors::bad_request);
       }
       buff.erase(0, static_cast<size_t>(body_start) + unchunked.value());
-    } // else: chunked but not yet complete — leave buff untouched; remnants
-      // holds the partial
+    } else {
+      const size_t clrf_pos = req->remnants.find("\r\n");
+      if (clrf_pos != std::string::npos) { // first chunk arrived
+        std::string first_chunk_size(req->remnants.substr(0, clrf_pos));
+        const size_t ext_pos = first_chunk_size.find(';');
+        if (ext_pos != std::string::npos)
+          first_chunk_size = first_chunk_size.substr(0, ext_pos);
+        for (std::string::const_iterator it = first_chunk_size.begin();
+             it != first_chunk_size.end(); ++it)
+          if (!((*it >= '0' && *it <= '9') || (*it >= 'a' && *it <= 'f') ||
+                (*it >= 'A' && *it <= 'F')))
+            return ERR(Request *, Errors::bad_request);
+      }
+    }
     return OK(Request *, req);
   }
 }
@@ -292,6 +304,19 @@ Result<Void> Request::continue_parsing(std::string &buff) {
       const Result<size_t> unchunked = unchunk(chunk_end);
       if (!unchunked.has_value())
         return ERR(Void, Errors::bad_request);
+    } else {
+      const size_t clrf_pos = remnants.find("\r\n");
+      if (clrf_pos != std::string::npos) { // first chunk arrived
+        std::string first_chunk_size(remnants.substr(0, clrf_pos));
+        const size_t ext_pos = first_chunk_size.find(';');
+        if (ext_pos != std::string::npos)
+          first_chunk_size = first_chunk_size.substr(0, ext_pos);
+        for (std::string::const_iterator it = first_chunk_size.begin();
+             it != first_chunk_size.end(); ++it)
+          if (!((*it >= '0' && *it <= '9') || (*it >= 'a' && *it <= 'f') ||
+                (*it >= 'A' && *it <= 'F')))
+            return ERR(Void, Errors::bad_request);
+      }
     }
     return OKV;
   }
