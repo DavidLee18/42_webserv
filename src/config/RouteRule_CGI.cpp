@@ -101,21 +101,24 @@ std::string RouteRule_CGI::is_executable_file(const std::string &path) {
 }
 
 std::string RouteRule_CGI::matches_route_cgi_syntax(const std::string &line) {
-  std::size_t pos;
+  std::size_t pos = line.find('(');
   std::size_t i = 0;
   std::size_t exec_end = 0;
+  std::string exec_path =
+    (pos == std::string::npos) ? line : line.substr(0, pos);
+
   for (std::size_t index = 0; index < file_extension.size(); ++index) {
-    pos = line.find(file_extension[index]);
-    if (pos != std::string::npos) {
-      exec_end = pos + file_extension[index].length();
-      break;
+    pos = exec_path.rfind(file_extension[index]);
+    if (pos != std::string::npos && pos == exec_path.length() - file_extension[index].size()) {
+        exec_end = pos + file_extension[index].length();
+        break;
     }
   }
   if (exec_end == 0)
     return "Undefined file extension in global CGI mapping (the global CGI file extension rule is violated because the provided file extension is not defined in the allowed extension list).";
   else if (exec_end < line.length() && line[exec_end] != '(')
-    return "Invalid CGI environment variable syntax (violates the environment variable format rule, additional environment variables after the .cgi extension must start with '(' in the form '(key=value)').";
-  std::string exec_path = line.substr(0, exec_end);
+    return "Invalid CGI environment variable syntax (the CGI inline environment rule is violated because any characters after the executable path must start with '(' and follow the exact '(key=value)' format).";
+  exec_path = line.substr(0, exec_end);
   if (RouteRule_CGI::is_executable_file(exec_path) != "")
     return RouteRule_CGI::is_executable_file(exec_path);
 
@@ -123,31 +126,30 @@ std::string RouteRule_CGI::matches_route_cgi_syntax(const std::string &line) {
   if (i == line.length())
     return "";
   if (line[i] != '(')
-    return "Invalid CGI environment variable syntax (violates the environment "
-           "variable format rule: additional environment variables after the "
-           ".cgi extension must start with '(' in the form '(key=value)').";
+    return "Invalid CGI environment variable syntax (the CGI inline environment rule is violated because the token after the executable path is not '('; inline environment variables must use the exact '(key=value)' format).";
 
   std::size_t equals = line.find('=', i + 1);
   std::size_t end = line.find(')', i + 1);
 
-  if (line.find('=', equals + 1) != std::string::npos)
-    return "Invalid environment variable syntax (violates the environment "
-           "variable rule: multiple environment variable declarations are not "
-           "permitted; only a single '(key=value)' is allowed).";
-  else if (equals == std::string::npos)
+  if (equals == std::string::npos)
     return "Invalid environment variable syntax (violates the environment "
            "variable format rule: missing '=' in '(key=value)' declaration).";
   else if (end == std::string::npos)
     return "Invalid environment variable syntax (violates the environment "
            "variable format rule: missing closing ')' in '(key=value)' "
            "declaration).";
-  else if (equals <= i + 1 || equals + 1 >= end)
-    return "Invalid environment variable syntax (violates the key-value format "
-           "rule: missing key or value in '(key=value)' declaration).";
   else if (end + 1 != line.length())
     return "Invalid environment variable syntax (violates the environment "
            "variable format rule: trailing characters found after the closing "
            "')' in '(key=value)' declaration).";
+  else if (line.find('=', equals + 1) != std::string::npos)
+    return "Invalid environment variable syntax (violates the environment "
+           "variable rule: multiple environment variable declarations are not "
+           "permitted; only a single '(key=value)' is allowed).";
+  else if (equals <= i + 1 || equals + 1 >= end)
+    return "Invalid environment variable syntax (violates the key-value format "
+           "rule: missing key or value in '(key=value)' declaration).";
+
   return "";
 }
 

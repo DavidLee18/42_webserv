@@ -373,7 +373,7 @@ std::string ServerConfig::apply_default_err_page_entry(const std::string &line, 
     if (!std::isdigit(static_cast<unsigned char>(split[0][i])))
       return "], [" + split[0] + "]: Violates status format rule (status must consist only of digits).";
   }
-  if (split[0][0] != '4' && split[0][0] != '5' && split[0].size() != 3)
+  if (split[0].size() != 3 || (split[0][0] != '4' && split[0][0] != '5'))
     return "], [" + split[0] + "]: Violates status range rule (status must start with 4xx or 5xx).";
   else if (utils::check_html_file(split[1]) != "")
     return "], [" + split[1] + "]: " + utils::check_html_file(split[1]);
