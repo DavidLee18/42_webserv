@@ -298,6 +298,10 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
         }
         default_mime = value;
         continue;
+      } else if (type_map.find(k) != type_map.end()) {
+        err_meg = "on [\t" + line + "], [" + k +
+            "]: Duplicate MIME extension detected (the MIME extension rule is violated because the same extension is defined more than once).";
+        return false;
       }
       type_map[k] = value;
     }

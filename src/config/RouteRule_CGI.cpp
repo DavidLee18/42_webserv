@@ -228,8 +228,8 @@ RouteRule_CGI::parse_global_cgi_block(FileDescriptor &fd,
       return "on [\t" + line + "],[" + value + "]: Invalid executable path in global CGI mapping the global CGI configuration must follow the \"file extension -> executable path\" format (the global CGI executable path rule is violated because the executable path contains whitespace).";
     else if (global_cgi.find(key) != global_cgi.end())
       return "on [\t" + line + "], [" + key + "]: Duplicate global CGI mapping definition (the duplicate global CGI mapping rule is violated because the same file extension is already assigned to another executable path).";
-    // else if (is_executable_file(value) != "")
-      // return "on [\t" + line + "], [" + value + "]: " + is_executable_file(value);
+    else if (is_executable_file(value) != "")
+      return "on [\t" + line + "], [" + value + "]: " + is_executable_file(value);
 
     if (err != "")
       return err;
@@ -262,7 +262,7 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
        << utils::debug << "\t\tEnv key: " << env_it->first
        << ", Env value: " << env_it->second;
   }
-  os << "\n\tTimeout: " << data.get_timeout_ms() << "\n";
+  os << "\n\tTimeout(ms): " << data.get_timeout_ms() << "\n";
 
   return (os);
 }
