@@ -261,8 +261,10 @@ Result<Request *> Request::from_buff(std::string &buff) {
         for (std::string::const_iterator it = first_chunk_size.begin();
              it != first_chunk_size.end(); ++it)
           if (!((*it >= '0' && *it <= '9') || (*it >= 'a' && *it <= 'f') ||
-                (*it >= 'A' && *it <= 'F')))
+                (*it >= 'A' && *it <= 'F'))) {
+            delete req;
             return ERR(Request *, Errors::bad_request);
+          }
       }
     }
     return OK(Request *, req);

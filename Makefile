@@ -71,7 +71,7 @@ cgiclean:
 # -----------------------------------------------------------------------------
 TESTS_DIR    := tests
 TEST_SUITES  := parsing headers cgi_framing cgi chunked disconnect \
-                conditional slowloris exhaustion
+                conditional slowloris exhaustion eval_smoke
 
 # Run every suite in sequence. Assumes webserv is already running on
 # HOST:PORT (defaults 127.0.0.1:8080). Override via:
