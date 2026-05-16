@@ -103,9 +103,8 @@ std::string RouteRule_CGI::is_executable_file(const std::string &path,
   if (!S_ISREG(st.st_mode))
     return "Violates regular file rule (the given path is not a regular file).";
 
-  if (access(real_path.c_str(), X_OK) != 0)
-    return "Violates executable permission rule (the file does not have "
-           "execute permission).";
+  if (access(real_path.c_str(), R_OK) != 0)
+    return "Violates readable file rule (the file does not have read permission).";
   return "";
 }
 
