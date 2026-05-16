@@ -36,6 +36,7 @@ test-cgi: $(NAME) cgi
 
 cgi: $(CGI_NAME)
 	$(TESTS_DIR)/cgi_setup.zsh
+	$(TESTS_DIR)/multi_cgi_setup.zsh
 
 $(CGI_NAME): $(CGI_SRC)
 	mkdir -p www-files/cgi-bin/

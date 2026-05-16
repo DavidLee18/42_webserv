@@ -22,7 +22,7 @@ cgi =
 
 	GET /cgi-test/hello     $/www-files/cgi-bin/hello.cgi
 
-	GET /cgi-test/sleep     $/www-files/cgi-bin/sleep.py
+	GET /cgi-test/sleep     $/www-files/cgi-bin/sleep.cgi
 		...5000
 
 	GET /cgi-test/burncpu   $/www-files/cgi-bin/burncpu.cgi

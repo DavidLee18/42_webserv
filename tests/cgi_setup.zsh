@@ -21,7 +21,8 @@ print()
 print("hello from cgi")
 PY
 
-cat > "$CGI_DIR/sleep.py" <<'PY'
+cat > "$CGI_DIR/sleep.cgi" <<'PY'
+#!/usr/bin/env python3
 import sys, time
 print("Content-Type: text/plain")
 print()
