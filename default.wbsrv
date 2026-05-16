@@ -48,6 +48,18 @@ cgi =
 	POST /cgi-test/echo     $/www-files/cgi-bin/echo.cgi
 		...10000
 
+	GET /multi-cgi/echo.py $/www-files/cgi-bin/echo.py
+		...5000
+
+	POST /multi-cgi/echo.py $/www-files/cgi-bin/echo.py
+		...5000
+
+	GET /multi-cgi/echo.php $/www-files/cgi-bin/echo.php
+		...5000
+
+	POST /multi-cgi/echo.php $/www-files/cgi-bin/echo.php
+		...5000
+
 	GET /old_stuff/ =301> /new_stuff/
 
 	GET /old_stuff/* =301> /new_stuff/*
