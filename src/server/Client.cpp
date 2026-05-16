@@ -85,10 +85,13 @@ Result<Request *> Request::from_buff(std::string &buff) {
   bool decode_chunked = false;
   if (cl_pos != std::string::npos && te_pos != std::string::npos)
     return ERR(Request *, Errors::malformed_header); // conforming to the RFC
-  if (te_pos != std::string::npos &&
-      (header_lower.find("transfer-encoding:chunked") != std::string::npos ||
-       header_lower.find("transfer-encoding: chunked") != std::string::npos))
-    decode_chunked = true;
+  if (te_pos != std::string::npos) {
+    if (header_lower.find("transfer-encoding:chunked") != std::string::npos ||
+        header_lower.find("transfer-encoding: chunked") != std::string::npos)
+      decode_chunked = true;
+    else
+      return ERR(Request *, Errors::bad_request);
+  }
   if (cl_pos != std::string::npos && !decode_chunked) {
     const char *str =
         header_lower.c_str() + cl_pos + std::strlen("content-length:");
