@@ -30,7 +30,7 @@ int main(const int argc, char *argv[]) {
   PANIC(init_result)
   const Result<Void> server_result = server.start();
   PANIC(server_result)
-  std::cout << "Wrapping up..." << std::endl;
+  std::cout << std::endl << utils::info << "Wrapping up..." << std::endl;
 #endif
   return 0;
 }
