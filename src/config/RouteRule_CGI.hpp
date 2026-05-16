@@ -19,7 +19,7 @@ private:
   std::string parse_cgi_block(FileDescriptor &fd, std::string line);
   std::string parse_env_entry(const std::string &line,
                                      std::map<std::string, std::string> &env);
-  std::string parse_executable(const std::string &line,
+  std::string parse_routerule_cgi_executable(const std::string &line,
                                       std::string &executable,
                                       std::map<std::string, std::string> &env);
 
@@ -41,17 +41,17 @@ public:
     }
     return *this;
   }
-  const PathPattern get_path(void) const { return path; }
-  Request::Method get_method(void) const { return met; }
-  const std::string get_err_meg(void) const { return err_meg; }
-  const std::string get_executable(void) const { return executable; }
-  const std::map<std::string, std::string> get_env(void) const { return env; }
-  std::size_t get_count_line(void) const { return count_line; }
-  unsigned int get_timeout_ms() const { return timeout_ms; }
+  const PathPattern &get_path(void) const { return path; }
+  const Request::Method &get_method(void) const { return met; }
+  const std::string &get_err_meg(void) const { return err_meg; }
+  const std::string &get_executable(void) const { return executable; }
+  const std::map<std::string, std::string> &get_env(void) const { return env; }
+  const std::size_t &get_count_line(void) const { return count_line; }
+  const unsigned int &get_timeout_ms() const { return timeout_ms; }
 
   static bool is_valid_env_key(const std::string &key);
   static bool is_valid_cgi_config(std::string line);
-  static std::string is_executable_file(const std::string &path);
+  static std::string is_executable_file(const std::string &path, bool allow_absolute_path);
   static std::string
   parse_global_cgi_block(FileDescriptor &fd,
                     std::map<std::string, std::string> &global_cgi, std::size_t &count_line);

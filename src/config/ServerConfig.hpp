@@ -85,10 +85,10 @@ public:
   }
   const std::vector<std::string> &get_file_extension(void) const { return file_extension; }
   const std::string &get_err_meg(void) const { return err_meg; }
-  const std::vector<RouteRule_CGI> get_route_rule_cgi() const { return R_CGI; }
+  const std::vector<RouteRule_CGI> &get_route_rule_cgi() const { return R_CGI; }
   const std::vector<RouteRule> &get_routes(void) const { return routes; }
-  std::size_t get_count_line(void) const { return count_line; }
-  unsigned int get_server_response_time(void) const {
+  const std::size_t &get_count_line(void) const { return count_line; }
+  const unsigned int &get_server_response_time(void) const {
     return server_response_time_ms;
   }
   static std::string apply_default_err_page_entry(const std::string &line, std::map<unsigned int, std::string> &err_map);

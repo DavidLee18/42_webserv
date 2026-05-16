@@ -65,12 +65,12 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
         err_meg = "on [\t" + line + "]: Duplicate timeout definition in server block (the duplicate server timeout rule is violated because the timeout has already been defined in the same server block).";
         return false;
       }
-      err_meg = utils::string_to_unsigned_int(&line[3], server_response_time_ms);
+      err_meg = utils::string_to_unsigned_int(line.substr(3), server_response_time_ms);
       if (err_meg != "") {
-        err_meg = "on [\t" + line + "],[ " + &line[3] + "]: " + err_meg;
+        err_meg = "on [\t" + line + "],[ " + line.substr(3) + "]: " + err_meg;
         return false;
       } else if (server_response_time_ms > 60000 || 1 > server_response_time_ms) {
-        err_meg = "on [\t" + line + "], [" + &line[3] + "]: Invalid server response time "
+        err_meg = "on [\t" + line + "], [" + line.substr(3) + "]: Invalid server response time "
                                                         "(the server response time rule is violated because the value must "
                                                         "be between 1ms and 60000ms inclusive).";
         return false;
@@ -405,7 +405,7 @@ bool ServerConfig::apply_route_rule_entry(
     if (size > 2) {
       std::size_t pos = line.find(" ");
       pos = line.find(" ", pos + 1);
-      err_meg = "on [\t\t" + line + "], [" + &line[pos] +
+      err_meg = "on [\t\t" + line + "], [" + line.substr(pos) +
                 "]: Invalid RouteRule additional information format "
                 "(the RouteRule additional information rule is violated because "
                 "the line must contain exactly 2 tokens: KEY VALUE).";
