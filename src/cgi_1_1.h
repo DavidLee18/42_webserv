@@ -290,8 +290,9 @@ public:
     Done,
   };
 
-  static Result<CgiDelegate> from_req(Request const &, EPoll &,
-                                      RouteRule_CGI const &);
+  static Result<CgiDelegate>
+  from_req(Request const &, EPoll &, RouteRule_CGI const &,
+           std::map<std::string, std::string> const &);
 
   CgiDelegate(const CgiDelegate &);
   CgiDelegate &operator=(const CgiDelegate &) throw(std::logic_error);
@@ -320,6 +321,7 @@ public:
 private:
   CgiInput _env;
   std::string _script_path;
+  std::string _interpreter;
   const Request _req;
   EPoll &_epoll;
   pid_t _pid;

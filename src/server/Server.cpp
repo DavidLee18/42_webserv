@@ -217,7 +217,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
               clients.at(client_fd).req->get_path());
       if (cgi_path != NULL) {
         Result<Void> del_ = ServerResponse::register_cgi(
-            *clients.at(client_fd).req, *cgi_path, &epoll, cgis, client_fd);
+            *clients.at(client_fd).req, *cgi_path, &epoll,
+            config.get_global_cgi(), cgis, client_fd);
         if (!del_.has_value())
           std::cerr << utils::error
                     << "CGI registration failed: " << del_.error() << std::endl;
@@ -308,7 +309,8 @@ void Server::client_read(const FileDescriptor *client_fd) {
 
       if (cgi_path != NULL) {
         Result<Void> del_ = ServerResponse::register_cgi(
-            *clients.at(client_fd).req, *cgi_path, &epoll, cgis, client_fd);
+            *clients.at(client_fd).req, *cgi_path, &epoll,
+            config.get_global_cgi(), cgis, client_fd);
         if (!del_.has_value())
           std::cerr << utils::error
                     << "CGI registration failed: " << del_.error() << std::endl;

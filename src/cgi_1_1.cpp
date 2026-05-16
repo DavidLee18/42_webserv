@@ -1423,8 +1423,9 @@ CgiDelegate::CgiDelegate(Request const &req, EPoll &ep)
       _stdout(NULL), _total_written(0), _output(), _state(NotRegistered),
       _start_time(), _timeout_ns(0) {}
 
-Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
-                                          const RouteRule_CGI &rule) {
+Result<CgiDelegate> CgiDelegate::from_req(
+    const Request &req, EPoll &ep, const RouteRule_CGI &rule,
+    std::map<std::string, std::string> const &cgi_interpreters) {
   CgiDelegate del(req, ep);
   TRY(CgiDelegate, CgiInput, del._env, CgiInput::Parser::parse(req))
   char pwd[PATH_MAX];
@@ -1432,7 +1433,15 @@ Result<CgiDelegate> CgiDelegate::from_req(const Request &req, EPoll &ep,
     return ERR(CgiDelegate, "getting PWD failed");
   del._script_path = pwd + std::string("/");
   del._script_path += rule.get_executable();
-  if (rule.get_timeout_ms() <= 0)
+  const size_t last_dot_pos = del._script_path.rfind('.');
+  if (last_dot_pos == std::string::npos)
+    return ERR(CgiDelegate, "no extension for cgi executable");
+  const std::string ext(del._script_path.substr(last_dot_pos + 1));
+  std::map<std::string, std::string>::const_iterator it =
+      cgi_interpreters.find(ext);
+  if (it != cgi_interpreters.end())
+    del._interpreter = it->second;
+  if (rule.get_timeout_ms() == 0)
     return ERR(CgiDelegate, "timeout must be positive");
   del._timeout_ns = static_cast<size_t>(rule.get_timeout_ms() * 1e6);
   std::map<std::string, std::string> vars(rule.get_env());
@@ -1575,23 +1584,31 @@ Result<Void> CgiDelegate::register_(
     }
 
     char **envp = _env.to_envp();
-    char *argv[2] = {const_cast<char *>(_script_path.c_str()), NULL};
+    char **argv;
+    if (_interpreter.empty()) {
+      argv = new char *[2];
+      argv[0] = const_cast<char *>(_script_path.c_str());
+      argv[1] = NULL;
+    } else {
+      argv = new char *[3];
+      argv[0] = const_cast<char *>(_interpreter.c_str());
+      argv[1] = const_cast<char *>(_script_path.c_str());
+      argv[2] = NULL;
+    }
 
     size_t last_slash = _script_path.rfind('/');
-    std::string path;
+    std::string dir_path;
     if (last_slash == std::string::npos)
-      path =
-          getenv("PWD") ? getenv("PWD") + std::string("/") + _script_path : "/";
+      dir_path = getenv("PWD") ? getenv("PWD") + std::string("/") : "/";
     else
-      path = _script_path.substr(0, last_slash + 1);
+      dir_path = _script_path.substr(0, last_slash + 1);
 
-    argv[0] = const_cast<char *>(path.c_str());
-    if (chdir(path.c_str()) != 0) {
-      std::cerr << "Failed to change directory to: " << path << std::endl;
+    if (chdir(dir_path.c_str()) != 0) {
+      std::cerr << "Failed to change directory to: " << dir_path << std::endl;
       std::exit(1);
     }
 
-    execve(_script_path.c_str(), argv, envp);
+    execve(argv[0], argv, envp);
 
     // execve failed
     for (size_t i = 0; envp[i] != NULL; i++)
@@ -1639,7 +1656,9 @@ Result<Void> CgiDelegate::register_(
     }
     _stdin = add_res.value();
   } else {
-    { FileDescriptor stdin_drop(stdin); }
+    {
+      FileDescriptor stdin_drop(stdin);
+    }
     _stdin = NULL;
   }
 

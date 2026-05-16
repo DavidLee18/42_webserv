@@ -237,12 +237,14 @@ Response ServerResponse::http_response(
 
 Result<Void> ServerResponse::register_cgi(
     const Request &request, const RouteRule_CGI &rule, EPoll *epoll,
+    std::map<std::string, std::string> const &cgi_interpreters,
     std::map<FileDescriptor const *,
              std::pair<FileDescriptor const *, CgiDelegate *> > &cgis,
     FileDescriptor const *client_fd) {
   CgiDelegate *del =
       static_cast<CgiDelegate *>(operator new(sizeof(CgiDelegate)));
-  const Result<CgiDelegate> del_ = CgiDelegate::from_req(request, *epoll, rule);
+  const Result<CgiDelegate> del_ =
+      CgiDelegate::from_req(request, *epoll, rule, cgi_interpreters);
   if (!del_.has_value()) {
     operator delete(del);
     return ERR(Void, del_.error());

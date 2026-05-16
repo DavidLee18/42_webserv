@@ -126,6 +126,7 @@ public:
 
   static Result<Void> register_cgi(
       const Request &request, const RouteRule_CGI &rule, EPoll *epoll,
+      std::map<std::string, std::string> const &cgi_interpreters,
       std::map<FileDescriptor const *,
                std::pair<FileDescriptor const *, CgiDelegate *> > &cgis,
       FileDescriptor const *client_fd);
