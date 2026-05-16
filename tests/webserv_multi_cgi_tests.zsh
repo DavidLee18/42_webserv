@@ -71,7 +71,6 @@ fi
 
 if (( PY_AVAIL )); then
   cat > "$CGI_DIR/echo.py" <<'PY'
-#!/usr/bin/env python3
 import os, sys, platform
 sys.stdout.write("Content-Type: text/plain\r\n\r\n")
 sys.stdout.write("INTERPRETER=python\n")
@@ -87,7 +86,6 @@ except ValueError:
 body = sys.stdin.read(cl) if cl > 0 else ''
 sys.stdout.write(f"BODY={body}\n")
 PY
-  chmod +x "$CGI_DIR/echo.py"
   print -- "${C_DIM}deployed: $CGI_DIR/echo.py${C_OFF}"
 fi
 
@@ -105,7 +103,6 @@ $cl = intval(getenv('CONTENT_LENGTH') ?: 0);
 $body = $cl > 0 ? fread(STDIN, $cl) : '';
 echo "BODY=" . $body . "\n";
 PHP
-  chmod +x "$CGI_DIR/echo.php"
   print -- "${C_DIM}deployed: $CGI_DIR/echo.php${C_OFF}"
 fi
 print -- ""

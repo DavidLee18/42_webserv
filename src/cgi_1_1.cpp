@@ -1,6 +1,4 @@
 #include "webserv.h"
-#include <cstdio>
-#include <fcntl.h>
 
 CgiAuthType::CgiAuthType(const CgiAuthType::Type type)
     : _type(type), _other(NULL) {}
@@ -1431,16 +1429,20 @@ Result<CgiDelegate> CgiDelegate::from_req(
   char pwd[PATH_MAX];
   if (getcwd(pwd, sizeof(pwd)) == NULL)
     return ERR(CgiDelegate, "getting PWD failed");
-  del._script_path = pwd + std::string("/");
-  del._script_path += rule.get_executable();
+  del._script_path = pwd + rule.get_executable();
   const size_t last_dot_pos = del._script_path.rfind('.');
   if (last_dot_pos == std::string::npos)
     return ERR(CgiDelegate, "no extension for cgi executable");
   const std::string ext(del._script_path.substr(last_dot_pos + 1));
+  std::cout << utils::debug << "found script\'s extension: " << ext
+            << std::endl;
   std::map<std::string, std::string>::const_iterator it =
       cgi_interpreters.find(ext);
-  if (it != cgi_interpreters.end())
+  if (it != cgi_interpreters.end()) {
+    std::cout << utils::debug << "found interpreter: \"" << it->second << "\""
+              << std::endl;
     del._interpreter = it->second;
+  }
   if (rule.get_timeout_ms() == 0)
     return ERR(CgiDelegate, "timeout must be positive");
   del._timeout_ns = static_cast<size_t>(rule.get_timeout_ms() * 1e6);
@@ -1611,6 +1613,7 @@ Result<Void> CgiDelegate::register_(
     execve(argv[0], argv, envp);
 
     // execve failed
+    delete[] argv;
     for (size_t i = 0; envp[i] != NULL; i++)
       delete[] envp[i];
     delete[] envp;
