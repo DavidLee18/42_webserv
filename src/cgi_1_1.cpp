@@ -1417,9 +1417,9 @@ unsigned char to_upper(const unsigned char c) {
 }
 
 CgiDelegate::CgiDelegate(Request const &req, EPoll &ep)
-    : _env(), _script_path(), _req(req), _epoll(ep), _pid(-1), _stdin(NULL),
-      _stdout(NULL), _total_written(0), _output(), _state(NotRegistered),
-      _start_time(), _timeout_ns(0) {}
+    : _env(), _script_path(), _interpreter(), _req(req), _epoll(ep), _pid(-1),
+      _stdin(NULL), _stdout(NULL), _total_written(0), _output(),
+      _state(NotRegistered), _start_time(), _timeout_ns(0) {}
 
 Result<CgiDelegate> CgiDelegate::from_req(
     const Request &req, EPoll &ep, const RouteRule_CGI &rule,
@@ -1455,11 +1455,12 @@ Result<CgiDelegate> CgiDelegate::from_req(
 }
 
 CgiDelegate::CgiDelegate(const CgiDelegate &other)
-    : _env(other._env), _script_path(other._script_path), _req(other._req),
-      _epoll(other._epoll), _pid(other._pid), _stdin(other._stdin),
-      _stdout(other._stdout), _total_written(other._total_written),
-      _output(other._output), _state(other._state),
-      _start_time(other._start_time), _timeout_ns(other._timeout_ns) {
+    : _env(other._env), _script_path(other._script_path),
+      _interpreter(other._interpreter), _req(other._req), _epoll(other._epoll),
+      _pid(other._pid), _stdin(other._stdin), _stdout(other._stdout),
+      _total_written(other._total_written), _output(other._output),
+      _state(other._state), _start_time(other._start_time),
+      _timeout_ns(other._timeout_ns) {
   const_cast<CgiDelegate &>(other)._env.mvars.clear();
   const_cast<CgiDelegate &>(other)._env.req_body.clear();
   const_cast<CgiDelegate &>(other)._script_path.clear();
@@ -1553,6 +1554,8 @@ Result<Void> CgiDelegate::register_(
     return ERR(Void, "Failed to set stdout pipe to close-on-exec mode");
   }
 
+  std::cout << utils::debug << "interpreter: \"" << _interpreter << "\""
+            << std::endl;
   pid_t pid = fork();
   if (pid == -1) {
     {
@@ -1610,6 +1613,9 @@ Result<Void> CgiDelegate::register_(
       std::exit(1);
     }
 
+    std::cout << utils::debug << "executing \"" << argv[0] << "\" with \""
+              << argv[1] << "\"" << std::endl;
+
     execve(argv[0], argv, envp);
 
     // execve failed
@@ -1618,7 +1624,12 @@ Result<Void> CgiDelegate::register_(
       delete[] envp[i];
     delete[] envp;
 
-    std::cerr << "Failed to execute CGI script: " << _script_path << std::endl;
+    if (_interpreter.empty())
+      std::cerr << "Failed to execute CGI script: " << _script_path
+                << std::endl;
+    else
+      std::cerr << "Failed to run CGI interpreter: " << _interpreter
+                << " with script: " << _script_path << std::endl;
     exit(1);
   }
 
