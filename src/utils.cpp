@@ -127,6 +127,15 @@ std::string utils::get_indent_whitespace_error(const std::string &line,
   std::size_t indent_level = utils::return_indent_level(line);
   std::string err_line = "";
 
+  if (line.empty()) {
+    if (level == 0)
+      return "";
+    std::ostringstream l_oss;
+    l_oss << level;
+    return "on []: It is not a valid indentation level(expected indentation "
+           "level: " +
+           l_oss.str() + ", found: 0)";
+  }
   if (level != 0 && line[0] != '\t') {
     err_line += "on [" + line +
                 "]: It is not a valid indentation character (expected "
@@ -145,14 +154,13 @@ std::string utils::get_indent_whitespace_error(const std::string &line,
       }
     }
     i_oss << indent_level;
-    ;
 
     err_line +=
         "on [" + line +
         "]: It is not a valid indentation level(expected indentation level: " +
         l_oss.str() + ", found: " + i_oss.str() + ")";
     return err_line;
-  } else if (utils::has_leading_space(&line[level])) {
+  } else if (utils::has_leading_space(line.substr(level))) {
     err_line += "on [" + line + "]: Leading whitespace exists.";
     return err_line;
   } else if (utils::has_trailing_space(line)) {
@@ -218,6 +226,10 @@ std::string utils::string_to_unsigned_int(const std::string &str,
   errno = 0;
   char *end;
   unsigned long temp = std::strtoul(str.c_str(), &end, 10);
+
+  if (str.empty())
+    return "Invalid value (the unsigned integer conversion rule is violated "
+           "because the value is empty).";
 
   if (str[0] == '0') {
     if (str.size() != 1)

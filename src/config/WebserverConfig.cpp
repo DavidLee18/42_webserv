@@ -131,9 +131,9 @@ WebserverConfig::parse_type_keys(const std::string &key) {
 
   if (utils::has_invalid_char(temp, "_|")) {
     err_meg += temp +
-               "]: Invalid character in extension part of header (only '|' and "
-               "'_' are allowed as special characters within the extension, "
-               "the extension contains disallowed characters).";
+              "]: Invalid character in MIME extension mapping "
+              "(the MIME extension rule is violated because only alphanumeric "
+              "characters, '_' and '|' are allowed in the extension list).";
     return (key_data);
   }
   key_data = utils::string_split(temp, "|");
@@ -169,9 +169,9 @@ bool WebserverConfig::is_valid_mime_type(const std::string &value) {
 
   if (utils::has_invalid_char(value, "/-")) {
     err_meg += value +
-               "]: Invalid character in MIME type part of header (only '/' "
-               "and '_' are allowed as special characters within the MIME "
-               "type, the MIME type contains disallowed characters).";
+            "]: Invalid character in MIME type "
+            "(the MIME type rule is violated because only alphanumeric "
+            "characters, '/' and '-' are allowed).";
     return false;
   } else if (value[0] == '-') {
     err_meg += value +
@@ -211,18 +211,18 @@ bool WebserverConfig::is_valid_mime_type(const std::string &value) {
       if (i == value.size() - 1) {
         err_meg +=
             value +
-            "]: Invalid MIME type format (the type part of the MIME type must "
-            "not end with '-', as it violates the rule that the type/subtype "
-            "structure must start with a valid type name).";
+            "]: Invalid MIME type format "
+            "(the MIME type rule is violated because '-' must not appear at "
+            "the beginning or end of a MIME type component).";
         return false;
       }
       if (!std::isalnum(static_cast<unsigned char>(value[i - 1])) ||
           !std::isalnum(static_cast<unsigned char>(value[i + 1]))) {
         err_meg +=
             value +
-            "]: Invalid MIME type format (the type part must consist only of "
-            "letters and digits; hyphens, whitespace, underscores, and other "
-            "special characters are not allowed).";
+            "]: Invalid MIME type format "
+            "(the MIME type rule is violated because '-' must be placed "
+            "between alphanumeric characters).";
         return false;
       }
     }
@@ -235,19 +235,19 @@ bool WebserverConfig::parse_type_mapping(const std::string &line,
                                          std::string &value_out) {
   if (utils::count_occurrences(line, "->") != 1) {
     err_meg = "on [\t" + line +
-              "]: Missing '->' in header (violates the rule requiring the "
-              "'extension -> MIME type' format, so the mapping between "
-              "extension and MIME type cannot be determined).";
+              "]: Invalid MIME type mapping syntax "
+              "(the MIME type mapping rule is violated because the line must "
+              "contain exactly one '->' operator in the form "
+              "'extension -> MIME type').";
     return false;
   }
   std::vector<std::string> type_data = utils::string_split(line, "->");
   if (type_data.size() != 2) {
     err_meg =
         "on [\t" + line +
-        "]: Missing value in header mapping the header configuration must "
-        "follow the \"file extension -> MIME type\" format (the header mapping "
-        "format rule is violated because either the file extension before "
-        "\"->\" or the MIME type after \"->\" is missing).";
+        "]: Invalid MIME type mapping value "
+        "(the MIME type mapping rule is violated because both the extension "
+        "and MIME type are required in the form 'extension -> MIME type').";
     return false;
   }
 
@@ -298,6 +298,10 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
         }
         default_mime = value;
         continue;
+      } else if (type_map.find(k) != type_map.end()) {
+        err_meg = "on [\t" + line + "], [" + k +
+            "]: Duplicate MIME extension detected (the MIME extension rule is violated because the same extension is defined more than once).";
+        return false;
       }
       type_map[k] = value;
     }
