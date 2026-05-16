@@ -8,7 +8,7 @@
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 #define CHUNKED_PENDING_TIMEOUT 3
 #define DEFAULT_LOG_LEVEL utils::DEBUG
-// #define CONFIG_DEBUG 0
+#define CONFIG_DEBUG 0
 
 #include "cgi_1_1.h"
 #include "config/WebserverConfig.hpp"
