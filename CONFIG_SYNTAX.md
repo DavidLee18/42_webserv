@@ -1,8 +1,10 @@
-# Config File Rule 정리
+# Config File Rule 정리 (최신 코드 기준)
 
 현재 구현된 `WebserverConfig`, `ServerConfig`, `RouteRule_CGI`, `PathPattern`, `utils` 기준으로 config 파일의 작성 규칙을 정리한다.
 
 이 문서는 config 작성자가 지켜야 할 문법을 중심으로 설명하며, 실제 코드의 파싱 흐름과 검증 조건을 기준으로 작성한다.
+
+> 참고: 파일 시스템 경로를 어떤 기준 디렉토리에서 해석할지에 대한 정책은 추후 `base_root` 방식으로 별도 정리할 예정이므로, 이 문서에서는 문법과 검증 규칙만 정리한다.
 
 ---
 
@@ -108,12 +110,14 @@ cgi =
 
 - 각 항목은 `확장자 -> 실행파일경로` 형식이다.
 - 확장자에는 `.` 을 쓰지 않는다.
+- 확장자와 실행파일경로에는 공백을 포함할 수 없다.
 - 같은 확장자를 중복 선언할 수 없다.
 - 전역 CGI 블록은 최대 한 번만 정의할 수 있다.
-- 전역 CGI 확장자는 Route CGI executable 검사에 사용된다.
+- 전역 CGI에 등록된 확장자는 Route CGI executable 검사에 사용된다.
 - 전역 CGI 확장자와 별개로 `.cgi` 확장자는 기본 허용된다.
-- Route CGI executable은 허용된 확장자로 끝나야 한다. 경로 중간에 같은 확장자 문자열이 있어도 executable 끝 확장자가 아니면 인정하지 않는다.
-- CGI executable 경로가 OS 절대 경로인지, 실행 위치 기준 경로인지는 별도 정책 결정 대상이다. 이 문서에서는 경로 해석 정책을 확정하지 않는다.
+- Route CGI executable은 `.cgi` 또는 전역 CGI에 등록된 확장자로 끝나야 한다. 경로 중간에 같은 확장자 문자열이 있어도 executable 끝 확장자가 아니면 인정하지 않는다.
+- 전역 CGI 실행파일 경로는 실행 가능한 regular file이어야 한다.
+- 파일 시스템 경로의 기준 디렉토리 정책은 추후 별도로 정리한다.
 
 ---
 
@@ -132,6 +136,7 @@ cgi =
 - 형식은 `! <status>:<path>` 이다.
 - status는 3자리 HTTP error status code여야 한다.
 - status는 `400 ~ 599` 범위여야 한다.
+- `:` 구분자는 정확히 한 번만 사용해야 한다.
 - path는 존재하고 읽기 가능한 regular file이어야 한다.
 - path 확장자는 `.html` 이어야 한다.
 - 전역 기본 에러 페이지 선언은 최대 한 번만 허용된다.
@@ -311,6 +316,7 @@ inline env 없이 작성할 수도 있다.
 - 세 번째 토큰은 반드시 `$` 로 시작해야 한다.
 - CGI executable path는 `.cgi` 또는 전역 `cgi =` 블록에 등록된 확장자로 끝나야 한다.
 - 경로 중간에 허용 확장자 문자열이 포함되어 있어도, executable path의 끝 확장자가 아니면 허용되지 않는다.
+- CGI executable path는 실행 가능한 regular file이어야 한다.
 - inline env는 executable path 바로 뒤에 `(KEY=VALUE)` 형식으로 최대 한 개만 작성할 수 있다.
 - inline env를 작성하는 경우 `(KEY=VALUE)`는 해당 CGI 설정 문자열의 마지막에 위치해야 하며, `)` 뒤에 다른 문자를 붙일 수 없다.
 - Route CGI 하위 block에서는 timeout과 env 설정을 작성할 수 있다.
@@ -348,6 +354,7 @@ inline env 없이 작성할 수도 있다.
 ```
 
 - 형식은 `KEY=VALUE` 이다.
+- CGI 환경변수 줄에는 공백을 포함할 수 없다.
 - `=` 는 정확히 한 번만 사용해야 한다.
 - KEY와 VALUE는 비어 있으면 안 된다.
 - KEY에는 대문자, `_`, 숫자를 사용할 수 있다.
@@ -477,7 +484,23 @@ result:  /var/www/docs/a/b.html
 위와 같은 중간 wildcard 패턴은 순수 capture 치환 방식으로 해석되지 않을 수 있다. 현재 rewrite 정책은 wildcard capture 하나만 치환하는 방식이 아니라, 요청 path의 relative path를 오른쪽 TARGET의 `*` 에 넣는 방식에 가깝다. 따라서 rewrite가 필요한 route에서는 wildcard를 path 끝부분의 파일 또는 하위 경로 매핑 용도로 사용하는 것을 기준으로 한다.
 
 
-## 14. Route 매칭 정책
+---
+
+## 14. 파일 시스템 경로 해석 정책
+
+이 문서는 config 문법과 검증 규칙을 정리한다. 파일 시스템 경로를 어떤 기준 디렉토리에서 해석할지는 추후 `base_root` 방식으로 별도 정리할 예정이다.
+
+따라서 이 문서에서는 아래 항목을 확정하지 않는다.
+
+- 일반 Route Rule의 TARGET 경로 기준
+- `@` auth file 경로 기준
+- error page 경로 기준
+- Route CGI executable 경로 기준
+- 전역 CGI executable 경로와 일반 route 경로의 기준 차이
+
+현재 문법상 경로는 config에 작성된 문자열을 기준으로 검증되며, 실제 기준 디렉토리 정책은 별도 결정 후 문서에 반영한다.
+
+## 15. Route 매칭 정책
 
 ### 일반 Route Rule
 
@@ -497,7 +520,7 @@ result:  /var/www/docs/a/b.html
 
 ---
 
-## 15. AUTOINDEX와 REDIRECT
+## 16. AUTOINDEX와 REDIRECT
 
 ### AUTOINDEX
 
@@ -525,7 +548,7 @@ result:  /var/www/docs/a/b.html
 
 ---
 
-## 16. 전체 예시
+## 17. 전체 예시
 
 아래 예시처럼 server 블록 내부에서 일반 Route Rule과 Route CGI 묶음은 빈 줄 하나로 구분해야 한다.
 빈 줄 두 개가 연속되면 server 블록 종료로 해석될 수 있다.
@@ -567,7 +590,7 @@ cgi =
 
 ---
 
-## 17. 핵심 주의사항
+## 18. 핵심 주의사항
 
 - Route Rule과 Route CGI는 반드시 빈 줄 하나로 구분한다.
 - 빈 줄 두 개는 server block 종료로 처리될 수 있다.
@@ -577,5 +600,5 @@ cgi =
 - `*` 는 빈 문자열과 매칭되지 않고 최소 1글자 이상과 매칭된다.
 - `*` 는 `/` 를 포함한 하위 경로까지 매칭할 수 있다.
 - rewrite 시 TARGET의 `*` 에는 단일 파일명뿐 아니라 relative path가 들어갈 수 있다.
-- CGI executable 경로 해석 정책은 별도 결정 대상이다.
+- 파일 시스템 경로 기준 디렉토리 정책은 추후 `base_root` 방식으로 별도 정리한다.
 - HTML 파일 검사는 `.html` 만 허용한다.
