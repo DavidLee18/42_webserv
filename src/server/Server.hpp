@@ -1,12 +1,6 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-/**
- * @file Server.hpp
- * @brief Defines the main Server class that manages epoll, connections, and
- * event loops.
- */
-
 #include "../cgi_1_1.h"
 #include "../config/WebserverConfig.hpp"
 #include "../epoll.h"

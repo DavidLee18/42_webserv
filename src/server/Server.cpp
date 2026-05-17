@@ -423,9 +423,8 @@ Result<Void> Server::start(char **envp) {
           // Client has timed out -> schedule disconnect
           clients_to_disconnect.push_back(client_fd);
         } else if (elapsed_ms >= chunked_pending_ms &&
-                   ((session.req &&
-                     (session.req->is_partial() || !session.in_buff.empty())) ||
-                    (session.req == NULL && session.in_buff.empty()))) {
+                   (session.req &&
+                    (session.req->is_partial() || !session.in_buff.empty()))) {
           // Pending chunked/partial read exceeded; schedule a 408 flush
           Response resp =
               DefaultError::default_err_response(Response::REQUEST_TIMEOUT);
