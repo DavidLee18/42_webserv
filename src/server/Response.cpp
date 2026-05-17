@@ -142,10 +142,10 @@ Response ServerResponse::http_response(
   // payload check
   Result<size_t>res_content_len = request->get_content_length();
   if (!res_content_len.has_value())
-    return error_response(config, rule, Response::FORBIDDEN);
+    return error_response(config, rule, Response::FORBIDDEN, envp);
   size_t content_len = res_content_len.value();
   if (content_len > static_cast<size_t>(rule->max_body_KB * 1000))
-    return error_response(config, rule, Response::PAYLOAD_TOO_LARGE);
+    return error_response(config, rule, Response::PAYLOAD_TOO_LARGE, envp);
 
   response.headers = config->get_header();
   const Target target = resolve_target(rule, config, request, envp);

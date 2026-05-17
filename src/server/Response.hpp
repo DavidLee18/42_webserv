@@ -159,7 +159,7 @@ private:
    */
   static Target resolve_target(const RouteRule *rule,
                                const ServerConfig *config,
-                               const Request *request);
+                               const Request *request, char **envp);
 
   /**
    * @brief Gets the current working directory of the process.
