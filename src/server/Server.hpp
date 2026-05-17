@@ -16,7 +16,6 @@
 #include "Response.hpp"
 #include "Session.hpp"
 
-#include <arpa/inet.h>
 #include <csignal>
 #include <fcntl.h>
 #include <fstream>
@@ -101,7 +100,7 @@ class Server {
    *
    * @param client_fd The client FileDescriptor that is ready to be read.
    */
-  void client_read(const FileDescriptor *client_fd);
+  void client_read(const FileDescriptor *client_fd, char **envp);
 
   /**
    * @brief Handles a write event on a registered client socket (flushes
@@ -150,7 +149,7 @@ public:
    *
    * @return Result<Void> Success or mapped error on loop failure.
    */
-  Result<Void> start();
+  Result<Void> start(char **envp);
 };
 
 #endif

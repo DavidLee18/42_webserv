@@ -13,7 +13,7 @@ private:
   std::map<unsigned int, std::string> default_err_page;
   std::size_t count_line;
 
-  bool file_parsing(FileDescriptor &file);
+  bool file_parsing(FileDescriptor &file, char **envp);
   bool parse_types_block(FileDescriptor &file);
   bool parse_type_mapping(const std::string &line,
                           std::vector<std::string> &keys_out,
@@ -21,10 +21,11 @@ private:
   std::vector<std::string> parse_type_keys(const std::string &key);
   bool is_valid_mime_type(const std::string &value);
   static bool is_server_config_header(const std::string &line);
-  bool parse_server_config_entry(FileDescriptor &file, const std::string &line);
+  bool parse_server_config_entry(FileDescriptor &file, const std::string &line,
+                                 char **envp);
   static std::string parse_server_port(const std::string &line);
 
-  WebserverConfig(FileDescriptor &file);
+  WebserverConfig(FileDescriptor &file, char **envp);
 
 public:
   WebserverConfig &operator=(const WebserverConfig &other) {
@@ -53,8 +54,8 @@ public:
   const std::map<unsigned int, std::string> &get_default_err_page(void) const {
     return default_err_page;
   }
-  static Result<WebserverConfig> parse(FileDescriptor &file) {
-    WebserverConfig temp(file);
+  static Result<WebserverConfig> parse(FileDescriptor &file, char **envp) {
+    WebserverConfig temp(file, envp);
 
     if (temp.err_meg == "")
       return OK(WebserverConfig, temp);

@@ -288,10 +288,12 @@ public:
     Waiting,
     Failed,
     Done,
+    Reaping,
   };
 
-  static Result<CgiDelegate> from_req(Request const &, EPoll &,
-                                      RouteRule_CGI const &);
+  static Result<CgiDelegate>
+  from_req(Request const &, EPoll &, RouteRule_CGI const &,
+           std::map<std::string, std::string> const &, char **envp);
 
   CgiDelegate(const CgiDelegate &);
   CgiDelegate &operator=(const CgiDelegate &) throw(std::logic_error);
@@ -315,11 +317,14 @@ public:
 
   size_t remaining_ns() const;
 
+  bool wait_or_reap();
+
   ~CgiDelegate();
 
 private:
   CgiInput _env;
   std::string _script_path;
+  std::string _interpreter;
   const Request _req;
   EPoll &_epoll;
   pid_t _pid;

@@ -119,8 +119,11 @@ ServerResponse::get_mime_type_for_extension(const std::string &ext) {
 
 Response ServerResponse::http_response(
     const Request *request, const ClientSession *client,
-    const std::map<std::string, std::string> &mime_type, Session *session) {
+    const std::map<std::string, std::string> &mime_type, Session *session,
+    char **envp) {
   const ServerConfig *config = client->config;
+  if (config == NULL)
+    return DefaultError::default_err_response(Response::INTERNAL_SERVER_ERR);
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
   Response response;
@@ -136,7 +139,7 @@ Response ServerResponse::http_response(
     return response;
   }
   response.headers = config->get_header();
-  const Target target = resolve_target(rule, config, request);
+  const Target target = resolve_target(rule, config, request, envp);
 
   // [쿠키 검증 로직 추가]
   const std::string session_id = request->get_cookie_value("session_id");
@@ -156,7 +159,7 @@ Response ServerResponse::http_response(
       std::cout << utils::info
                 << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
-      response = error_response(config, rule, Response::UNAUTHORIZED);
+      response = error_response(config, rule, Response::UNAUTHORIZED, envp);
       response.headers = config->get_header();
       return response;
     } else {
@@ -168,19 +171,20 @@ Response ServerResponse::http_response(
 
   switch (request->get_method()) {
   case Request::DELETE:
-    response = ServerResponse::delete_method(target, response, config, rule);
+    response =
+        ServerResponse::delete_method(target, response, config, rule, envp);
     break;
   case Request::POST:
     response = ServerResponse::post_method(target, response, client, rule,
-                                           request, session);
+                                           request, session, envp);
     break;
   case Request::HEAD:
   case Request::GET:
-    response =
-        ServerResponse::get_method(target, response, config, rule, request);
+    response = ServerResponse::get_method(target, response, config, rule,
+                                          request, envp);
     break;
   default:
-    response = error_response(config, rule, Response::METHOD_NOT_ALLOWED);
+    response = error_response(config, rule, Response::METHOD_NOT_ALLOWED, envp);
     break;
   }
 
@@ -228,7 +232,7 @@ Response ServerResponse::http_response(
       }
       return response;
     } else {
-      return error_response(config, rule, Response::METHOD_NOT_ALLOWED);
+      return error_response(config, rule, Response::METHOD_NOT_ALLOWED, envp);
     }
   } else {
     return response;
@@ -237,12 +241,14 @@ Response ServerResponse::http_response(
 
 Result<Void> ServerResponse::register_cgi(
     const Request &request, const RouteRule_CGI &rule, EPoll *epoll,
+    std::map<std::string, std::string> const &cgi_interpreters,
     std::map<FileDescriptor const *,
              std::pair<FileDescriptor const *, CgiDelegate *> > &cgis,
-    FileDescriptor const *client_fd) {
+    FileDescriptor const *client_fd, char **envp) {
   CgiDelegate *del =
       static_cast<CgiDelegate *>(operator new(sizeof(CgiDelegate)));
-  const Result<CgiDelegate> del_ = CgiDelegate::from_req(request, *epoll, rule);
+  const Result<CgiDelegate> del_ =
+      CgiDelegate::from_req(request, *epoll, rule, cgi_interpreters, envp);
   if (!del_.has_value()) {
     operator delete(del);
     return ERR(Void, del_.error());
@@ -277,7 +283,7 @@ int ServerResponse::check_path_type(const std::string &path) {
 
 Target ServerResponse::resolve_target(const RouteRule *rule,
                                       const ServerConfig *config,
-                                      const Request *request) {
+                                      const Request *request, char **envp) {
   Target target;
   if (rule == NULL) {
     target.type = Response::NOT_FOUND;
@@ -287,12 +293,13 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   const std::string root =
       config->get_rewritten_path(request->get_method(), request->get_path());
 
-  target.path = get_pwd();
+  target.path = utils::get_env("PWD", envp);
   const int type = check_path_type(target.path + root);
   if (type == IS_DIR) {
-    target.path += root;
     if (rule->op == SERVE_FROM && request->get_path() == "/") {
-      target.path = get_pwd() + rule->index;
+      target.path += rule->index;
+    } else {
+      target.path += root;
     }
     target.type = check_path_type(target.path);
   } else if (type == Response::NOT_FOUND) {
@@ -309,19 +316,12 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   return target;
 }
 
-std::string ServerResponse::get_pwd() {
-  char buffer[1024];
-  if (getcwd(buffer, sizeof(buffer)) != NULL) {
-    return std::string(buffer);
-  }
-  return "";
-}
-
 Response ServerResponse::error_response(const ServerConfig *config,
                                         const RouteRule *rule,
-                                        const Response::StatusCode error_code) {
-  std::string err_page =
-      get_pwd() + get_string_from_map(rule->error_pages, error_code);
+                                        const Response::StatusCode error_code,
+                                        char **envp) {
+  std::string err_page = utils::get_env("PWD", envp) +
+                         get_string_from_map(rule->error_pages, error_code);
 
   if (err_page.empty())
     return DefaultError::default_err_response(error_code);
@@ -346,76 +346,108 @@ Response ServerResponse::error_response(const ServerConfig *config,
   }
 }
 
+static std::string escape_html(const std::string &input) {
+  std::string escaped;
+
+  escaped.reserve(input.size());
+  for (std::size_t i = 0; i < input.size(); ++i) {
+    if (input[i] == '&')
+      escaped += "&amp;";
+    else if (input[i] == '<')
+      escaped += "&lt;";
+    else if (input[i] == '>')
+      escaped += "&gt;";
+    else if (input[i] == '"')
+      escaped += "&quot;";
+    else if (input[i] == '\'')
+      escaped += "&#39;";
+    else
+      escaped += input[i];
+  }
+  return escaped;
+}
+
 std::string ServerResponse::make_autoindex_page(const std::string &real_path,
                                                 const std::string &req_uri,
                                                 DIR *dir) {
   std::ostringstream html;
 
-  // 1. HTML 기본 뼈대 및 모던 다크 테마 CSS 작성
-  html
-      << "<!DOCTYPE html>\n"
-      << "<html><head><meta charset=\"UTF-8\">\n"
-      << "<meta name=\"viewport\" content=\"width=device-width, "
-         "initial-scale=1.0\">\n"
-      << "<title>Index of " << req_uri << "</title>\n"
-      << "<style>\n"
-      << "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', "
-         "Roboto, Helvetica, Arial, sans-serif; background-color: #0d1117; "
-         "color: #c9d1d9; margin: 0; padding: 40px 20px; }\n"
-      << ".container { max-width: 800px; margin: 0 auto; background: #161b22; "
-         "border: 1px solid #30363d; border-radius: 12px; box-shadow: 0 8px "
-         "24px rgba(0,0,0,0.2); overflow: hidden; }\n"
-      << ".header { padding: 20px 24px; border-bottom: 1px solid #30363d; "
-         "background: #21262d; }\n"
-      << "h1 { margin: 0; font-size: 18px; font-weight: 600; word-break: "
-         "break-all; color: #8b949e; }\n"
-      << "h1 span { color: #e6edf3; }\n"
-      << ".list { list-style: none; padding: 0; margin: 0; }\n"
-      << ".item { border-bottom: 1px solid #21262d; }\n"
-      << ".item:last-child { border-bottom: none; }\n"
-      << ".link { display: flex; align-items: center; padding: 14px 24px; "
-         "text-decoration: none; color: #58a6ff; transition: all 0.2s ease; }\n"
-      << ".link:hover { background-color: #30363d; transform: translateX(4px); "
-         "}\n"
-      << ".icon { margin-right: 14px; font-size: 20px; width: 24px; "
-         "text-align: center; }\n"
-      << "</style></head><body>\n"
-      << "<div class=\"container\">\n"
-      << "  <div class=\"header\">\n"
-      << "    <h1>Index of <span>" << req_uri << "</span></h1>\n"
-      << "  </div>\n"
-      << "  <ul class=\"list\">\n";
+  html << "<!DOCTYPE html>\n"
+       << "<html><head><meta charset=\"UTF-8\">\n"
+       << "<meta name=\"viewport\" content=\"width=device-width, "
+          "initial-scale=1.0\">\n"
+       << "<title>Index of " << req_uri << "</title>\n"
+       << "<style>\n"
+       << "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', "
+          "Roboto, Helvetica, Arial, sans-serif; background-color: #0d1117; "
+          "color: #c9d1d9; margin: 0; padding: 40px 20px; }\n"
+       << ".container { max-width: 800px; margin: 0 auto; background: #161b22; "
+          "border: 1px solid #30363d; border-radius: 12px; box-shadow: 0 8px "
+          "24px rgba(0,0,0,0.2); overflow: hidden; }\n"
+       << ".header { padding: 20px 24px; border-bottom: 1px solid #30363d; "
+          "background: #21262d; }\n"
+       << "h1 { margin: 0; font-size: 18px; font-weight: 600; word-break: "
+          "break-all; color: #8b949e; }\n"
+       << "h1 span { color: #e6edf3; }\n"
+       << ".list { list-style: none; padding: 0; margin: 0; }\n"
+       << ".item { border-bottom: 1px solid #21262d; }\n"
+       << ".item:last-child { border-bottom: none; }\n"
+       << ".entry { display: flex; align-items: center; gap: 12px; padding: "
+          "14px 24px; }\n"
+       << ".link { display: flex; align-items: center; flex: 1; min-width: 0; "
+          "text-decoration: none; color: #58a6ff; transition: transform 0.2s "
+          "ease; }\n"
+       << ".link:hover { transform: translateX(4px); }\n"
+       << ".icon { margin-right: 14px; font-size: 20px; width: 24px; "
+          "text-align: center; flex: 0 0 24px; }\n"
+       << ".delete-btn { border: none; border-radius: 8px; padding: 8px 14px; "
+          "background: #da3633; color: #fff; font-size: 13px; font-weight: "
+          "600; cursor: pointer; transition: transform 0.15s ease, "
+          "background-color 0.15s ease; }\n"
+       << ".delete-btn:hover { background: #f85149; transform: "
+          "translateY(-1px); }\n"
+       << ".delete-btn:active { transform: translateY(0); }\n"
+       << "</style></head><body>\n"
+       << "<div class=\"container\">\n"
+       << "  <div class=\"header\">\n"
+       << "    <h1>Index of <span>" << req_uri << "</span></h1>\n"
+       << "  </div>\n"
+       << "  <ul class=\"list\">\n"
+       << "  <script src=\"/autoindex-delete.js\" defer></script>\n";
 
   dirent *entity;
-
-  // 2. 디렉토리 안의 파일들을 하나씩 읽기
   while ((entity = readdir(dir)) != NULL) {
     std::string name = entity->d_name;
-
-    // 현재 폴더(.)는 굳이 보여줄 필요가 없으니 스킵
     if (name == ".")
       continue;
 
-    // 절대 경로를 합쳐서 진짜 폴더인지 검사
     std::string full_item_path = real_path + name;
     const int type = check_path_type(full_item_path);
-
-    std::string icon = "📄"; // 기본 파일 아이콘
+    std::string icon = "📄";
 
     if (type == IS_DIR) {
       name += "/";
-      icon = "📁"; // 폴더 아이콘
+      icon = "📁";
     }
+    if (name == "../")
+      icon = "🔙";
 
-    if (name == "../") {
-      icon = "🔙"; // 상위 폴더 아이콘
+    const bool deletable = (type != IS_DIR && name != "../");
+    const std::string item_path = req_uri + name;
+
+    html << "    <li class=\"item\">\n"
+         << "      <div class=\"entry\">\n"
+         << "        <a href=\"" << escape_html(name) << "\" class=\"link\">\n"
+         << "          <span class=\"icon\">" << icon << "</span>\n"
+         << "          <span>" << escape_html(name) << "</span>\n"
+         << "        </a>\n";
+    if (deletable) {
+      html << "        <button type=\"button\" class=\"delete-btn\" "
+              "data-delete-target=\""
+           << escape_html(item_path) << "\">Delete</button>\n";
     }
-
-    html << "    <li class=\"item\"><a href=\"" << name
-         << "\" class=\"link\">\n"
-         << "      <span class=\"icon\">" << icon << "</span>\n"
-         << "      <span>" << name << "</span>\n"
-         << "    </a></li>\n";
+    html << "      </div>\n"
+         << "    </li>\n";
   }
 
   html << "  </ul>\n"
@@ -423,7 +455,6 @@ std::string ServerResponse::make_autoindex_page(const std::string &real_path,
        << "</body></html>";
 
   closedir(dir);
-
   return html.str();
 }
 
@@ -551,19 +582,20 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
 
 Response ServerResponse::delete_method(const Target &target, Response response,
                                        const ServerConfig *config,
-                                       const RouteRule *rule) {
+                                       const RouteRule *rule, char **envp) {
   if (unlink(target.path.c_str()) == 0) {
     response.status_code = Response::NO_CONTENT;
     return response;
   } else {
-    return error_response(config, rule, Response::FORBIDDEN);
+    return error_response(config, rule, Response::FORBIDDEN, envp);
   }
 }
 
 Response ServerResponse::post_method(const Target &target, Response response,
                                      const ClientSession *client,
                                      const RouteRule *rule,
-                                     const Request *request, Session *session) {
+                                     const Request *request, Session *session,
+                                     char **envp) {
   std::cout << utils::debug << "target path: " << target.path << std::endl;
   std::cout << utils::debug << "POST request path: " << request->get_path()
             << std::endl;
@@ -578,7 +610,8 @@ Response ServerResponse::post_method(const Target &target, Response response,
       rule->op == LOGIN_USING) {
     const std::string &body = request->get_body();
 
-    std::string auth_target = get_pwd() + rule->root.to_string();
+    std::string auth_target =
+        utils::get_env("PWD", envp) + rule->root.to_string();
     std::cout << "\n"
               << utils::debug << "auth info: " << auth_target << "\n"
               << std::endl;
@@ -646,7 +679,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
         return response;
       }
     } else
-      return error_response(config, rule, Response::NOT_FOUND);
+      return error_response(config, rule, Response::NOT_FOUND, envp);
   }
 
   // Handle file uploads
@@ -662,11 +695,11 @@ Response ServerResponse::post_method(const Target &target, Response response,
     std::map<std::string, std::string>::const_iterator content_type_it =
         headers.find("Content-Type");
     if (content_type_it == headers.end())
-      return error_response(config, rule, Response::BAD_REQUEST);
+      return error_response(config, rule, Response::BAD_REQUEST, envp);
 
     std::string content_type = content_type_it->second;
     if (content_type.find("multipart/form-data") == std::string::npos)
-      return error_response(config, rule, Response::BAD_REQUEST);
+      return error_response(config, rule, Response::BAD_REQUEST, envp);
 
     // Check body size limit
     const unsigned int max_body_KB = rule->max_body_KB;
@@ -674,23 +707,33 @@ Response ServerResponse::post_method(const Target &target, Response response,
       std::cout << utils::warning << "Upload rejected: body size "
                 << body.length() << " exceeds limit " << (max_body_KB * 1024)
                 << std::endl;
-      return error_response(config, rule, Response::PAYLOAD_TOO_LARGE);
+      return error_response(config, rule, Response::PAYLOAD_TOO_LARGE, envp);
     }
 
     // Extract boundary
     std::string boundary = extract_boundary(content_type);
     if (boundary.empty())
-      return error_response(config, rule, Response::BAD_REQUEST);
+      return error_response(config, rule, Response::BAD_REQUEST, envp);
 
     std::cout << utils::info << "Boundary: " << boundary << std::endl;
 
     // Create upload directory if it doesn't exist
-    std::string upload_path = get_pwd() + "/" + rule->root.to_string();
-    if (mkdir(upload_path.c_str(), 0755) != 0 && errno != EEXIST) {
-      std::cout << utils::warning
-                << "Failed to create upload directory: " << upload_path
+    std::string upload_path =
+        utils::get_env("PWD", envp) + "/" + rule->root.to_string();
+    struct stat st = {};
+    if (stat(upload_path.c_str(), &st) != 0) {
+      std::cerr << utils::warning << "upload dir missing: " << upload_path
+                << " - operator must pre-create" << std::endl;
+      return error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
+    }
+    if (!S_ISDIR(st.st_mode)) {
+      std::cerr << utils::warning << "upload path exists yet not a directory"
                 << std::endl;
-      return error_response(config, rule, Response::FORBIDDEN);
+      return error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
+    }
+    if (access(upload_path.c_str(), W_OK) != 0) {
+      std::cerr << utils::warning << "upload dir not writable" << std::endl;
+      return error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
     }
 
     // Parse multipart parts and save files
@@ -735,7 +778,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
           std::cout << utils::warning
                     << "Failed to open file for writing: " << file_path
                     << std::endl;
-          return error_response(config, rule, Response::FORBIDDEN);
+          return error_response(config, rule, Response::FORBIDDEN, envp);
         }
 
         // Write file data
@@ -745,7 +788,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
           std::cout << utils::warning << "Failed to write file: " << file_path
                     << std::endl;
           outfile.close();
-          return error_response(config, rule, Response::FORBIDDEN);
+          return error_response(config, rule, Response::FORBIDDEN, envp);
         }
 
         outfile.close();
@@ -759,7 +802,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
     }
 
     if (!error_msg.empty())
-      return error_response(config, rule, Response::BAD_REQUEST);
+      return error_response(config, rule, Response::BAD_REQUEST, envp);
 
     if (files_uploaded > 0) {
       response.status_code = Response::OK;
@@ -776,13 +819,13 @@ Response ServerResponse::post_method(const Target &target, Response response,
     }
   }
 
-  return error_response(config, rule, Response::FORBIDDEN);
+  return error_response(config, rule, Response::FORBIDDEN, envp);
 }
 
 Response ServerResponse::get_method(Target target, Response response,
                                     const ServerConfig *config,
                                     const RouteRule *rule,
-                                    const Request *request) {
+                                    const Request *request, char **envp) {
   std::cout << utils::debug << "target path: " << target.path << std::endl;
   // Handle redirects FIRST, before checking if target exists on filesystem
   if (rule->op == REDIRECT) {
@@ -797,17 +840,17 @@ Response ServerResponse::get_method(Target target, Response response,
 
   // Then handle error responses (NOT_FOUND_ERR, FORBIDDEN_ERR)
   if (target.type == Response::NOT_FOUND)
-    return error_response(config, rule, Response::NOT_FOUND);
+    return error_response(config, rule, Response::NOT_FOUND, envp);
   if (target.type == Response::FORBIDDEN)
-    return error_response(config, rule, Response::FORBIDDEN);
+    return error_response(config, rule, Response::FORBIDDEN, envp);
 
   if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     DIR *dir = opendir(target.path.c_str());
     if (dir == NULL) {
       if (errno == EACCES) // access denied
-        return error_response(config, rule, Response::FORBIDDEN);
+        return error_response(config, rule, Response::FORBIDDEN, envp);
       else if (errno == ENOENT) // no such directory
-        return error_response(config, rule, Response::NOT_FOUND);
+        return error_response(config, rule, Response::NOT_FOUND, envp);
     }
     target.type = Response::OK;
     response.content_type = "text/html";
@@ -815,7 +858,7 @@ Response ServerResponse::get_method(Target target, Response response,
     response.status_code = Response::OK;
   } else {
     if (check_path_type(target.path) != IS_FILE)
-      return error_response(config, rule, Response::NOT_FOUND);
+      return error_response(config, rule, Response::NOT_FOUND, envp);
     std::ifstream file(target.path.c_str());
     if (file.is_open()) {
       std::ostringstream ss;
@@ -825,7 +868,7 @@ Response ServerResponse::get_method(Target target, Response response,
       response.status_code = Response::OK;
       file.close();
     } else {
-      return error_response(config, rule, Response::NOT_FOUND);
+      return error_response(config, rule, Response::NOT_FOUND, envp);
     }
   }
   return response;
@@ -834,6 +877,8 @@ Response ServerResponse::get_method(Target target, Response response,
 Result<Response>
 Response::from_cgi_outbuff(std::string const &cgi_out,
                            std::map<std::string, std::string> const &headers) {
+  std::cerr << "[CGI-PARSE] raw output (" << cgi_out.length() << " bytes):\n"
+            << cgi_out << "\n[CGI-PARSE-END]\n";
   size_t bound_pos = cgi_out.find("\r\n\r\n");
   size_t bound_len = 4;
 
@@ -879,8 +924,12 @@ Response::from_cgi_outbuff(std::string const &cgi_out,
       std::string header_name_lower_(it->first.size(), '\0');
       std::transform(it->first.begin(), it->first.end(),
                      header_name_lower_.begin(), utils::tolower);
-      if (header_name_lower_ == header_name_lower)
+      if (header_name_lower_ == header_name_lower) {
+        std::cerr << "[CGI-PARSE-DUP] incoming='" << header_name
+                  << "' collides with seeded='" << it->first << "'"
+                  << std::endl;
         return ERR(Response, Errors::bad_gateway);
+      }
     }
     resp.headers[header_name] = header_value;
   }

@@ -51,7 +51,8 @@ Result<FileDescriptor> FileDescriptor::from_raw(const int raw_fd) {
   return OK(FileDescriptor, fd);
 }
 
-Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
+Result<FileDescriptor> FileDescriptor::open_file(std::string const &path,
+                                                 char **envp) {
   // Extract just the filename (basename) to prevent directory traversal.
   const std::string::size_type slash_pos = path.rfind('/');
   const std::string filename =
@@ -67,22 +68,17 @@ Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
   }
 
   // Build the safe path: current working directory + "/" + basename.
-  char cwd_buf[PATH_MAX];
-  if (getcwd(cwd_buf, sizeof(cwd_buf)) == NULL) {
+  std::string cwd(utils::get_env("PWD", envp));
+  if (cwd.empty())
     return ERR(FileDescriptor, "cannot retrieve current working directory");
-  }
-  const std::string safe_path = std::string(cwd_buf) + "/" + filename;
+  const std::string safe_path = cwd + "/" + filename;
 
-  // Use lstat to inspect the path without following symlinks.
+  // Use stat to inspect the path without following symlinks.
   struct stat st = {};
-  if (lstat(safe_path.c_str(), &st) != 0) {
+  if (stat(safe_path.c_str(), &st) != 0) {
     // Path does not exist or is otherwise invalid.
     return ERR(FileDescriptor,
                "config file does not exist or the file path is invalid");
-  }
-  if (S_ISLNK(st.st_mode)) {
-    // Reject symbolic links.
-    return ERR(FileDescriptor, "a symbolic link is not allowed");
   }
   if (!S_ISREG(st.st_mode)) {
     // Ensure the target is a regular file.

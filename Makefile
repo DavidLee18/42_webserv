@@ -21,25 +21,11 @@ DEPS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.d))
 
 vpath %.cpp $(addprefix $(SRC_DIR)/,$(SRC_DIRS)) $(SRC_DIR)
 
-CGI_NAME      := www-files/cgi-bin/gen_html.cgi
-CGI_SRC       := src/cgi/cgi_html_gen.cpp
-
 all: $(NAME) cgi
 
-test-cgi: $(NAME) cgi
-	@echo "── CGI framing parser unit tests ──────────────────────────────"
-	@cd tests && PROJECT_ROOT=$(CURDIR) zsh ./webserv_cgi_framing_tests.zsh
-	@echo ""
-	@echo "── CGI sandboxing integration tests ───────────────────────────"
-	@echo "NOTE: start ./$(NAME) <config> in another terminal first."
-	@cd tests && zsh ./webserv_cgi_tests.zsh
-
-cgi: $(CGI_NAME)
+cgi:
 	$(TESTS_DIR)/cgi_setup.zsh
-
-$(CGI_NAME): $(CGI_SRC)
-	mkdir -p www-files/cgi-bin/
-	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(CGI_NAME) $(CGI_SRC)
+	$(TESTS_DIR)/multi_cgi_setup.zsh
 
 $(NAME): $(OBJS)
 	$(CXX) $(OBJS) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(NAME)
@@ -64,14 +50,14 @@ cgiclean:
 
 -include $(DEPS)
 
-.PHONY: all clean fclean re bonus rebo cgi test-cgi compile-commands
+.PHONY: all clean fclean re bonus rebo cgi compile-commands
 
 # -----------------------------------------------------------------------------
 # Test suites
 # -----------------------------------------------------------------------------
 TESTS_DIR    := tests
 TEST_SUITES  := parsing headers cgi_framing cgi chunked disconnect \
-                conditional slowloris exhaustion eval_smoke
+                conditional slowloris exhaustion eval_smoke multi_cgi
 
 # Run every suite in sequence. Assumes webserv is already running on
 # HOST:PORT (defaults 127.0.0.1:8080). Override via:

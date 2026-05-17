@@ -1,7 +1,8 @@
 #include "RouteRule_CGI.hpp"
 
 RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line,
-                             const std::vector<std::string> &file_extension) {
+                             const std::vector<std::string> &file_extension,
+                             char **envp) {
   err_meg = "";
   timeout_ms = 3000;
   count_line = 0;
@@ -16,11 +17,11 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line,
   else if (temp[0] == "DELETE")
     met = Request::DELETE;
   path = PathPattern(temp[1]);
-  err_meg = parse_cgi_block(fd, line);
+  err_meg = parse_cgi_block(fd, line, envp);
 }
 
-std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
-                                           std::string line) {
+std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd, std::string line,
+                                           char **envp) {
   std::vector<std::string> split = utils::string_split(line, " ");
   if (split[2][0] != '$')
     return "on [" + line + "], [" + split[2] +
@@ -31,7 +32,7 @@ std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd,
   std::string file_line = utils::remove_char(split[2], '$');
 
   err_meg = RouteRule_CGI::parse_routerule_cgi_executable(
-      file_line, this->executable, this->env);
+      file_line, this->executable, this->env, envp);
   if (err_meg != "")
     return "on [\t" + line + err_meg;
   err_meg = RouteRule_CGI::parse_cgi_params(fd);
@@ -88,11 +89,9 @@ std::string RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
 }
 
 std::string RouteRule_CGI::is_executable_file(const std::string &path,
-                                              bool allow_absolute_path) {
-  char cwd[4096];
-  getcwd(cwd, sizeof(cwd));
-
-  std::string real_path = std::string(cwd) + path;
+                                              bool allow_absolute_path,
+                                              char **envp) {
+  std::string real_path = utils::get_env("PWD", envp) + path;
   if (allow_absolute_path == true)
     real_path = path;
   struct stat st;
@@ -103,19 +102,23 @@ std::string RouteRule_CGI::is_executable_file(const std::string &path,
   if (!S_ISREG(st.st_mode))
     return "Violates regular file rule (the given path is not a regular file).";
 
-  bool is_cgi_file = real_path.length() >= 4 && real_path.rfind(".cgi") == real_path.length() - 4;
+  bool is_cgi_file = real_path.length() >= 4 &&
+                     real_path.rfind(".cgi") == real_path.length() - 4;
   if (!is_cgi_file) {
     if (access(real_path.c_str(), R_OK) != 0)
-      return "Violates readable file rule (the file does not have read permission).";
+      return "Violates readable file rule (the file does not have read "
+             "permission).";
   } else {
     if (access(real_path.c_str(), R_OK) != 0)
       return "Violates executable permission rule (the file does not have "
-           "execute permission).";;
+             "execute permission).";
+    ;
   }
   return "";
 }
 
-std::string RouteRule_CGI::matches_route_cgi_syntax(const std::string &line) {
+std::string RouteRule_CGI::matches_route_cgi_syntax(const std::string &line,
+                                                    char **envp) {
   std::size_t pos = line.find('(');
   std::size_t i = 0;
   std::size_t exec_end = 0;
@@ -140,7 +143,7 @@ std::string RouteRule_CGI::matches_route_cgi_syntax(const std::string &line) {
            "executable path must start with '(' and follow the exact "
            "'(key=value)' format).";
   exec_path = line.substr(0, exec_end);
-  std::string err = RouteRule_CGI::is_executable_file(exec_path, false);
+  std::string err = RouteRule_CGI::is_executable_file(exec_path, false, envp);
   if (err != "")
     return err;
 
@@ -237,7 +240,7 @@ RouteRule_CGI::parse_env_entry(const std::string &line,
 
 std::string RouteRule_CGI::parse_global_cgi_block(
     FileDescriptor &fd, std::map<std::string, std::string> &global_cgi,
-    std::size_t &count_line) {
+    std::size_t &count_line, char **envp) {
   std::string line = "";
   std::string err = "";
 
@@ -294,7 +297,7 @@ std::string RouteRule_CGI::parse_global_cgi_block(
              "]: Duplicate global CGI mapping definition (the duplicate global "
              "CGI mapping rule is violated because the same file extension is "
              "already assigned to another executable path).";
-    err = is_executable_file(value, true);
+    err = is_executable_file(value, true, envp);
     if (err != "")
       return "on [\t" + line + "], [" + value + "]: " + err;
 
@@ -333,17 +336,17 @@ std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
 
 std::string RouteRule_CGI::parse_routerule_cgi_executable(
     const std::string &line, std::string &executable,
-    std::map<std::string, std::string> &map) {
+    std::map<std::string, std::string> &map, char **envp) {
   std::string err_msg = "";
   std::string file_line = utils::remove_char(line, '$');
-  err_msg = matches_route_cgi_syntax(file_line);
+  err_msg = matches_route_cgi_syntax(file_line, envp);
   if (err_msg != "")
     return "], [" + file_line + "]: " + err_msg;
   std::size_t start = file_line.find('(');
   if (std::string::npos != start) {
     std::size_t end = file_line.find(')');
     executable = file_line.substr(0, start);
-    err_msg = is_executable_file(executable, false);
+    err_msg = is_executable_file(executable, false, envp);
     if (err_msg != "")
       return "], [" + file_line + "]: " + err_msg;
     std::string env = file_line.substr(start + 1, end - start - 1);
@@ -352,7 +355,7 @@ std::string RouteRule_CGI::parse_routerule_cgi_executable(
       return err_msg;
   } else {
     executable = file_line;
-    err_msg = is_executable_file(executable, false);
+    err_msg = is_executable_file(executable, false, envp);
     if (err_msg != "")
       return "], [" + file_line + "]: " + err_msg;
   }

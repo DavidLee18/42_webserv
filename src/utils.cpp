@@ -170,11 +170,9 @@ std::string utils::get_indent_whitespace_error(const std::string &line,
   return err_line;
 }
 
-std::string utils::check_html_file(const std::string &path) {
-  char cwd[4096];
-  getcwd(cwd, sizeof(cwd));
+std::string utils::check_html_file(const std::string &path, char **envp) {
 
-  std::string real_path = std::string(cwd) + "/" + path;
+  std::string real_path = utils::get_env("PWD", envp) + "/" + path;
   struct stat st;
   if (stat(real_path.c_str(), &st) != 0)
     return "Invalid HTML file (file does not exist or cannot be accessed).";
@@ -255,3 +253,17 @@ std::ostream &utils::warning(std::ostream &os) { return os << "[WARNING] "; }
 std::ostream &utils::error(std::ostream &os) { return os << "[ERROR] "; }
 
 std::ostream &utils::crlf(std::ostream &os) { return os << "\r" << std::endl; }
+
+std::string utils::get_env(std::string const &name, char **envp) {
+  if (envp == NULL || *envp == NULL)
+    return std::string();
+  for (size_t i = 0; envp[i] != NULL; i++) {
+    const std::string env_pair(envp[i]);
+    const size_t equals_pos = env_pair.find('=');
+    if (equals_pos == std::string::npos)
+      continue;
+    if (name == env_pair.substr(0, equals_pos))
+      return env_pair.substr(equals_pos + 1);
+  }
+  return std::string();
+}
