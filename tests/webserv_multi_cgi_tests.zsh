@@ -100,7 +100,7 @@ echo "CONTENT_TYPE=" . getenv('CONTENT_TYPE') . "\n";
 echo "CONTENT_LENGTH=" . getenv('CONTENT_LENGTH') . "\n";
 echo "REQUEST_METHOD=" . getenv('REQUEST_METHOD') . "\n";
 $cl = intval(getenv('CONTENT_LENGTH') ?: 0);
-$body = $cl > 0 ? fread(STDIN, $cl) : '';
+$body = $cl > 0 ? file_get_contents('php://input') : '';
 echo "BODY=" . $body . "\n";
 PHP
   print -- "${C_DIM}deployed: $CGI_DIR/echo.php${C_OFF}"
