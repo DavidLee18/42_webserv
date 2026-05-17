@@ -18,7 +18,7 @@ cgi =
 	[] +<= Referrer-Policy: no-referrer
 	[] +<= Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'
 
-	...30000
+	...300
 
 	GET /cgi-test/hello     $/www-files/cgi-bin/hello.cgi
 
@@ -104,7 +104,7 @@ cgi =
 	[] +<= Referrer-Policy: no-referrer
 	[] +<= Content-Security-Policy: default-src 'self'
 
-	...30000
+	...300
 
 	GET /old_stuff/* =301> /new_stuff/*
 
