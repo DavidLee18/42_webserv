@@ -1,3 +1,4 @@
+#include "cgi_1_1.h"
 #include "webserv.h"
 
 CgiAuthType::CgiAuthType(const CgiAuthType::Type type)
@@ -1477,34 +1478,6 @@ CgiDelegate::CgiDelegate(const CgiDelegate &other)
   const_cast<CgiDelegate &>(other)._state = NotRegistered;
 }
 
-static const int kWaitpidPollIntervalUs = 1000;
-static const int kMaxReapWaitMs = 50;
-static const int kWaitpidReapAttempts =
-    (kMaxReapWaitMs * 1000) / kWaitpidPollIntervalUs;
-
-// Reap child without risking an unbounded blocking wait.
-// Writes the exit status through 'status' when a child is successfully
-// reaped, leaves it untouched otherwise.
-static bool waitpid_nohang(const pid_t pid, int *status) {
-  int dummy;
-  int *s = (status != NULL) ? status : &dummy;
-  for (int i = 0; i < kWaitpidReapAttempts; ++i) {
-    const pid_t wr = waitpid(pid, s, WNOHANG);
-    if (wr == pid) {
-      return true;
-    }
-    if (wr == -1)
-      return false;
-    usleep(kWaitpidPollIntervalUs);
-  }
-  return false;
-}
-
-static void terminate_child(const pid_t pid) {
-  kill(pid, SIGKILL);
-  (void)waitpid_nohang(pid, NULL);
-}
-
 CgiDelegate &
 CgiDelegate::operator=(const CgiDelegate &other) throw(std::logic_error) {
   (void)other;
@@ -1766,9 +1739,10 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
         if (written.has_value() && written.value() > 0)
           _total_written += static_cast<size_t>(written.value());
         else if (written.has_value() && written.value() == 0) {
-          terminate_child(_pid);
-          _pid = -1;
-          _state = Failed;
+          kill(_pid, SIGKILL);
+          _state = Reaping;
+          if (wait_or_reap())
+            _state = Failed;
           return ERR(Void, Errors::bad_gateway);
         } else {
           _state = Failed;
@@ -1802,9 +1776,10 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
         return OKV;
       }
       if (!bytes_read.has_value() || bytes_read.value() < 0) {
-        terminate_child(_pid);
-        _pid = -1;
-        _state = Failed;
+        kill(_pid, SIGKILL);
+        _state = Reaping;
+        if (wait_or_reap())
+          _state = Failed;
         return ERR(Void, Errors::bad_gateway);
       }
 
@@ -1824,31 +1799,27 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       _state = Done;
 
       int status = 0;
-      if (!waitpid_nohang(_pid, &status)) {
-        terminate_child(_pid);
-        _state = Failed;
-        _pid = -1;
+      int wait_res = waitpid(_pid, &status, WNOHANG);
+      if (wait_res == 0) {
+        kill(_pid, SIGKILL);
+        _state = Reaping;
+        if (wait_or_reap())
+          _state = Failed;
         return ERR(Void, Errors::bad_gateway);
       }
-      _pid = -1;
-
-      std::cerr << "[CGI-EXIT] pid=" << _pid
-                << " WIFEXITED=" << WIFEXITED(status)
-                << " WEXITSTATUS=" << WEXITSTATUS(status)
-                << " WIFSIGNALED=" << WIFSIGNALED(status) << std::endl;
-
-      if (!WIFEXITED(status)) {
+      if (wait_res < 0) {
         _state = Failed;
         return ERR(Void, Errors::bad_gateway);
       }
-
+      (void)wait_or_reap();
       return OKV;
     }
 
     if (ev->err) {
-      terminate_child(_pid);
-      _pid = -1;
-      _state = Failed;
+      kill(_pid, SIGKILL);
+      _state = Reaping;
+      if (wait_or_reap())
+        _state = Failed;
       return ERR(Void, Errors::bad_gateway);
     }
     return OKV;
@@ -1902,7 +1873,30 @@ CgiDelegate::~CgiDelegate() {
     _stdout = NULL;
   }
   if (_pid > 0) {
-    terminate_child(_pid);
+    kill(_pid, SIGKILL);
+    waitpid(_pid, NULL, 0);
     _pid = -1;
+  }
+}
+
+bool CgiDelegate::wait_or_reap() {
+  if (_state == Done || _state == Failed)
+    return true;
+  else if (_state != Reaping)
+    return false;
+  int status = 0;
+  const int wait_stat = waitpid(_pid, &status, WNOHANG);
+  if (wait_stat == 0)
+    return false;
+  if (wait_stat < 0) {
+    _state = Failed;
+    return false;
+  } else if (!WIFEXITED(status))
+    return false;
+  else {
+    const int code = WEXITSTATUS(status);
+    _state = code == 0 ? Done : Failed;
+    _pid = -1;
+    return true;
   }
 }

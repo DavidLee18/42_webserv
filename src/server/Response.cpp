@@ -688,11 +688,20 @@ Response ServerResponse::post_method(const Target &target, Response response,
 
     // Create upload directory if it doesn't exist
     std::string upload_path = get_pwd() + "/" + rule->root.to_string();
-    if (mkdir(upload_path.c_str(), 0755) != 0 && errno != EEXIST) {
-      std::cout << utils::warning
-                << "Failed to create upload directory: " << upload_path
+    struct stat st = {};
+    if (stat(upload_path.c_str(), &st) != 0) {
+      std::cerr << utils::warning << "upload dir missing: " << upload_path
+                << " - operator must pre-create" << std::endl;
+      return error_response(config, rule, Response::INTERNAL_SERVER_ERR);
+    }
+    if (!S_ISDIR(st.st_mode)) {
+      std::cerr << utils::warning << "upload path exists yet not a directory"
                 << std::endl;
-      return error_response(config, rule, Response::FORBIDDEN);
+      return error_response(config, rule, Response::INTERNAL_SERVER_ERR);
+    }
+    if (access(upload_path.c_str(), W_OK) != 0) {
+      std::cerr << utils::warning << "upload dir not writable" << std::endl;
+      return error_response(config, rule, Response::INTERNAL_SERVER_ERR);
     }
 
     // Parse multipart parts and save files

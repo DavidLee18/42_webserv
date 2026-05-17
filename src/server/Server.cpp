@@ -47,9 +47,11 @@ void Server::new_connection(const FileDescriptor *server_fd) {
     }
     std::ostringstream oss;
     const unsigned char *octets =
-        reinterpret_cast<unsigned char *>(client_addr.sin_addr.s_addr);
-    oss << octets[0] << '.' << octets[1] << '.' << octets[2] << '.'
-        << octets[3];
+        reinterpret_cast<unsigned char *>(&client_addr.sin_addr.s_addr);
+    oss << static_cast<unsigned int>(octets[0]) << '.'
+        << static_cast<unsigned int>(octets[1]) << '.'
+        << static_cast<unsigned int>(octets[2]) << '.'
+        << static_cast<unsigned int>(octets[3]);
     client.ip = oss.str();
 
     // register client socket to EPoll
@@ -445,9 +447,12 @@ Result<Void> Server::init() {
     listeners[fd_ptr] = &it->second;
     const unsigned char *octets =
         reinterpret_cast<const unsigned char *>(&addr);
-    std::cout << utils::info << "Server listening " << octets[0] << '.'
-              << octets[1] << '.' << octets[2] << '.' << octets[3] << " : "
-              << port << std::endl;
+    std::cout << utils::info << "Server listening "
+              << static_cast<unsigned int>(octets[0]) << '.'
+              << static_cast<unsigned int>(octets[1]) << '.'
+              << static_cast<unsigned int>(octets[2]) << '.'
+              << static_cast<unsigned int>(octets[3]) << " : " << port
+              << std::endl;
   }
   return OK(Void, Void());
 }
@@ -542,6 +547,32 @@ Result<Void> Server::start() {
             DefaultError::default_err_response(Response::GATEWAY_TIMEOUT));
         resp.print_simple(std::cout);
         oss << resp;
+        std::map<FileDescriptor const *, ClientSession>::iterator jt =
+            clients.find(it->second.first);
+        if (jt != clients.end()) {
+          if (!resp.keep_alive)
+            jt->second.dropping = true;
+          jt->second.out_buff = oss.str();
+          client_write(jt->first);
+        }
+        cgis_to_reap.insert(cgi);
+      } else if (it->second.second->wait_or_reap()) {
+        const Result<std::string> resp_res = it->second.second->poll();
+        Response resp;
+        if (resp_res.has_value()) {
+          const Result<Response> resp_res2 = Response::from_cgi_outbuff(
+              resp_res.value(), std::map<std::string, std::string>());
+          resp =
+              resp_res2.has_value()
+                  ? resp_res2.value()
+                  : DefaultError::default_err_response(Response::BAD_GATEWAY);
+        } else
+          resp = DefaultError::default_err_response(Response::BAD_GATEWAY);
+
+        resp.print_simple(std::cout);
+        std::ostringstream oss;
+        oss << resp;
+
         std::map<FileDescriptor const *, ClientSession>::iterator jt =
             clients.find(it->second.first);
         if (jt != clients.end()) {

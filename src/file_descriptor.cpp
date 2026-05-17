@@ -73,7 +73,7 @@ Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
   }
   const std::string safe_path = std::string(cwd_buf) + "/" + filename;
 
-  // Use lstat to inspect the path without following symlinks.
+  // Use stat to inspect the path without following symlinks.
   struct stat st = {};
   if (stat(safe_path.c_str(), &st) != 0) {
     // Path does not exist or is otherwise invalid.

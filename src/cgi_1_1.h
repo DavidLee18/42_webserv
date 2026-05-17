@@ -288,6 +288,7 @@ public:
     Waiting,
     Failed,
     Done,
+    Reaping,
   };
 
   static Result<CgiDelegate>
@@ -315,6 +316,8 @@ public:
   bool check_timeout();
 
   size_t remaining_ns() const;
+
+  bool wait_or_reap();
 
   ~CgiDelegate();
 
