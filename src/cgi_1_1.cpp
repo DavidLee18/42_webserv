@@ -1581,9 +1581,10 @@ Result<Void> CgiDelegate::register_(
 
     size_t last_slash = _script_path.rfind('/');
     std::string dir_path;
-    if (last_slash == std::string::npos)
-      dir_path = getenv("PWD") ? getenv("PWD") + std::string("/") : "/";
-    else
+    if (last_slash == std::string::npos) {
+      const std::string pwd(utils::get_env("PWD", envp));
+      dir_path = pwd.empty() ? "/" : pwd + "/";
+    } else
       dir_path = _script_path.substr(0, last_slash + 1);
 
     if (chdir(dir_path.c_str()) != 0) {
@@ -1648,7 +1649,9 @@ Result<Void> CgiDelegate::register_(
     }
     _stdin = add_res.value();
   } else {
-    { FileDescriptor stdin_drop(stdin); }
+    {
+      FileDescriptor stdin_drop(stdin);
+    }
     _stdin = NULL;
   }
 

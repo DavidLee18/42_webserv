@@ -26,15 +26,7 @@ CGI_SRC       := src/cgi/cgi_html_gen.cpp
 
 all: $(NAME) cgi
 
-test-cgi: $(NAME) cgi
-	@echo "── CGI framing parser unit tests ──────────────────────────────"
-	@cd tests && PROJECT_ROOT=$(CURDIR) zsh ./webserv_cgi_framing_tests.zsh
-	@echo ""
-	@echo "── CGI sandboxing integration tests ───────────────────────────"
-	@echo "NOTE: start ./$(NAME) <config> in another terminal first."
-	@cd tests && zsh ./webserv_cgi_tests.zsh
-
-cgi: $(CGI_NAME)
+cgi:
 	$(TESTS_DIR)/cgi_setup.zsh
 	$(TESTS_DIR)/multi_cgi_setup.zsh
 
