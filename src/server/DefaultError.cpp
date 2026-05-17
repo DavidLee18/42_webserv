@@ -1,72 +1,14 @@
 #include "Response.hpp"
 
-std::string DefaultError::bad_request() {
+static std::string generate_error_page(const std::string &heading) {
   return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta "
          "charset=\"UTF-8\">\n<title>Webserv</title>\n<style>\nbody { "
          "font-family: Arial, sans-serif; text-align: center; margin-top: "
          "50px; }\na { display: inline-block; margin: 15px; padding: 10px "
          "20px; background-color: #007bff; color: white; text-decoration: "
          "none; border-radius: 5px; }\na:hover { background-color: #0056b3; "
-         "}\n</style>\n</head>\n<body>\n<h1>404 Error: Bad Request</h1>\n<p> "
-         "</p>\n<a href=\"/\">Back to main</a>\n<br>\n</body>\n</html>";
-}
-
-std::string DefaultError::forbidden() {
-  return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta "
-         "charset=\"UTF-8\">\n<title>Webserv</title>\n<style>\nbody { "
-         "font-family: Arial, sans-serif; text-align: center; margin-top: "
-         "50px; }\na { display: inline-block; margin: 15px; padding: 10px "
-         "20px; background-color: #007bff; color: white; text-decoration: "
-         "none; border-radius: 5px; }\na:hover { background-color: #0056b3; "
-         "}\n</style>\n</head>\n<body>\n<h1>404 Error: Forbidden</h1>\n<p> "
-         "</p>\n<a href=\"/\">Back to main</a>\n<br>\n</body>\n</html>";
-}
-
-std::string DefaultError::not_found() {
-  return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta "
-         "charset=\"UTF-8\">\n<title>Webserv</title>\n<style>\nbody { "
-         "font-family: Arial, sans-serif; text-align: center; margin-top: "
-         "50px; }\na { display: inline-block; margin: 15px; padding: 10px "
-         "20px; background-color: #007bff; color: white; text-decoration: "
-         "none; border-radius: 5px; }\na:hover { background-color: #0056b3; "
-         "}\n</style>\n</head>\n<body>\n<h1>404 Error: Not Found</h1>\n<p> "
-         "</p>\n<a href=\"/\">Back to main</a>\n<br>\n</body>\n</html>";
-}
-
-std::string DefaultError::server_error() {
-  return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
-         "<meta charset=\"UTF-8\">\n<title>Webserv</title>\n<style>\nbody { "
-         "font-family: Arial, sans-serif; text-align: center; margin-top: "
-         "50px; }\na { display: inline-block; margin: 15px; padding: 10px "
-         "20px; background-color: #007bff; color: white; text-decoration: "
-         "none; border-radius: 5px; }\na:hover { background-color: #0056b3; "
-         "}\n</style>\n</head>\n<body>\n<h1>500 Error: Internal Server "
-         "Error</h1>\n<p> </p>\n<a href=\"/\">Back to "
-         "main</a>\n<br>\n</body>\n</html>";
-}
-
-std::string DefaultError::payload_too_large() {
-  return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
-         "<meta charset=\"UTF-8\">\n<title>Webserv</title>\n<style>\nbody { "
-         "font-family: Arial, sans-serif; text-align: center; margin-top: "
-         "50px; }\na { display: inline-block; margin: 15px; padding: 10px "
-         "20px; background-color: #007bff; color: white; text-decoration: "
-         "none; border-radius: 5px; }\na:hover { background-color: #0056b3; "
-         "}\n</style>\n</head>\n<body>\n<h1>413 Error: Payload Too Large "
-         "ERROR</h1>\n<p> </p>\n<a href=\"/\">Back to "
-         "main</a>\n<br>\n</body>\n</html>";
-}
-
-std::string DefaultError::unknown_err() {
-  return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
-         "<meta charset=\"UTF-8\">\n<title>Webserv</title>\n<style>\nbody { "
-         "font-family: Arial, sans-serif; text-align: center; margin-top: "
-         "50px; }\na { display: inline-block; margin: 15px; padding: 10px "
-         "20px; background-color: #007bff; color: white; text-decoration: "
-         "none; border-radius: 5px; }\na:hover { background-color: #0056b3; "
-         "}\n</style>\n</head>\n<body>\n<h1>UNKNOWN "
-         "ERROR</h1>\n<p> </p>\n<a href=\"/\">Back to "
-         "main</a>\n<br>\n</body>\n</html>";
+         "}\n</style>\n</head>\n<body>\n<h1>" + heading +
+         "</h1>\n<p> </p>\n<a href=\"/\">Back to main</a>\n<br>\n</body>\n</html>";
 }
 
 Response::StatusCode
@@ -153,25 +95,6 @@ DefaultError::default_err_response(const Response::StatusCode err_code) {
   response.content_type = "text/html";
   response.status_code = err_code;
   response.keep_alive = false;
-  switch (err_code) {
-  case Response::BAD_REQUEST:
-    response.body = bad_request();
-    break;
-  case Response::FORBIDDEN:
-    response.body = forbidden();
-    break;
-  case Response::NOT_FOUND:
-    response.body = not_found();
-    break;
-  case Response::INTERNAL_SERVER_ERR:
-    response.body = server_error();
-    break;
-  case Response::PAYLOAD_TOO_LARGE:
-    response.body = payload_too_large();
-    break;
-  default:
-    response.body = unknown_err();
-    break;
-  }
+  response.body = generate_error_page(status_code_to_string(err_code) + " Error");
   return response;
 }

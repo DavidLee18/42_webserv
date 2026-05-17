@@ -110,6 +110,26 @@ class Server {
    */
   void client_write(const FileDescriptor *client_fd);
 
+  /**
+   * @brief Dispatches a complete request to either CGI or normal response
+   * generation, logging and handling the output.
+   *
+   * @param client_fd The client socket.
+   * @param client The client session state.
+   * @param envp Environment variables.
+   */
+  void dispatch_request(const FileDescriptor *client_fd, ClientSession &client,
+                        char **envp);
+
+  /**
+   * @brief Queues a response to the client output buffer, respecting
+   * keep-alive and handling disconnection.
+   *
+   * @param client_fd The client socket.
+   * @param response The HTTP response to queue.
+   */
+  void queue_response(const FileDescriptor *client_fd, const Response &response);
+
   void reap_cgi(CgiDelegate *cgi);
 
 public:

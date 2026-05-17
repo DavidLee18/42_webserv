@@ -162,13 +162,6 @@ private:
                                const Request *request, char **envp);
 
   /**
-   * @brief Gets the current working directory of the process.
-   *
-   * @return std::string The absolute path of the current working directory.
-   */
-  static std::string get_pwd();
-
-  /**
    * @brief Computes ETag for a file based on inode, size, and mtime.
    *
    * @param path File path to compute ETag for.
@@ -247,12 +240,6 @@ private:
 
 class DefaultError {
   virtual int phantom() = 0;
-  static std::string bad_request();
-  static std::string forbidden();
-  static std::string not_found();
-  static std::string server_error();
-  static std::string payload_too_large();
-  static std::string unknown_err();
 
 public:
   static Response::StatusCode int_to_status_code(unsigned short status_code);

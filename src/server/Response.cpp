@@ -37,54 +37,42 @@ static std::string get_http_date() {
   return std::string(buffer);
 }
 
-std::ostream &operator<<(std::ostream &os, Response const &resp) {
-  os << "HTTP/1.1 " << DefaultError::status_code_to_string(resp.status_code)
-     << utils::crlf;
-  os << "Date: " << get_http_date() << utils::crlf;
-  os << "Server: webserv" << utils::crlf;
+static std::ostream &identity_stream(std::ostream &os) { return os; }
+
+static void write_response_head(std::ostream &os, const Response &resp,
+                                std::ostream &(*prefix)(std::ostream &)) {
+  os << prefix << "HTTP/1.1 "
+     << DefaultError::status_code_to_string(resp.status_code) << utils::crlf;
+  os << prefix << "Date: " << get_http_date() << utils::crlf;
+  os << prefix << "Server: webserv" << utils::crlf;
   if ((resp.status_code == Response::MOVED_PERMANENTLY ||
        resp.status_code == Response::FOUND) &&
       !resp.redir.empty())
-    os << "Location: " << resp.redir << utils::crlf;
-  os << "Content-Type: " << resp.content_type << utils::crlf;
+    os << prefix << "Location: " << resp.redir << utils::crlf;
+  os << prefix << "Content-Type: " << resp.content_type << utils::crlf;
   if (!resp.cookie.empty())
-    os << "Set-Cookie:" << resp.cookie << utils::crlf;
+    os << prefix << "Set-Cookie:" << resp.cookie << utils::crlf;
   for (std::map<std::string, std::string>::const_iterator it =
            resp.headers.begin();
        it != resp.headers.end(); ++it)
-    os << it->first << ": " << it->second << utils::crlf;
-  os << "Content-Length: " << resp.content_length << utils::crlf;
+    os << prefix << it->first << ": " << it->second << utils::crlf;
+  os << prefix << "Content-Length: " << resp.content_length << utils::crlf;
   if (resp.keep_alive)
-    os << "Connection: keep-alive" << utils::crlf;
+    os << prefix << "Connection: keep-alive" << utils::crlf;
   else
-    os << "Connection: close" << utils::crlf;
+    os << prefix << "Connection: close" << utils::crlf;
   os << utils::crlf;
+}
+
+std::ostream &operator<<(std::ostream &os, Response const &resp) {
+  write_response_head(os, resp, identity_stream);
   if (!resp.body.empty())
     os << resp.body;
   return os;
 }
 
 void Response::print_simple(std::ostream &os) const {
-  os << utils::info << "HTTP/1.1 "
-     << DefaultError::status_code_to_string(status_code) << utils::crlf;
-  os << utils::info << "Date: " << get_http_date() << utils::crlf;
-  os << utils::info << "Server: webserv" << utils::crlf;
-  if ((status_code == Response::MOVED_PERMANENTLY ||
-       status_code == Response::FOUND) &&
-      !redir.empty())
-    os << utils::info << "Location: " << redir << utils::crlf;
-  os << utils::info << "Content-Type: " << content_type << utils::crlf;
-  if (!cookie.empty())
-    os << utils::info << "Set-Cookie:" << cookie << utils::crlf;
-  for (std::map<std::string, std::string>::const_iterator it = headers.begin();
-       it != headers.end(); ++it)
-    os << utils::info << it->first << ": " << it->second << utils::crlf;
-  os << utils::info << "Content-Length: " << content_length << utils::crlf;
-  if (keep_alive)
-    os << utils::info << "Connection: keep-alive" << utils::crlf;
-  else
-    os << utils::info << "Connection: close" << utils::crlf;
-  os << utils::crlf;
+  write_response_head(os, *this, utils::info);
 }
 
 std::string ServerResponse::find_file_type(const std::string &path) {
@@ -350,14 +338,6 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   }
 
   return target;
-}
-
-std::string ServerResponse::get_pwd() {
-  char buffer[1024];
-  if (getcwd(buffer, sizeof(buffer)) != NULL) {
-    return std::string(buffer);
-  }
-  return "";
 }
 
 std::string ServerResponse::compute_etag(const std::string &path) {
