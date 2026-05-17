@@ -119,7 +119,8 @@ ServerResponse::get_mime_type_for_extension(const std::string &ext) {
 
 Response ServerResponse::http_response(
     const Request *request, const ClientSession *client,
-    const std::map<std::string, std::string> &mime_type, Session *session) {
+    const std::map<std::string, std::string> &mime_type, Session *session,
+    char **envp) {
   const ServerConfig *config = client->config;
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
@@ -136,7 +137,7 @@ Response ServerResponse::http_response(
     return response;
   }
   response.headers = config->get_header();
-  const Target target = resolve_target(rule, config, request);
+  const Target target = resolve_target(rule, config, request, envp);
 
   // [쿠키 검증 로직 추가]
   const std::string session_id = request->get_cookie_value("session_id");
@@ -156,7 +157,7 @@ Response ServerResponse::http_response(
       std::cout << utils::info
                 << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
-      response = error_response(config, rule, Response::UNAUTHORIZED);
+      response = error_response(config, rule, Response::UNAUTHORIZED, envp);
       response.headers = config->get_header();
       return response;
     } else {
@@ -168,19 +169,20 @@ Response ServerResponse::http_response(
 
   switch (request->get_method()) {
   case Request::DELETE:
-    response = ServerResponse::delete_method(target, response, config, rule);
+    response =
+        ServerResponse::delete_method(target, response, config, rule, envp);
     break;
   case Request::POST:
     response = ServerResponse::post_method(target, response, client, rule,
-                                           request, session);
+                                           request, session, envp);
     break;
   case Request::HEAD:
   case Request::GET:
-    response =
-        ServerResponse::get_method(target, response, config, rule, request);
+    response = ServerResponse::get_method(target, response, config, rule,
+                                          request, envp);
     break;
   default:
-    response = error_response(config, rule, Response::METHOD_NOT_ALLOWED);
+    response = error_response(config, rule, Response::METHOD_NOT_ALLOWED, envp);
     break;
   }
 
@@ -228,7 +230,7 @@ Response ServerResponse::http_response(
       }
       return response;
     } else {
-      return error_response(config, rule, Response::METHOD_NOT_ALLOWED);
+      return error_response(config, rule, Response::METHOD_NOT_ALLOWED, envp);
     }
   } else {
     return response;
@@ -240,11 +242,11 @@ Result<Void> ServerResponse::register_cgi(
     std::map<std::string, std::string> const &cgi_interpreters,
     std::map<FileDescriptor const *,
              std::pair<FileDescriptor const *, CgiDelegate *> > &cgis,
-    FileDescriptor const *client_fd) {
+    FileDescriptor const *client_fd, char **envp) {
   CgiDelegate *del =
       static_cast<CgiDelegate *>(operator new(sizeof(CgiDelegate)));
   const Result<CgiDelegate> del_ =
-      CgiDelegate::from_req(request, *epoll, rule, cgi_interpreters);
+      CgiDelegate::from_req(request, *epoll, rule, cgi_interpreters, envp);
   if (!del_.has_value()) {
     operator delete(del);
     return ERR(Void, del_.error());
@@ -279,7 +281,7 @@ int ServerResponse::check_path_type(const std::string &path) {
 
 Target ServerResponse::resolve_target(const RouteRule *rule,
                                       const ServerConfig *config,
-                                      const Request *request) {
+                                      const Request *request, char **envp) {
   Target target;
   if (rule == NULL) {
     target.type = Response::NOT_FOUND;
@@ -289,12 +291,13 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   const std::string root =
       config->get_rewritten_path(request->get_method(), request->get_path());
 
-  target.path = get_pwd();
+  target.path = utils::get_env("PWD", envp);
   const int type = check_path_type(target.path + root);
   if (type == IS_DIR) {
-    target.path += root;
     if (rule->op == SERVE_FROM && request->get_path() == "/") {
-      target.path = get_pwd() + rule->index;
+      target.path += rule->index;
+    } else {
+      target.path += root;
     }
     target.type = check_path_type(target.path);
   } else if (type == Response::NOT_FOUND) {
@@ -311,19 +314,12 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
   return target;
 }
 
-std::string ServerResponse::get_pwd() {
-  char buffer[1024];
-  if (getcwd(buffer, sizeof(buffer)) != NULL) {
-    return std::string(buffer);
-  }
-  return "";
-}
-
 Response ServerResponse::error_response(const ServerConfig *config,
                                         const RouteRule *rule,
-                                        const Response::StatusCode error_code) {
-  std::string err_page =
-      get_pwd() + get_string_from_map(rule->error_pages, error_code);
+                                        const Response::StatusCode error_code,
+                                        char **envp) {
+  std::string err_page = utils::get_env("PWD", envp) +
+                         get_string_from_map(rule->error_pages, error_code);
 
   if (err_page.empty())
     return DefaultError::default_err_response(error_code);
@@ -553,19 +549,20 @@ std::size_t ServerResponse::parse_multipart_part(const std::string &body,
 
 Response ServerResponse::delete_method(const Target &target, Response response,
                                        const ServerConfig *config,
-                                       const RouteRule *rule) {
+                                       const RouteRule *rule, char **envp) {
   if (unlink(target.path.c_str()) == 0) {
     response.status_code = Response::NO_CONTENT;
     return response;
   } else {
-    return error_response(config, rule, Response::FORBIDDEN);
+    return error_response(config, rule, Response::FORBIDDEN, envp);
   }
 }
 
 Response ServerResponse::post_method(const Target &target, Response response,
                                      const ClientSession *client,
                                      const RouteRule *rule,
-                                     const Request *request, Session *session) {
+                                     const Request *request, Session *session,
+                                     char **envp) {
   std::cout << utils::debug << "target path: " << target.path << std::endl;
   std::cout << utils::debug << "POST request path: " << request->get_path()
             << std::endl;
@@ -580,7 +577,8 @@ Response ServerResponse::post_method(const Target &target, Response response,
       rule->op == LOGIN_USING) {
     const std::string &body = request->get_body();
 
-    std::string auth_target = get_pwd() + rule->root.to_string();
+    std::string auth_target =
+        utils::get_env("PWD", envp) + rule->root.to_string();
     std::cout << "\n"
               << utils::debug << "auth info: " << auth_target << "\n"
               << std::endl;
@@ -648,7 +646,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
         return response;
       }
     } else
-      return error_response(config, rule, Response::NOT_FOUND);
+      return error_response(config, rule, Response::NOT_FOUND, envp);
   }
 
   // Handle file uploads
@@ -664,11 +662,11 @@ Response ServerResponse::post_method(const Target &target, Response response,
     std::map<std::string, std::string>::const_iterator content_type_it =
         headers.find("Content-Type");
     if (content_type_it == headers.end())
-      return error_response(config, rule, Response::BAD_REQUEST);
+      return error_response(config, rule, Response::BAD_REQUEST, envp);
 
     std::string content_type = content_type_it->second;
     if (content_type.find("multipart/form-data") == std::string::npos)
-      return error_response(config, rule, Response::BAD_REQUEST);
+      return error_response(config, rule, Response::BAD_REQUEST, envp);
 
     // Check body size limit
     const unsigned int max_body_KB = rule->max_body_KB;
@@ -676,32 +674,33 @@ Response ServerResponse::post_method(const Target &target, Response response,
       std::cout << utils::warning << "Upload rejected: body size "
                 << body.length() << " exceeds limit " << (max_body_KB * 1024)
                 << std::endl;
-      return error_response(config, rule, Response::PAYLOAD_TOO_LARGE);
+      return error_response(config, rule, Response::PAYLOAD_TOO_LARGE, envp);
     }
 
     // Extract boundary
     std::string boundary = extract_boundary(content_type);
     if (boundary.empty())
-      return error_response(config, rule, Response::BAD_REQUEST);
+      return error_response(config, rule, Response::BAD_REQUEST, envp);
 
     std::cout << utils::info << "Boundary: " << boundary << std::endl;
 
     // Create upload directory if it doesn't exist
-    std::string upload_path = get_pwd() + "/" + rule->root.to_string();
+    std::string upload_path =
+        utils::get_env("PWD", envp) + "/" + rule->root.to_string();
     struct stat st = {};
     if (stat(upload_path.c_str(), &st) != 0) {
       std::cerr << utils::warning << "upload dir missing: " << upload_path
                 << " - operator must pre-create" << std::endl;
-      return error_response(config, rule, Response::INTERNAL_SERVER_ERR);
+      return error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
     }
     if (!S_ISDIR(st.st_mode)) {
       std::cerr << utils::warning << "upload path exists yet not a directory"
                 << std::endl;
-      return error_response(config, rule, Response::INTERNAL_SERVER_ERR);
+      return error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
     }
     if (access(upload_path.c_str(), W_OK) != 0) {
       std::cerr << utils::warning << "upload dir not writable" << std::endl;
-      return error_response(config, rule, Response::INTERNAL_SERVER_ERR);
+      return error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
     }
 
     // Parse multipart parts and save files
@@ -746,7 +745,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
           std::cout << utils::warning
                     << "Failed to open file for writing: " << file_path
                     << std::endl;
-          return error_response(config, rule, Response::FORBIDDEN);
+          return error_response(config, rule, Response::FORBIDDEN, envp);
         }
 
         // Write file data
@@ -756,7 +755,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
           std::cout << utils::warning << "Failed to write file: " << file_path
                     << std::endl;
           outfile.close();
-          return error_response(config, rule, Response::FORBIDDEN);
+          return error_response(config, rule, Response::FORBIDDEN, envp);
         }
 
         outfile.close();
@@ -770,7 +769,7 @@ Response ServerResponse::post_method(const Target &target, Response response,
     }
 
     if (!error_msg.empty())
-      return error_response(config, rule, Response::BAD_REQUEST);
+      return error_response(config, rule, Response::BAD_REQUEST, envp);
 
     if (files_uploaded > 0) {
       response.status_code = Response::OK;
@@ -787,13 +786,13 @@ Response ServerResponse::post_method(const Target &target, Response response,
     }
   }
 
-  return error_response(config, rule, Response::FORBIDDEN);
+  return error_response(config, rule, Response::FORBIDDEN, envp);
 }
 
 Response ServerResponse::get_method(Target target, Response response,
                                     const ServerConfig *config,
                                     const RouteRule *rule,
-                                    const Request *request) {
+                                    const Request *request, char **envp) {
   std::cout << utils::debug << "target path: " << target.path << std::endl;
   // Handle redirects FIRST, before checking if target exists on filesystem
   if (rule->op == REDIRECT) {
@@ -808,17 +807,17 @@ Response ServerResponse::get_method(Target target, Response response,
 
   // Then handle error responses (NOT_FOUND_ERR, FORBIDDEN_ERR)
   if (target.type == Response::NOT_FOUND)
-    return error_response(config, rule, Response::NOT_FOUND);
+    return error_response(config, rule, Response::NOT_FOUND, envp);
   if (target.type == Response::FORBIDDEN)
-    return error_response(config, rule, Response::FORBIDDEN);
+    return error_response(config, rule, Response::FORBIDDEN, envp);
 
   if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     DIR *dir = opendir(target.path.c_str());
     if (dir == NULL) {
       if (errno == EACCES) // access denied
-        return error_response(config, rule, Response::FORBIDDEN);
+        return error_response(config, rule, Response::FORBIDDEN, envp);
       else if (errno == ENOENT) // no such directory
-        return error_response(config, rule, Response::NOT_FOUND);
+        return error_response(config, rule, Response::NOT_FOUND, envp);
     }
     target.type = Response::OK;
     response.content_type = "text/html";
@@ -826,7 +825,7 @@ Response ServerResponse::get_method(Target target, Response response,
     response.status_code = Response::OK;
   } else {
     if (check_path_type(target.path) != IS_FILE)
-      return error_response(config, rule, Response::NOT_FOUND);
+      return error_response(config, rule, Response::NOT_FOUND, envp);
     std::ifstream file(target.path.c_str());
     if (file.is_open()) {
       std::ostringstream ss;
@@ -836,7 +835,7 @@ Response ServerResponse::get_method(Target target, Response response,
       response.status_code = Response::OK;
       file.close();
     } else {
-      return error_response(config, rule, Response::NOT_FOUND);
+      return error_response(config, rule, Response::NOT_FOUND, envp);
     }
   }
   return response;

@@ -24,7 +24,7 @@ std::size_t return_indent_level(std::string line);
 bool has_leading_space(const std::string &str);
 bool has_trailing_space(const std::string &str);
 std::string get_indent_whitespace_error(const std::string &line, size_t level);
-std::string check_html_file(const std::string &path);
+std::string check_html_file(const std::string &path, char **envp);
 bool is_header_name(const std::string &name);
 bool is_header_value(const std::string &value);
 char tolower(char c);
@@ -34,5 +34,6 @@ std::ostream &info(std::ostream &);
 std::ostream &warning(std::ostream &);
 std::ostream &error(std::ostream &);
 std::ostream &crlf(std::ostream &);
+std::string get_env(std::string const &name, char **envp);
 } // namespace utils
 #endif

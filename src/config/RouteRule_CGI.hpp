@@ -16,23 +16,23 @@ private:
 
   static bool is_valid_timeout(const std::string &line);
   std::string parse_timeout_value(std::string &line);
-  std::string parse_cgi_block(FileDescriptor &fd, std::string line);
+  std::string parse_cgi_block(FileDescriptor &fd, std::string line,
+                              char **envp);
   std::string parse_env_entry(const std::string &line,
                               std::map<std::string, std::string> &env);
-  std::string
-  parse_routerule_cgi_executable(const std::string &line,
-                                 std::string &executable,
-                                 std::map<std::string, std::string> &env);
+  std::string parse_routerule_cgi_executable(
+      const std::string &line, std::string &executable,
+      std::map<std::string, std::string> &env, char **envp);
 
-  std::string matches_route_cgi_syntax(const std::string &line);
+  std::string matches_route_cgi_syntax(const std::string &line, char **envp);
   std::string parse_cgi_params(FileDescriptor &fd);
 
 public:
   RouteRule_CGI()
       : met(Request::GET), path(""), executable(""), env(), timeout_ms(3000),
-        err_meg(""), count_line(0) {};
+        err_meg(""), count_line(0){};
   RouteRule_CGI(FileDescriptor &fd, const std::string &line,
-                const std::vector<std::string> &file_extension);
+                const std::vector<std::string> &file_extension, char **envp);
   RouteRule_CGI &operator=(const RouteRule_CGI &other) {
     if (this != &other) {
       met = other.met;
@@ -57,11 +57,11 @@ public:
   static bool is_valid_env_key(const std::string &key);
   static bool is_valid_cgi_config(std::string line);
   static std::string is_executable_file(const std::string &path,
-                                        bool allow_absolute_path);
+                                        bool allow_absolute_path, char **envp);
   static std::string
   parse_global_cgi_block(FileDescriptor &fd,
                          std::map<std::string, std::string> &global_cgi,
-                         std::size_t &count_line);
+                         std::size_t &count_line, char **envp);
 };
 
 std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data);

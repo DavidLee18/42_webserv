@@ -43,7 +43,7 @@ private:
   std::size_t count_line;
   std::vector<std::string> file_extension;
 
-  bool parse_server_block(FileDescriptor &fd);
+  bool parse_server_block(FileDescriptor &fd, char **envp);
   bool is_header_block(const std::string &line);
   bool parse_header_entry(FileDescriptor &fd, const std::string &line);
   bool is_valid_server_response_time(const std::string &line);
@@ -60,17 +60,18 @@ private:
   bool has_compatible_wildcards(const PathPattern &path,
                                 const PathPattern &root);
   bool parse_route_rule_block(const std::string &method_line,
-                              FileDescriptor &fd);
+                              FileDescriptor &fd, char **envp);
   bool create_route_rules(const std::vector<std::string> &data,
                           const std::vector<Request::Method> &mets,
                           std::vector<std::size_t> &createdIndexes);
   bool apply_route_rule_entry(const std::string &line,
-                              std::vector<std::size_t> &route_indexes);
+                              std::vector<std::size_t> &route_indexes,
+                              char **envp);
   RuleOperator parse_rule_operator(const std::string &indicator);
 
 public:
-  ServerConfig(FileDescriptor &,
-               std::map<std::string, std::string> &global_cgi);
+  ServerConfig(FileDescriptor &, std::map<std::string, std::string> &global_cgi,
+               char **envp);
   ServerConfig()
       : header(), server_response_time_ms(3), routes(), err_meg(""),
         end_flag(0), count_line(0), file_extension() {}
@@ -96,7 +97,8 @@ public:
   }
   static std::string
   apply_default_err_page_entry(const std::string &line,
-                               std::map<unsigned int, std::string> &err_map);
+                               std::map<unsigned int, std::string> &err_map,
+                               char **envp);
 };
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data);

@@ -1,7 +1,8 @@
 #include "ServerConfig.hpp"
 
 ServerConfig::ServerConfig(FileDescriptor &file,
-                           std::map<std::string, std::string> &global_cgi) {
+                           std::map<std::string, std::string> &global_cgi,
+                           char **envp) {
   err_meg = "";
   server_response_time_ms = 3;
   end_flag = 0;
@@ -11,13 +12,13 @@ ServerConfig::ServerConfig(FileDescriptor &file,
        it != global_cgi.end(); ++it)
     file_extension.push_back("." + it->first);
   file_extension.push_back(".cgi");
-  if (!parse_server_block(file)) {
+  if (!parse_server_block(file, envp)) {
     return;
   }
   return;
 }
 
-bool ServerConfig::parse_server_block(FileDescriptor &fd) {
+bool ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
   std::string line;
   bool is_route_parse = false;
   bool is_header_parse = false;
@@ -97,12 +98,12 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
       }
       is_timeout_parse = true;
     } else if (matches_route_rule_syntax(line)) {
-      if (!parse_route_rule_block(line, fd)) {
+      if (!parse_route_rule_block(line, fd, envp)) {
         return false;
       }
       is_route_parse = true;
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
-      RouteRule_CGI temp(fd, line, file_extension);
+      RouteRule_CGI temp(fd, line, file_extension, envp);
       count_line += temp.get_count_line();
       if (temp.get_err_meg() != "") {
         err_meg = temp.get_err_meg();
@@ -396,7 +397,8 @@ std::string ServerConfig::parse_max_body_size(std::string line,
 }
 
 std::string ServerConfig::apply_default_err_page_entry(
-    const std::string &line, std::map<unsigned int, std::string> &err_map) {
+    const std::string &line, std::map<unsigned int, std::string> &err_map,
+    char **envp) {
   std::vector<std::string> split = utils::string_split(line, " ");
 
   if (split.size() != 2) {
@@ -430,8 +432,8 @@ std::string ServerConfig::apply_default_err_page_entry(
     return "], [" + split[0] +
            "]: Violates status range rule "
            "(status must be a 3-digit HTTP error code between 400 and 599).";
-  else if (utils::check_html_file(split[1]) != "")
-    return "], [" + split[1] + "]: " + utils::check_html_file(split[1]);
+  else if (utils::check_html_file(split[1], envp) != "")
+    return "], [" + split[1] + "]: " + utils::check_html_file(split[1], envp);
 
   unsigned int num = 0;
   std::string err = utils::string_to_unsigned_int(split[0], num);
@@ -447,7 +449,8 @@ std::string ServerConfig::apply_default_err_page_entry(
 }
 
 bool ServerConfig::apply_route_rule_entry(
-    const std::string &line, std::vector<std::size_t> &route_indexes) {
+    const std::string &line, std::vector<std::size_t> &route_indexes,
+    char **envp) {
 
   std::vector<std::string> rule = utils::string_split(line, " ");
   std::size_t size = rule.size();
@@ -472,17 +475,14 @@ bool ServerConfig::apply_route_rule_entry(
 
   for (std::size_t i = 0; i < route_indexes.size(); ++i) {
     if (rule[0] == "?") {
-      err_meg = utils::check_html_file(rule[1]);
+      err_meg = utils::check_html_file(rule[1], envp);
       if (err_meg != "") {
         err_meg = "on [\t\t" + line + "], [" + rule[1] + "]: " + err_meg;
         return false;
       }
       routes[route_indexes[i]].index = rule[1];
     } else if (rule[0] == "@") {
-      char cwd[4096];
-      getcwd(cwd, sizeof(cwd));
-
-      std::string real_path = std::string(cwd) + "/" + rule[1];
+      std::string real_path = utils::get_env("PWD", envp) + "/" + rule[1];
       if (access(real_path.c_str(), F_OK) != 0) {
         err_meg = "on [\t\t" + line + "], [" + rule[1] +
                   "]: the value after \"@\" must refer to an existing file "
@@ -501,7 +501,7 @@ bool ServerConfig::apply_route_rule_entry(
     } else if (rule[0] == "!") {
       std::string errPageLine = rule[1];
       err_meg = ServerConfig::apply_default_err_page_entry(
-          line, routes[route_indexes[i]].error_pages);
+          line, routes[route_indexes[i]].error_pages, envp);
       if (err_meg != "") {
         err_meg = "on [\t\t" + line + err_meg;
         return false;
@@ -619,7 +619,7 @@ bool ServerConfig::create_route_rules(
 }
 
 bool ServerConfig::parse_route_rule_block(const std::string &route_line,
-                                          FileDescriptor &fd) {
+                                          FileDescriptor &fd, char **envp) {
   std::string line;
   std::vector<Request::Method> mets;
   std::vector<std::string> route_line_data =
@@ -659,7 +659,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
     line = utils::trim_whitespace(line);
     if (err_meg != "")
       return false;
-    else if (!apply_route_rule_entry(line, createdIndexes))
+    else if (!apply_route_rule_entry(line, createdIndexes, envp))
       return false;
   }
   err_meg = "";

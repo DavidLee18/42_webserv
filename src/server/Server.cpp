@@ -79,7 +79,7 @@ void Server::disconnect(const FileDescriptor *client_fd) {
   clients.erase(client_fd);
 }
 
-void Server::client_read(const FileDescriptor *client_fd) {
+void Server::client_read(const FileDescriptor *client_fd, char **envp) {
   if (clients.find(client_fd) == clients.end()) {
     return;
   }
@@ -218,7 +218,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
       if (cgi_path != NULL) {
         Result<Void> del_ = ServerResponse::register_cgi(
             *clients.at(client_fd).req, *cgi_path, &epoll,
-            config.get_global_cgi(), cgis, client_fd);
+            config.get_global_cgi(), cgis, client_fd, envp);
         if (!del_.has_value())
           std::cerr << utils::error
                     << "CGI registration failed: " << del_.error() << std::endl;
@@ -229,7 +229,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
       // response generate
       Response http = ServerResponse::http_response(clients.at(client_fd).req,
                                                     &clients.at(client_fd),
-                                                    mime_type, &sessions);
+                                                    mime_type, &sessions, envp);
 
       http.print_simple(std::cout);
 
@@ -310,7 +310,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
       if (cgi_path != NULL) {
         Result<Void> del_ = ServerResponse::register_cgi(
             *clients.at(client_fd).req, *cgi_path, &epoll,
-            config.get_global_cgi(), cgis, client_fd);
+            config.get_global_cgi(), cgis, client_fd, envp);
         if (!del_.has_value())
           std::cerr << utils::error
                     << "CGI registration failed: " << del_.error() << std::endl;
@@ -321,7 +321,7 @@ void Server::client_read(const FileDescriptor *client_fd) {
       // response generate
       Response http = ServerResponse::http_response(clients.at(client_fd).req,
                                                     &clients.at(client_fd),
-                                                    mime_type, &sessions);
+                                                    mime_type, &sessions, envp);
 
       http.print_simple(std::cout);
       // read server response
@@ -457,7 +457,7 @@ Result<Void> Server::init() {
   return OK(Void, Void());
 }
 
-Result<Void> Server::start() {
+Result<Void> Server::start(char **envp) {
   std::cout << utils::info << "Starting server loop..." << std::endl;
   long epoll_timeout = -1; // Default: wait indefinitely
   while (g_receivedSignal == 0) {
@@ -617,12 +617,12 @@ Result<Void> Server::start() {
       } else if (clients.find(fd) !=
                  clients.end()) { // 2. 이미 연결된 클라이언트 소켓인 경우
         if (event->in)
-          client_read(fd);
+          client_read(fd, envp);
         if (event->out)
           client_write(fd);
         if (event->err || event->hup || event->rdhup) {
           if (clients.find(fd) != clients.end())
-            client_read(fd);
+            client_read(fd, envp);
           disconnect(fd);
         }
       } else { // CGI

@@ -1428,11 +1428,11 @@ CgiDelegate::CgiDelegate(Request const &req, EPoll &ep)
 
 Result<CgiDelegate> CgiDelegate::from_req(
     const Request &req, EPoll &ep, const RouteRule_CGI &rule,
-    std::map<std::string, std::string> const &cgi_interpreters) {
+    std::map<std::string, std::string> const &cgi_interpreters, char **envp) {
   CgiDelegate del(req, ep);
   TRY(CgiDelegate, CgiInput, del._env, CgiInput::Parser::parse(req))
-  char pwd[PATH_MAX];
-  if (getcwd(pwd, sizeof(pwd)) == NULL)
+  std::string pwd(utils::get_env("PWD", envp));
+  if (pwd.empty())
     return ERR(CgiDelegate, "getting PWD failed");
   del._script_path = pwd + rule.get_executable();
   const size_t last_dot_pos = del._script_path.rfind('.');
@@ -1648,9 +1648,7 @@ Result<Void> CgiDelegate::register_(
     }
     _stdin = add_res.value();
   } else {
-    {
-      FileDescriptor stdin_drop(stdin);
-    }
+    { FileDescriptor stdin_drop(stdin); }
     _stdin = NULL;
   }
 

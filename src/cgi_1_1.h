@@ -293,7 +293,7 @@ public:
 
   static Result<CgiDelegate>
   from_req(Request const &, EPoll &, RouteRule_CGI const &,
-           std::map<std::string, std::string> const &);
+           std::map<std::string, std::string> const &, char **envp);
 
   CgiDelegate(const CgiDelegate &);
   CgiDelegate &operator=(const CgiDelegate &) throw(std::logic_error);
