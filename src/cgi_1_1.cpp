@@ -1446,6 +1446,7 @@ Result<CgiDelegate> CgiDelegate::from_req(
     std::cout << utils::debug << "found interpreter: \"" << it->second << "\""
               << std::endl;
     del._interpreter = it->second;
+    del._env.add_mvar("SCRIPT_FILENAME", del._script_path);
   }
   if (rule.get_timeout_ms() == 0)
     return ERR(CgiDelegate, "timeout must be positive");
