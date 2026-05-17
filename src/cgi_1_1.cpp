@@ -1163,6 +1163,10 @@ Result<CgiInput> CgiInput::Parser::parse(Request const &req) {
     }
   }
 
+  // add REDIRECT_STATUS which php-cgi needs.
+  input.mvars.push_back(
+      CgiMetaVar::custom_var(EtcMetaVar::Custom, "REDIRECT_STATUS", "200"));
+
   return OK(CgiInput, input);
 }
 
@@ -1817,7 +1821,12 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       }
       _pid = -1;
 
-      if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      std::cerr << "[CGI-EXIT] pid=" << _pid
+                << " WIFEXITED=" << WIFEXITED(status)
+                << " WEXITSTATUS=" << WEXITSTATUS(status)
+                << " WIFSIGNALED=" << WIFSIGNALED(status) << std::endl;
+
+      if (!WIFEXITED(status)) {
         _state = Failed;
         return ERR(Void, Errors::bad_gateway);
       }

@@ -881,8 +881,11 @@ Response::from_cgi_outbuff(std::string const &cgi_out,
       std::string header_name_lower_(it->first.size(), '\0');
       std::transform(it->first.begin(), it->first.end(),
                      header_name_lower_.begin(), utils::tolower);
-      if (header_name_lower_ == header_name_lower)
+      if (header_name_lower_ == header_name_lower) {
+        std::cerr << "[CGI-DUP] rejecting: incoming=" << header_name
+                  << " collides with existing=" << it->first << std::endl;
         return ERR(Response, Errors::bad_gateway);
+      }
     }
     resp.headers[header_name] = header_value;
   }
