@@ -70,7 +70,7 @@ cgi =
 
 	GET *.(jpg|jpeg|gif) <- /www-files/*
 
-	GET|POST|DELETE /cgi-bin/* <- /www-files/cgi-bin/*
+	GET|HEAD|POST|DELETE /cgi-bin/* <- /www-files/cgi-bin/*
 
 	POST /login    # /www-files/auth_info
 		->{} 10MiB
@@ -117,7 +117,7 @@ cgi =
 
 	GET *.(jpg|jpeg|gif) <- /www-files/*
 
-	GET|POST|DELETE * <- /www-files/*
+	GET|HEAD|POST|DELETE * <- /www-files/*
 		? /www-files/index2.html
 		@ /www-files/auth_info
 		->{} 10MiB

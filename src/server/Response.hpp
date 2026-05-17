@@ -51,6 +51,7 @@ struct Response {
   enum StatusCode {
     OK = 200,
     NO_CONTENT = 204,
+    NOT_MODIFIED = 304,
     MOVED_PERMANENTLY = 301,
     FOUND = 302,
     BAD_REQUEST = 400,
@@ -158,7 +159,30 @@ private:
    */
   static Target resolve_target(const RouteRule *rule,
                                const ServerConfig *config,
-                               const Request *request, char **envp);
+                               const Request *request);
+
+  /**
+   * @brief Gets the current working directory of the process.
+   *
+   * @return std::string The absolute path of the current working directory.
+   */
+  static std::string get_pwd();
+
+  /**
+   * @brief Computes ETag for a file based on inode, size, and mtime.
+   *
+   * @param path File path to compute ETag for.
+   * @return std::string ETag value in format "inode-size-mtime".
+   */
+  static std::string compute_etag(const std::string &path);
+
+  /**
+   * @brief Formats file modification time as RFC 7231 date.
+   *
+   * @param path File path to get mtime for.
+   * @return std::string Last-Modified date string.
+   */
+  static std::string get_last_modified(const std::string &path);
 
   /**
    * @brief Gets the custom error file path corresponding to a status code.
