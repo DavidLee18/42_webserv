@@ -12,7 +12,7 @@
 
 #include "cgi_1_1.h"
 #include "config/WebserverConfig.hpp"
-#include "epoll_kqueue.h"
+#include "epoll.h"
 #include "errors.h"
 #include "json.h"
 #include "server/Client.hpp"

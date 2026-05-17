@@ -1,5 +1,5 @@
-#ifndef EPOLL_KQUEUE_H
-#define EPOLL_KQUEUE_H
+#ifndef EPOLL_H
+#define EPOLL_H
 
 #include "file_descriptor.h"
 #include <cstddef>

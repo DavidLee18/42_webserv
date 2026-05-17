@@ -8,7 +8,7 @@ BUILD_DIR := build
 SRC_DIR := src
 
 
-SRC_FILES	:= errors.cpp epoll_kqueue.cpp file_descriptor.cpp \
+SRC_FILES	:= errors.cpp epoll.cpp file_descriptor.cpp \
 	utils.cpp json.cpp cgi_1_1.cpp main.cpp
 SERVER		:= Server.cpp Client.cpp Response.cpp DefaultError.cpp Session.cpp
 CONFIG		:= WebserverConfig.cpp ServerConfig.cpp RouteRule_CGI.cpp PathPattern.cpp

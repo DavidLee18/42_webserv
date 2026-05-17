@@ -20,11 +20,6 @@ int main(const int argc, char *argv[], char **envp) {
 #else
   const WebserverConfig &config = result_config.value();
   std::map<unsigned int, ServerConfig> temp = config.get_serverconfig_map();
-  const RouteRule *rule = temp[8080].find_route(Request::POST, "/storage/");
-  if (rule) {
-    std::cout << "root: " << rule->root << std::endl;
-    std::cout << "path: " << rule->path << std::endl;
-  }
   Server server(config);
   const Result<Void> init_result = server.init();
   PANIC(init_result)

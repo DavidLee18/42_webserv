@@ -388,8 +388,9 @@ Result<Void> Server::start(char **envp) {
       continue;
     }
 
-    // Collect clients to disconnect (avoid modifying map during iteration)
+    // Collect clients to disconnect or flush (avoid modifying map during iteration)
     std::vector<const FileDescriptor *> clients_to_disconnect;
+    std::vector<std::pair<const FileDescriptor *, Response> > clients_to_flush;
 
     for (std::map<const FileDescriptor *, ClientSession>::iterator it =
              clients.begin();
@@ -400,44 +401,58 @@ Result<Void> Server::start(char **envp) {
       if (session.config == NULL)
         continue;
 
-      const long timeout_sec =
-          static_cast<long>(session.config->get_server_response_time()) / 1000;
-      if (timeout_sec > 0) {
-        const timespec elapsed = {
-            .tv_sec = now.tv_sec - session.last_activity_time.tv_sec,
-            .tv_nsec = now.tv_nsec - session.last_activity_time.tv_nsec};
-        if (elapsed.tv_sec < 0 ||
-            (elapsed.tv_sec == 0 && elapsed.tv_nsec < 0)) {
+      // Server config provides timeout in milliseconds
+      const long timeout_ms = static_cast<long>(
+          session.config->get_server_response_time()); // ms
+      if (timeout_ms > 0) {
+        // compute elapsed in milliseconds safely
+        const long long elapsed_ms =
+            (now.tv_sec - session.last_activity_time.tv_sec) * 1000LL +
+            (now.tv_nsec - session.last_activity_time.tv_nsec) / 1000000LL;
+        if (elapsed_ms < 0) {
           std::cerr << utils::error << "client activity time in the future"
                     << std::endl;
           continue;
         }
-        if (elapsed.tv_sec >= static_cast<time_t>(timeout_sec) &&
+
+        const long chunked_pending_ms = CHUNKED_PENDING_TIMEOUT * 1000L;
+
+        if (elapsed_ms >= timeout_ms &&
             (session.req == NULL ||
-             (!session.req->is_partial() &&
-              session.in_buff.empty()))) { // Client has timed out
+             (!session.req->is_partial() && session.in_buff.empty()))) {
+          // Client has timed out -> schedule disconnect
           clients_to_disconnect.push_back(client_fd);
-        } else if (elapsed.tv_sec >= CHUNKED_PENDING_TIMEOUT &&
+        } else if (elapsed_ms >= chunked_pending_ms &&
                    ((session.req &&
                      (session.req->is_partial() || !session.in_buff.empty())) ||
                     (session.req == NULL && session.in_buff.empty()))) {
+          // Pending chunked/partial read exceeded; schedule a 408 flush
           Response resp =
               DefaultError::default_err_response(Response::REQUEST_TIMEOUT);
-          resp.print_simple(std::cout);
-          std::ostringstream oss;
-          oss << resp;
-          session.dropping = true; // ensures disconnect after flush
-          session.out_buff = oss.str();
-          client_write(client_fd); // try to flush now
+          clients_to_flush.push_back(std::make_pair(client_fd, resp));
         } else {
-          // Calculate remaining time until this client times out
-          const long remaining = (timeout_sec - elapsed.tv_sec) / 1000;
-          if (epoll_timeout == -1 || remaining < epoll_timeout)
-            epoll_timeout =
-                remaining * 1000 -
-                elapsed.tv_nsec / 1000000; // Convert to milliseconds
+          // Calculate remaining time until this client times out (ms)
+          const long remaining_ms = static_cast<long>(timeout_ms - elapsed_ms);
+          if (epoll_timeout == -1 || remaining_ms < epoll_timeout)
+            epoll_timeout = remaining_ms;
         }
       }
+    }
+
+    // Apply pending flushes (safe to mutate clients now)
+    for (size_t i = 0; i < clients_to_flush.size(); ++i) {
+      const FileDescriptor *fd = clients_to_flush[i].first;
+      const Response &resp = clients_to_flush[i].second;
+      std::map<FileDescriptor const *, ClientSession>::iterator jt =
+          clients.find(fd);
+      if (jt == clients.end())
+        continue;
+      std::ostringstream oss;
+      oss << resp;
+      if (!resp.keep_alive)
+        jt->second.dropping = true;
+      jt->second.out_buff = oss.str();
+      client_write(jt->first);
     }
 
     // Disconnect timed-out clients
@@ -446,10 +461,11 @@ Result<Void> Server::start(char **envp) {
 
     // Clean expired sessions (use the first server's timeout as default)
     if (clients.begin() != clients.end()) {
-      const unsigned int session_timeout =
+      const unsigned int session_timeout_ms =
           clients.begin()->second.config->get_server_response_time();
-      if (session_timeout > 0)
-        sessions.clean_expired_sessions(static_cast<int>(session_timeout));
+      if (session_timeout_ms > 0)
+        sessions.clean_expired_sessions(
+            static_cast<int>(session_timeout_ms / 1000));
     }
 
     // apply CGI timeout
