@@ -836,6 +836,8 @@ Response ServerResponse::get_method(Target target, Response response,
 Result<Response>
 Response::from_cgi_outbuff(std::string const &cgi_out,
                            std::map<std::string, std::string> const &headers) {
+  std::cerr << "[CGI-PARSE] raw output (" << cgi_out.length() << " bytes):\n"
+            << cgi_out << "\n[CGI-PARSE-END]\n";
   size_t bound_pos = cgi_out.find("\r\n\r\n");
   size_t bound_len = 4;
 
@@ -882,8 +884,9 @@ Response::from_cgi_outbuff(std::string const &cgi_out,
       std::transform(it->first.begin(), it->first.end(),
                      header_name_lower_.begin(), utils::tolower);
       if (header_name_lower_ == header_name_lower) {
-        std::cerr << "[CGI-DUP] rejecting: incoming=" << header_name
-                  << " collides with existing=" << it->first << std::endl;
+        std::cerr << "[CGI-PARSE-DUP] incoming='" << header_name
+                  << "' collides with seeded='" << it->first << "'"
+                  << std::endl;
         return ERR(Response, Errors::bad_gateway);
       }
     }
