@@ -251,6 +251,7 @@ class DefaultError {
   static std::string forbidden();
   static std::string not_found();
   static std::string server_error();
+  static std::string payload_too_large();
   static std::string unknown_err();
 
 public:
