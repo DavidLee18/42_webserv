@@ -21,18 +21,11 @@ DEPS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.d))
 
 vpath %.cpp $(addprefix $(SRC_DIR)/,$(SRC_DIRS)) $(SRC_DIR)
 
-CGI_NAME      := www-files/cgi-bin/gen_html.cgi
-CGI_SRC       := src/cgi/cgi_html_gen.cpp
-
 all: $(NAME) cgi
 
 cgi:
 	$(TESTS_DIR)/cgi_setup.zsh
 	$(TESTS_DIR)/multi_cgi_setup.zsh
-
-$(CGI_NAME): $(CGI_SRC)
-	mkdir -p www-files/cgi-bin/
-	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(CGI_NAME) $(CGI_SRC)
 
 $(NAME): $(OBJS)
 	$(CXX) $(OBJS) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -o $(NAME)
@@ -57,7 +50,7 @@ cgiclean:
 
 -include $(DEPS)
 
-.PHONY: all clean fclean re bonus rebo cgi test-cgi compile-commands
+.PHONY: all clean fclean re bonus rebo cgi compile-commands
 
 # -----------------------------------------------------------------------------
 # Test suites
