@@ -122,6 +122,8 @@ Response ServerResponse::http_response(
     const std::map<std::string, std::string> &mime_type, Session *session,
     char **envp) {
   const ServerConfig *config = client->config;
+  if (config == NULL)
+    return DefaultError::default_err_response(Response::INTERNAL_SERVER_ERR);
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
   Response response;

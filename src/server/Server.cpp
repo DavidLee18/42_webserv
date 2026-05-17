@@ -83,8 +83,26 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
   if (clients.find(client_fd) == clients.end()) {
     return;
   }
-  if (clock_gettime(CLOCK_MONOTONIC,
-                    &clients.at(client_fd).last_activity_time) != 0) {
+  ClientSession &client = clients.at(client_fd);
+  if (client.config == NULL) {
+
+    Response resp(
+        DefaultError::default_err_response(Response::INTERNAL_SERVER_ERR));
+    resp.print_simple(std::cout);
+    std::ostringstream oss;
+    oss << resp;
+    if (!resp.keep_alive)
+      client.dropping = true;
+    client.out_buff += oss.str();
+    client_write(client_fd); // when the response is generated freshly,
+                             // likely EPOLLIN | EPOLLOUT
+
+    if (client.dropping && client.out_buff.empty())
+      disconnect(client_fd);
+
+    return;
+  }
+  if (clock_gettime(CLOCK_MONOTONIC, &client.last_activity_time) != 0) {
     std::cerr << utils::error << "failed to update client activity time"
               << std::endl;
     return;
@@ -95,140 +113,128 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
     if (!recv_res.has_value())
       break; // EWOULDBLOCK
 
-    if (clock_gettime(CLOCK_MONOTONIC,
-                      &clients.at(client_fd).last_activity_time) != 0) {
+    if (clock_gettime(CLOCK_MONOTONIC, &client.last_activity_time) != 0) {
       std::cerr << utils::error << "failed to update client activity time"
                 << std::endl;
       return;
     }
     ssize_t bytes = recv_res.value();
     if (bytes == 0) { // (EOF)
-      clients.at(client_fd).dropping = true;
+      client.dropping = true;
       break;
     }
-    clients.at(client_fd).in_buff.append(buf, static_cast<std::size_t>(bytes));
+    client.in_buff.append(buf, static_cast<std::size_t>(bytes));
   }
 
   // HTTP parsing and response generate
-  std::string &in_buffer = clients.at(client_fd).in_buff;
+  std::string &in_buffer = client.in_buff;
   while (!in_buffer.empty()) {
-    if (clients.at(client_fd).req == NULL) {
+    if (client.req == NULL) {
       Result<Request *> req_ = Request::from_buff(in_buffer);
 
       if (!req_.has_value()) {
         std::cerr << utils::error << "request parsing failed: " << req_.error()
                   << std::endl;
         if (req_.error() == Errors::incomplete_header) {
-          if (clients.at(client_fd).dropping)
+          if (client.dropping)
             disconnect(client_fd);
           return;
         } else if (req_.error() == Errors::malformed_header ||
                    req_.error() == Errors::bad_request) {
           Response resp(
               DefaultError::default_err_response(Response::BAD_REQUEST));
-          resp.headers = clients.at(client_fd).config->get_header();
+          resp.headers = client.config->get_header();
           resp.print_simple(std::cout);
           std::ostringstream oss;
           oss << resp;
           if (!resp.keep_alive)
-            clients.at(client_fd).dropping = true;
-          clients.at(client_fd).out_buff += oss.str();
+            client.dropping = true;
+          client.out_buff += oss.str();
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
 
-          if (clients.find(client_fd) != clients.end() &&
-              clients.at(client_fd).dropping &&
-              clients.at(client_fd).out_buff.empty())
+          if (client.dropping && client.out_buff.empty())
             disconnect(client_fd);
 
           return;
         } else if (req_.error() == Errors::not_implemented) {
           Response resp =
               DefaultError::default_err_response(Response::NOT_IMPLEMENTED);
-          resp.headers = clients.at(client_fd).config->get_header();
+          resp.headers = client.config->get_header();
           std::ostringstream oss;
           oss << resp;
           if (!resp.keep_alive)
-            clients.at(client_fd).dropping = true;
-          clients.at(client_fd).out_buff += oss.str();
+            client.dropping = true;
+          client.out_buff += oss.str();
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
 
-          if (clients.find(client_fd) != clients.end() &&
-              clients.at(client_fd).dropping &&
-              clients.at(client_fd).out_buff.empty())
+          if (client.dropping && client.out_buff.empty())
             disconnect(client_fd);
 
           return;
         }
       }
 
-      clients.at(client_fd).req = req_.value();
-      const Result<size_t> req_cl =
-          clients.at(client_fd).req->get_content_length();
-      const RouteRule *rule = clients.at(client_fd).config->find_route(
-          clients.at(client_fd).req->get_method(),
-          clients.at(client_fd).req->get_path());
+      client.req = req_.value();
+      const Result<size_t> req_cl = client.req->get_content_length();
+      const RouteRule *rule = client.config->find_route(
+          client.req->get_method(), client.req->get_path());
       if (rule != NULL && req_cl.has_value() &&
           req_cl.value() > static_cast<size_t>(rule->max_body_KB) * 1024) {
         Response resp(
             DefaultError::default_err_response(Response::PAYLOAD_TOO_LARGE));
-        resp.headers = clients.at(client_fd).config->get_header();
+        resp.headers = client.config->get_header();
         resp.keep_alive = false;
         std::ostringstream oss;
         oss << resp;
-        clients.at(client_fd).out_buff = oss.str();
-        clients.at(client_fd).dropping = true;
+        client.out_buff = oss.str();
+        client.dropping = true;
         client_write(client_fd);
         return;
       }
-      if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
+      if (client.req->is_partial()) // 아직 파싱 더 해야함
       {
-        if (clients.at(client_fd).dropping)
+        if (client.dropping)
           disconnect(client_fd);
         return;
       }
 
-      Result<size_t> content_length =
-          clients.at(client_fd).req->get_content_length();
+      Result<size_t> content_length = client.req->get_content_length();
 
       // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
       std::cout << "\n"
-                << utils::info << "client ip: " << clients.at(client_fd).ip
-                << std::endl;
+                << utils::info << "client ip: " << client.ip << std::endl;
       std::cout << utils::info << "[Request] "
-                << clients.at(client_fd).req->get_method_string() << " "
-                << clients.at(client_fd).req->get_path() << " (Body: ";
+                << client.req->get_method_string() << " "
+                << client.req->get_path() << " (Body: ";
       if (content_length.has_value())
         std::cout << content_length.value();
       else
         std::cout << "(non-existent)";
       std::cout << " bytes)" << std::endl;
       for (std::map<std::string, std::string>::const_iterator it =
-               clients.at(client_fd).req->get_headers().begin();
-           it != clients.at(client_fd).req->get_headers().end(); ++it) {
+               client.req->get_headers().begin();
+           it != client.req->get_headers().end(); ++it) {
         std::cout << utils::info << "[Request]" << it->first << ": "
                   << it->second << std::endl;
       }
 
-      RouteRule_CGI const *cgi_path =
-          clients.at(client_fd).config->find_route_cgi(
-              clients.at(client_fd).req->get_method(),
-              clients.at(client_fd).req->get_path());
+      RouteRule_CGI const *cgi_path = client.config->find_route_cgi(
+          client.req->get_method(), client.req->get_path());
       if (cgi_path != NULL) {
         Result<Void> del_ = ServerResponse::register_cgi(
-            *clients.at(client_fd).req, *cgi_path, &epoll,
-            config.get_global_cgi(), cgis, client_fd, envp);
+            *client.req, *cgi_path, &epoll, config.get_global_cgi(), cgis,
+            client_fd, envp);
         if (!del_.has_value())
           std::cerr << utils::error
                     << "CGI registration failed: " << del_.error() << std::endl;
-        delete clients.at(client_fd).req;
-        clients.at(client_fd).req = NULL;
+        delete client.req;
+        client.req = NULL;
         return;
       }
       // response generate
-      Response http = ServerResponse::http_response(clients.at(client_fd).req,
-                                                    &clients.at(client_fd),
+      Response http = ServerResponse::http_response(client.req, &client,
                                                     mime_type, &sessions, envp);
 
       http.print_simple(std::cout);
@@ -238,89 +244,79 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
 
       server_response << http;
 
-      delete clients.at(client_fd).req;
-      clients.at(client_fd).req = NULL;
+      delete client.req;
+      client.req = NULL;
 
-      clients.at(client_fd).out_buff += server_response.str();
+      client.out_buff += server_response.str();
 
       // If client sent "Connection: close", close after sending response
       if (!http.keep_alive) {
         client_write(client_fd);
-        if (clients.find(client_fd) != clients.end() &&
-            clients.at(client_fd).out_buff.empty())
+        if (client.out_buff.empty())
           disconnect(client_fd);
         return;
       }
     } else {
-      clients.at(client_fd).req->continue_parsing(in_buffer);
-      const Result<size_t> content_len =
-          clients.at(client_fd).req->get_content_length();
-      const RouteRule *const rule = clients.at(client_fd).config->find_route(
-          clients.at(client_fd).req->get_method(),
-          clients.at(client_fd).req->get_path());
+      client.req->continue_parsing(in_buffer);
+      const Result<size_t> content_len = client.req->get_content_length();
+      const RouteRule *const rule = client.config->find_route(
+          client.req->get_method(), client.req->get_path());
       if (content_len.has_value() && rule != NULL &&
           (static_cast<size_t>(rule->max_body_KB) * 1024 <
                content_len.value() ||
-           (clients.at(client_fd).req->is_partial() &&
-            content_len.value() <=
-                clients.at(client_fd).req->get_body().size()) ||
-           (!clients.at(client_fd).req->is_partial() &&
-            content_len.value() <
-                clients.at(client_fd).req->get_body().size()))) {
+           (client.req->is_partial() &&
+            content_len.value() <= client.req->get_body().size()) ||
+           (!client.req->is_partial() &&
+            content_len.value() < client.req->get_body().size()))) {
         const Response resp(
             DefaultError::default_err_response(Response::PAYLOAD_TOO_LARGE));
         std::ostringstream oss;
         oss << resp;
-        clients.at(client_fd).out_buff = oss.str();
-        clients.at(client_fd).dropping = false;
-        delete clients.at(client_fd).req;
-        clients.at(client_fd).req = NULL;
+        client.out_buff = oss.str();
+        client.dropping = false;
+        delete client.req;
+        client.req = NULL;
         break;
       }
-      if (clients.at(client_fd).req->is_partial()) // 아직 파싱 더 해야함
+      if (client.req->is_partial()) // 아직 파싱 더 해야함
         return;
 
-      const Result<size_t> content_length =
-          clients.at(client_fd).req->get_content_length();
+      const Result<size_t> content_length = client.req->get_content_length();
 
       // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
       std::cout << "\n"
-                << utils::info << "client ip: " << clients.at(client_fd).ip
-                << std::endl;
+                << utils::info << "client ip: " << client.ip << std::endl;
       std::cout << utils::info << "[Request] "
-                << clients.at(client_fd).req->get_method_string() << " "
-                << clients.at(client_fd).req->get_path() << " (Body: ";
+                << client.req->get_method_string() << " "
+                << client.req->get_path() << " (Body: ";
       if (content_length.has_value())
         std::cout << content_length.value();
       else
         std::cout << "(non-existent)";
       std::cout << " bytes)" << std::endl;
       for (std::map<std::string, std::string>::const_iterator it =
-               clients.at(client_fd).req->get_headers().begin();
-           it != clients.at(client_fd).req->get_headers().end(); ++it) {
+               client.req->get_headers().begin();
+           it != client.req->get_headers().end(); ++it) {
         std::cout << utils::info << "[Request]" << it->first << ": "
                   << it->second << std::endl;
       }
 
-      RouteRule_CGI const *cgi_path =
-          clients.at(client_fd).config->find_route_cgi(
-              clients.at(client_fd).req->get_method(),
-              clients.at(client_fd).req->get_path());
+      RouteRule_CGI const *cgi_path = client.config->find_route_cgi(
+          client.req->get_method(), client.req->get_path());
 
       if (cgi_path != NULL) {
         Result<Void> del_ = ServerResponse::register_cgi(
-            *clients.at(client_fd).req, *cgi_path, &epoll,
-            config.get_global_cgi(), cgis, client_fd, envp);
+            *client.req, *cgi_path, &epoll, config.get_global_cgi(), cgis,
+            client_fd, envp);
         if (!del_.has_value())
           std::cerr << utils::error
                     << "CGI registration failed: " << del_.error() << std::endl;
-        delete clients.at(client_fd).req;
-        clients.at(client_fd).req = NULL;
+        delete client.req;
+        client.req = NULL;
         return;
       }
       // response generate
-      Response http = ServerResponse::http_response(clients.at(client_fd).req,
-                                                    &clients.at(client_fd),
+      Response http = ServerResponse::http_response(client.req, &client,
                                                     mime_type, &sessions, envp);
 
       http.print_simple(std::cout);
@@ -329,14 +325,14 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
 
       server_response << http;
 
-      delete clients.at(client_fd).req;
-      clients.at(client_fd).req = NULL;
+      delete client.req;
+      client.req = NULL;
 
-      clients.at(client_fd).out_buff += server_response.str();
+      client.out_buff += server_response.str();
 
       // If client sent "Connection: close", close after sending response
       if (!http.keep_alive) {
-        clients.at(client_fd).dropping = true;
+        client.dropping = true;
         client_write(client_fd);
         return;
       }
@@ -345,9 +341,7 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
   client_write(client_fd); // when the response is generated freshly, likely
                            // EPOLLIN | EPOLLOUT
 
-  if (clients.find(client_fd) != clients.end() &&
-      clients.at(client_fd).dropping &&
-      clients.at(client_fd).out_buff.empty()) {
+  if (client.dropping && client.out_buff.empty()) {
     disconnect(client_fd);
   }
 }
@@ -355,13 +349,13 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
 void Server::client_write(const FileDescriptor *client_fd) {
   if (clients.find(client_fd) == clients.end())
     return;
-  if (clock_gettime(CLOCK_MONOTONIC,
-                    &clients.at(client_fd).last_activity_time) != 0) {
+  ClientSession &client = clients.at(client_fd);
+  if (clock_gettime(CLOCK_MONOTONIC, &client.last_activity_time) != 0) {
     std::cerr << utils::error << "failed to update client activity time"
               << std::endl;
     return;
   }
-  std::string &write_buffer = clients.at(client_fd).out_buff;
+  std::string &write_buffer = client.out_buff;
   if (!write_buffer.empty()) {
     while (true) { // ET 모드이므로 보낼 수 있는 만큼 다 보냄
       Result<ssize_t> send_res =
@@ -375,12 +369,12 @@ void Server::client_write(const FileDescriptor *client_fd) {
 
       write_buffer.erase(0, static_cast<std::size_t>(bytes));
       if (write_buffer.empty()) {
-        if (clients.at(client_fd).dropping)
+        if (client.dropping)
           disconnect(client_fd);
         return;
       }
     }
-  } else if (clients.at(client_fd).dropping)
+  } else if (client.dropping)
     disconnect(client_fd);
 }
 
