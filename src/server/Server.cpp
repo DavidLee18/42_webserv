@@ -62,13 +62,9 @@ void Server::queue_response(const FileDescriptor *client_fd,
   oss << response;
   client.out_buff += oss.str();
 
-  // Handle keep-alive and disconnection
-  if (!response.keep_alive) {
+  // Mark for disconnection if client doesn't want keep-alive
+  if (!response.keep_alive)
     client.dropping = true;
-    client_write(client_fd);
-    if (client.out_buff.empty())
-      disconnect(client_fd);
-  }
 }
 
 void Server::new_connection(const FileDescriptor *server_fd) {
