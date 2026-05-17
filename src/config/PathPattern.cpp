@@ -47,7 +47,6 @@ bool PathPattern::matches(const PathPattern &other) const {
   return pattern == target;
 }
 
-
 bool PathPattern::matches(const std::string &pathStr) const {
   return matches(PathPattern(pathStr));
 }

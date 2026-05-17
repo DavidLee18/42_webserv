@@ -1,33 +1,71 @@
-## Config File Rule 정리
+# Config File Rule 정리 (최신 코드 기준)
 
-현재 구현된 `WebserverConfig`, `ServerConfig`, `RouteRule_CGI`, `PathPattern` 기준으로 config 파일 문법과 규칙을 정리한다.
+현재 구현된 `WebserverConfig`, `ServerConfig`, `RouteRule_CGI`, `PathPattern`, `utils` 기준으로 config 파일의 작성 규칙을 정리한다.
 
----
+이 문서는 config 작성자가 지켜야 할 문법을 중심으로 설명하며, 실제 코드의 파싱 흐름과 검증 조건을 기준으로 작성한다.
 
-## 1. 최상위 구성
-
-config 파일 최상위에서는 아래 항목들만 허용한다.
-
-- `types =`
-- `uwsgi =`
-- `! ...` : 전역 기본 에러 페이지 설정
-- `:PORT =` : 서버 블록 시작
-
-그 외 형식은 invalid line 으로 처리한다.
+> 참고: 파일 시스템 경로를 어떤 기준 디렉토리에서 해석할지에 대한 정책은 추후 `base_root` 방식으로 별도 정리할 예정이므로, 이 문서에서는 문법과 검증 규칙만 정리한다.
 
 ---
 
-## 2. 들여쓰기 규칙
+## 1. 전체 구성
 
-들여쓰기는 문법의 일부로 사용된다.
+config 파일은 아래 순서로 작성한다.
 
-- 최상위 항목: indent level 0
-- 서버 블록 내부 항목: indent level 1
-- route / CGI block 내부 세부 항목: indent level 2
-- 서버 블록의 끝은 빈 줄이 2번 연속 나오는 것으로 판단한다.
-- 항목 사이에는 빈 줄로 구분할 수 있다.
+```conf
+types =
+	...
 
-또한 줄 끝에 공백(space/tab)이 있으면 syntax error로 처리될 수 있다.
+cgi =
+	...
+
+! 404:/errors/404.html
+
+:8080 =
+	...
+```
+
+### 규칙
+
+- `types =` 또는 `types=` 는 필수이다.
+- `types` 블록은 server 블록보다 먼저 작성해야 한다.
+- `cgi =` 또는 `cgi=` 는 선택 항목이다.
+- `cgi` 블록도 server 블록보다 먼저 작성해야 한다.
+- 전역 기본 에러 페이지 `! <status>:<path>` 는 선택 항목이다.
+- 전역 기본 에러 페이지도 server 블록보다 먼저 작성해야 한다.
+- server 블록은 하나 이상 필요하다.
+- 최상위에서 정의되지 않은 형식은 오류로 처리된다.
+
+---
+
+## 2. 공통 작성 규칙
+
+### 들여쓰기
+
+| 위치 | indent level |
+|---|---:|
+| 최상위 항목 | 0 |
+| `types` / `cgi` 블록 내부 | 1 |
+| server 블록 내부 항목 | 1 |
+| route / Route CGI 하위 설정 | 2 |
+| header continuation line | 2 |
+
+### 규칙
+
+- 들여쓰기는 tab(`\t`) 기준이다.
+- 기대 indent level과 실제 tab 개수가 다르면 오류이다.
+- level 0 줄 앞에는 공백이나 tab이 있으면 안 된다.
+- level 1 이상 줄은 필요한 개수만큼 tab으로 시작해야 한다.
+- 줄 끝에 trailing whitespace가 있으면 오류이다.
+
+### 빈 줄 규칙
+
+- 빈 줄은 현재 block을 종료하는 기준으로 사용된다.
+- server 블록 내부에서 일반 Route Rule 또는 Route CGI는 반드시 빈 줄 하나로 구분해야 한다.
+- Route Rule 또는 Route CGI의 하위 설정은 해당 route 바로 아래에 이어서 작성한다.
+- 빈 줄 없이 다음 route를 작성하면 이전 route의 하위 block으로 해석되어 오류가 발생한다.
+- server 블록 안에서 빈 줄이 두 번 연속 나오면 server 블록 종료로 처리된다.
+- 따라서 server 블록 내부 항목을 구분할 때는 빈 줄을 정확히 하나만 사용한다.
 
 ---
 
@@ -36,448 +74,531 @@ config 파일 최상위에서는 아래 항목들만 허용한다.
 MIME type 매핑을 정의한다.
 
 ### 형식
+
 ```conf
 types =
-  html|htm -> text/html
-  css -> text/css
-  js -> application/javascript
-  _ -> application/octet-stream
+	html -> text/html
+	css -> text/css
+	js -> application/javascript
+	png|jpg|jpeg -> image/jpeg
+	_ -> application/octet-stream
 ```
 
 ### 규칙
-- `types =` 또는 `types=` 형식으로 시작한다.
-- `확장자 -> MIME 타입` 형식으로 작성한다.
+
+- 각 항목은 `확장자 -> MIME타입` 형식이다.
 - 여러 확장자는 `|` 로 연결할 수 있다.
-- `_` 는 기본 MIME 타입을 의미한다.
 - 같은 확장자를 중복 선언할 수 없다.
-- 기본 MIME 타입(`_`)은 반드시 한 번 정의되어야 한다.
-- MIME 타입은 `type/subtype` 형식이어야 한다.
+- `_` 는 default MIME type을 의미하며 반드시 한 번 정의해야 한다.
+- MIME type은 `type/subtype` 형식이어야 한다.
 
 ---
 
-## 4. `uwsgi` 블록
+## 4. 전역 CGI 블록
 
-uWSGI용 Python 파일과 포트를 매핑한다.
+CGI 파일 확장자와 실행 파일 경로를 매핑한다.
 
 ### 형식
+
 ```conf
-uwsgi =
-  app.py:8000
-  admin.py:8001
+cgi =
+	php -> /usr/bin/php-cgi
+	py -> /usr/bin/python3
 ```
 
 ### 규칙
-- `파일경로:포트` 형식으로 작성한다.
-- 파일은 `.py` 여야 한다.
-- 포트는 숫자만 허용한다.
-- 중복 key는 허용하지 않는다.
+
+- 각 항목은 `확장자 -> 실행파일경로` 형식이다.
+- 확장자에는 `.` 을 쓰지 않는다.
+- 확장자와 실행파일경로에는 공백을 포함할 수 없다.
+- 같은 확장자를 중복 선언할 수 없다.
+- 전역 CGI 블록은 최대 한 번만 정의할 수 있다.
+- 전역 CGI에 등록된 확장자는 Route CGI executable 검사에 사용된다.
+- 전역 CGI 확장자와 별개로 `.cgi` 확장자는 기본 허용된다.
+- Route CGI executable은 `.cgi` 또는 전역 CGI에 등록된 확장자로 끝나야 한다. 경로 중간에 같은 확장자 문자열이 있어도 executable 끝 확장자가 아니면 인정하지 않는다.
+- 전역 CGI 실행파일 경로는 실행 가능한 regular file이어야 한다.
+- 파일 시스템 경로의 기준 디렉토리 정책은 추후 별도로 정리한다.
 
 ---
 
 ## 5. 전역 기본 에러 페이지
 
-전역 기본 에러 페이지는 `!` 로 시작한다.
+전역 기본 에러 페이지는 최상위에서 `!` 로 선언한다.
 
 ### 형식
+
 ```conf
 ! 404:/errors/404.html
-! $/usr/bin/python(ERROR_MODE=default)
 ```
 
 ### 규칙
-- `!` 다음에는 값이 하나만 와야 한다.
-- `$` 로 시작하지 않으면 `상태코드:경로` 형식으로 해석한다.
-- `$` 로 시작하면 CGI executable 설정으로 해석한다.
+
+- 형식은 `! <status>:<path>` 이다.
+- status는 3자리 HTTP error status code여야 한다.
+- status는 `400 ~ 599` 범위여야 한다.
+- `:` 구분자는 정확히 한 번만 사용해야 한다.
+- path는 존재하고 읽기 가능한 regular file이어야 한다.
+- path 확장자는 `.html` 이어야 한다.
+- 전역 기본 에러 페이지 선언은 최대 한 번만 허용된다.
 
 ---
 
-## 6. 서버 블록
+## 6. Server 블록
 
-서버 블록은 포트 번호를 기준으로 선언한다.
+server 블록은 port 번호를 기준으로 선언한다.
 
 ### 형식
+
 ```conf
 :8080 =
+	[] +<= Server: webserv
+	...3000
+
+	GET / <- /var/www/html
+```
+
+또는 아래 형식도 허용된다.
+
+```conf
+:8080=
+	GET / <- /var/www/html
 ```
 
 ### 규칙
-- `:PORT =` 형식이어야 한다.
-- `PORT` 는 숫자만 가능하다.
-- 같은 포트를 중복 선언할 수 없다.
+
+- server header는 `:PORT =` 또는 `:PORT=` 형식이다.
+- port 범위는 `1024 ~ 49151` 이다.
+- 같은 port의 server 블록을 중복 선언할 수 없다.
+- server 블록은 최소 하나 이상의 일반 Route Rule 또는 Route CGI를 포함해야 한다.
+- Header와 Server response time은 Route Rule 또는 Route CGI보다 먼저 작성해야 한다.
+- route가 나온 뒤에 Header 또는 Server response time을 작성하면 오류이다.
 
 ---
 
-## 7. 서버 블록 내부 허용 항목
+## 7. Header와 Server response time
 
-서버 블록 내부에서는 정해진 항목만 사용할 수 있다.
+### Header 형식
 
-### 형식
 ```conf
-:8080 =
-  [] +<= Server: webserv
-
-  ...3
-
-  $add_csp_sha256.cgi
-
-  GET / <- /var/www/html
-
-  GET /cgi-bin/test $/usr/bin/python(SCRIPT_MODE=prod)
+	[] +<= Server: webserv
+	[] +<= X-Test: hello;
+		world
 ```
 
-### 규칙
-- Header 설정을 사용할 수 있다.
-- Server response time을 설정할 수 있다.
-- Server CGI shortcut을 선언할 수 있다.
-- Route rule을 선언할 수 있다.
-- Route CGI config를 선언할 수 있다.
-- 서버 블록의 끝은 빈 줄이 2번 연속 나오는 것으로 판단한다.
-- 그 외 형식은 invalid line으로 처리한다.
+### Header 규칙
+
+- header 시작 줄은 `[] +<= Header-Name: value` 형식이다.
+- header line에는 `:` 가 정확히 한 번 있어야 한다.
+- header name은 비어 있으면 안 된다.
+- 줄 끝이 `;` 로 끝나면 다음 줄을 continuation line으로 읽는다.
+- continuation line은 indent level 2여야 한다.
+
+### Server response time 형식
+
+```conf
+	...3000
+```
+
+### Server response time 규칙
+
+- `...` 뒤에는 unsigned integer 문자열이 와야 한다.
+- 허용 범위는 `1 ~ 60000` 이다.
+- 단위는 millisecond이다.
+- server 블록 안에서 최대 한 번만 정의할 수 있다.
 
 ---
 
-## 8. Header 설정
+## 8. Route Rule
 
-특수 문법으로 header를 추가한다.
+일반 route는 요청 method, 요청 path, operator, 대상 path로 구성된다.
 
 ### 형식
+
 ```conf
-[] +<= Content-Type: text/html
-[] +<= X-Test: hello;
-    world
+	GET / <- /var/www/html
+	GET|POST /upload -> /data/upload
+	GET /download/ <i- /var/www/download/
+	GET /old =301> /new
 ```
 
 ### 규칙
-- 총 4개 토큰이어야 한다.
-- 첫 토큰은 `[]` 여야 한다.
-- 둘째 토큰은 `+<=` 여야 한다.
-- 셋째 토큰은 `:` 로 끝나야 한다.
-- 넷째 토큰에는 값이 있어야 한다.
-- 값이 `;` 로 끝나면 다음 줄을 이어서 읽는다.
-- 이어지는 줄은 indent level 2여야 한다.
 
----
-
-## 9. Server response time
-
-서버 응답 시간을 설정한다.
-
-### 형식
-```conf
-...3
-```
-
-### 규칙
-- `...` 으로 시작해야 한다.
-- 뒤에는 숫자만 허용한다.
-- 범위는 `1 ~ 900` 이다.
-
----
-
-## 10. Route Rule
-
-서버 블록 내부의 라우팅 규칙은 아래 형식을 따른다.
-
-### 형식
-```conf
-GET / <- /var/www/html
-GET|POST /upload -> /data/upload
-GET /docs =301> /documents
-GET /list <i- /var/www/list
-```
-
-### 규칙
-- 총 4개 토큰이어야 한다.
-- METHOD 는 `GET`, `POST`, `DELETE` 만 허용한다.
+- 형식은 `METHOD PATH OPERATOR TARGET` 이다.
+- 공백 기준 토큰은 정확히 4개여야 한다.
+- METHOD는 `GET`, `POST`, `DELETE` 만 허용한다.
 - 여러 method는 `|` 로 연결할 수 있다.
-- operator는 정의된 값만 허용한다.
-- path와 root는 wildcard 규칙을 따라야 한다.
+- 여러 method를 작성하면 method별 route가 각각 생성된다.
+- route는 작성 순서대로 저장된다.
+- 요청 처리 시 먼저 매칭되는 route가 선택된다.
+- 다음 Route Rule 또는 Route CGI를 이어 작성하려면 이전 route block 뒤에 반드시 빈 줄 하나를 넣어야 한다.
+
+### 지원 operator
+
+| Operator | 의미 |
+|---|---|
+| `<-` | SERVE_FROM |
+| `->` | UPLOAD_TO |
+| `<i-` | AUTOINDEX |
+| `#` | LOGIN_USING |
+| `=300>` | MULTIPLE_CHOICES |
+| `=301>` | REDIRECT |
+| `=302>` | FOUND |
+| `=303>` | SEE_OTHER |
+| `=304>` | NOT_MODIFIED |
+| `=307>` | TEMPORARY_REDIRECT |
+| `=308>` | PERMANENT_REDIRECT |
 
 ---
 
-## 11. 지원하는 Route Operator
+## 9. Route 하위 설정
 
-Route Rule 에서 사용할 수 있는 operator를 정의한다.
+일반 route 선언 다음 줄에서 route별 추가 설정을 작성할 수 있다.
 
 ### 형식
+
 ```conf
-GET / <- /var/www/html
-GET /upload -> /data/upload
-GET /list <i- /var/www/list
-GET /old =301> /new
+	GET / <- /var/www/html
+		? index.html
+		@ auth/basic_auth
+		->{} 10MB
+		! 404:/errors/notfound.html
 ```
 
 ### 규칙
-- `<-` 는 SERVEFROM 이다.
-- `->` 는 POINT 이다.
-- `<i-` 는 AUTOINDEX 이다.
-- `=300>` 는 MULTIPLECHOICES 이다.
-- `=301>` 는 REDIRECT 이다.
-- `=302>` 는 FOUND 이다.
-- `=303>` 는 SEEOTHER 이다.
-- `=304>` 는 NOTMODIFIED 이다.
-- `=307>` 는 TEMPORARYREDIRECT 이다.
-- `=308>` 는 PERMANENTREDIRECT 이다.
-- 정의되지 않은 operator는 허용하지 않는다.
 
----
-
-## 12. Path Pattern 규칙
-
-`PathPattern` 은 route path/root 매칭과 rewrite에 사용된다.
-
-### 형식
-```conf
-GET /login <- /pages/login.html
-GET /download/ <- /data/files/
-GET /images/*.png <- /static/*.png
-GET /user/*/profile <- /profile/*
-```
-
-### 규칙
-- `*` wildcard를 지원한다.
-- wildcard가 없으면 exact match로 동작한다.
-- `/` 로 끝나는 패턴은 prefix match로 동작한다.
-- wildcard `*` 는 최소 1글자 이상 매칭해야 한다.
-- wildcard `*` 는 파일, directory, sub-directory 등 모든 경로 요소를 매칭할 수 있다.
-
----
-
-## 13. Wildcard 제한
-
-wildcard 사용에는 제한이 있다.
-
-### 형식
-```conf
-GET /images/* <- /static/*
-GET /user/*/profile <- /profile/*
-GET /images/*.(png|jpg|jpeg) <- /static/*
-```
-
-### 규칙
-- 하나의 path segment 안에서 wildcard * 는 2개 이상 허용하지 않는다.
-- path와 root의 wildcard 개수는 호환되어야 한다.
-- 확장 패턴 `*.(...)` 는 path 쪽에서 여러 후보로 확장된 뒤, root 쪽의 일반 wildcard `*` 와 매칭되는 방식으로 처리한다.
-- path와 root의 wildcard 구조가 맞지 않으면 route 생성이 실패한다.
-- AUTOINDEX route의 path는 wildcard 없이 directory 형태(`/download/`)로 작성한다.
-
----
-
-## 14. 확장 패턴 문법
-
-특정 path segment에서 여러 확장자 후보를 한 번에 선언할 수 있다.
-
-### 형식
-```conf
-GET /images/*.(png|jpg|jpeg) <- /static/*
-GET /assets/*.(css|js) <- /public/*
-```
-
-### 규칙
-- 확장 패턴은 `*.(a|b|c)` 형식으로 작성한다.
-- 괄호 내부의 후보는 `|` 로 구분한다.
-- 후보는 최소 2개 이상이어야 한다.
-- 각 후보는 영숫자만 허용한다.
-- 확장 패턴은 path 쪽 segment에서만 사용한다.
-- root 쪽은 확장 패턴으로 함께 맞추지 않고 일반 wildcard(`*`)를 사용한다.
-- 내부적으로는 path 쪽 후보마다 별도의 `PathPattern` 으로 확장하여 저장한다.
-- 잘못된 괄호 형식, 빈 후보, 영숫자가 아닌 문자가 포함된 후보는 허용하지 않는다.
----
-
-## 15. Route 하위 세부 설정
-
-route 선언 다음 줄에서 추가 설정을 할 수 있다.
-
-### 형식
-```conf
-GET / <- /var/www/html
-  ? index.html
-  @ basic_auth
-  ->{} 10MB
-  ! 404:/errors/notfound.html
-```
-
-### 규칙
 - 하위 설정은 indent level 2에서 작성한다.
-- `?` 는 index file 설정이다.
-- `@` 는 auth info 설정이다.
-- `->{}` 는 max body size 설정이다.
-- `!` 는 route 전용 error page 설정이다.
+- 하위 설정은 빈 줄 또는 EOF를 만나면 종료된다.
+- 하위 설정은 공백 기준 정확히 2개 토큰이어야 한다.
+
+| 키워드 | 의미 | 주요 규칙 |
+|---|---|---|
+| `?` | index file | 존재하고 읽기 가능한 `.html` 파일 |
+| `@` | auth info | 존재하는 파일 경로 |
+| `->{}` | max body size | `KB`, `KiB`, `MB`, `MiB` 허용 |
+| `!` | route error page | `400 ~ 599` 상태코드와 `.html` 파일 |
+
+### Max body size 규칙
+
+- 숫자만 쓰면 KB 단위로 해석한다.
+- `KB`, `KiB` 는 값 그대로 KB로 저장된다.
+- `MB` 는 `숫자 * 1000` KB로 변환된다.
+- `MiB` 는 `숫자 * 1024` KB로 변환된다.
+- 최대값은 `1048576KB` 이다.
 
 ---
 
-## 16. index file 설정
-
-route의 기본 index 파일을 설정한다.
-
-### 형식
-```conf
-  ? index.html
-```
-
-### 규칙
-- `.html`, `.htm` 만 허용한다.
-
----
-
-## 17. auth info 설정
-
-route의 인증 정보를 설정한다.
-
-### 형식
-```conf
-  @ basic_auth
-```
-
-### 규칙
-- 값은 하나만 허용한다.
-
----
-
-## 18. max body size 설정
-
-route의 최대 body 크기를 설정한다.
-
-### 형식
-```conf
-  ->{} 10MB
-  ->{} 512KB
-  ->{} 4MiB
-```
-
-### 규칙
-- 숫자만 쓰면 KB로 해석한다.
-- `KB`, `KiB`, `MB`, `MiB` 단위를 허용한다.
-- 잘못된 단위는 허용하지 않는다.
-
----
-
-## 19. route 전용 error page 설정
-
-route 별 에러 페이지를 설정한다.
-
-### 형식
-```conf
-  ! 404:/errors/notfound.html
-```
-
-### 규칙
-- `상태코드:경로` 형식이어야 한다.
-- route 별 error page map에 저장된다.
-
----
-
-## 20. Route CGI 설정
+## 10. Route CGI
 
 Route 단위 CGI를 선언한다.
 
 ### 형식
+
 ```conf
-GET /cgi-bin/test $/usr/bin/python(SCRIPT_MODE=prod)
-  ...1.5
-  SCRIPT_NAME=test.py
-  ROOT_DIR=/var/www/cgi
+	GET /cgi-bin/test $/cgi-bin/test.cgi(MODE=prod)
+		...3000
+		SCRIPT_NAME=test.cgi
+		ROOT_DIR=/var/www/cgi
+```
+
+inline env 없이 작성할 수도 있다.
+
+```conf
+	POST /cgi-bin/upload $/cgi-bin/upload.cgi
+		...5000
+		UPLOAD_MODE=on
 ```
 
 ### 규칙
+
 - 첫 줄은 `METHOD PATH CGI설정` 형식이다.
-- 총 3개 토큰이어야 한다.
-- METHOD 는 `GET`, `POST`, `DELETE` 만 허용한다.
-- 마지막 값은 반드시 `$` 문자로 시작해야 한다.
-- `$` 뒤에는 문자열 또는 숫자 문자열이 와야 한다.
-- 괄호 `()` 안에는 키=값 형식의 옵션을 작성할 수 있다.
-- 괄호 안의 키=값 형식은 최대 1개까지만 허용한다.
-- `키=값` 옵션이 필요하지 않은 경우 괄호는 생략할 수 있다.
-- 내부 block에서는 timeout과 env 설정이 가능하다.
-- 내부 block의 각 줄은 indent level 2여야 한다.
-- 내부 block의 줄 끝 공백은 허용하지 않는다.
+- 공백 기준 토큰은 정확히 3개여야 한다.
+- METHOD는 `GET`, `POST`, `DELETE` 만 허용한다.
+- 세 번째 토큰은 반드시 `$` 로 시작해야 한다.
+- CGI executable path는 `.cgi` 또는 전역 `cgi =` 블록에 등록된 확장자로 끝나야 한다.
+- 경로 중간에 허용 확장자 문자열이 포함되어 있어도, executable path의 끝 확장자가 아니면 허용되지 않는다.
+- CGI executable path는 실행 가능한 regular file이어야 한다.
+- inline env는 executable path 바로 뒤에 `(KEY=VALUE)` 형식으로 최대 한 개만 작성할 수 있다.
+- inline env를 작성하는 경우 `(KEY=VALUE)`는 해당 CGI 설정 문자열의 마지막에 위치해야 하며, `)` 뒤에 다른 문자를 붙일 수 없다.
+- Route CGI 하위 block에서는 timeout과 env 설정을 작성할 수 있다.
+- 다른 Route Rule 또는 Route CGI를 이어 작성하려면 CGI block 뒤에 반드시 빈 줄 하나를 넣어야 한다.
+
+### CGI executable과 inline env
+
+```conf
+	GET /run $/cgi-bin/run.cgi
+	GET /run $/cgi-bin/run.cgi(MODE=prod)
+```
+
+- `$` 뒤에는 CGI executable path가 온다.
+- executable path는 `.cgi` 또는 전역 `cgi =` 블록에 등록된 확장자로 끝나야 한다.
+- inline env가 있다면 executable path 바로 뒤에 `(KEY=VALUE)` 형식으로 작성한다.
+- inline env는 최대 한 개만 허용된다.
+- `(KEY=VALUE)` 뒤에는 다른 문자가 올 수 없다.
+
+### CGI timeout
+
+```conf
+		...3000
+```
+
+- `...` 뒤에는 unsigned integer 문자열이 와야 한다.
+- 허용 범위는 `1 ~ 3600000` 이다.
+- 단위는 millisecond이다.
+- 소수는 허용하지 않는다.
+
+### CGI 환경변수
+
+```conf
+		SCRIPT_NAME=test.cgi
+		ROOT_DIR=/var/www/cgi
+```
+
+- 형식은 `KEY=VALUE` 이다.
+- CGI 환경변수 줄에는 공백을 포함할 수 없다.
+- `=` 는 정확히 한 번만 사용해야 한다.
+- KEY와 VALUE는 비어 있으면 안 된다.
+- KEY에는 대문자, `_`, 숫자를 사용할 수 있다.
+- KEY의 첫 글자는 숫자가 될 수 없다.
+- 같은 CGI context 안에서 같은 KEY를 중복 선언할 수 없다.
 
 ---
 
-## 21. CGI timeout 규칙
+## 11. Path Pattern과 Wildcard
 
-CGI timeout을 설정한다.
+### 기본 매칭 규칙
 
-### 형식
-```conf
-...3
-...0.5
-```
+- `*` wildcard를 지원한다.
+- wildcard가 있는 pattern은 wildcard match로 처리한다.
+- wildcard가 없는 pattern이 `/` 로 끝나면 prefix match로 처리한다.
+- wildcard가 없고 `/` 로 끝나지 않으면 exact match로 처리한다.
+- `*` 는 최소 1글자 이상과 매칭되어야 한다.
+- `*` 는 빈 문자열과 매칭되지 않는다.
+- `*` 는 `/` 도 포함해서 매칭할 수 있다.
 
-### 규칙
-- `...` 으로 시작해야 한다.
-- 숫자 또는 소수를 허용한다.
-- 범위는 `0.05 < timeout <= 15.0` 이다.
+### 예시
 
----
+| Pattern | Request | 결과 |
+|---|---|---:|
+| `/download/` | `/download/a.txt` | match |
+| `/download/` | `/download` | no match |
+| `/download/*` | `/download/a.txt` | match |
+| `/download/*` | `/download/` | no match |
+| `/images/*.png` | `/images/a.png` | match |
+| `/images/*.png` | `/images/.png` | no match |
 
-## 22. 환경변수 규칙
+### wildcard 제한
 
-CGI 환경변수는 `KEY=VALUE` 형식으로 설정한다.
-
-### 형식
-```conf
-SCRIPT_NAME=test.py
-ROOT_DIR=/var/www/cgi
-ENV_MODE=prod
-```
-
-### 규칙
-- `KEY=VALUE` 형식이어야 한다.
-- KEY 는 비어 있으면 안 된다.
-- 대문자, `_`, 숫자를 허용한다.
-- 첫 글자는 숫자가 될 수 없다.
-- 중복 key는 허용하지 않는다.
+- 하나의 path segment 안에서 `*` 는 최대 1개만 사용할 수 있다.
+- 왼쪽 PATH에서는 `*.png`, `*.(png|jpg|jpeg)`, `/user/*/profile` 같은 패턴을 사용할 수 있다.
+- 오른쪽 TARGET에서 wildcard는 반드시 독립된 `*` segment로만 존재해야 한다.
+- 오른쪽 TARGET의 `/static/*` 는 허용된다.
+- 오른쪽 TARGET의 `/static/*.png` 는 허용되지 않는다.
+- 오른쪽 TARGET의 wildcard segment 수와 왼쪽 PATH의 wildcard 포함 segment 수가 같아야 한다.
 
 ---
 
-## 23. Path Rewrite 규칙
+## 12. 확장 패턴
 
-rewrite 시 `PathPattern::rewrite_path()` 를 사용한다.
+특정 path segment에서 여러 확장자 후보를 한 번에 선언할 수 있다.
 
 ### 형식
+
 ```conf
-GET /download/* <- /data/*
+	GET /images/*.(png|jpg|jpeg) <- /static/*
+	GET /assets/*.(css|js) <- /public/*
 ```
 
 ### 규칙
-- from(path rule)에 wildcard가 있으면 wildcard 캡처값을 root에 삽입한다.
-- from이 `/` 로 끝나면 suffix를 root 뒤에 이어붙인다.
-- wildcard 개수가 맞지 않으면 실패한다.
-- root mapping 형태일 경우 relative path 기반 rewrite를 수행할 수 있다.
+
+- 확장 패턴은 `*.(a|b|c)` 형식이다.
+- 괄호 내부 후보는 `|` 로 구분한다.
+- 후보는 최소 2개 이상이어야 한다.
+- 각 후보는 영문자 또는 숫자로만 구성되어야 한다.
+- 확장 패턴은 path 쪽에서 확장된다.
+- root/TARGET 쪽은 일반 wildcard `*` segment로 받는다.
+
+### 확장 예시
+
+```conf
+	GET /images/*.(png|jpg) <- /static/*
+```
+
+위 설정은 내부적으로 아래와 유사하게 확장된다.
+
+```conf
+	GET /images/*.png <- /static/*
+	GET /images/*.jpg <- /static/*
+```
 
 ---
 
-## 24. Route 매칭 규칙
+## 13. Path Rewrite
 
-현재 `find_route()` 기준으로 route를 찾는다.
+실제 파일 경로 또는 대상 경로 계산에는 `PathPattern::rewrite_path()`가 사용된다.
 
-### 형식
+### 예시 1: 확장자 패턴과 하위 경로 보존
+
 ```conf
-GET /images/* <- /var/www/assets/*
-GET /images/logo.png <- /var/www/static/logo.png
-GET /download/ <i- /var/www/download/
-GET /old =301> /new
+	GET /images/*.png <- /static/*
+```
+
+```text
+request: /images/logo.png
+result:  /static/logo.png
+```
+
+```text
+request: /images/a/b/c.png
+result:  /static/a/b/c.png
+```
+
+위 예시에서 `*` 는 단일 파일명만 의미하지 않는다. `*` 는 `/` 를 포함한 하위 경로까지 매칭할 수 있으며, rewrite 결과에서도 해당 relative path가 오른쪽 TARGET의 독립된 `*` segment 위치에 들어간다.
+
+### 예시 2: directory prefix mapping
+
+```conf
+	GET /docs/ <- /var/www/docs/
+```
+
+```text
+request: /docs/a/b.html
+result:  /var/www/docs/a/b.html
 ```
 
 ### 규칙
+
+- 왼쪽 PATH에 wildcard가 있으면 요청 path에서 추출한 relative path를 오른쪽 TARGET의 `*` 에 삽입한다.
+- 오른쪽 TARGET의 wildcard는 단일 `*` segment로만 작성해야 한다.
+- 왼쪽 PATH의 `*` 는 `/` 를 포함한 여러 path segment를 매칭할 수 있다.
+- 따라서 `/images/*.png` 는 `/images/a/b/c.png` 와 매칭될 수 있다.
+- 왼쪽 PATH가 `/` 로 끝나는 prefix pattern이면 요청 path의 suffix를 TARGET 뒤에 이어붙인다.
+- 왼쪽 PATH와 요청 path가 exact match이면 TARGET을 그대로 반환한다.
+- rewrite 결과는 연속된 `/` 를 하나로 정규화한다.
+
+### 주의: 중간 wildcard 사용
+
+```conf
+	GET /user/*/profile <- /profiles/*
+```
+
+위와 같은 중간 wildcard 패턴은 순수 capture 치환 방식으로 해석되지 않을 수 있다. 현재 rewrite 정책은 wildcard capture 하나만 치환하는 방식이 아니라, 요청 path의 relative path를 오른쪽 TARGET의 `*` 에 넣는 방식에 가깝다. 따라서 rewrite가 필요한 route에서는 wildcard를 path 끝부분의 파일 또는 하위 경로 매핑 용도로 사용하는 것을 기준으로 한다.
+
+
+---
+
+## 14. 파일 시스템 경로 해석 정책
+
+이 문서는 config 문법과 검증 규칙을 정리한다. 파일 시스템 경로를 어떤 기준 디렉토리에서 해석할지는 추후 `base_root` 방식으로 별도 정리할 예정이다.
+
+따라서 이 문서에서는 아래 항목을 확정하지 않는다.
+
+- 일반 Route Rule의 TARGET 경로 기준
+- `@` auth file 경로 기준
+- error page 경로 기준
+- Route CGI executable 경로 기준
+- 전역 CGI executable 경로와 일반 route 경로의 기준 차이
+
+현재 문법상 경로는 config에 작성된 문자열을 기준으로 검증되며, 실제 기준 디렉토리 정책은 별도 결정 후 문서에 반영한다.
+
+## 15. Route 매칭 정책
+
+### 일반 Route Rule
+
 - method가 일치해야 한다.
-- `route.path.matches(request_path)` 가 true인 첫 route를 반환한다.
-- 현재 구현에서는 선언 순서가 중요하다.
+- 단, 요청 method가 `HEAD` 이고 route method가 `GET` 이면 일반 route에서 매칭된다.
+- `route.path.matches(request_path)` 가 true인 첫 번째 route를 반환한다.
+- longest match를 자동으로 계산하지 않는다.
+- 더 구체적인 route를 우선하고 싶다면 config 파일에서 더 위에 작성해야 한다.
+- config 작성 순서가 route 우선순위이다.
+
+### Route CGI
+
+- method가 정확히 일치해야 한다.
+- 일반 route와 달리 `HEAD` 를 `GET` 으로 대체 매칭하지 않는다.
+- `RouteRule_CGI.path.matches(request_path)` 가 true인 첫 번째 CGI route를 반환한다.
+- Route CGI도 작성 순서가 우선순위이다.
 
 ---
 
-## 25. 참고: AUTOINDEX / REDIRECT 처리 정책
+## 16. AUTOINDEX와 REDIRECT
 
-현재 문서화된 정책은 아래와 같다.
+### AUTOINDEX
 
-### 형식
 ```conf
-GET /download/ <i- /var/www/download/
-GET /old =301> /new
+	GET /download/ <i- /var/www/download/
 ```
 
-### 규칙
-- AUTOINDEX route의 path는 wildcard 없이 directory 형태(`/download/`)로 작성한다.
-- AUTOINDEX는 해당 directory 자신과 그 하위 path들을 대상으로 처리하는 정책을 따른다.
-- REDIRECT는 일반 route와 동일한 매칭 규칙을 사용한다.
+- AUTOINDEX는 `<i-` operator를 사용한다.
+- AUTOINDEX path는 wildcard 없이 directory prefix 형태로 작성하는 것을 기준으로 한다.
+- path가 `/` 로 끝나면 prefix match로 처리된다.
+- `/download/` 는 `/download/a.txt`, `/download/dir/a.txt` 와 매칭될 수 있다.
+- `/download` 처럼 trailing slash가 없는 요청은 `/download/` 와 매칭되지 않는다.
+
+### REDIRECT
+
+```conf
+	GET /old =301> /new
+	GET /temp =302> /temporary
+```
+
+- REDIRECT 계열 operator는 `=30x>` 형식을 사용한다.
+- REDIRECT도 일반 route와 동일하게 method와 path로 매칭된다.
+- 작성 순서가 우선순위이다.
+- wildcard 규칙은 일반 route와 동일하게 적용된다.
+
+---
+
+## 17. 전체 예시
+
+아래 예시처럼 server 블록 내부에서 일반 Route Rule과 Route CGI 묶음은 빈 줄 하나로 구분해야 한다.
+빈 줄 두 개가 연속되면 server 블록 종료로 해석될 수 있다.
+
+```conf
+types =
+	html -> text/html
+	css -> text/css
+	js -> application/javascript
+	png|jpg|jpeg -> image/jpeg
+	_ -> application/octet-stream
+
+cgi =
+	py -> /usr/bin/python3
+
+! 404:/errors/404.html
+
+:8080 =
+	[] +<= Server: webserv
+	...3000
+
+	GET /private/ <- /var/www/private/
+		? index.html
+		@ auth/basic_auth
+		->{} 10MB
+		! 404:/errors/private_404.html
+
+	GET /images/*.(png|jpg|jpeg) <- /var/www/static/images/*
+
+	GET /download/ <i- /var/www/download/
+
+	GET /old =301> /new
+
+	GET /cgi-bin/test $/cgi-bin/test.cgi(MODE=prod)
+		...3000
+		SCRIPT_NAME=test.cgi
+		ROOT_DIR=/var/www/cgi
+```
+
+---
+
+## 18. 핵심 주의사항
+
+- Route Rule과 Route CGI는 반드시 빈 줄 하나로 구분한다.
+- 빈 줄 두 개는 server block 종료로 처리될 수 있다.
+- route 선택은 longest match가 아니라 작성 순서 우선이다.
+- 더 구체적인 route를 먼저 작성해야 한다.
+- 오른쪽 TARGET의 wildcard는 반드시 독립된 `*` segment여야 한다.
+- `*` 는 빈 문자열과 매칭되지 않고 최소 1글자 이상과 매칭된다.
+- `*` 는 `/` 를 포함한 하위 경로까지 매칭할 수 있다.
+- rewrite 시 TARGET의 `*` 에는 단일 파일명뿐 아니라 relative path가 들어갈 수 있다.
+- 파일 시스템 경로 기준 디렉토리 정책은 추후 `base_root` 방식으로 별도 정리한다.
+- HTML 파일 검사는 `.html` 만 허용한다.

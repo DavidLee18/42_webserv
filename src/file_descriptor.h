@@ -20,7 +20,7 @@ public:
   static Result<std::pair<FileDescriptor, struct addrinfo *> >
   socket_client_new(std::string const &, std::string const &);
 
-  static Result<FileDescriptor> open_file(std::string const &);
+  static Result<FileDescriptor> open_file(std::string const &, char **envp);
 
   static Result<std::pair<FileDescriptor, FileDescriptor> > pipe();
 

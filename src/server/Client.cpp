@@ -59,10 +59,9 @@ Result<Request *> Request::from_buff(std::string &buff) {
   size_t content_length = 0;
 
   std::string header_lower = buff.substr(0, header_end + std::strlen("\r\n"));
-  for (size_t i = 0; i < header_lower.length(); ++i) {
+  for (size_t i = 0; i < header_lower.length(); ++i)
     header_lower[i] = static_cast<char>(
         std::tolower(static_cast<unsigned char>(header_lower[i])));
-  }
   const size_t host_pos = header_lower.find("host:");
   // Check if there's only ONE host header (not counting it as a substring)
   // We look for it as a header name, which must be preceded by \r\n or be at
@@ -86,10 +85,13 @@ Result<Request *> Request::from_buff(std::string &buff) {
   bool decode_chunked = false;
   if (cl_pos != std::string::npos && te_pos != std::string::npos)
     return ERR(Request *, Errors::malformed_header); // conforming to the RFC
-  if (te_pos != std::string::npos &&
-      (header_lower.find("transfer-encoding:chunked") != std::string::npos ||
-       header_lower.find("transfer-encoding: chunked") != std::string::npos))
-    decode_chunked = true;
+  if (te_pos != std::string::npos) {
+    if (header_lower.find("transfer-encoding:chunked") != std::string::npos ||
+        header_lower.find("transfer-encoding: chunked") != std::string::npos)
+      decode_chunked = true;
+    else
+      return ERR(Request *, Errors::bad_request);
+  }
   if (cl_pos != std::string::npos && !decode_chunked) {
     const char *str =
         header_lower.c_str() + cl_pos + std::strlen("content-length:");
@@ -199,12 +201,12 @@ Result<Request *> Request::from_buff(std::string &buff) {
   std::string connection_header =
       get_string_from_map(req->header, "Connection");
   // If empty (no Connection header), HTTP/1.1 defaults to keep-alive
-  if (connection_header.empty())
-    req->header["Connection"] = "keep-alive";
   // keep_alive defaults to true; only set false if client explicitly requests
   // close
   if (connection_header == "close")
     req->keep_alive = false;
+  if (!connection_header.empty())
+    req->header.erase(req->header.find("Connection"));
 
   req->cookie = get_string_from_map(req->header, "Cookie");
   if (req->decode_chunk_state == NOT_CHUNKED) {
@@ -213,7 +215,7 @@ Result<Request *> Request::from_buff(std::string &buff) {
                                      static_cast<size_t>(req->content_length);
     if (buff.length() < total_request_len) {
       req->remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
-      buff.erase(0, total_request_len);
+      buff.clear();
       return OK(Request *, req);
     }
 
@@ -252,8 +254,22 @@ Result<Request *> Request::from_buff(std::string &buff) {
         return ERR(Request *, Errors::bad_request);
       }
       buff.erase(0, static_cast<size_t>(body_start) + unchunked.value());
-    } // else: chunked but not yet complete — leave buff untouched; remnants
-      // holds the partial
+    } else {
+      const size_t clrf_pos = req->remnants.find("\r\n");
+      if (clrf_pos != std::string::npos) { // first chunk arrived
+        std::string first_chunk_size(req->remnants.substr(0, clrf_pos));
+        const size_t ext_pos = first_chunk_size.find(';');
+        if (ext_pos != std::string::npos)
+          first_chunk_size = first_chunk_size.substr(0, ext_pos);
+        for (std::string::const_iterator it = first_chunk_size.begin();
+             it != first_chunk_size.end(); ++it)
+          if (!((*it >= '0' && *it <= '9') || (*it >= 'a' && *it <= 'f') ||
+                (*it >= 'A' && *it <= 'F'))) {
+            delete req;
+            return ERR(Request *, Errors::bad_request);
+          }
+      }
+    }
     return OK(Request *, req);
   }
 }
@@ -293,6 +309,19 @@ Result<Void> Request::continue_parsing(std::string &buff) {
       const Result<size_t> unchunked = unchunk(chunk_end);
       if (!unchunked.has_value())
         return ERR(Void, Errors::bad_request);
+    } else {
+      const size_t clrf_pos = remnants.find("\r\n");
+      if (clrf_pos != std::string::npos) { // first chunk arrived
+        std::string first_chunk_size(remnants.substr(0, clrf_pos));
+        const size_t ext_pos = first_chunk_size.find(';');
+        if (ext_pos != std::string::npos)
+          first_chunk_size = first_chunk_size.substr(0, ext_pos);
+        for (std::string::const_iterator it = first_chunk_size.begin();
+             it != first_chunk_size.end(); ++it)
+          if (!((*it >= '0' && *it <= '9') || (*it >= 'a' && *it <= 'f') ||
+                (*it >= 'A' && *it <= 'F')))
+            return ERR(Void, Errors::bad_request);
+      }
     }
     return OKV;
   }
@@ -301,7 +330,8 @@ Result<Void> Request::continue_parsing(std::string &buff) {
 
 bool Request::is_partial() const {
   if (decode_chunk_state == NOT_CHUNKED)
-    return !remnants.empty();
+    return content_length > 0 &&
+           body.length() < static_cast<size_t>(content_length);
   return decode_chunk_state != DONE;
 }
 

@@ -41,6 +41,8 @@ SUITES=(
   "webserv_conditional_tests.zsh"
   "webserv_slowloris_tests.zsh"
   "webserv_exhaustion_tests.zsh"
+  "webserv_eval_smoke_tests.zsh"
+  "webserv_multi_cgi_tests.zsh"
 )
 
 # Sanity probe: is the server up?

@@ -1,21 +1,28 @@
 #include "ServerConfig.hpp"
 
-ServerConfig::ServerConfig(FileDescriptor &file, std::map<std::string, std::string> &global_cgi) {
+ServerConfig::ServerConfig(FileDescriptor &file,
+                           std::map<std::string, std::string> &global_cgi,
+                           char **envp) {
   err_meg = "";
-  server_response_time = 3;
+  server_response_time_ms = 3;
   end_flag = 0;
   count_line = 0;
-  for (std::map<std::string, std::string>::const_iterator it = global_cgi.begin(); it != global_cgi.end(); ++it)
+  for (std::map<std::string, std::string>::const_iterator it =
+           global_cgi.begin();
+       it != global_cgi.end(); ++it)
     file_extension.push_back("." + it->first);
   file_extension.push_back(".cgi");
-  if (!parse_server_block(file)) {
+  if (!parse_server_block(file, envp)) {
     return;
   }
   return;
 }
 
-bool ServerConfig::parse_server_block(FileDescriptor &fd) {
+bool ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
   std::string line;
+  bool is_route_parse = false;
+  bool is_header_parse = false;
+  bool is_timeout_parse = false;
 
   while (true) {
     Result<std::string> temp = fd.read_file_line();
@@ -39,26 +46,72 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd) {
     line = utils::trim_whitespace(line);
 
     if (is_header_block(line)) {
-      if (!parse_header_entry(fd, line)) { // 수정 중
+      if (is_route_parse == true) {
+        err_meg =
+            "on [\t" + line +
+            "]: Invalid header definition location in server block (the server "
+            "header definition order rule is violated because header must be "
+            "defined before any RouteRule or RouteRule_CGI).";
+        return false;
+      } else if (is_header_parse == true &&
+                 (is_route_parse || is_timeout_parse)) {
+        err_meg =
+            "on [\t" + line +
+            "]: Duplicate header block definition in server block (the "
+            "duplicate server header block rule is violated because the header "
+            "block has already been defined in the same server block).";
+        return false;
+      }
+      if (!parse_header_entry(fd, line)) {
         err_meg = "Header syntax Error: " + err_meg;
         return false;
       }
+      is_header_parse = true;
     } else if (is_valid_server_response_time(line)) {
-      parse_server_response_time(line);
-      if (err_meg != "")
+      if (is_route_parse == true) {
+        err_meg =
+            "on [\t" + line +
+            "]: Invalid timeout definition location in server block (the "
+            "server timeout definition order rule is violated because timeout "
+            "must be defined before any RouteRule or RouteRule_CGI).";
         return false;
-    } else if (matches_route_rule_syntax(line)) {
-      if (!parse_route_rule_block(line, fd)) {
+      } else if (is_timeout_parse == true) {
+        err_meg = "on [\t" + line +
+                  "]: Duplicate timeout definition in server block (the "
+                  "duplicate server timeout rule is violated because the "
+                  "timeout has already been defined in the same server block).";
         return false;
       }
+      err_meg = utils::string_to_unsigned_int(line.substr(3),
+                                              server_response_time_ms);
+      if (err_meg != "") {
+        err_meg = "on [\t" + line + "],[ " + line.substr(3) + "]: " + err_meg;
+        return false;
+      } else if (server_response_time_ms > 60000 ||
+                 1 > server_response_time_ms) {
+        err_meg =
+            "on [\t" + line + "], [" + line.substr(3) +
+            "]: Invalid server response time "
+            "(the server response time rule is violated because the value must "
+            "be between 1ms and 60000ms inclusive).";
+        return false;
+      }
+      is_timeout_parse = true;
+    } else if (matches_route_rule_syntax(line)) {
+      if (!parse_route_rule_block(line, fd, envp)) {
+        return false;
+      }
+      is_route_parse = true;
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
-      RouteRule_CGI temp(fd, line, file_extension);
+      RouteRule_CGI temp(fd, line, file_extension, envp);
       count_line += temp.get_count_line();
       if (temp.get_err_meg() != "") {
         err_meg = temp.get_err_meg();
         return false;
       }
       R_CGI.push_back(temp);
+      is_route_parse = true;
+      end_flag += 1;
     } else {
       err_meg =
           "on [\t" + line +
@@ -85,38 +138,46 @@ bool ServerConfig::is_header_block(const std::string &line) {
   return true;
 }
 
-// :로 split후 size가 2개 인지 확인 -> 아니면 에러처리들 하기( : 기준 key, value 확인)
-// 2개이면 0번 배열을 다시 " " 기준으로 split후에 2번 배열이 값을 utils::trim_whitespace 사용 후 값 사용
-// 키를 utils::is_header_name 사용하여 키값 확인
-// value들은 : 기준으로 한 split의 배열이 value 값
-// value는 utils::is_header_value 사용하여 값 확인
 bool ServerConfig::parse_header_entry(FileDescriptor &fd,
                                       const std::string &line) {
   std::string temp(line);
   if (temp.find(':') == std::string::npos) {
     std::size_t pos = temp.find("+<=") + 3;
-    err_meg = "on [\t" + temp + "], [" + &temp[pos] + "]: Invalid header format (missing ':' separator between header name and value).";
+    err_meg = "on [\t" + temp + "], [" + &temp[pos] +
+              "]: Invalid header format (missing ':' separator between header "
+              "name and value).";
     return false;
   } else if (utils::count_occurrences(temp, ":") != 1) {
     std::size_t pos = temp.find(":");
-    pos = temp.find(":", pos);
-    err_meg =
-        "on [\t" + temp + "], [" + &temp[pos] +
-        "]: The HTTP header contains an invalid format due to extra delimiter "
-        "characters. (HTTP header structure, a header must follow the key: "
-        "value format with only one : separator, but additional : characters "
-        "are present, making parsing ambiguous and invalid).";
+    pos = temp.find(":", pos + 1);
+    err_meg = "on [\t" + temp + "], [" + &temp[pos] +
+              "]: Invalid HTTP header format "
+              "(the header rule is violated because a header must contain "
+              "exactly one "
+              "':' separator in the form 'Header-Name: value').";
     return false;
   }
-  std::vector<std::string> key_value = utils::string_split(temp, ":");
-  std::string key = utils::string_split(key_value[0], " ")[2];
+  std::vector<std::string> key_value =
+      utils::string_split(temp.substr(temp.find("+<=") + 4), ":");
+  if (key_value.size() != 2) {
+    err_meg = "on [\t" + temp +
+              "]: Invalid header format (expected Header-Name: value).";
+    return false;
+  }
+  std::string key = utils::trim_whitespace(key_value[0]);
   if (!utils::is_header_name(key)) {
-    err_meg = "on [\t" + temp + "], [" + key + "]: Invalid HTTP header name (reason: contains illegal characters or is empty; only alphanumeric characters and !#$%&'*+-.^_`|~ are allowed).";
+    err_meg = "on [\t" + temp + "], [" + key +
+              "]: Invalid HTTP header name (reason: contains illegal "
+              "characters or is empty; only alphanumeric characters and "
+              "!#$%&'*+-.^_`|~ are allowed).";
     return false;
   }
   std::string value = utils::trim_whitespace(key_value[1]);
   if (!utils::is_header_value(value)) {
-    err_meg = "on [\t" + temp + "], [" + value + "]: Invalid HTTP header value (reason: contains non-printable or control characters such as CR/LF or non-ASCII characters; only ASCII 0x20-0x7E and TAB are allowed).";
+    err_meg = "on [\t" + temp + "], [" + value +
+              "]: Invalid HTTP header value (reason: contains non-printable or "
+              "control characters such as CR/LF or non-ASCII characters; only "
+              "ASCII 0x20-0x7E and TAB are allowed).";
     return false;
   }
   while (temp[temp.length() - 1] == ';') {
@@ -134,7 +195,10 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
     if (err_meg != "")
       return false;
     if (!utils::is_header_value(temp)) {
-      err_meg = "on [\t" + temp + "], [" + temp + "]: Invalid HTTP header value (reason: contains non-printable or control characters such as CR/LF or non-ASCII characters; only ASCII 0x20-0x7E and TAB are allowed).";
+      err_meg = "on [\t" + temp + "], [" + temp +
+                "]: Invalid HTTP header value (reason: contains non-printable "
+                "or control characters such as CR/LF or non-ASCII characters; "
+                "only ASCII 0x20-0x7E and TAB are allowed).";
       return false;
     }
     value += " " + utils::trim_whitespace(temp);
@@ -147,31 +211,6 @@ bool ServerConfig::is_valid_server_response_time(const std::string &line) {
   if (line.length() < 4 || line[0] != '.' || line[1] != '.' || line[2] != '.')
     return (false);
   return (true);
-}
-
-void ServerConfig::parse_server_response_time(std::string line) {
-  int data = 0;
-
-  for (size_t i = 3; i < line.length(); ++i) {
-    if (!std::isdigit(static_cast<unsigned char>(line[i]))) {
-      err_meg =
-          "on [\t" + line + "], [" + &line[3] +
-          "]: The response time configuration contains an invalid value type "
-          "after the delimiter. (response time rule, the value after ... must "
-          "consist only of numeric characters, but non-numeric characters are "
-          "present, making it invalid for parsing).";
-      return;
-    }
-    data = data * 10 + (line[i] - '0');
-  }
-  if (data > 900 || 0 >= data) {
-    err_meg = "on [\t" + line + "], [" + &line[3] +
-              "]: The response time configuration is out of the allowed range. "
-              "(response time rule, the value must be between 0 and 900 "
-              "inclusive, but the provided value falls outside this range).";
-    return;
-  }
-  server_response_time = data;
 }
 
 bool ServerConfig::is_path_pattern_segment(const std::string &line) {
@@ -305,55 +344,73 @@ bool ServerConfig::matches_route_rule_syntax(const std::string &line) {
   return true;
 }
 
-std::string ServerConfig::parse_max_body_size(std::string line, int &maxbody) {
+std::string ServerConfig::parse_max_body_size(std::string line,
+                                              unsigned int &maxbody) {
   size_t i = 0;
   maxbody = 0;
+  std::string prefix = "], [";
+  if (line[0] == '0') {
+    if (line.size() != 1)
+      return prefix + line +
+             "]: Invalid value (the unsigned integer leading zero rule is "
+             "violated because the value must not contain leading zeros).";
+  }
   for (; i < line.size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(line[i])))
       break;
-    maxbody = maxbody * 10 + (line[i] - '0');
+    maxbody = maxbody * 10 + static_cast<unsigned int>(line[i] - '0');
+    if (maxbody > 1048576)
+      return prefix + line +
+             "]: Invalid value (the max body size range rule is violated "
+             "because the max body size must not exceed 1024MiB or 1048576KB).";
   }
-  std::string res = "], [";
   if (i == 0)
-    return err_meg =
-               res + line +
-               "]: Invalid max_body_size value syntax: the value after "
-               "\"->{}\" must be a numeric string optionally followed by one "
-               "of the allowed units: \"MB\", \"MiB\", \"KB\", or \"KiB\" (the "
-               "max_body_size additional information value rule is violated "
-               "because the provided value does not match the required format: "
-               "<numeric string><optional unit>).";
-  line = line.substr(i);
-  if (line.empty() || line == "KB" || line == "KiB")
-    ;
-  else if (line == "MB")
+    return prefix + line +
+           "]: Invalid max_body_size value syntax: the value after \"->{}\" "
+           "must be a numeric string optionally followed by one of the allowed "
+           "units: \"MB\", \"MiB\", \"KB\", or \"KiB\" (the max_body_size "
+           "additional information value rule is violated because the provided "
+           "value does not match the required format: <numeric "
+           "string><optional unit>).";
+  std::string temp = line.substr(i);
+  if (temp.empty() || temp == "KB" || temp == "KiB")
+    return "";
+  else if (temp == "MB") {
+    if (static_cast<std::size_t>(maxbody) * 1000 > 1048576)
+      return prefix + line +
+             "]: Invalid value (the max body size range rule is violated "
+             "because the max body size must not exceed 1024MiB or 1048576KB)";
     maxbody = maxbody * 1000;
-  else if (line == "MiB")
+  } else if (temp == "MiB") {
+    if (static_cast<std::size_t>(maxbody) * 1024 > 1048576)
+      return prefix + line +
+             "]: Invalid value (the max body size range rule is violated "
+             "because the max body size must not exceed 1024MiB or 1048576KB).";
     maxbody = maxbody * 1024;
-  else
-    return err_meg =
-               res + line +
-               "]: Invalid max_body_size value syntax: the value after "
-               "\"->{}\" must be a numeric string optionally followed by one "
-               "of the allowed units: \"MB\", \"MiB\", \"KB\", or \"KiB\" (the "
-               "max_body_size additional information value rule is violated "
-               "because the provided value does not match the required format: "
-               "<numeric string><optional unit>).";
+  } else
+    return prefix + line +
+           "]: Invalid max_body_size value syntax: the value after \"->{}\" "
+           "must be a numeric string optionally followed by one of the allowed "
+           "units: \"MB\", \"MiB\", \"KB\", or \"KiB\" (the max_body_size "
+           "additional information value rule is violated because the provided "
+           "value does not match the required format: <numeric "
+           "string><optional unit>).";
   return "";
 }
 
 std::string ServerConfig::apply_default_err_page_entry(
-    const std::string &line, std::map<int, std::string> &err_map) {
+    const std::string &line, std::map<unsigned int, std::string> &err_map,
+    char **envp) {
   std::vector<std::string> split = utils::string_split(line, " ");
 
   if (split.size() != 2) {
     if (split.size() == 1)
       return "], []: Violates default error page format (must be \"! "
              "<status>:<path>\").";
-    std::string res = "";
+    std::string prefix = "";
     for (std::size_t i = 2; i < split.size(); ++i)
-      res += " " + split[i];
-    return "], [" + res +
+      prefix += " " + split[i];
+    return "], [" + prefix +
            "]: Violates default error page format (invalid format for \"! "
            "<status>:<path>\").";
   }
@@ -361,9 +418,9 @@ std::string ServerConfig::apply_default_err_page_entry(
   split = utils::string_split(split[1], ":");
   if (split.size() != 2 || utils::count_occurrences(path, ":") != 1) {
     std::size_t pos = line.find(':');
-    std::string res = "], [";
+    std::string prefix = "], [";
     pos = line.find(':', pos + 1);
-    return res + &line[pos] +
+    return prefix + path +
            "]: Violates error page mapping rule (expected \"status:path\" with "
            "no trailing ':' or extra fields).";
   }
@@ -373,94 +430,72 @@ std::string ServerConfig::apply_default_err_page_entry(
              "]: Violates status format rule (status must consist only of "
              "digits).";
   }
-  if (split[0][0] != '4' && split[0][0] != '5' && split[0].size() != 3)
+  if (split[0].size() != 3 || (split[0][0] != '4' && split[0][0] != '5'))
     return "], [" + split[0] +
-           "]: Violates status range rule (status must start with 4xx or 5xx).";
-  else if (utils::check_html_file(split[1]) != "")
-    return "], [" + split[1] + "]: " + utils::check_html_file(split[1]);
-  char *end;
-  unsigned long num = std::strtoul(split[0].c_str(), &end, 10);
-  err_map[static_cast<int>(num)] = split[1];
+           "]: Violates status range rule "
+           "(status must be a 3-digit HTTP error code between 400 and 599).";
+  else if (utils::check_html_file(split[1], envp) != "")
+    return "], [" + split[1] + "]: " + utils::check_html_file(split[1], envp);
+
+  unsigned int num = 0;
+  std::string err = utils::string_to_unsigned_int(split[0], num);
+  if (err != "")
+    return "], [" + split[0] + "]:" + err;
+  else if (num < 400 || num > 599)
+    return "], [" + split[0] +
+           "]: Invalid value (the HTTP status code range rule is violated "
+           "because the value must be between 400 and 599).";
+  err_map[num] = split[1];
 
   return "";
 }
 
 bool ServerConfig::apply_route_rule_entry(
-    const std::vector<Request::Method> &mets, const std::string &key_data,
-    const std::string &line) {
+    const std::string &line, std::vector<std::size_t> &route_indexes,
+    char **envp) {
 
   std::vector<std::string> rule = utils::string_split(line, " ");
   std::size_t size = rule.size();
-  PathPattern key(key_data);
 
   if (size != 2) {
     if (size > 2) {
       std::size_t pos = line.find(" ");
-      pos = line.find(" ", pos);
-      err_meg = "on [\t\t" + line + "], [" + &line[pos] +
-                "]: RouteRule additional information must contain exactly 2 "
-                "elements (the RouteRule additional information rule is "
-                "violated because the number of provided elements is not 2).";
+      pos = line.find(" ", pos + 1);
+      err_meg =
+          "on [\t\t" + line + "], [" + line.substr(pos) +
+          "]: Invalid RouteRule additional information format "
+          "(the RouteRule additional information rule is violated because "
+          "the line must contain exactly 2 tokens: KEY VALUE).";
     } else if (size == 1)
-      err_meg = "on [\t\t" + line +
-                "], []: RouteRule additional information must contain exactly "
-                "2 elements (the RouteRule additional information rule is "
-                "violated because the number of provided elements is not 2).";
+      err_meg =
+          "on [\t\t" + line +
+          "], []: Invalid RouteRule additional information format "
+          "(the RouteRule additional information rule is violated because "
+          "the line must contain exactly 2 tokens: KEY VALUE).";
     return false;
   }
 
-  for (std::size_t i = 0; i < mets.size(); ++i) {
-    std::size_t targetRouteIndex = routes.size();
-
-    for (std::size_t j = 0; j < routes.size(); ++j) {
-      if (routes[j].method == mets[i]) {
-        const std::vector<std::string> &routePath = routes[j].path.get_path();
-        const std::vector<std::string> &keyPath = key.get_path();
-        if (routePath.size() == keyPath.size()) {
-          bool exactMatch = true;
-          for (std::size_t k = 0; k < routePath.size(); ++k) {
-            if (routePath[k] != keyPath[k]) {
-              exactMatch = false;
-              break;
-            }
-          }
-          if (exactMatch) {
-            targetRouteIndex = j;
-            break;
-          }
-        }
-      }
-    }
-
-    if (targetRouteIndex == routes.size()) {
-      RouteRule newRoute;
-      newRoute.method = mets[i];
-      newRoute.path = key;
-      newRoute.op = UNDEFINED;
-      newRoute.max_body_KB = 1;
-      routes.push_back(newRoute);
-    }
-
+  for (std::size_t i = 0; i < route_indexes.size(); ++i) {
     if (rule[0] == "?") {
-      err_meg = utils::check_html_file(rule[1]);
+      err_meg = utils::check_html_file(rule[1], envp);
       if (err_meg != "") {
         err_meg = "on [\t\t" + line + "], [" + rule[1] + "]: " + err_meg;
         return false;
       }
-      routes[targetRouteIndex].index = rule[1];
+      routes[route_indexes[i]].index = rule[1];
     } else if (rule[0] == "@") {
-      char cwd[4096];
-      getcwd(cwd, sizeof(cwd));
-
-      std::string real_path = std::string(cwd) + "/" + rule[1];
+      std::string real_path = utils::get_env("PWD", envp) + "/" + rule[1];
       if (access(real_path.c_str(), F_OK) != 0) {
-        err_meg = "on [\t\t" + line + "], [" + rule[1] + "]: the value after \"@\" must refer to an existing file (the \"@\" keyword file path rule is violated because the provided value does not exist or is not a valid file).";
+        err_meg = "on [\t\t" + line + "], [" + rule[1] +
+                  "]: the value after \"@\" must refer to an existing file "
+                  "(the \"@\" keyword file path rule is violated because the "
+                  "provided value does not exist or is not a valid file).";
         return false;
       }
-      routes[targetRouteIndex].auth_info = rule[1];
+      routes[route_indexes[i]].auth_info = rule[1];
     } else if (rule[0] == "->{}") {
       err_meg =
-          parse_max_body_size(rule[1], routes[targetRouteIndex].max_body_KB);
+          parse_max_body_size(rule[1], routes[route_indexes[i]].max_body_KB);
       if (err_meg != "") {
         err_meg = "on [\t\t" + line + err_meg;
         return false;
@@ -468,14 +503,19 @@ bool ServerConfig::apply_route_rule_entry(
     } else if (rule[0] == "!") {
       std::string errPageLine = rule[1];
       err_meg = ServerConfig::apply_default_err_page_entry(
-          line, routes[targetRouteIndex].error_pages);
+          line, routes[route_indexes[i]].error_pages, envp);
       if (err_meg != "") {
         err_meg = "on [\t\t" + line + err_meg;
         return false;
       }
     } else {
-      std::cout << "in" <<std::endl;
-      err_meg = "on [\t\t" + line + "], [" + line +  "]: Invalid RouteRule additional information syntax: this line does not match the RouteRule additional information format (the RouteRule additional information syntax rule is violated because the line cannot be parsed as valid additional information; allowed keywords are \"!\", \"@\", \"->{}\", and \"?\").";
+      err_meg =
+          "on [\t\t" + line + "], [" + line +
+          "]: Invalid RouteRule additional information syntax: this line does "
+          "not match the RouteRule additional information format (the "
+          "RouteRule additional information syntax rule is violated because "
+          "the line cannot be parsed as valid additional information; allowed "
+          "keywords are \"!\", \"@\", \"->{}\", and \"?\").";
       return false;
     }
   }
@@ -503,6 +543,8 @@ RuleOperator ServerConfig::parse_rule_operator(const std::string &indicator) {
     return (TEMPORARY_REDIRECT);
   else if (indicator == "=308>")
     return (PERMANENT_REDIRECT);
+  else if (indicator == "#")
+    return (LOGIN_USING);
   else
     return (UNDEFINED);
 }
@@ -521,8 +563,9 @@ bool ServerConfig::has_compatible_wildcards(const PathPattern &path,
   }
   for (size_t i = 0; i < root_pattern.size(); ++i) {
     if (std::string::npos != root_pattern[i].find('*')) {
-      if (root_pattern[i] == "*" || root_pattern[i] == "/*")
-        root_wild++;
+      if (root_pattern[i] != "*" && root_pattern[i] != "/*")
+        return false;
+      root_wild++;
     }
   }
   if (path_wild != root_wild)
@@ -532,7 +575,8 @@ bool ServerConfig::has_compatible_wildcards(const PathPattern &path,
 
 bool ServerConfig::create_route_rules(
     const std::vector<std::string> &data,
-    const std::vector<Request::Method> &mets) {
+    const std::vector<Request::Method> &mets,
+    std::vector<std::size_t> &createdIndexes) {
 
   RouteRule route;
   std::vector<PathPattern> path_url = expand_path_pattern(data[1]);
@@ -550,36 +594,41 @@ bool ServerConfig::create_route_rules(
     }
     route.index = "";
     route.auth_info = "";
-    route.max_body_KB = 1;
+    route.max_body_KB = 0;
 
     for (size_t j = 0; j < path_url.size(); ++j) {
       route.path = path_url[j];
       route.root = root_url;
       if (!has_compatible_wildcards(route.path, route.root)) {
-        err_meg = route.path.to_string() + ", " + route.root.to_string() +
-                  "]: The route rule has a mismatch in wildcard usage around "
-                  "the operator. (route rule, the number of wildcard * "
-                  "occurrences in the left-hand and right-hand expressions "
-                  "must match, but the provided rule has inconsistent wildcard "
-                  "counts, making the mapping invalid).";
+        err_meg =
+            route.path.to_string() + ", " + route.root.to_string() +
+            "]: Invalid wildcard mapping in route rule "
+            "(the wildcard mapping rule is violated because each wildcard used "
+            "on the left-hand path must be mapped to an independent '*' "
+            "segment "
+            "on the right-hand path; patterns such as '/static/*.png' are not "
+            "allowed as a destination wildcard target. Use '/static/*' "
+            "instead).";
         return false;
       }
       if (route.op == REDIRECT)
         route.redirect_target = route.root;
       routes.push_back(route);
+      createdIndexes.push_back(routes.size() - 1);
     }
   }
   return true;
 }
 
 bool ServerConfig::parse_route_rule_block(const std::string &route_line,
-                                          FileDescriptor &fd) {
+                                          FileDescriptor &fd, char **envp) {
   std::string line;
   std::vector<Request::Method> mets;
   std::vector<std::string> route_line_data =
       utils::string_split(route_line, " ");
   std::vector<std::string> method =
       utils::string_split(route_line_data[0], "|");
+  std::vector<std::size_t> createdIndexes;
 
   for (std::size_t i = 0; i < method.size(); ++i) {
     if (method[i] == "GET")
@@ -592,7 +641,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
       mets.push_back(Request::DELETE);
   }
 
-  if (!create_route_rules(route_line_data, mets)) {
+  if (!create_route_rules(route_line_data, mets, createdIndexes)) {
     err_meg = "on [\t" + route_line + "], [" + err_meg;
     return false;
   }
@@ -614,7 +663,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
     line = utils::trim_whitespace(line);
     if (err_meg != "")
       return false;
-    else if (!apply_route_rule_entry(mets, route_line_data[1], line))
+    else if (!apply_route_rule_entry(line, createdIndexes, envp))
       return false;
   }
   err_meg = "";
@@ -626,7 +675,9 @@ RouteRule const *ServerConfig::find_route(Request::Method method,
   PathPattern pathPattern(path);
 
   for (size_t i = 0; i < routes.size(); ++i) {
-    if (routes[i].method == method && routes[i].path.matches(pathPattern)) {
+    if (((method == Request::HEAD && routes[i].method == Request::GET) ||
+         routes[i].method == method) &&
+        routes[i].path.matches(pathPattern)) {
       return &routes[i];
     }
   }
@@ -648,7 +699,7 @@ ServerConfig::find_route_cgi(Request::Method method,
 }
 
 std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
-  os << utils::debug << data.to_string();
+  os << data.to_string();
   return (os);
 }
 
@@ -671,13 +722,17 @@ static std::string what_RuleOperator(const RuleOperator op) {
     return ("AUTOINDEX (<i-)");
   else if (op == UPLOAD_TO)
     return ("UPLOAD_TO (->)");
+  else if (op == LOGIN_USING)
+    return ("LOGIN_USING (#)");
+  else if (op == UNDEFINED)
+    return ("UNDEFINED");
   else
     return ("SERVEFROM (<-)");
 }
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
   os << utils::debug
-     << "Server Response Time(s): " << data.get_server_response_time()
+     << "Server Response Time(ms): " << data.get_server_response_time()
      << std::endl;
 
   const std::map<std::string, std::string> &header = data.get_header();
@@ -719,7 +774,7 @@ std::ostream &operator<<(std::ostream &os, const ServerConfig &data) {
          << utils::debug << "\tError Page: "
          << "empty map";
     else {
-      std::map<int, std::string>::const_iterator err_it;
+      std::map<unsigned int, std::string>::const_iterator err_it;
       for (err_it = route.error_pages.begin();
            err_it != route.error_pages.end(); ++err_it)
         os << "\n"
@@ -769,7 +824,17 @@ std::string normalize_slashes(const std::string &path) {
 std::string ServerConfig::get_rewritten_path(Request::Method method,
                                              const std::string &path) const {
   const RouteRule *route = find_route(method, path);
-  if (!route)
+  if (!route) {
+    std::cout << utils::debug << "get_rewritten_path: NO ROUTE for " << path
+              << std::endl;
     return "";
-  return normalize_slashes(route->path.rewrite_path(path, route->root));
+  }
+  std::cout << utils::debug << "route.path='" << route->path.to_string()
+            << "' route.root='" << route->root.to_string() << "' req_path='"
+            << PathPattern(path).to_string() << "'" << std::endl;
+  const std::string result = normalize_slashes(
+      route->path.rewrite_path(PathPattern(path), route->root));
+  std::cout << utils::debug << "rewrite_path returned: '" << result << "'"
+            << std::endl;
+  return result;
 }

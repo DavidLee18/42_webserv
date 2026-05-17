@@ -2,6 +2,8 @@
 
 CGI_DIR=${CGI_DIR:-www-files/cgi-bin}
 
+mkdir -p $CGI_DIR
+
 if [[ -t 1 ]]; then
   C_PASS=$'\e[32m'; C_FAIL=$'\e[31m'; C_DIM=$'\e[2m'; C_OFF=$'\e[0m'
 else

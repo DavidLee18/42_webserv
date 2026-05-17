@@ -127,6 +127,15 @@ std::string utils::get_indent_whitespace_error(const std::string &line,
   std::size_t indent_level = utils::return_indent_level(line);
   std::string err_line = "";
 
+  if (line.empty()) {
+    if (level == 0)
+      return "";
+    std::ostringstream l_oss;
+    l_oss << level;
+    return "on []: It is not a valid indentation level(expected indentation "
+           "level: " +
+           l_oss.str() + ", found: 0)";
+  }
   if (level != 0 && line[0] != '\t') {
     err_line += "on [" + line +
                 "]: It is not a valid indentation character (expected "
@@ -145,14 +154,13 @@ std::string utils::get_indent_whitespace_error(const std::string &line,
       }
     }
     i_oss << indent_level;
-    ;
 
     err_line +=
         "on [" + line +
         "]: It is not a valid indentation level(expected indentation level: " +
         l_oss.str() + ", found: " + i_oss.str() + ")";
     return err_line;
-  } else if (utils::has_leading_space(&line[level])) {
+  } else if (utils::has_leading_space(line.substr(level))) {
     err_line += "on [" + line + "]: Leading whitespace exists.";
     return err_line;
   } else if (utils::has_trailing_space(line)) {
@@ -162,14 +170,12 @@ std::string utils::get_indent_whitespace_error(const std::string &line,
   return err_line;
 }
 
-std::string utils::check_html_file(const std::string &path) {
-  char cwd[4096];
-  getcwd(cwd, sizeof(cwd));
+std::string utils::check_html_file(const std::string &path, char **envp) {
 
-    std::string real_path = std::string(cwd) + "/" + path;
-    struct stat st;
-    if (stat(real_path.c_str(), &st) != 0)
-        return "Invalid HTML file (file does not exist or cannot be accessed).";
+  std::string real_path = utils::get_env("PWD", envp) + "/" + path;
+  struct stat st;
+  if (stat(real_path.c_str(), &st) != 0)
+    return "Invalid HTML file (file does not exist or cannot be accessed).";
 
   if (!S_ISREG(st.st_mode))
     return "Invalid HTML file (path is not a regular file).";
@@ -213,6 +219,31 @@ char utils::tolower(const char c) {
   return static_cast<char>(std::tolower(static_cast<int>(c)));
 }
 
+std::string utils::string_to_unsigned_int(const std::string &str,
+                                          unsigned int &num) {
+  errno = 0;
+  char *end;
+  unsigned long temp = std::strtoul(str.c_str(), &end, 10);
+
+  if (str.empty())
+    return "Invalid value (the unsigned integer conversion rule is violated "
+           "because the value is empty).";
+
+  if (str[0] == '0') {
+    if (str.size() != 1)
+      return "Invalid value (the unsigned integer leading zero rule is "
+             "violated because the value must not contain leading zeros).";
+  } else if (*end != '\0')
+    return "Invalid value (the unsigned integer conversion rule is violated "
+           "because the value cannot be fully converted as a base-10 unsigned "
+           "integer)";
+  else if (errno == ERANGE || temp > UINT_MAX)
+    return "Invalid value (the unsigned integer range rule is violated because "
+           "the value is outside the range of unsigned int).";
+  num = static_cast<unsigned int>(temp);
+  return "";
+}
+
 std::ostream &utils::debug(std::ostream &os) { return os << "[DEBUG] "; }
 
 std::ostream &utils::info(std::ostream &os) { return os << "[INFO] "; }
@@ -222,3 +253,17 @@ std::ostream &utils::warning(std::ostream &os) { return os << "[WARNING] "; }
 std::ostream &utils::error(std::ostream &os) { return os << "[ERROR] "; }
 
 std::ostream &utils::crlf(std::ostream &os) { return os << "\r" << std::endl; }
+
+std::string utils::get_env(std::string const &name, char **envp) {
+  if (envp == NULL || *envp == NULL)
+    return std::string();
+  for (size_t i = 0; envp[i] != NULL; i++) {
+    const std::string env_pair(envp[i]);
+    const size_t equals_pos = env_pair.find('=');
+    if (equals_pos == std::string::npos)
+      continue;
+    if (name == env_pair.substr(0, equals_pos))
+      return env_pair.substr(equals_pos + 1);
+  }
+  return std::string();
+}

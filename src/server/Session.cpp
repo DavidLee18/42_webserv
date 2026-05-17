@@ -6,24 +6,12 @@
 
 std::string Session::generate_session_id() {
   unsigned char random_bytes[16];
-  bool urandom_success = false;
 
   // 1. /dev/urandom에서 난수 추출 시도 (가장 안전한 방법)
   std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
   if (urandom.is_open()) {
     urandom.read(reinterpret_cast<char *>(random_bytes), 16);
-    if (urandom) {
-      urandom_success = true;
-    }
     urandom.close();
-  }
-
-  // 2. 실패 시 rand()로 fallback
-  if (!urandom_success) {
-    std::srand(static_cast<unsigned int>(std::time(NULL)));
-    for (int i = 0; i < 16; ++i) {
-      random_bytes[i] = static_cast<unsigned char>(std::rand() % 256);
-    }
   }
 
   // 3. UUID v4 규칙 적용

@@ -53,6 +53,7 @@ cat > "$SRC" <<EOF
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 
@@ -71,7 +72,7 @@ int main(int argc, char **argv) {
   ss << f.rdbuf();
   const std::string input = ss.str();
 
-  Result<Response> r = $FRAME_CALL(input);
+  Result<Response> r = $FRAME_CALL(input, std::map<std::string, std::string>());
   if (!r.has_value()) {
     std::cerr << "ERR: " << r.error() << std::endl;
     return 1;
