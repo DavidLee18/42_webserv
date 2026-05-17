@@ -82,6 +82,9 @@ cgi =
 	DELETE /storage/* <- /www-files/storage/*
 		@ /www-files/auth_info
 
+	DELETE /download/* <- /www-files/storage/*
+		@ /www-files/auth_info
+
 	GET * <- /www-files/*
 		? /www-files/index.html
 		@ /www-files/auth_info
@@ -103,6 +106,8 @@ cgi =
 	[] +<= Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'
 
 	...30000
+
+	GET /old_stuff/ =301> /new_stuff/
 
 	GET /old_stuff/* =301> /new_stuff/*
 
