@@ -152,10 +152,6 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
           client.out_buff += oss.str();
           client_write(client_fd); // when the response is generated freshly,
                                    // likely EPOLLIN | EPOLLOUT
-
-          if (client.dropping && client.out_buff.empty())
-            disconnect(client_fd);
-
           return;
         } else if (req_.error() == Errors::not_implemented) {
           Response resp =
@@ -340,10 +336,6 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
   }
   client_write(client_fd); // when the response is generated freshly, likely
                            // EPOLLIN | EPOLLOUT
-
-  if (client.dropping && client.out_buff.empty()) {
-    disconnect(client_fd);
-  }
 }
 
 void Server::client_write(const FileDescriptor *client_fd) {
