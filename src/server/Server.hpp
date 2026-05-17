@@ -16,7 +16,6 @@
 #include "Response.hpp"
 #include "Session.hpp"
 
-#include <arpa/inet.h>
 #include <csignal>
 #include <fcntl.h>
 #include <fstream>

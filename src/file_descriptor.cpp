@@ -75,14 +75,10 @@ Result<FileDescriptor> FileDescriptor::open_file(std::string const &path) {
 
   // Use lstat to inspect the path without following symlinks.
   struct stat st = {};
-  if (lstat(safe_path.c_str(), &st) != 0) {
+  if (stat(safe_path.c_str(), &st) != 0) {
     // Path does not exist or is otherwise invalid.
     return ERR(FileDescriptor,
                "config file does not exist or the file path is invalid");
-  }
-  if (S_ISLNK(st.st_mode)) {
-    // Reject symbolic links.
-    return ERR(FileDescriptor, "a symbolic link is not allowed");
   }
   if (!S_ISREG(st.st_mode)) {
     // Ensure the target is a regular file.

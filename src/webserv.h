@@ -19,7 +19,6 @@
 #include "server/Server.hpp"
 
 #include <algorithm>
-#include <arpa/inet.h>
 #include <cctype>
 #include <cerrno>
 #include <climits>

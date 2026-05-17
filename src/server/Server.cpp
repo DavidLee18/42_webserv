@@ -45,14 +45,12 @@ void Server::new_connection(const FileDescriptor *server_fd) {
                 << std::endl;
       continue;
     }
-    char ip_str[INET_ADDRSTRLEN];
-    if (inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN) ==
-        NULL) {
-      std::cerr << utils::error
-                << "failed to convert client IP address to string" << std::endl;
-      continue;
-    }
-    client.ip = ip_str;
+    std::ostringstream oss;
+    const unsigned char *octets =
+        reinterpret_cast<unsigned char *>(client_addr.sin_addr.s_addr);
+    oss << octets[0] << '.' << octets[1] << '.' << octets[2] << '.'
+        << octets[3];
+    client.ip = oss.str();
 
     // register client socket to EPoll
     Event client_event(NULL, true, true, true, false, false, false);
@@ -445,8 +443,10 @@ Result<Void> Server::init() {
     // Save pointer to distinguish server sockets from client sockets
     FileDescriptor *fd_ptr = add_result.value();
     listeners[fd_ptr] = &it->second;
-
-    std::cout << utils::info << "Server listening " << inet_ntoa(addr) << " : "
+    const unsigned char *octets =
+        reinterpret_cast<const unsigned char *>(&addr);
+    std::cout << utils::info << "Server listening " << octets[0] << '.'
+              << octets[1] << '.' << octets[2] << '.' << octets[3] << " : "
               << port << std::endl;
   }
   return OK(Void, Void());
@@ -579,7 +579,7 @@ Result<Void> Server::start() {
 
       const Event *event = ev_result.value();
       const FileDescriptor *fd = event->fd;
-      dprintf(2, "[DEBUG] epoll event on fd=%d\n", fd->_fd);
+      std::cerr << utils::debug << "epoll event on fd=" << fd->_fd << std::endl;
       // 1. 서버 소켓(문지기)인 경우 (listeners map에 Key가 존재함)
       if (listeners.find(fd) != listeners.end()) {
         new_connection(fd);

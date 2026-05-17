@@ -1688,11 +1688,13 @@ Result<Void> CgiDelegate::register_(
       _epoll.add_fd(stdout, read_event, read_option);
   if (!add_out_res.has_value()) {
     if (_stdin != NULL) {
-      dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+      std::cerr << utils::debug << "closing stdin: fd=" << _stdin->_fd
+                << std::endl;
       const int stdin = _stdin->_fd;
       _epoll.del_fd(_stdin);
       const int r = fcntl(stdin, F_GETFD);
-      dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
+      std::cerr << utils::debug << "F_GETFD stdin(" << stdin << "): " << r
+                << " (" << strerror(errno) << ')' << std::endl;
       _stdin = NULL;
     }
     _state = Failed;
@@ -1713,9 +1715,10 @@ Result<Void> CgiDelegate::register_(
 // Caller is expected to filter events and only forward those belonging to
 // fds this delegate registered. Unknown events are ignored.
 Result<Void> CgiDelegate::handle_event(const Event *ev) {
-  dprintf(2, "handle_event called: ev_fd=%d stdin=%d stdout=%d\n",
-          ev ? ev->fd->_fd : -1, _stdin ? _stdin->_fd : -1,
-          _stdout ? _stdout->_fd : -1);
+  std::cerr << utils::debug
+            << "handle_event called: ev_fd=" << (ev ? ev->fd->_fd : -1)
+            << " stdin=" << (_stdin ? _stdin->_fd : -1)
+            << " stdout=" << (_stdout ? _stdout->_fd : -1) << std::endl;
   if (ev == NULL)
     return OKV;
   if (_state == Failed)
@@ -1745,11 +1748,13 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       }
       // All data was already written; close stdin and continue.
 
-      dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+      std::cerr << utils::debug << "closing stdin: fd=" << _stdin->_fd
+                << std::endl;
       const int stdin = _stdin->_fd;
       _epoll.del_fd(_stdin);
       const int r = fcntl(stdin, F_GETFD);
-      dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
+      std::cerr << utils::debug << "F_GETFD stdin(" << stdin << "): " << r
+                << " (" << strerror(errno) << ')' << std::endl;
       _stdin = NULL;
       return OKV;
     }
@@ -1772,11 +1777,13 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       } else {
         // Done writing: drop stdin from epoll, which also closes the pipe,
         // signalling EOF to the CGI script.
-        dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+        std::cerr << utils::debug << "closing stdin: fd=" << _stdin->_fd
+                  << std::endl;
         const int stdin = _stdin->_fd;
         _epoll.del_fd(_stdin);
         const int r = fcntl(stdin, F_GETFD);
-        dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
+        std::cerr << utils::debug << "F_GETFD stdin(" << stdin << "): " << r
+                  << " (" << strerror(errno) << ')' << std::endl;
         _stdin = NULL;
         return OKV;
       }
@@ -1784,7 +1791,8 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
   }
   if (_stdout != NULL && ev->fd == _stdout) {
     // is_stdout
-    dprintf(2, "stdout event: in=%d hup=%d\n", ev->in, ev->hup);
+    std::cerr << utils::debug << "stdout event: in=" << ev->in
+              << " hup=" << ev->hup << std::endl;
     if (ev->in || ev->hup || ev->rdhup) {
       char buffer[4096];
       const Result<ssize_t> bytes_read =
@@ -1804,11 +1812,13 @@ Result<Void> CgiDelegate::handle_event(const Event *ev) {
       _epoll.del_fd(_stdout);
       _stdout = NULL;
       if (_stdin != NULL) {
-        dprintf(2, "closing stdin: fd=%d\n", _stdin->_fd);
+        std::cerr << utils::debug << "closing stdin: fd=" << _stdin->_fd
+                  << std::endl;
         const int stdin = _stdin->_fd;
         _epoll.del_fd(_stdin);
         const int r = fcntl(stdin, F_GETFD);
-        dprintf(2, "F_GETFD stdin(%d): %d (%s)\n", stdin, r, strerror(errno));
+        std::cerr << "F_GETFD stdin(" << stdin << "): " << r << " ("
+                  << strerror(errno) << ')' << std::endl;
         _stdin = NULL;
       }
       _state = Done;
