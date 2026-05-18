@@ -1,5 +1,5 @@
 #include "Client.hpp"
-#include "../errors.h"
+#include "../Errors.hpp"
 
 ClientSession::~ClientSession() {
   if (req != NULL)

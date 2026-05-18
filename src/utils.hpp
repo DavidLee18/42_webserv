@@ -1,7 +1,7 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
-#include "file_descriptor.h"
+#include "FileDescriptor.hpp"
 #include "server/Client.hpp"
 #include <cstdlib>
 #include <sys/stat.h>
@@ -35,5 +35,7 @@ std::ostream &warning(std::ostream &);
 std::ostream &error(std::ostream &);
 std::ostream &crlf(std::ostream &);
 std::string get_env(std::string const &name, char **envp);
+
+unsigned char to_upper(unsigned char);
 } // namespace utils
 #endif

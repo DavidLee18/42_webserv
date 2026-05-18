@@ -1,4 +1,7 @@
-#include "webserv.h"
+#include "utils.hpp"
+#include <algorithm>
+#include <cerrno>
+#include <limits>
 
 int utils::count_occurrences(const std::string &line,
                              const std::string &delim) {
@@ -237,7 +240,7 @@ std::string utils::string_to_unsigned_int(const std::string &str,
     return "Invalid value (the unsigned integer conversion rule is violated "
            "because the value cannot be fully converted as a base-10 unsigned "
            "integer)";
-  else if (errno == ERANGE || temp > UINT_MAX)
+  else if (errno == ERANGE || temp > std::numeric_limits<unsigned int>::max())
     return "Invalid value (the unsigned integer range rule is violated because "
            "the value is outside the range of unsigned int).";
   num = static_cast<unsigned int>(temp);
@@ -266,4 +269,8 @@ std::string utils::get_env(std::string const &name, char **envp) {
       return env_pair.substr(equals_pos + 1);
   }
   return std::string();
+}
+
+unsigned char utils::to_upper(const unsigned char c) {
+  return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
 }

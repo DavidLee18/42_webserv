@@ -1,5 +1,6 @@
 #include "Response.hpp"
-#include "../cgi_1_1.h"
+#include "../Errors.hpp"
+#include "../cgi_1_1/CgiDelegate.hpp"
 #include "../utils.hpp"
 #include "Session.hpp"
 
