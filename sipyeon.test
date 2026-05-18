@@ -1,0 +1,471 @@
+webserv curl test plan
+======================
+
+Assumptions
+-----------
+- Host: 127.0.0.1
+- Port: 8080
+- Base URL: http://127.0.0.1:8080
+- Adjust ports, hostnames, and paths to match the active configuration.
+
+Setup
+-----
+```bash
+export HOST=127.0.0.1
+export PORT=8080
+export BASE="http://$HOST:$PORT"
+```
+
+1. Basic connectivity
+---------------------
+
+```bash
+curl -i "$BASE/"
+```
+Expected:
+- 200 OK, or a configured redirect if `/` is not served directly.
+- Response headers include `Server`, `Date`, `Content-Type`, and `Content-Length`.
+
+```bash
+curl -I "$BASE/"
+```
+Expected:
+- Same status code as GET.
+- No response body.
+
+```bash
+curl -v "$BASE/"
+```
+Expected:
+- Connection succeeds.
+- No crash.
+
+2. Missing and malformed URLs
+-----------------------------
+
+```bash
+curl -i "$BASE/does-not-exist"
+curl -i "$BASE/../etc/passwd"
+curl -i --path-as-is "$BASE/%2e%2e/%2e%2e/etc/passwd"
+curl -i --path-as-is "$BASE/%00"
+```
+Expected:
+- 400 or 404, depending on the case.
+- No crash.
+- No file traversal leak.
+
+```bash
+curl -i "$BASE//"
+curl -i "$BASE/./././missing"
+```
+Expected:
+- Valid HTTP response, usually 404 or a directory response.
+
+3. HTTP methods
+---------------
+
+```bash
+curl -i "$BASE/index.html"
+curl -i -X POST "$BASE/upload" --data "hello=world"
+curl -i -X DELETE "$BASE/storage/test.txt"
+```
+Expected:
+- GET returns 200, 301, 302, or 404 depending on the route.
+- POST to `/upload` returns 404 on the current `default.wbsrv` config because that route is not defined.
+- If you add an upload route yourself, POST may return 200/201/204 if accepted, or 400/405/413 if rejected.
+- DELETE returns 204 on success or an error status if forbidden or missing.
+
+Edge cases:
+
+```bash
+curl -i -X DELETE "$BASE/storage/no-such-file.txt"
+curl -i -X POST "$BASE/upload" --data ""
+curl -i -X POST "$BASE/upload" --data-binary @/dev/null
+```
+Expected:
+- No crash.
+- `POST /upload` should again return 404 on this config unless you add that route.
+- Proper 4xx/2xx status according to route rules for any configured POST endpoint such as `/storage/` or `/cgi-test/echo`.
+
+4. Unknown methods and invalid requests
+---------------------------------------
+
+```bash
+curl -i -X PROPFIND "$BASE/"
+curl -i -X FOO "$BASE/"
+curl -i -X PATCH "$BASE/"
+```
+Expected:
+- 400 or 405.
+- No crash.
+
+Raw invalid request examples:
+
+```bash
+printf 'GET / HTTP/1.1\r\n\r\n' | nc 127.0.0.1 8080
+printf 'GET / HTTP/1.1\r\nHost: a\r\nHost: b\r\n\r\n' | nc 127.0.0.1 8080
+printf 'GET / HTTP/1.1\r\nHost : a\r\n\r\n' | nc 127.0.0.1 8080
+printf 'GET / HTTP/1.1\r\nHost: a\r\nX-Test\r\n\r\n' | nc 127.0.0.1 8080
+```
+Expected:
+- 400 Bad Request.
+- Server remains alive.
+
+5. Multiple servers and hostnames
+---------------------------------
+
+```bash
+curl -i "http://127.0.0.1:8080/"
+curl -i "http://127.0.0.1:8081/"
+```
+Expected:
+- Each port serves the correct site/configuration.
+
+```bash
+curl -i --resolve example.com:8080:127.0.0.1 "http://example.com:8080/"
+curl -i --resolve test.local:8080:127.0.0.1 "http://test.local:8080/"
+```
+Expected:
+- Hostname-based virtual host selection works.
+
+6. Default error pages
+----------------------
+
+```bash
+curl -i "$BASE/does-not-exist"
+curl -i "$BASE/%2Fetc%2Fpasswd"
+curl -i "$BASE/%00"
+```
+Expected:
+- 404/400 page according to the error.
+- Custom error page is shown if configured.
+
+7. Request body size limit
+--------------------------
+
+```bash
+curl -i -X POST "$BASE/upload" -H "Content-Type: text/plain" --data "small body"
+```
+Expected:
+- Accepted if under the route limit.
+
+```bash
+python3 - <<'PY' | curl -i -X POST "$BASE/upload" -H "Content-Type: text/plain" --data-binary @-
+print("A" * 200000)
+PY
+```
+Expected:
+- 413 Payload Too Large, or the configured rejection code.
+
+Edge cases:
+
+```bash
+curl -i -X POST "$BASE/upload" -H "Content-Type: text/plain" --data ""
+curl -i -X POST "$BASE/upload" -H "Content-Type: text/plain" --data-binary @<(python3 - <<'PY'
+print("A" * 1024)
+PY
+)
+```
+Expected:
+- Accepted or rejected according to the configured limit and route behavior.
+
+8. Routes to different directories
+----------------------------------
+
+```bash
+curl -i "$BASE/"
+curl -i "$BASE/old_stuff/"
+curl -i "$BASE/new_stuff/"
+curl -i "$BASE/download/"
+```
+Expected:
+- Each route resolves to the configured root or directory listing.
+
+Edge cases:
+
+```bash
+curl -i "$BASE/old_stuff"
+curl -i "$BASE/new_stuff"
+curl -i "$BASE/download"
+```
+Expected:
+- Redirect, directory response, or 404 depending on configuration.
+
+9. Default file serving for directories
+---------------------------------------
+
+```bash
+curl -i "$BASE/"
+curl -i "$BASE/download/"
+curl -i "$BASE/images/"
+```
+Expected:
+- Directory requests serve the configured index/default file or autoindex.
+
+10. Accepted methods per route
+------------------------------
+
+```bash
+curl -i -X DELETE "$BASE/delete-enabled/resource"
+curl -i -X DELETE "$BASE/read-only/resource"
+curl -i -X POST "$BASE/read-only/resource"
+```
+Expected:
+- Allowed methods succeed.
+- Disallowed methods return 405 or the configured error.
+
+11. File upload and retrieval
+-----------------------------
+
+```bash
+curl -i -F "file=@www-files/index.html" "$BASE/upload"
+curl -i -F "file=@www-files/session-info.html" "$BASE/upload"
+```
+Expected:
+- Multipart upload succeeds if the route permits it.
+
+```bash
+curl -i "$BASE/storage/index.html"
+curl -i "$BASE/storage/session-info.html"
+```
+Expected:
+- Uploaded files are retrievable and match the stored content.
+
+Edge cases:
+
+```bash
+curl -i -F "file=@/etc/hosts" "$BASE/upload"
+curl -i -F "file=@www-files/index.html;filename=../../evil.txt" "$BASE/upload"
+curl -i -F "file=@www-files/index.html;filename=subdir/evil.txt" "$BASE/upload"
+```
+Expected:
+- Traversal filenames are rejected.
+- No file is written outside the upload directory.
+
+12. CGI GET
+-----------
+
+```bash
+curl -i "$BASE/cgi-test/hello"
+curl -i "$BASE/cgi-test/cwd"
+curl -i "$BASE/cgi-test/envdump"
+```
+Expected:
+- 200 OK.
+- CGI runs in the correct directory.
+- Relative file access works from the CGI directory.
+
+Edge cases:
+
+```bash
+curl -i "$BASE/cgi-test/hello?name=alice&id=42"
+curl -i "$BASE/cgi-test/cwd?x=1&y=2"
+```
+Expected:
+- `QUERY_STRING` is present and correctly populated.
+
+13. CGI POST
+------------
+
+```bash
+curl -i -X POST "$BASE/cgi-test/envdump-post" -H "Content-Type: application/x-www-form-urlencoded" --data "field=value"
+curl -i -X POST "$BASE/cgi-test/echo" -H "Content-Type: application/x-www-form-urlencoded" --data "hello=world"
+```
+Expected:
+- 200 OK if the CGI is working.
+- `CONTENT_LENGTH`, `CONTENT_TYPE`, and stdin body are passed correctly.
+
+Edge cases:
+
+```bash
+curl -i -X POST "$BASE/cgi-test/envdump-post" -H "Content-Type: application/x-www-form-urlencoded" --data ""
+curl -i -X POST "$BASE/cgi-test/envdump-post" -H "Content-Type: text/plain" --data "abc"
+```
+Expected:
+- Proper error handling or accepted behavior based on route implementation.
+
+14. CGI error handling and limits
+---------------------------------
+
+```bash
+curl -i "$BASE/cgi-test/memhog"
+curl -i "$BASE/cgi-test/burncpu"
+curl -i "$BASE/cgi-test/fbomb"
+curl -i "$BASE/cgi-test/fdhog"
+```
+Expected:
+- Server does not crash.
+- CGI is bounded by timeout and resource limits.
+- Typical results are 502, 504, 413, or a valid CGI response.
+
+```bash
+curl -i "$BASE/cgi-test/sleep"
+curl -i "$BASE/cgi-test/fddump"
+```
+Expected:
+- Sleep CGI is terminated or times out cleanly.
+- FD dump stays within expected limits.
+
+For `memhog.cgi` specifically:
+- It prints headers first.
+- It attempts to allocate memory until Python raises `MemoryError`.
+- Your server should either kill it under a resource limit/timeout or return its output safely.
+- The server must remain alive afterward.
+
+15. Redirects
+-------------
+
+```bash
+curl -i "$BASE/old_stuff/"
+curl -i "$BASE/redirect"
+curl -i "$BASE/old_stuff"
+```
+Expected:
+- 301/302 with a valid `Location` header.
+
+```bash
+curl -i -L "$BASE/old_stuff/"
+```
+Expected:
+- Follows redirect successfully.
+
+16. Directory listing / autoindex
+---------------------------------
+
+```bash
+curl -i "$BASE/download/"
+curl -i "$BASE/images/"
+```
+Expected:
+- Autoindex HTML if enabled.
+- 403/404 if directory listing is disabled or forbidden.
+
+17. Chunked body edge cases
+---------------------------
+
+Valid chunked request:
+
+```bash
+printf 'POST /upload HTTP/1.1\r\nHost: a\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n' | nc 127.0.0.1 8080
+```
+Expected:
+- Accepted if the route supports chunked uploads.
+
+Malformed chunked requests:
+
+```bash
+printf 'POST /upload HTTP/1.1\r\nHost: a\r\nTransfer-Encoding: chunked\r\n\r\nZ\r\nhello\r\n0\r\n\r\n' | nc 127.0.0.1 8080
+printf 'POST /upload HTTP/1.1\r\nHost: a\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello0\r\n\r\n' | nc 127.0.0.1 8080
+printf 'POST /upload HTTP/1.1\r\nHost: a\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhel' | nc 127.0.0.1 8080
+```
+Expected:
+- 400 or 408 depending on completeness and timeout behavior.
+
+18. Slow connections and hanging clients
+----------------------------------------
+
+```bash
+curl -i --limit-rate 1B -X POST "$BASE/upload" --data-binary @<(python3 - <<'PY'
+print("A" * 1024)
+PY
+)
+```
+Expected:
+- Connection eventually times out cleanly.
+- No hanging forever.
+
+```bash
+nc 127.0.0.1 8080
+```
+Then type slowly:
+
+```text
+GET / HTTP/1.1
+Host: localhost:8080
+```
+Expected:
+- Idle/partial connection is closed by the server after the configured timeout.
+
+19. Keep-alive and pipelining
+-----------------------------
+
+```bash
+curl -i --http1.1 "$BASE/"
+curl -i --http1.1 "$BASE/" "$BASE/index.html"
+```
+Expected:
+- Keep-alive works.
+- Multiple requests are handled correctly.
+
+Raw pipelined test:
+
+```bash
+printf 'GET / HTTP/1.1\r\nHost: a\r\nConnection: keep-alive\r\n\r\nGET /index.html HTTP/1.1\r\nHost: a\r\nConnection: close\r\n\r\n' | nc 127.0.0.1 8080
+```
+Expected:
+- Both requests are processed.
+- No duplicate read/write per select-equivalent event.
+
+20. Browser checks
+------------------
+
+Open the browser devtools Network tab and verify:
+- Request headers are correct.
+- Response headers include `Server`, `Date`, `Content-Type`, `Content-Length`.
+- 404 pages show the custom error page.
+- Redirects work.
+- Directory listing loads.
+- Static website serving works.
+
+21. Siege stress tests
+----------------------
+
+Install Siege:
+
+```bash
+brew install siege
+```
+
+Basic stress test:
+
+```bash
+siege -b -c 20 -r 50 http://127.0.0.1:8080/
+siege -b -c 10 -r 100 http://127.0.0.1:8080/index.html
+```
+
+Edge cases:
+
+```bash
+siege -b -c 50 -r 20 -d 1 http://127.0.0.1:8080/
+siege -b -c 1 -r 500 http://127.0.0.1:8080/
+```
+Expected:
+- Availability above 99.5% on a simple GET to an empty page.
+- No memory growth that increases indefinitely.
+- No hanging connections.
+- The server should remain usable without restarts.
+
+22. What to verify in code during the defense
+---------------------------------------------
+
+These are not curl commands, but they are mandatory talking points:
+- There is one main multiplexing loop.
+- Read and write happen only after the multiplexing call reports readiness.
+- There is only one read or one write per client per readiness event.
+- No socket I/O occurs outside the main loop.
+- Every socket I/O return value is checked correctly.
+- If a socket I/O error occurs, the client is removed.
+- `errno` is not used after read/write for normal control flow.
+
+23. Notes about `memhog.cgi`
+---------------------------
+
+The script is expected to:
+- print headers immediately,
+- try to allocate about 4 GiB in 1 MiB chunks,
+- catch `MemoryError` and print `memory error caught` if it reaches Python’s memory limit.
+
+From the server’s perspective, acceptable outcomes are:
+- bounded and terminated by your resource limit or timeout,
+- or a clean CGI response,
+- but never a crash or a hung worker.

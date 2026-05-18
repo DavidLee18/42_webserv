@@ -10,11 +10,11 @@
 #include <cctype>
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <sstream>
 #include <string>
-#include <fstream>
 
 class ServerConfig;
 class Request;
@@ -29,13 +29,13 @@ struct ClientSession {
   Request *req;
   timespec last_activity_time; ///< Timestamp for timeout tracking.
   bool dropping;
-  std::ifstream out_file;     ///< Optional file stream for response streaming.
-  size_t out_file_offset;     ///< Offset into streaming file.
-  bool streaming_file;        ///< Whether we're currently streaming a file.
+  std::string out_file_path;   ///< File path for streamed responses.
+  size_t out_file_offset;      ///< Offset into streaming file.
+  bool streaming_file;         ///< Whether we're currently streaming a file.
 
   ClientSession()
       : config(NULL), req(NULL), last_activity_time(), dropping(false),
-        out_file(), out_file_offset(0), streaming_file(false) {}
+        out_file_path(), out_file_offset(0), streaming_file(false) {}
   ~ClientSession();
 };
 

@@ -12,8 +12,7 @@ void Server::dispatch_request(const FileDescriptor *client_fd,
 
   // Log request details
   Result<size_t> content_length = client.req->get_content_length();
-  std::cout << "\n"
-            << utils::info << "client ip: " << client.ip << std::endl;
+  std::cout << "\n" << utils::info << "client ip: " << client.ip << std::endl;
   std::cout << utils::info << "[Request] " << client.req->get_method_string()
             << " " << client.req->get_path() << " (Body: ";
   if (content_length.has_value())
@@ -24,8 +23,8 @@ void Server::dispatch_request(const FileDescriptor *client_fd,
   for (std::map<std::string, std::string>::const_iterator it =
            client.req->get_headers().begin();
        it != client.req->get_headers().end(); ++it) {
-    std::cout << utils::info << "[Request]" << it->first << ": "
-              << it->second << std::endl;
+    std::cout << utils::info << "[Request]" << it->first << ": " << it->second
+              << std::endl;
   }
 
   // Dispatch to CGI if applicable
@@ -42,8 +41,8 @@ void Server::dispatch_request(const FileDescriptor *client_fd,
   }
 
   // Generate normal HTTP response
-  Response http = ServerResponse::http_response(client.req, &client,
-                                                mime_type, &sessions, envp);
+  Response http = ServerResponse::http_response(client.req, &client, mime_type,
+                                                &sessions, envp);
   http.print_simple(std::cout);
 
   delete client.req;
@@ -83,9 +82,9 @@ void Server::queue_response(const FileDescriptor *client_fd,
       std::ostringstream ss;
       ss << response; // headers only (body is not set)
       client.out_buff += ss.str();
-      client.out_file.open(response.file_path.c_str(), std::ios::binary);
-      if (client.out_file.is_open()) {
-        client.out_file_offset = 0;
+      client.out_file_path = response.file_path;
+      client.out_file_offset = 0;
+      if (!client.out_file_path.empty()) {
         client.streaming_file = true;
       } else {
         // Could not open: send 404
@@ -276,7 +275,20 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
       // Refresh client reference before continuing
       if (clients.find(client_fd) == clients.end())
         return;
-      client.req->continue_parsing(in_buffer);
+      const Result<Void> parse_more = client.req->continue_parsing(in_buffer);
+      if (!parse_more.has_value()) {
+        std::cerr << utils::error
+                  << "request body parsing failed: " << parse_more.error()
+                  << std::endl;
+        Response resp(
+            DefaultError::default_err_response(Response::BAD_REQUEST));
+        resp.headers = client.config->get_header();
+        resp.print_simple(std::cout);
+        queue_response(client_fd, resp);
+        delete client.req;
+        client.req = NULL;
+        return;
+      }
       const Result<size_t> content_len = client.req->get_content_length();
       const RouteRule *const rule = client.config->find_route(
           client.req->get_method(), client.req->get_path());
@@ -338,20 +350,29 @@ void Server::client_write(const FileDescriptor *client_fd) {
         return;
       }
     }
-  } else if (client.dropping)
+  } else if (client.dropping) {
     disconnect(client_fd);
+    return;
+  }
 
   // If we've emptied the write buffer and are streaming a file, load next
   // chunk from disk into the buffer and attempt to send it immediately.
   if (write_buffer.empty() && client.streaming_file) {
     const size_t CHUNK = NETWORK_BUFFER_SIZE; // 4096
     std::vector<char> buf(CHUNK);
-    if (!client.out_file.is_open()) {
+    if (client.out_file_path.empty()) {
       client.streaming_file = false;
     } else {
-      client.out_file.seekg(static_cast<std::streamoff>(client.out_file_offset));
-      client.out_file.read(buf.data(), static_cast<std::streamsize>(CHUNK));
-      std::streamsize read_bytes = client.out_file.gcount();
+      std::ifstream infile(client.out_file_path.c_str(), std::ios::binary);
+      if (!infile.is_open()) {
+        client.streaming_file = false;
+        if (client.dropping)
+          disconnect(client_fd);
+        return;
+      }
+      infile.seekg(static_cast<std::streamoff>(client.out_file_offset));
+      infile.read(buf.data(), static_cast<std::streamsize>(CHUNK));
+      std::streamsize read_bytes = infile.gcount();
       if (read_bytes > 0) {
         client.out_file_offset += static_cast<size_t>(read_bytes);
         client.out_buff.append(buf.data(), static_cast<size_t>(read_bytes));
@@ -368,11 +389,12 @@ void Server::client_write(const FileDescriptor *client_fd) {
         }
       }
 
-      if (client.out_file.eof()) {
-        client.out_file.close();
+      if (infile.eof()) {
         client.streaming_file = false;
+        client.out_file_path.clear();
         if (client.dropping && client.out_buff.empty())
           disconnect(client_fd);
+        return;
       }
     }
   }
@@ -453,8 +475,9 @@ Result<Void> Server::init() {
 
 Result<Void> Server::start(char **envp) {
   std::cout << utils::info << "Starting server loop..." << std::endl;
-  long epoll_timeout = -1; // Default: wait indefinitely
   while (g_receivedSignal == 0) {
+    long epoll_timeout = -1; // Default: wait indefinitely
+
     // Check for client timeouts and calculate epoll timeout
     timespec now = {};
     if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
@@ -464,7 +487,8 @@ Result<Void> Server::start(char **envp) {
       continue;
     }
 
-    // Collect clients to disconnect or flush (avoid modifying map during iteration)
+    // Collect clients to disconnect or flush (avoid modifying map during
+    // iteration)
     std::vector<const FileDescriptor *> clients_to_disconnect;
     std::vector<std::pair<const FileDescriptor *, Response> > clients_to_flush;
 
@@ -477,11 +501,9 @@ Result<Void> Server::start(char **envp) {
       if (session.config == NULL)
         continue;
 
-      // Server config provides timeout in milliseconds
-      const long timeout_ms = static_cast<long>(
-          session.config->get_server_response_time()); // ms
+      const long timeout_ms =
+          static_cast<long>(session.config->get_server_response_time());
       if (timeout_ms > 0) {
-        // compute elapsed in milliseconds safely
         const long long elapsed_ms =
             (now.tv_sec - session.last_activity_time.tv_sec) * 1000LL +
             (now.tv_nsec - session.last_activity_time.tv_nsec) / 1000000LL;
@@ -494,40 +516,31 @@ Result<Void> Server::start(char **envp) {
         const long chunked_pending_ms = CHUNKED_PENDING_TIMEOUT * 1000L;
         const long idle_timeout_ms = IDLE_TIMEOUT * 1000L;
 
-        // Check for idle connections (no request, no buffered input)
         if (session.req == NULL && session.in_buff.empty() &&
             elapsed_ms >= idle_timeout_ms) {
-          // Idle client connection exceeded timeout -> schedule disconnect
           clients_to_disconnect.push_back(client_fd);
         } else if (elapsed_ms >= timeout_ms &&
-            (session.req == NULL ||
-             (!session.req->is_partial() && session.in_buff.empty()))) {
-          // Client has timed out -> schedule disconnect
+                   (session.req == NULL ||
+                    (!session.req->is_partial() && session.in_buff.empty()))) {
           clients_to_disconnect.push_back(client_fd);
         } else if (elapsed_ms >= chunked_pending_ms &&
                    (session.req &&
                     (session.req->is_partial() || !session.in_buff.empty()))) {
-          // Pending chunked/partial read exceeded; schedule a 408 flush
           Response resp =
               DefaultError::default_err_response(Response::REQUEST_TIMEOUT);
           clients_to_flush.push_back(std::make_pair(client_fd, resp));
         } else {
-          // Calculate remaining time until this client times out (ms)
           long remaining_ms;
-          if (session.req == NULL && session.in_buff.empty()) {
-            // Idle connection: use idle timeout
+          if (session.req == NULL && session.in_buff.empty())
             remaining_ms = static_cast<long>(idle_timeout_ms - elapsed_ms);
-          } else {
-            // Active/partial request: use server response timeout
+          else
             remaining_ms = static_cast<long>(timeout_ms - elapsed_ms);
-          }
           if (epoll_timeout == -1 || remaining_ms < epoll_timeout)
             epoll_timeout = remaining_ms;
         }
       }
     }
 
-    // Apply pending flushes (safe to mutate clients now)
     for (size_t i = 0; i < clients_to_flush.size(); ++i) {
       const FileDescriptor *fd = clients_to_flush[i].first;
       const Response &resp = clients_to_flush[i].second;
@@ -541,13 +554,13 @@ Result<Void> Server::start(char **envp) {
         jt->second.dropping = true;
       jt->second.out_buff = oss.str();
       client_write(jt->first);
+      if (clients.find(fd) != clients.end() && jt->second.dropping)
+        disconnect(fd);
     }
 
-    // Disconnect timed-out clients
     for (size_t i = 0; i < clients_to_disconnect.size(); ++i)
       disconnect(clients_to_disconnect[i]);
 
-    // Clean expired sessions (use the first server's timeout as default)
     if (clients.begin() != clients.end()) {
       const unsigned int session_timeout_ms =
           clients.begin()->second.config->get_server_response_time();
@@ -556,7 +569,6 @@ Result<Void> Server::start(char **envp) {
             static_cast<int>(session_timeout_ms / 1000));
     }
 
-    // apply CGI timeout
     std::set<CgiDelegate *> cgis_to_reap;
     for (std::map<const FileDescriptor *,
                   std::pair<const FileDescriptor *, CgiDelegate *> >::iterator
@@ -582,14 +594,21 @@ Result<Void> Server::start(char **envp) {
         const Result<std::string> resp_res = it->second.second->poll();
         Response resp;
         if (resp_res.has_value()) {
+          std::map<FileDescriptor const *, ClientSession>::iterator jt =
+              clients.find(it->second.first);
+          if (jt == clients.end()) {
+            cgis_to_reap.insert(cgi);
+            continue;
+          }
           const Result<Response> resp_res2 = Response::from_cgi_outbuff(
-              resp_res.value(), std::map<std::string, std::string>());
+              resp_res.value(), jt->second.config->get_header());
           resp =
               resp_res2.has_value()
                   ? resp_res2.value()
                   : DefaultError::default_err_response(Response::BAD_GATEWAY);
-        } else
+        } else {
           resp = DefaultError::default_err_response(Response::BAD_GATEWAY);
+        }
 
         resp.print_simple(std::cout);
         std::ostringstream oss;
@@ -606,7 +625,7 @@ Result<Void> Server::start(char **envp) {
         cgis_to_reap.insert(cgi);
       } else {
         const size_t cgi_remaining =
-            cgi->remaining_ns() / static_cast<size_t>(1e6); // milliseconds
+            cgi->remaining_ns() / static_cast<size_t>(1e6);
         if (epoll_timeout == -1 ||
             cgi_remaining < static_cast<size_t>(epoll_timeout))
           epoll_timeout = static_cast<long>(cgi_remaining);
@@ -616,7 +635,6 @@ Result<Void> Server::start(char **envp) {
          it != cgis_to_reap.end(); ++it)
       reap_cgi(*it);
 
-    // Waiting for events using epoll
     Result<Events> events_result = epoll.wait(static_cast<int>(epoll_timeout));
     if (!events_result.has_value()) {
       if (events_result.error() == Errors::interrupted)
@@ -633,11 +651,9 @@ Result<Void> Server::start(char **envp) {
       const Event *event = ev_result.value();
       const FileDescriptor *fd = event->fd;
       std::cerr << utils::debug << "epoll event on fd=" << fd->_fd << std::endl;
-      // 1. 서버 소켓(문지기)인 경우 (listeners map에 Key가 존재함)
       if (listeners.find(fd) != listeners.end()) {
         new_connection(fd);
-      } else if (clients.find(fd) !=
-                 clients.end()) { // 2. 이미 연결된 클라이언트 소켓인 경우
+      } else if (clients.find(fd) != clients.end()) {
         if (event->in)
           client_read(fd, envp);
         if (event->out)
@@ -647,9 +663,9 @@ Result<Void> Server::start(char **envp) {
             client_read(fd, envp);
           disconnect(fd);
         }
-      } else { // CGI
+      } else {
         std::map<FileDescriptor const *,
-                 std::pair<FileDescriptor const *, CgiDelegate *> >::iterator
+                 std::pair<const FileDescriptor *, CgiDelegate *> >::iterator
             it = cgis.find(fd);
 
         if (it != cgis.end()) {
@@ -662,25 +678,32 @@ Result<Void> Server::start(char **envp) {
             if (res.error() == Errors::gateway_timeout)
               resp =
                   DefaultError::default_err_response(Response::GATEWAY_TIMEOUT);
-            else // res.error() == Errors::bad_gateway
+            else
               resp = DefaultError::default_err_response(Response::BAD_GATEWAY);
           } else {
             Result<std::string> output = cgi->poll();
+            std::map<FileDescriptor const *, ClientSession>::iterator jt =
+                clients.find(client_fd);
+            if (jt == clients.end()) {
+              reap_cgi(cgi);
+              continue;
+            }
             if (output.has_value()) {
               const Result<Response> res_ = Response::from_cgi_outbuff(
-                  output.value(), clients.at(client_fd).config->get_header());
+                  output.value(), jt->second.config->get_header());
               if (res_.has_value())
                 resp = res_.value();
               else
                 resp =
                     DefaultError::default_err_response(Response::BAD_GATEWAY);
-            } else
+            } else {
               continue;
+            }
             resp.print_simple(std::cout);
             oss << resp;
             if (!resp.keep_alive)
-              clients.at(client_fd).dropping = true;
-            clients.at(client_fd).out_buff = oss.str();
+              jt->second.dropping = true;
+            jt->second.out_buff = oss.str();
             client_write(client_fd);
             reap_cgi(cgi);
           }
