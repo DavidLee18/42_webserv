@@ -80,7 +80,7 @@ public:
   ServerConfig(FileDescriptor &, std::map<std::string, std::string> &global_cgi,
                char **envp);
   ServerConfig()
-      : header(), server_response_time_ms(3), routes(), R_CGI(), file_extension(),
+      : header(), server_response_time_ms(3000), routes(), R_CGI(), file_extension(),
         end_flag(0), err_meg(), origin_line(),  count_line(0) {}
   RouteRule const *find_route(Request::Method method,
                               const std::string &path) const;
