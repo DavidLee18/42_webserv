@@ -14,6 +14,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <fstream>
 
 class ServerConfig;
 class Request;
@@ -28,9 +29,13 @@ struct ClientSession {
   Request *req;
   timespec last_activity_time; ///< Timestamp for timeout tracking.
   bool dropping;
+  std::ifstream out_file;     ///< Optional file stream for response streaming.
+  size_t out_file_offset;     ///< Offset into streaming file.
+  bool streaming_file;        ///< Whether we're currently streaming a file.
 
   ClientSession()
-      : config(NULL), req(NULL), last_activity_time(), dropping(false) {}
+      : config(NULL), req(NULL), last_activity_time(), dropping(false),
+        out_file(), out_file_offset(0), streaming_file(false) {}
   ~ClientSession();
 };
 
@@ -69,9 +74,8 @@ public:
   std::string get_cookie() const { return cookie; }
   std::string get_cookie_value(const std::string &name) const;
   void set_cookie(const std::string &value) { cookie = value; }
-  const std::map<std::string, std::string> &get_headers() const {
-    return header;
-  }
+  const std::map<std::string, std::string> &get_headers() const
+  { return header; }
   const std::string &get_query() const { return query; }
   const std::string &get_body() const { return body; }
   Result<size_t> get_content_length() const;
@@ -85,6 +89,21 @@ public:
   Result<Void> continue_parsing(std::string &);
 
   Result<size_t> unchunk(size_t remnant_end);
+
+  // Helper parsers broken out from from_buff for clarity and testability.
+  static Result<Void> parse_request_line(std::stringstream &ss,
+                                        Method &method,
+                                        std::string &req_path,
+                                        std::string &req_version,
+                                        const size_t cl_pos,
+                                        const size_t te_pos,
+                                        std::string &line);
+
+  static Result<Void> parse_headers(std::stringstream &ss, Request *req);
+
+  static Result<Void> parse_body_or_chunked(std::stringstream &ss,
+                                           std::string &buff, Request *req,
+                                           const size_t header_end);
 
 private:
   Method method;       ///< The HTTP method (e.g., "GET").

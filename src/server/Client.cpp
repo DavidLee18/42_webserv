@@ -1,6 +1,157 @@
 #include "Client.hpp"
 #include "../errors.h"
 
+// Helper parser implementations for Request::from_buff splitting.
+Result<Void> Request::parse_request_line(std::stringstream &ss,
+                                         Request::Method &method,
+                                         std::string &req_path,
+                                         std::string &req_version,
+                                         const size_t cl_pos,
+                                         const size_t te_pos,
+                                         std::string &line) {
+  if (std::getline(ss, line) && !ss.fail()) {
+    if (!line.empty() && line[line.size() - 1] == '\r')
+      line.erase(line.size() - 1);
+
+    std::stringstream line_ss(line);
+    std::string method_str;
+
+    line_ss >> method_str;  // "GET"
+    line_ss >> req_path;    // "/"
+    line_ss >> req_version; // "HTTP/1.1"
+    if (req_version != "HTTP/1.0" && req_version != "HTTP/1.1")
+      return ERR(Void, Errors::bad_request);
+    if (line.length() > 0x2000 || req_path.find('\0') != std::string::npos)
+      return ERR(Void, Errors::bad_request);
+    if (method_str == "GET")
+      method = GET;
+    else if (method_str == "HEAD")
+      method = HEAD;
+    else if (method_str == "OPTIONS")
+      method = OPTIONS;
+    else if (method_str == "POST")
+      method = POST;
+    else if (method_str == "DELETE")
+      method = DELETE;
+    else if (method_str == "PUT")
+      method = PUT;
+    else if (method_str == "CONNECT")
+      method = CONNECT;
+    else if (method_str == "TRACE")
+      method = TRACE;
+    else if (method_str == "PATCH")
+      method = PATCH;
+    else
+      return ERR(Void, Errors::bad_request);
+
+    if (cl_pos == std::string::npos && te_pos == std::string::npos &&
+        (method == POST || method == PUT || method == PATCH))
+      return ERR(Void, Errors::malformed_header);
+    return OKV;
+  } else {
+    return ERR(Void, Errors::internal_server_error);
+  }
+}
+
+Result<Void> Request::parse_headers(std::stringstream &ss, Request *req) {
+  std::string header_line;
+  while (std::getline(ss, header_line) && header_line != "\r" &&
+         !header_line.empty()) {
+    if (!header_line.empty() && header_line[header_line.size() - 1] == '\r')
+      header_line.erase(header_line.size() - 1);
+
+    const size_t colon_pos = header_line.find(':');
+    if (header_line.length() > 0x2000 || header_line[0] == ' ' ||
+        header_line[0] == '\t' || colon_pos == std::string::npos ||
+        colon_pos == 0 || header_line[colon_pos - 1] == ' ' ||
+        header_line[colon_pos - 1] == '\t') {
+      return ERR(Void, Errors::bad_request);
+    }
+    std::string key = header_line.substr(0, colon_pos);
+    std::string value = header_line.substr(colon_pos + 1);
+
+    const size_t first_non_space = value.find_first_not_of(" \t");
+    if (first_non_space != std::string::npos) {
+      value = value.substr(first_non_space);
+    } else {
+      value = "";
+    }
+    for (std::string::const_iterator it = value.begin(); it != value.end();
+         ++it) {
+      if (*it < 0x20 && *it != '\t') {
+        return ERR(Void, Errors::bad_request);
+      }
+    }
+    req->header[key] = value;
+    if (req->header.size() > 100) {
+      return ERR(Void, Errors::bad_request);
+    }
+  }
+  return OKV;
+}
+
+Result<Void> Request::parse_body_or_chunked(std::stringstream &ss,
+                                            std::string &buff, Request *req,
+                                            const size_t header_end) {
+  if (req->decode_chunk_state == NOT_CHUNKED) {
+    const size_t total_request_len =
+        header_end + std::strlen("\r\n\r\n") +
+        static_cast<size_t>(req->content_length);
+    if (buff.length() < total_request_len) {
+      req->remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
+      buff.clear();
+      return OKV; // incomplete body; caller should return the allocated req
+    }
+
+    const std::streampos pos = ss.tellg();
+    if (pos == std::streampos(-1)) {
+      return ERR(Void, "streampos error");
+    }
+    req->body = buff.substr(static_cast<size_t>(pos));
+
+    if (req->body.empty() ||
+        req->body.size() == static_cast<size_t>(req->content_length))
+      req->remnants.clear();
+    buff.erase(0, total_request_len);
+    return OKV;
+  } else {
+    const std::streampos body_start = ss.tellg();
+    if (body_start == std::streampos(-1)) {
+      return ERR(Void, "streampos error");
+    }
+    req->remnants = buff.substr(static_cast<size_t>(body_start));
+    size_t chunk_end;
+
+    if (req->remnants.compare(0, 3, "0\r\n") == 0) {
+      chunk_end = 0;
+    } else {
+      const size_t crlf_zero = req->remnants.find("\r\n0\r\n");
+      chunk_end = (crlf_zero == std::string::npos) ? std::string::npos
+                                                   : crlf_zero + 2;
+    }
+    if (chunk_end != std::string::npos) {
+      const Result<size_t> unchunked = req->unchunk(chunk_end);
+      if (!unchunked.has_value())
+        return ERR(Void, Errors::bad_request);
+      buff.erase(0, static_cast<size_t>(body_start) + unchunked.value());
+    } else {
+      const size_t clrf_pos = req->remnants.find("\r\n");
+      if (clrf_pos != std::string::npos) { // first chunk arrived
+        std::string first_chunk_size(req->remnants.substr(0, clrf_pos));
+        const size_t ext_pos = first_chunk_size.find(';');
+        if (ext_pos != std::string::npos)
+          first_chunk_size = first_chunk_size.substr(0, ext_pos);
+        for (std::string::const_iterator it = first_chunk_size.begin();
+             it != first_chunk_size.end(); ++it)
+          if (!((*it >= '0' && *it <= '9') || (*it >= 'a' && *it <= 'f') ||
+                (*it >= 'A' && *it <= 'F')))
+            return ERR(Void, Errors::bad_request);
+      }
+    }
+    return OKV;
+  }
+}
+
 ClientSession::~ClientSession() {
   if (req != NULL)
     delete req;
@@ -115,86 +266,25 @@ Result<Request *> Request::from_buff(std::string &buff) {
   Request::Method method;
   std::string req_path;
   std::string req_version;
-  // 1. 첫 번째 줄(Request Line)만 읽기
-  if (std::getline(ss, line) && !ss.fail()) {
-    if (!line.empty() && line[line.size() - 1] == '\r')
-      line.erase(line.size() - 1);
-
-    std::stringstream line_ss(line);
-    std::string method_str;
-
-    line_ss >> method_str;  // "GET"
-    line_ss >> req_path;    // "/"
-    line_ss >> req_version; // "HTTP/1.1"
-    if (req_version != "HTTP/1.0" && req_version != "HTTP/1.1")
-      return ERR(Request *, Errors::bad_request);
-    if (line.length() > 0x2000 || req_path.find('\0') != std::string::npos)
-      return ERR(Request *, Errors::bad_request);
-    if (method_str == "GET")
-      method = GET;
-    else if (method_str == "HEAD")
-      method = HEAD;
-    else if (method_str == "OPTIONS")
-      method = OPTIONS;
-    else if (method_str == "POST")
-      method = POST;
-    else if (method_str == "DELETE")
-      method = DELETE;
-    else if (method_str == "PUT")
-      method = PUT;
-    else if (method_str == "CONNECT")
-      method = CONNECT;
-    else if (method_str == "TRACE")
-      method = TRACE;
-    else if (method_str == "PATCH")
-      method = PATCH;
-    else
-      return ERR(Request *, Errors::bad_request);
-
-    if (cl_pos == std::string::npos && te_pos == std::string::npos &&
-        (method == POST || method == PUT || method == PATCH))
-      return ERR(Request *, Errors::malformed_header);
-  } else {
-    return ERR(Request *, Errors::internal_server_error);
+  // 1. Parse request line
+  {
+    Result<Void> _prl = Request::parse_request_line(ss, method, req_path,
+                                                   req_version, cl_pos, te_pos,
+                                                   line);
+    if (!_prl.error().empty())
+      return ERR(Request *, _prl.error());
   }
   Request *req;
   if (!decode_chunked)
     req = new Request(method, req_path, req_version, content_length);
   else
     req = new Request(method, req_path, req_version);
-
-  while (std::getline(ss, line) && line != "\r" && !line.empty()) {
-    if (!line.empty() && line[line.size() - 1] == '\r')
-      line.erase(line.size() - 1);
-
-    const size_t colon_pos = line.find(':');
-    if (line.length() > 0x2000 || line[0] == ' ' || line[0] == '\t' ||
-        colon_pos == std::string::npos || colon_pos == 0 ||
-        line[colon_pos - 1] == ' ' || line[colon_pos - 1] == '\t') {
+  // Parse header lines into req->header
+  {
+    Result<Void> _rh = Request::parse_headers(ss, req);
+    if (!_rh.error().empty()) {
       delete req;
-      return ERR(Request *, Errors::bad_request);
-    }
-    std::string key = line.substr(0, colon_pos);
-    std::string value = line.substr(colon_pos + 1);
-
-    // Value 앞쪽에 있는 공백 지워주기 (예: ": localhost" -> "localhost")
-    const size_t first_non_space = value.find_first_not_of(" \t");
-    if (first_non_space != std::string::npos) {
-      value = value.substr(first_non_space);
-    } else {
-      value = "";
-    }
-    for (std::string::const_iterator it = value.begin(); it != value.end();
-         ++it) {
-      if (*it < 0x20 && *it != '\t') {
-        delete req;
-        return ERR(Request *, Errors::bad_request);
-      }
-    }
-    req->header[key] = value;
-    if (req->header.size() > 100) {
-      delete req;
-      return ERR(Request *, Errors::bad_request);
+      return ERR(Request *, _rh.error());
     }
   }
 
@@ -209,69 +299,12 @@ Result<Request *> Request::from_buff(std::string &buff) {
     req->header.erase(req->header.find("Connection"));
 
   req->cookie = get_string_from_map(req->header, "Cookie");
-  if (req->decode_chunk_state == NOT_CHUNKED) {
-    // check body; if body is not full, break to get more event
-    const size_t total_request_len = header_end + std::strlen("\r\n\r\n") +
-                                     static_cast<size_t>(req->content_length);
-    if (buff.length() < total_request_len) {
-      req->remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
-      buff.clear();
-      return OK(Request *, req);
-    }
-
-    const std::streampos pos = ss.tellg();
-    if (pos == std::streampos(-1)) {
-      delete req;
-      return ERR(Request *, "streampos error");
-    }
-    req->body = buff.substr(static_cast<size_t>(pos));
-
-    if (req->body.empty() ||
-        req->body.size() == static_cast<size_t>(req->content_length))
-      req->remnants.clear();
-    buff.erase(0, total_request_len);
-    return OK(Request *, req);
-  } else {
-    const std::streampos body_start = ss.tellg();
-    if (body_start == std::streampos(-1)) {
-      delete req;
-      return ERR(Request *, "streampos error");
-    }
-    req->remnants = buff.substr(static_cast<size_t>(body_start));
-    size_t chunk_end;
-
-    if (req->remnants.compare(0, 3, "0\r\n") == 0) {
-      chunk_end = 0;
-    } else {
-      const size_t crlf_zero = req->remnants.find("\r\n0\r\n");
-      chunk_end =
-          (crlf_zero == std::string::npos) ? std::string::npos : crlf_zero + 2;
-    }
-    if (chunk_end != std::string::npos) {
-      const Result<size_t> unchunked = req->unchunk(chunk_end);
-      if (!unchunked.has_value()) {
-        delete req;
-        return ERR(Request *, Errors::bad_request);
-      }
-      buff.erase(0, static_cast<size_t>(body_start) + unchunked.value());
-    } else {
-      const size_t clrf_pos = req->remnants.find("\r\n");
-      if (clrf_pos != std::string::npos) { // first chunk arrived
-        std::string first_chunk_size(req->remnants.substr(0, clrf_pos));
-        const size_t ext_pos = first_chunk_size.find(';');
-        if (ext_pos != std::string::npos)
-          first_chunk_size = first_chunk_size.substr(0, ext_pos);
-        for (std::string::const_iterator it = first_chunk_size.begin();
-             it != first_chunk_size.end(); ++it)
-          if (!((*it >= '0' && *it <= '9') || (*it >= 'a' && *it <= 'f') ||
-                (*it >= 'A' && *it <= 'F'))) {
-            delete req;
-            return ERR(Request *, Errors::bad_request);
-          }
-      }
-    }
-    return OK(Request *, req);
+  Result<Void> _pb = Request::parse_body_or_chunked(ss, buff, req, header_end);
+  if (!_pb.error().empty()) {
+    delete req;
+    return ERR(Request *, _pb.error());
   }
+  return OK(Request *, req);
 }
 
 Result<Void> Request::continue_parsing(std::string &buff) {

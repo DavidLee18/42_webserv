@@ -58,9 +58,49 @@ void Server::queue_response(const FileDescriptor *client_fd,
     return;
   ClientSession &client = clients.at(client_fd);
 
-  std::ostringstream oss;
-  oss << response;
-  client.out_buff += oss.str();
+  const size_t STREAM_THRESHOLD = 64 * 1024; // 64 KiB
+
+  if (!response.file_path.empty()) {
+    // For small files, buffer entirely; for large files, stream from disk.
+    if (response.content_length <= STREAM_THRESHOLD) {
+      std::ifstream infile(response.file_path.c_str(), std::ios::binary);
+      if (infile.is_open()) {
+        std::ostringstream ss;
+        ss << response; // headers
+        ss << infile.rdbuf();
+        client.out_buff += ss.str();
+        infile.close();
+      } else {
+        // Fallback: send 404-like error
+        Response err = DefaultError::default_err_response(Response::NOT_FOUND);
+        std::ostringstream ss;
+        ss << err;
+        client.out_buff += ss.str();
+        client.dropping = true;
+      }
+    } else {
+      // Stream: send headers now, keep file open to stream body later
+      std::ostringstream ss;
+      ss << response; // headers only (body is not set)
+      client.out_buff += ss.str();
+      client.out_file.open(response.file_path.c_str(), std::ios::binary);
+      if (client.out_file.is_open()) {
+        client.out_file_offset = 0;
+        client.streaming_file = true;
+      } else {
+        // Could not open: send 404
+        Response err = DefaultError::default_err_response(Response::NOT_FOUND);
+        std::ostringstream es;
+        es << err;
+        client.out_buff += es.str();
+        client.dropping = true;
+      }
+    }
+  } else {
+    std::ostringstream oss;
+    oss << response;
+    client.out_buff += oss.str();
+  }
 
   // Mark for disconnection if client doesn't want keep-alive
   if (!response.keep_alive)
@@ -300,6 +340,42 @@ void Server::client_write(const FileDescriptor *client_fd) {
     }
   } else if (client.dropping)
     disconnect(client_fd);
+
+  // If we've emptied the write buffer and are streaming a file, load next
+  // chunk from disk into the buffer and attempt to send it immediately.
+  if (write_buffer.empty() && client.streaming_file) {
+    const size_t CHUNK = NETWORK_BUFFER_SIZE; // 4096
+    std::vector<char> buf(CHUNK);
+    if (!client.out_file.is_open()) {
+      client.streaming_file = false;
+    } else {
+      client.out_file.seekg(static_cast<std::streamoff>(client.out_file_offset));
+      client.out_file.read(buf.data(), static_cast<std::streamsize>(CHUNK));
+      std::streamsize read_bytes = client.out_file.gcount();
+      if (read_bytes > 0) {
+        client.out_file_offset += static_cast<size_t>(read_bytes);
+        client.out_buff.append(buf.data(), static_cast<size_t>(read_bytes));
+        // Try sending what we just read
+        while (!client.out_buff.empty()) {
+          Result<ssize_t> send_res = client_fd->sock_send(
+              client.out_buff.c_str(), client.out_buff.length());
+          if (!send_res.has_value())
+            break;
+          const ssize_t bytes = send_res.value();
+          if (bytes == 0)
+            break;
+          client.out_buff.erase(0, static_cast<std::size_t>(bytes));
+        }
+      }
+
+      if (client.out_file.eof()) {
+        client.out_file.close();
+        client.streaming_file = false;
+        if (client.dropping && client.out_buff.empty())
+          disconnect(client_fd);
+      }
+    }
+  }
 }
 
 Result<Void> Server::init() {
@@ -416,8 +492,14 @@ Result<Void> Server::start(char **envp) {
         }
 
         const long chunked_pending_ms = CHUNKED_PENDING_TIMEOUT * 1000L;
+        const long idle_timeout_ms = IDLE_TIMEOUT * 1000L;
 
-        if (elapsed_ms >= timeout_ms &&
+        // Check for idle connections (no request, no buffered input)
+        if (session.req == NULL && session.in_buff.empty() &&
+            elapsed_ms >= idle_timeout_ms) {
+          // Idle client connection exceeded timeout -> schedule disconnect
+          clients_to_disconnect.push_back(client_fd);
+        } else if (elapsed_ms >= timeout_ms &&
             (session.req == NULL ||
              (!session.req->is_partial() && session.in_buff.empty()))) {
           // Client has timed out -> schedule disconnect
@@ -431,7 +513,14 @@ Result<Void> Server::start(char **envp) {
           clients_to_flush.push_back(std::make_pair(client_fd, resp));
         } else {
           // Calculate remaining time until this client times out (ms)
-          const long remaining_ms = static_cast<long>(timeout_ms - elapsed_ms);
+          long remaining_ms;
+          if (session.req == NULL && session.in_buff.empty()) {
+            // Idle connection: use idle timeout
+            remaining_ms = static_cast<long>(idle_timeout_ms - elapsed_ms);
+          } else {
+            // Active/partial request: use server response timeout
+            remaining_ms = static_cast<long>(timeout_ms - elapsed_ms);
+          }
           if (epoll_timeout == -1 || remaining_ms < epoll_timeout)
             epoll_timeout = remaining_ms;
         }

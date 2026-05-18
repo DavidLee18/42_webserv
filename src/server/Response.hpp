@@ -51,6 +51,7 @@ struct Response {
   std::string content_type; ///< Content-Type header.
   std::string cookie;       ///< Cookies.
   std::string body;         ///< The response body payload.
+  std::string file_path;    ///< If set, stream body from this file path.
   std::string redir;        ///< Redirect location, if applicable.
   bool keep_alive;          ///< Connection keep-alive status.
   std::map<std::string, std::string> headers;

@@ -7,6 +7,7 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 #define CHUNKED_PENDING_TIMEOUT 3
+#define IDLE_TIMEOUT 30
 #define DEFAULT_LOG_LEVEL utils::DEBUG
 // #define CONFIG_DEBUG 0
 

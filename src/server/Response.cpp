@@ -907,10 +907,15 @@ Response ServerResponse::get_method(Target target, Response response,
       return error_response(config, rule, Response::NOT_FOUND, envp);
     std::ifstream file(target.path.c_str());
     if (file.is_open()) {
-      std::ostringstream ss;
-      ss << file.rdbuf();
+      // Stream large file responses instead of buffering whole file in memory.
+      struct stat st;
+      if (stat(target.path.c_str(), &st) != 0) {
+        file.close();
+        return error_response(config, rule, Response::NOT_FOUND, envp);
+      }
+      response.content_length = static_cast<size_t>(st.st_size);
+      response.file_path = target.path;
       target.type = Response::OK;
-      response.body = ss.str();
       response.status_code = Response::OK;
       file.close();
       // Add ETag and Last-Modified headers
