@@ -28,7 +28,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
     Result<std::string> temp = fd.read_file_line();
     count_line++;
     if (temp.error() != "") {
-      err_meg = "FileDescriptor Error: " + temp.error();
+      err_meg = ConfigError::file_descriptor(temp.error());
       return false;
     } else if (temp.value() == "\n") {
       end_flag += 1;
@@ -148,7 +148,7 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
     Result<std::string> fd_line = fd.read_file_line();
     count_line++;
     if (fd_line.error() != "") {
-      err_meg = "FileDescriptor Error: " + fd_line.error();
+      err_meg = ConfigError::file_descriptor(fd_line.error());
       return false;
     } else if (fd_line.value() == "\n" || fd_line.value() == "") {
       end_flag += 1;
@@ -554,7 +554,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
     Result<std::string> temp = fd.read_file_line();
     count_line++;
     if (temp.error() != "") {
-      err_meg = "FileDescriptor Error: " + temp.error();
+      err_meg = ConfigError::file_descriptor(temp.error());
       return false;
     }
     if (temp.value() == "\n" || temp.value() == "") {

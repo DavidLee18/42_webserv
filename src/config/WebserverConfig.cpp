@@ -23,7 +23,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
     Result<std::string> temp = file.read_file_line();
     count_line++;
     if (temp.error() != "") {
-      err_meg = "FileDescriptor Error: " + temp.error();
+      err_meg = ConfigError::file_descriptor(temp.error());
       return false;
     } else if (temp.value() == "")
       break;
@@ -55,10 +55,10 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
       is_server_parse = true;
     } else if (line == "cgi =" || line == "cgi=") {
       if (is_cgi_parse == true) {
-        err_meg = ConfigError::make(line, ERR_DUPLICATE_GLOBAL_CGI_BLOCK);
+        err_meg = ConfigError::make(origin_line, ERR_DUPLICATE_GLOBAL_CGI_BLOCK);
         return false;
       } else if (is_server_parse == true) {
-        err_meg = ConfigError::make(line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
+        err_meg = ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
         return false;
       }
       err_meg = RouteRule_CGI::parse_global_cgi_block(file, global_cgi,
@@ -68,10 +68,10 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
       is_cgi_parse = true;
     } else if (line[0] == '!') {
       if (is_err_page_parse == true) {
-        err_meg = ConfigError::make(line, ERR_DUPLICATE_DEFAULT_ERROR_PAGE_BLOCK);
+        err_meg = ConfigError::make(origin_line, ERR_DUPLICATE_DEFAULT_ERROR_PAGE_BLOCK);
         return false;
       } else if (is_server_parse == true) {
-        err_meg = ConfigError::make(line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
+        err_meg = ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
         return false;
       }
       err_meg = ServerConfig::apply_err_page_entry(origin_line,
@@ -80,7 +80,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
         return false;
       is_err_page_parse = true;
     } else {
-      err_meg = ConfigError::make(line, ERR_INVALID_TOP_LEVEL_FORMAT);
+      err_meg = ConfigError::make(origin_line, ERR_INVALID_TOP_LEVEL_FORMAT);
       return false;
     }
   }
@@ -199,7 +199,7 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
     Result<std::string> temp = file.read_file_line();
     count_line++;
     if (temp.error() != "") {
-      err_meg = "FileDescriptor Error: " + temp.error();
+      err_meg = ConfigError::file_descriptor(temp.error());
       return (false);
     } else if (temp.value() == "\n" || temp.value() == "")
       break;
@@ -266,8 +266,10 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   ServerConfig server(file, global_cgi, envp);
 
   err_meg = configutils::string_to_unsigned_int(WebserverConfig::parse_server_port(temp), key);
-  if (err_meg != "")
+  if (err_meg != "") {
     err_meg = ConfigError::make(line, WebserverConfig::parse_server_port(temp), err_meg);
+    return false;
+  }
   if (MIN_PORT_VALUE > key || key > MAX_PORT_VALUE) {
     err_meg = ConfigError::make(line, WebserverConfig::parse_server_port(temp), ERR_INVALID_SERVER_PORT);
     return false;

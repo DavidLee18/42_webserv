@@ -45,7 +45,7 @@ std::string RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
     Result<std::string> temp = fd.read_file_line();
     count_line++;
     if (temp.error() != "")
-      return "FileDescriptor Error: " + temp.error();
+      return ConfigError::file_descriptor(temp.error());
     else if (temp.value() == "\n" || temp.value() == "")
       return "";
 
@@ -200,7 +200,7 @@ std::string RouteRule_CGI::parse_global_cgi_block(
     Result<std::string> temp = fd.read_file_line();
     count_line++;
     if (temp.error() != "")
-      return "FileDescriptor Error: " + temp.error();
+      return ConfigError::file_descriptor(temp.error());
     else if (temp.value() == "\n" || temp.value() == "")
       break;
 
