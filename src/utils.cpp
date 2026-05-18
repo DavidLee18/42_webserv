@@ -122,7 +122,61 @@ bool utils::has_trailing_space(const std::string &str) {
   return std::isspace(str[str.length() - 1]);
 }
 
-std::string utils::get_indent_whitespace_error(const std::string &line,
+bool utils::is_header_name(const std::string &name) {
+  if (name.empty())
+    return false;
+  for (std::string::const_iterator it = name.begin(); it != name.end(); ++it) {
+    const char c = *it;
+    if (!std::isalnum(c) && c != '!' && c != '#' && c != '$' && c != '%' &&
+        c != '&' && c != '\'' && c != '*' && c != '+' && c != '-' && c != '.' &&
+        c != '^' && c != '_' && c != '`' && c != '|' && c != '~')
+      return false;
+  }
+  return true;
+}
+
+bool utils::is_header_value(const std::string &value) {
+  if (value.empty())
+    return true;
+  for (std::string::const_iterator it = value.begin(); it != value.end();
+       ++it) {
+    const char c = *it;
+    if ((c < 0x20 || c > 0x7e) && c != 0x09)
+      return false;
+  }
+  return true;
+}
+
+char utils::tolower(const char c) {
+  return static_cast<char>(std::tolower(static_cast<int>(c)));
+}
+
+std::ostream &utils::debug(std::ostream &os) { return os << "[DEBUG] "; }
+
+std::ostream &utils::info(std::ostream &os) { return os << "[INFO] "; }
+
+std::ostream &utils::warning(std::ostream &os) { return os << "[WARNING] "; }
+
+std::ostream &utils::error(std::ostream &os) { return os << "[ERROR] "; }
+
+std::ostream &utils::crlf(std::ostream &os) { return os << "\r" << std::endl; }
+
+std::string utils::get_env(std::string const &name, char **envp) {
+  if (envp == NULL || *envp == NULL)
+    return std::string();
+  for (size_t i = 0; envp[i] != NULL; i++) {
+    const std::string env_pair(envp[i]);
+    const size_t equals_pos = env_pair.find('=');
+    if (equals_pos == std::string::npos)
+      continue;
+    if (name == env_pair.substr(0, equals_pos))
+      return env_pair.substr(equals_pos + 1);
+  }
+  return std::string();
+}
+
+
+std::string configutils::get_indent_whitespace_error(const std::string &line,
                                                size_t level) {
   std::size_t indent_level = utils::return_indent_level(line);
   std::string err_line = "";
@@ -170,56 +224,7 @@ std::string utils::get_indent_whitespace_error(const std::string &line,
   return err_line;
 }
 
-std::string utils::check_html_file(const std::string &path, char **envp) {
-
-  std::string real_path = utils::get_env("PWD", envp) + "/" + path;
-  struct stat st;
-  if (stat(real_path.c_str(), &st) != 0)
-    return "Invalid HTML file (file does not exist or cannot be accessed).";
-
-  if (!S_ISREG(st.st_mode))
-    return "Invalid HTML file (path is not a regular file).";
-
-  if (real_path.length() < 5 ||
-      real_path.substr(real_path.length() - 5) != ".html")
-    return "Invalid HTML file (file extension must be .html).";
-
-  if (access(real_path.c_str(), R_OK) != 0)
-    return "Invalid HTML file (no read permission).";
-
-  return "";
-}
-
-bool utils::is_header_name(const std::string &name) {
-  if (name.empty())
-    return false;
-  for (std::string::const_iterator it = name.begin(); it != name.end(); ++it) {
-    const char c = *it;
-    if (!std::isalnum(c) && c != '!' && c != '#' && c != '$' && c != '%' &&
-        c != '&' && c != '\'' && c != '*' && c != '+' && c != '-' && c != '.' &&
-        c != '^' && c != '_' && c != '`' && c != '|' && c != '~')
-      return false;
-  }
-  return true;
-}
-
-bool utils::is_header_value(const std::string &value) {
-  if (value.empty())
-    return true;
-  for (std::string::const_iterator it = value.begin(); it != value.end();
-       ++it) {
-    const char c = *it;
-    if ((c < 0x20 || c > 0x7e) && c != 0x09)
-      return false;
-  }
-  return true;
-}
-
-char utils::tolower(const char c) {
-  return static_cast<char>(std::tolower(static_cast<int>(c)));
-}
-
-std::string utils::string_to_unsigned_int(const std::string &str,
+std::string configutils::string_to_unsigned_int(const std::string &str,
                                           unsigned int &num) {
   errno = 0;
   char *end;
@@ -244,26 +249,22 @@ std::string utils::string_to_unsigned_int(const std::string &str,
   return "";
 }
 
-std::ostream &utils::debug(std::ostream &os) { return os << "[DEBUG] "; }
+std::string configutils::check_html_file(const std::string &path, char **envp) {
 
-std::ostream &utils::info(std::ostream &os) { return os << "[INFO] "; }
+  std::string real_path = utils::get_env("PWD", envp) + "/" + path;
+  struct stat st;
+  if (stat(real_path.c_str(), &st) != 0)
+    return "Invalid HTML file (file does not exist or cannot be accessed).";
 
-std::ostream &utils::warning(std::ostream &os) { return os << "[WARNING] "; }
+  if (!S_ISREG(st.st_mode))
+    return "Invalid HTML file (path is not a regular file).";
 
-std::ostream &utils::error(std::ostream &os) { return os << "[ERROR] "; }
+  if (real_path.length() < 5 ||
+      real_path.substr(real_path.length() - 5) != ".html")
+    return "Invalid HTML file (file extension must be .html).";
 
-std::ostream &utils::crlf(std::ostream &os) { return os << "\r" << std::endl; }
+  if (access(real_path.c_str(), R_OK) != 0)
+    return "Invalid HTML file (no read permission).";
 
-std::string utils::get_env(std::string const &name, char **envp) {
-  if (envp == NULL || *envp == NULL)
-    return std::string();
-  for (size_t i = 0; envp[i] != NULL; i++) {
-    const std::string env_pair(envp[i]);
-    const size_t equals_pos = env_pair.find('=');
-    if (equals_pos == std::string::npos)
-      continue;
-    if (name == env_pair.substr(0, equals_pos))
-      return env_pair.substr(equals_pos + 1);
-  }
-  return std::string();
+  return "";
 }

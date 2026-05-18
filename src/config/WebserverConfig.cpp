@@ -3,12 +3,10 @@
 WebserverConfig::WebserverConfig(FileDescriptor &file, char **envp) {
   err_meg = "";
   count_line = 0;
-  if (!file_parsing(file, envp)) {
-    std::ostringstream oss;
-    oss << count_line;
-
+  file_parsing(file, envp);
+  if (err_meg != "") {
     if (!std::isdigit(static_cast<unsigned char>(err_meg[0])))
-      err_meg = oss.str() + " " + err_meg;
+      err_meg = ConfigError::add_line_number(count_line, err_meg);
     return;
   }
   return;
@@ -25,56 +23,42 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
     Result<std::string> temp = file.read_file_line();
     count_line++;
     if (temp.error() != "") {
-      err_meg = "FileDescriptor Error: " + temp.error();
+      err_meg = ConfigError::file_descriptor(temp.error());
       return false;
     } else if (temp.value() == "")
       break;
     else if (temp.value() == "\n")
       continue;
 
-    line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(line, 0);
+    origin_line = utils::remove_char(temp.value(), '\n');
+    err_meg = configutils::get_indent_whitespace_error(origin_line, 0);
     if (err_meg != "")
       return false;
-    line = utils::trim_whitespace(line);
+    line = utils::trim_whitespace(origin_line);
 
     if (line == "types =" || line == "types=") {
       if (is_type_parse == true) {
-        err_meg =
-            "on [" + line +
-            "]: Duplicate type block definition (the duplicate type block rule "
-            "is violated because the type block has already been defined).";
+        err_meg = ConfigError::make(line, ERR_DUPLICATE_TYPE_BLOCK);
         return false;
       } else if (is_server_parse == true) {
-        err_meg = "on [" + line +
-                  "]: Invalid block definition location (the global block "
-                  "definition order rule is violated because non-server blocks "
-                  "must be defined before any server block).";
+        err_meg = ConfigError::make(line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
         return false;
       } else if (!parse_types_block(file))
         return false;
       is_type_parse = true;
     } else if (WebserverConfig::is_server_config_header(line)) {
       if (is_type_parse == false) {
-        err_meg = "1 on [], []: Required type block is missing (the 'types' "
-                  "block is not defined at indentation level 0, so no MIME "
-                  "type mapping rules can be processed).";
+        err_meg = ConfigError::add_line_number(1, ConfigError::make("", "", ERR_REQUIRED_TYPE_BLOCK_MISSING));
         return false;
       } else if (!parse_server_config_entry(file, line, envp))
         return false;
       is_server_parse = true;
     } else if (line == "cgi =" || line == "cgi=") {
       if (is_cgi_parse == true) {
-        err_meg = "on [" + line +
-                  "]: Duplicate global CGI block definition (the duplicate "
-                  "global CGI block rule is violated because the global CGI "
-                  "block has already been defined).";
+        err_meg = ConfigError::make(origin_line, ERR_DUPLICATE_GLOBAL_CGI_BLOCK);
         return false;
       } else if (is_server_parse == true) {
-        err_meg = "on [" + line +
-                  "]: Invalid block definition location (the global block "
-                  "definition order rule is violated because non-server blocks "
-                  "must be defined before any server block).";
+        err_meg = ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
         return false;
       }
       err_meg = RouteRule_CGI::parse_global_cgi_block(file, global_cgi,
@@ -84,40 +68,28 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
       is_cgi_parse = true;
     } else if (line[0] == '!') {
       if (is_err_page_parse == true) {
-        err_meg = "on [" + line +
-                  "]: Duplicate default error page block definition (the "
-                  "duplicate default error page block rule is violated because "
-                  "the default error page block has already been defined).";
+        err_meg = ConfigError::make(origin_line, ERR_DUPLICATE_DEFAULT_ERROR_PAGE_BLOCK);
         return false;
       } else if (is_server_parse == true) {
-        err_meg = "on [" + line +
-                  "]: Invalid block definition location (the global block "
-                  "definition order rule is violated because non-server blocks "
-                  "must be defined before any server block).";
+        err_meg = ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
         return false;
       }
-      err_meg = ServerConfig::apply_default_err_page_entry(
+      err_meg = ServerConfig::apply_err_page_entry(origin_line,
           line, default_err_page, envp);
-      if (err_meg != "") {
-        err_meg = "on [" + line + err_meg;
+      if (err_meg != "") 
         return false;
-      }
       is_err_page_parse = true;
     } else {
-      err_meg = "on [" + line +
-                "]: Invalid configuration format (the line does not correspond "
-                "to a valid grammar rule at indentation level 0).";
+      err_meg = ConfigError::make(origin_line, ERR_INVALID_TOP_LEVEL_FORMAT);
       return false;
     }
   }
+
   if (type_map.empty()) {
-    err_meg = "1 on [], []: Required type block is missing (the 'types' block "
-              "is not defined at indentation level 0, so no MIME type mapping "
-              "rules can be processed).";
+    err_meg = ConfigError::add_line_number(1, ConfigError::make("", "", ERR_REQUIRED_TYPE_BLOCK_MISSING));
     return false;
   } else if (serverconfig_map.empty()) {
-    err_meg = "1 on [], []: Required server block is missing. (the Server "
-              "block is mandatory but not present in the configuration).";
+    err_meg = ConfigError::add_line_number(1, ConfigError::make("", "", ERR_REQUIRED_SERVER_BLOCK_MISSING));
     return false;
   }
   return true;
@@ -130,34 +102,19 @@ WebserverConfig::parse_type_keys(const std::string &key) {
   std::vector<std::string> key_data;
 
   if (utils::has_invalid_char(temp, "_|")) {
-    err_meg += temp +
-               "]: Invalid character in MIME extension mapping "
-               "(the MIME extension rule is violated because only alphanumeric "
-               "characters, '_' and '|' are allowed in the extension list).";
+    err_meg = ConfigError::make(origin_line, temp, ERR_INVALID_MIME_EXTENSION_CHAR);
     return (key_data);
   }
+
   key_data = utils::string_split(temp, "|");
   number_of_key = utils::count_occurrences(temp, "|") + 1;
   if (key_data.size() != static_cast<std::size_t>(number_of_key)) {
-    std::ostringstream key_num;
-    std::ostringstream num;
-
-    key_num << key_data.size();
-    num << number_of_key;
-
-    err_meg += temp +
-               "]: Mismatch between expected and actual number of extension "
-               "items (expected count: number of extensions must equal the "
-               "number of '|' separators plus one, expected items: " +
-               num.str() + ", actual items: " + key_num.str() + ").";
+    err_meg = ConfigError::make(origin_line, temp, ERR_MIME_EXTENSION_COUNT_MISMATCH);
     return (std::vector<std::string>());
   }
   for (std::size_t i = 0; i < key_data.size(); ++i) {
     if (type_map.find(key_data[i]) != type_map.end()) {
-      err_meg += temp +
-                 "]: Duplicate extensions detected (the same extension was "
-                 "registered more than once, violating the rule that the same "
-                 "extension cannot be registered multiple times).";
+      err_meg = ConfigError::make(origin_line, key_data[i], ERR_DUPLICATE_MIME_EXTENSION);
       return (std::vector<std::string>());
     }
   }
@@ -168,60 +125,36 @@ bool WebserverConfig::is_valid_mime_type(const std::string &value) {
   std::vector<std::string> value_data;
 
   if (utils::has_invalid_char(value, "/-")) {
-    err_meg += value +
-               "]: Invalid character in MIME type "
-               "(the MIME type rule is violated because only alphanumeric "
-               "characters, '/' and '-' are allowed).";
+    err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_CHAR);
     return false;
-  } else if (value[0] == '-') {
-    err_meg += value +
-               "]: Invalid MIME type format (the type part of the MIME type "
-               "must not start with '-', as it violates the rule that the "
-               "type/subtype structure must start with a valid type name).";
-    return false;
-  } else if (value[0] == '/') {
-    err_meg += value +
-               "]: Invalid MIME type format (MIME type must not start with "
-               "'/', as it violates the required 'type/subtype' structure).";
+  } else if (value[0] == '-' || value[0] == '/') {
+    err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
     return false;
   }
   for (std::size_t i = 1; i < value.size(); ++i) {
     if (value[i] == '-' && value[i - 1] == '-') {
-      err_meg += value +
-                 "]: Invalid MIME type format (consecutive '-' characters are "
-                 "not allowed in the MIME type, as they violate the naming "
-                 "rules for a valid type/subtype structure).";
+      err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
       return false;
     }
   }
   value_data = utils::string_split(value, "/");
   if (value_data.size() != 2) {
-    err_meg += value + "]: Invalid MIME type format (the value does not follow "
-                       "the required 'type/subtype' structure).";
+    err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
     return false;
   } else if (utils::count_occurrences(value, "/") != 1) {
-    err_meg += value + "]: Invalid MIME type format (multiple '/' characters "
-                       "are not allowed; a valid MIME type must contain "
-                       "exactly one '/' separating type and subtype).";
+    err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
     return false;
   }
 
   for (std::size_t i = 0; i < value.size(); ++i) {
     if (value[i] == '-') {
       if (i == value.size() - 1) {
-        err_meg +=
-            value +
-            "]: Invalid MIME type format "
-            "(the MIME type rule is violated because '-' must not appear at "
-            "the beginning or end of a MIME type component).";
+        err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
         return false;
       }
       if (!std::isalnum(static_cast<unsigned char>(value[i - 1])) ||
           !std::isalnum(static_cast<unsigned char>(value[i + 1]))) {
-        err_meg += value +
-                   "]: Invalid MIME type format "
-                   "(the MIME type rule is violated because '-' must be placed "
-                   "between alphanumeric characters).";
+        err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
         return false;
       }
     }
@@ -232,25 +165,20 @@ bool WebserverConfig::is_valid_mime_type(const std::string &value) {
 bool WebserverConfig::parse_type_mapping(const std::string &line,
                                          std::vector<std::string> &keys_out,
                                          std::string &value_out) {
-  if (utils::count_occurrences(line, "->") != 1) {
-    err_meg = "on [\t" + line +
-              "]: Invalid MIME type mapping syntax "
-              "(the MIME type mapping rule is violated because the line must "
-              "contain exactly one '->' operator in the form "
-              "'extension -> MIME type').";
+  std::size_t pos = line.find("->");
+  if (pos == std::string::npos) {
+    err_meg = ConfigError::make(origin_line, line, ERR_MISSING_MIME_MAPPING_OPERATOR);
+    return false;
+  } else if (utils::count_occurrences(line, "->") != 1) {
+    err_meg = ConfigError::make(origin_line, line, ERR_INVALID_MIME_MAPPING_SYNTAX);
     return false;
   }
   std::vector<std::string> type_data = utils::string_split(line, "->");
   if (type_data.size() != 2) {
-    err_meg =
-        "on [\t" + line +
-        "]: Invalid MIME type mapping value "
-        "(the MIME type mapping rule is violated because both the extension "
-        "and MIME type are required in the form 'extension -> MIME type').";
+    err_meg = ConfigError::make(origin_line, line, ERR_INVALID_MIME_MAPPING_VALUE);
     return false;
   }
 
-  err_meg = "on [\t" + line + "], [";
   std::vector<std::string> keys =
       WebserverConfig::parse_type_keys(utils::trim_whitespace(type_data[0]));
   if (keys.empty() || !is_valid_mime_type(utils::trim_whitespace(type_data[1])))
@@ -271,16 +199,16 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
     Result<std::string> temp = file.read_file_line();
     count_line++;
     if (temp.error() != "") {
-      err_meg = "FileDescriptor Error: " + temp.error();
+      err_meg = ConfigError::file_descriptor(temp.error());
       return (false);
     } else if (temp.value() == "\n" || temp.value() == "")
       break;
 
-    line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(line, 1);
+    origin_line = utils::remove_char(temp.value(), '\n');
+    err_meg = configutils::get_indent_whitespace_error(origin_line, 1);
     if (err_meg != "")
       return false;
-    line = utils::trim_whitespace(line);
+    line = utils::trim_whitespace(origin_line);
 
     if (!parse_type_mapping(line, keys, value))
       return false;
@@ -289,27 +217,20 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
       const std::string &k = keys[i];
       if (k == "_") {
         if (!default_mime.empty()) {
-          err_meg = "on [\t" + line + "], [" + value +
-                    "]: Duplicate default MIME type detected (the default MIME "
-                    "type '_' must be defined only once; multiple declarations "
-                    "are not allowed).";
+          err_meg = ConfigError::make(origin_line, value, ERR_DUPLICATE_DEFAULT_MIME_TYPE);
           return false;
         }
         default_mime = value;
         continue;
       } else if (type_map.find(k) != type_map.end()) {
-        err_meg =
-            "on [\t" + line + "], [" + k +
-            "]: Duplicate MIME extension detected (the MIME extension rule is "
-            "violated because the same extension is defined more than once).";
+        err_meg = ConfigError::make(origin_line, k, ERR_DUPLICATE_MIME_EXTENSION);
         return false;
       }
       type_map[k] = value;
     }
   }
   if (default_mime.empty()) {
-    err_meg = "on [], []: Missing default MIME type definition (the '_' entry "
-              "must be defined exactly once as the default MIME type).";
+    err_meg = ConfigError::make("", "", ERR_MISSING_DEFAULT_MIME_TYPE);
     return false;
   }
   return true;
@@ -343,36 +264,33 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   unsigned int key = 0;
   std::string temp(line);
   ServerConfig server(file, global_cgi, envp);
-  std::ostringstream oss;
 
-  oss << count_line + 1;
-  utils::string_to_unsigned_int(WebserverConfig::parse_server_port(temp), key);
-  if (1024 > key || key > 49151) {
-    err_meg = "on [\t" + line + "], [" +
-              WebserverConfig::parse_server_port(temp) +
-              "]: Invalid value (the port registered range rule is violated "
-              "because the port value must be between 1024 and 49151).";
+  err_meg = configutils::string_to_unsigned_int(WebserverConfig::parse_server_port(temp), key);
+  if (err_meg != "") {
+    err_meg = ConfigError::make(line, WebserverConfig::parse_server_port(temp), err_meg);
     return false;
   }
-  count_line += server.get_count_line();
+  if (MIN_PORT_VALUE > key || key > MAX_PORT_VALUE) {
+    err_meg = ConfigError::make(line, WebserverConfig::parse_server_port(temp), ERR_INVALID_SERVER_PORT);
+    return false;
+  }
+
   if (server.get_err_meg() != "") {
     err_meg = server.get_err_meg();
+    count_line += server.get_count_line();
     return false;
   } else if (server.get_routes().size() == 0 &&
              server.get_route_rule_cgi().size() == 0) {
-    err_meg = oss.str() +
-              " on [], []: Invalid empty server block (the server block route "
-              "rule requirement is violated because each server block must "
-              "contain at least one RouteRule or one RouteRule_CGI).";
+    err_meg = ConfigError::make(origin_line, ERR_EMPTY_SERVER_BLOCK);
     return false;
   } else if (serverconfig_map.find(key) != serverconfig_map.end()) {
+    std::ostringstream oss;
     oss << key;
 
-    err_meg = "on [\t" + line + "], [" + oss.str() +
-              "]: Violates configuration rule (server block is declared more "
-              "than once).";
+    err_meg = ConfigError::make(line, oss.str(), ERR_DUPLICATE_SERVER_PORT);
     return false;
   }
+  count_line += server.get_count_line();
   serverconfig_map[key] = server;
   return true;
 }
