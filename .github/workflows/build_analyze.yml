@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       - name: Make
-        run: make
+        run: make webserv
   codeql:
     name: CodeQL (${{ matrix.language }})
     needs: make
@@ -94,7 +94,7 @@ jobs:
         if: matrix.build-mode == 'manual'
         shell: bash
         run: |
-          make
+          make webserv
       - name: Perform CodeQL Analysis
         id: analyze
         uses: github/codeql-action/analyze@0c0c5dc2f136b98cb0537075ccfa21f94cd9a63e
