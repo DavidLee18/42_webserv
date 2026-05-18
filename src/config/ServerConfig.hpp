@@ -38,10 +38,13 @@ private:
   unsigned int server_response_time_ms;
   std::vector<RouteRule> routes;
   std::vector<RouteRule_CGI> R_CGI;
-  std::string err_meg;
-  int end_flag;
-  std::size_t count_line;
   std::vector<std::string> file_extension;
+
+private:  
+  int end_flag;
+  std::string err_meg;
+  std::string origin_line;
+  std::size_t count_line;
 
   bool parse_server_block(FileDescriptor &fd, char **envp);
   bool is_header_block(const std::string &line);
@@ -73,8 +76,8 @@ public:
   ServerConfig(FileDescriptor &, std::map<std::string, std::string> &global_cgi,
                char **envp);
   ServerConfig()
-      : header(), server_response_time_ms(3), routes(), err_meg(""),
-        end_flag(0), count_line(0), file_extension() {}
+      : header(), server_response_time_ms(3), routes(), R_CGI(), file_extension(),
+        end_flag(0), err_meg(), origin_line(),  count_line(0) {}
   RouteRule const *find_route(Request::Method method,
                               const std::string &path) const;
   RouteRule_CGI const *find_route_cgi(Request::Method method,

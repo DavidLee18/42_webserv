@@ -32,11 +32,11 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
     else if (temp.value() == "\n")
       continue;
 
-    line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(line, 0);
+    origin_line = utils::remove_char(temp.value(), '\n');
+    err_meg = utils::get_indent_whitespace_error(origin_line, 0);
     if (err_meg != "")
       return false;
-    line = utils::trim_whitespace(line);
+    line = utils::trim_whitespace(origin_line);
 
     if (line == "types =" || line == "types=") {
       if (is_type_parse == true) {
@@ -276,11 +276,11 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
     } else if (temp.value() == "\n" || temp.value() == "")
       break;
 
-    line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(line, 1);
+    origin_line = utils::remove_char(temp.value(), '\n');
+    err_meg = utils::get_indent_whitespace_error(origin_line, 1);
     if (err_meg != "")
       return false;
-    line = utils::trim_whitespace(line);
+    line = utils::trim_whitespace(origin_line);
 
     if (!parse_type_mapping(line, keys, value))
       return false;

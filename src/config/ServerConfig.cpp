@@ -39,11 +39,11 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
       break;
     end_flag = 0;
 
-    line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(line, 1);
+    origin_line = utils::remove_char(temp.value(), '\n');
+    err_meg = utils::get_indent_whitespace_error(origin_line, 1);
     if (err_meg != "")
       return false;
-    line = utils::trim_whitespace(line);
+    line = utils::trim_whitespace(origin_line);
 
     if (is_header_block(line)) {
       if (is_route_parse == true) {
@@ -190,8 +190,9 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
       end_flag += 1;
       break;
     }
-    temp = utils::remove_char(fd_line.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(temp, 2);
+
+    origin_line = utils::remove_char(fd_line.value(), '\n');
+    err_meg = utils::get_indent_whitespace_error(origin_line, 2);
     if (err_meg != "")
       return false;
     if (!utils::is_header_value(temp)) {
@@ -654,9 +655,9 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
       break;
     }
 
-    line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(line, 2);
-    line = utils::trim_whitespace(line);
+    origin_line = utils::remove_char(temp.value(), '\n');
+    err_meg = utils::get_indent_whitespace_error(origin_line, 2);
+    line = utils::trim_whitespace(origin_line);
     if (err_meg != "")
       return false;
     else if (!apply_route_rule_entry(line, createdIndexes, envp))

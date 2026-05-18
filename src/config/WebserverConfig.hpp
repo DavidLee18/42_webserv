@@ -6,6 +6,7 @@
 class WebserverConfig {
 private:
   std::string err_meg;
+  std::string origin_line;
   std::string default_mime;
   std::map<std::string, std::string> global_cgi;
   std::map<std::string, std::string> type_map;
@@ -31,6 +32,7 @@ public:
   WebserverConfig &operator=(const WebserverConfig &other) {
     if (this != &other) {
       this->err_meg = other.err_meg;
+      this->origin_line = other.origin_line;
       this->default_mime = other.default_mime;
       this->global_cgi = other.global_cgi;
       this->type_map = other.type_map;
