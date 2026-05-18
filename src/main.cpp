@@ -1,6 +1,12 @@
-#include "webserv.h"
+#include "FileDescriptor.hpp"
+#include "config/WebserverConfig.hpp"
+#include "server/Server.hpp"
+#include <csignal>
+#include <iostream>
 
 volatile sig_atomic_t g_receivedSignal = 0;
+
+void wrap_up(const int signum) throw() { g_receivedSignal = signum; }
 
 int main(const int argc, char *argv[], char **envp) {
   signal(SIGPIPE, SIG_IGN);
@@ -28,5 +34,3 @@ int main(const int argc, char *argv[], char **envp) {
 #endif
   return 0;
 }
-
-void wrap_up(const int signum) throw() { g_receivedSignal = signum; }

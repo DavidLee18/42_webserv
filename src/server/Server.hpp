@@ -7,15 +7,13 @@
  * event loops.
  */
 
-#include "../cgi_1_1.h"
+#include "../EPoll_KQueue.hpp"
+#include "../Errors.hpp"
+#include "../cgi_1_1/CgiDelegate.hpp"
 #include "../config/WebserverConfig.hpp"
-#include "../epoll_kqueue.h"
-#include "../errors.h"
-
 #include "Client.hpp"
 #include "Response.hpp"
 #include "Session.hpp"
-
 #include <csignal>
 #include <fcntl.h>
 #include <fstream>
@@ -29,7 +27,12 @@
 #include <unistd.h>
 #include <utility>
 
+#define NETWORK_BUFFER_SIZE 4096
+#define CHUNKED_PENDING_TIMEOUT 3
+
 class ServerConfig;
+
+extern volatile sig_atomic_t g_receivedSignal;
 
 /**
  * @class Server

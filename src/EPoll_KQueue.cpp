@@ -1,4 +1,6 @@
-#include "webserv.h"
+#include "EPoll_KQueue.hpp"
+#include "Errors.hpp"
+#include <cerrno>
 
 Result<Events> Events::init(const std::list<FileDescriptor> &all_events,
                             const size_t size, const epoll_event *events) {
