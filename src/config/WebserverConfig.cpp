@@ -74,7 +74,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
         err_meg = ConfigError::make(line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
         return false;
       }
-      err_meg = ServerConfig::apply_default_err_page_entry(
+      err_meg = ServerConfig::apply_err_page_entry(origin_line,
           line, default_err_page, envp);
       if (err_meg != "") 
         return false;

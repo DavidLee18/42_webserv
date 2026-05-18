@@ -3,6 +3,10 @@
 
 #include "RouteRule_CGI.hpp"
 
+#define MAX_SERVER_RESPONSE_TIME 60000
+#define MIN_SERVER_RESPONSE_TIME 1
+#define MAX_BODY_SIZE 1048576
+
 typedef std::map<std::string, std::map<std::string, std::string> > CGI;
 
 enum RuleOperator {
@@ -99,7 +103,7 @@ public:
     return server_response_time_ms;
   }
   static std::string
-  apply_default_err_page_entry(const std::string &line,
+  apply_err_page_entry(const std::string &origin_line, const std::string &line,
                                std::map<unsigned int, std::string> &err_map,
                                char **envp);
 };

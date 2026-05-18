@@ -61,7 +61,7 @@ std::string RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
       file_line = file_line.substr(3);
       err_meg = utils::string_to_unsigned_int(file_line, timeout_ms);
       if (err_meg != "")
-        return ConfigError::make(origin_line, file_line, ERR_INVALID_MAX_BODY_SIZE);
+        return ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_TIMEOUT_VALUE);
       else if (timeout_ms > CGI_MAX_TIMEOUT || CGI_MIN_TIMEOUT > timeout_ms)
         return ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_TIMEOUT_RANGE);
     } else if (std::string::npos != file_line.find("=")) {

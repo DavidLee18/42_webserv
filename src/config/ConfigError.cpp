@@ -313,6 +313,53 @@ static const ErrorInfo g_error_infos[] = {
               "Missing MIME type mapping operator",
               "MIME type mapping operator",
               "the mapping must contain the '->' operator in the form 'extension -> MIME type', but it was not found"),
+    ErrorInfo(ERR_INVALID_ERROR_PAGE_FORMAT,
+        "Invalid error page format",
+        "error page format",
+        "the error page entry must contain exactly two tokens in the form '! status:path'"),
+
+    ErrorInfo(ERR_MISSING_ERROR_PAGE_MAPPING_OPERATOR,
+        "Missing error page mapping operator",
+        "error page mapping operator",
+        "the mapping must contain the ':' operator in the form status:path, but it was not found"),
+
+    ErrorInfo(ERR_INVALID_ERROR_PAGE_MAPPING_OPERATOR,
+        "Invalid error page mapping operator",
+        "error page mapping operator",
+        "the mapping must contain exactly one ':' operator in the form status:path"),
+
+    ErrorInfo(ERR_INVALID_ERROR_PAGE_MAPPING,
+        "Invalid error page mapping",
+        "error page mapping",
+        "the mapping must contain both a status code and a path in the form status:path"),
+
+    ErrorInfo(ERR_INVALID_ERROR_PAGE_STATUS_CODE_FORMAT,
+        "Invalid error page status code format",
+        "error page status code format",
+        "the status code must contain only digits"),
+
+    ErrorInfo(ERR_INVALID_ERROR_PAGE_STATUS_CODE,
+        "Invalid error page status code",
+        "error page status code",
+        "the status code must be a three-digit 4xx or 5xx HTTP error code"),
+
+    ErrorInfo(ERR_INVALID_ERROR_PAGE_STATUS_CODE_RANGE,
+        "Invalid error page status code range",
+        "error page status code range",
+        "the status code must be between 400 and 599 inclusive"),
+
+    ErrorInfo(ERR_INVALID_ERROR_PAGE_PATH,
+        "Invalid error page path",
+        "error page path",
+        "the configured error page path must refer to an accessible HTML file"),
+    ErrorInfo(ERR_INVALID_INDEX_FILE_PATH,
+      "Invalid index file path",
+      "index file path",
+      "the value after '?' must refer to an accessible HTML file"),
+    ErrorInfo(ERR_INVALID_CGI_TIMEOUT_VALUE,
+      "Invalid CGI timeout value",
+      "CGI timeout value",
+      "the value after '...' must be a valid unsigned integer")
 };
 
 static const ErrorInfo &find_error_info(ConfigErrorCode code) {
