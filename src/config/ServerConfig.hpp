@@ -44,7 +44,7 @@ private:
   std::vector<RouteRule_CGI> R_CGI;
   std::vector<std::string> file_extension;
 
-private:  
+private:
   int end_flag;
   std::string err_meg;
   std::string origin_line;
@@ -80,8 +80,9 @@ public:
   ServerConfig(FileDescriptor &, std::map<std::string, std::string> &global_cgi,
                char **envp);
   ServerConfig()
-      : header(), server_response_time_ms(3), routes(), R_CGI(), file_extension(),
-        end_flag(0), err_meg(), origin_line(),  count_line(0) {}
+      : header(), server_response_time_ms(3), routes(), R_CGI(),
+        file_extension(), end_flag(0), err_meg(), origin_line(), count_line(0) {
+  }
   RouteRule const *find_route(Request::Method method,
                               const std::string &path) const;
   RouteRule_CGI const *find_route_cgi(Request::Method method,
@@ -104,8 +105,8 @@ public:
   }
   static std::string
   apply_err_page_entry(const std::string &origin_line, const std::string &line,
-                               std::map<unsigned int, std::string> &err_map,
-                               char **envp);
+                       std::map<unsigned int, std::string> &err_map,
+                       char **envp);
 };
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data);

@@ -48,17 +48,20 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
       is_type_parse = true;
     } else if (WebserverConfig::is_server_config_header(line)) {
       if (is_type_parse == false) {
-        err_meg = ConfigError::add_line_number(1, ConfigError::make("", "", ERR_REQUIRED_TYPE_BLOCK_MISSING));
+        err_meg = ConfigError::add_line_number(
+            1, ConfigError::make("", "", ERR_REQUIRED_TYPE_BLOCK_MISSING));
         return false;
       } else if (!parse_server_config_entry(file, line, envp))
         return false;
       is_server_parse = true;
     } else if (line == "cgi =" || line == "cgi=") {
       if (is_cgi_parse == true) {
-        err_meg = ConfigError::make(origin_line, ERR_DUPLICATE_GLOBAL_CGI_BLOCK);
+        err_meg =
+            ConfigError::make(origin_line, ERR_DUPLICATE_GLOBAL_CGI_BLOCK);
         return false;
       } else if (is_server_parse == true) {
-        err_meg = ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
+        err_meg =
+            ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
         return false;
       }
       err_meg = RouteRule_CGI::parse_global_cgi_block(file, global_cgi,
@@ -68,15 +71,17 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
       is_cgi_parse = true;
     } else if (line[0] == '!') {
       if (is_err_page_parse == true) {
-        err_meg = ConfigError::make(origin_line, ERR_DUPLICATE_DEFAULT_ERROR_PAGE_BLOCK);
+        err_meg = ConfigError::make(origin_line,
+                                    ERR_DUPLICATE_DEFAULT_ERROR_PAGE_BLOCK);
         return false;
       } else if (is_server_parse == true) {
-        err_meg = ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
+        err_meg =
+            ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
         return false;
       }
-      err_meg = ServerConfig::apply_err_page_entry(origin_line,
-          line, default_err_page, envp);
-      if (err_meg != "") 
+      err_meg = ServerConfig::apply_err_page_entry(origin_line, line,
+                                                   default_err_page, envp);
+      if (err_meg != "")
         return false;
       is_err_page_parse = true;
     } else {
@@ -86,10 +91,12 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
   }
 
   if (type_map.empty()) {
-    err_meg = ConfigError::add_line_number(1, ConfigError::make("", "", ERR_REQUIRED_TYPE_BLOCK_MISSING));
+    err_meg = ConfigError::add_line_number(
+        1, ConfigError::make("", "", ERR_REQUIRED_TYPE_BLOCK_MISSING));
     return false;
   } else if (serverconfig_map.empty()) {
-    err_meg = ConfigError::add_line_number(1, ConfigError::make("", "", ERR_REQUIRED_SERVER_BLOCK_MISSING));
+    err_meg = ConfigError::add_line_number(
+        1, ConfigError::make("", "", ERR_REQUIRED_SERVER_BLOCK_MISSING));
     return false;
   }
   return true;
@@ -102,19 +109,22 @@ WebserverConfig::parse_type_keys(const std::string &key) {
   std::vector<std::string> key_data;
 
   if (utils::has_invalid_char(temp, "_|")) {
-    err_meg = ConfigError::make(origin_line, temp, ERR_INVALID_MIME_EXTENSION_CHAR);
+    err_meg =
+        ConfigError::make(origin_line, temp, ERR_INVALID_MIME_EXTENSION_CHAR);
     return (key_data);
   }
 
   key_data = utils::string_split(temp, "|");
   number_of_key = utils::count_occurrences(temp, "|") + 1;
   if (key_data.size() != static_cast<std::size_t>(number_of_key)) {
-    err_meg = ConfigError::make(origin_line, temp, ERR_MIME_EXTENSION_COUNT_MISMATCH);
+    err_meg =
+        ConfigError::make(origin_line, temp, ERR_MIME_EXTENSION_COUNT_MISMATCH);
     return (std::vector<std::string>());
   }
   for (std::size_t i = 0; i < key_data.size(); ++i) {
     if (type_map.find(key_data[i]) != type_map.end()) {
-      err_meg = ConfigError::make(origin_line, key_data[i], ERR_DUPLICATE_MIME_EXTENSION);
+      err_meg = ConfigError::make(origin_line, key_data[i],
+                                  ERR_DUPLICATE_MIME_EXTENSION);
       return (std::vector<std::string>());
     }
   }
@@ -128,33 +138,39 @@ bool WebserverConfig::is_valid_mime_type(const std::string &value) {
     err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_CHAR);
     return false;
   } else if (value[0] == '-' || value[0] == '/') {
-    err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
+    err_meg =
+        ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
     return false;
   }
   for (std::size_t i = 1; i < value.size(); ++i) {
     if (value[i] == '-' && value[i - 1] == '-') {
-      err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
+      err_meg =
+          ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
       return false;
     }
   }
   value_data = utils::string_split(value, "/");
   if (value_data.size() != 2) {
-    err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
+    err_meg =
+        ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
     return false;
   } else if (utils::count_occurrences(value, "/") != 1) {
-    err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
+    err_meg =
+        ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
     return false;
   }
 
   for (std::size_t i = 0; i < value.size(); ++i) {
     if (value[i] == '-') {
       if (i == value.size() - 1) {
-        err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
+        err_meg =
+            ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
         return false;
       }
       if (!std::isalnum(static_cast<unsigned char>(value[i - 1])) ||
           !std::isalnum(static_cast<unsigned char>(value[i + 1]))) {
-        err_meg = ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
+        err_meg =
+            ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT);
         return false;
       }
     }
@@ -167,15 +183,18 @@ bool WebserverConfig::parse_type_mapping(const std::string &line,
                                          std::string &value_out) {
   std::size_t pos = line.find("->");
   if (pos == std::string::npos) {
-    err_meg = ConfigError::make(origin_line, line, ERR_MISSING_MIME_MAPPING_OPERATOR);
+    err_meg =
+        ConfigError::make(origin_line, line, ERR_MISSING_MIME_MAPPING_OPERATOR);
     return false;
   } else if (utils::count_occurrences(line, "->") != 1) {
-    err_meg = ConfigError::make(origin_line, line, ERR_INVALID_MIME_MAPPING_SYNTAX);
+    err_meg =
+        ConfigError::make(origin_line, line, ERR_INVALID_MIME_MAPPING_SYNTAX);
     return false;
   }
   std::vector<std::string> type_data = utils::string_split(line, "->");
   if (type_data.size() != 2) {
-    err_meg = ConfigError::make(origin_line, line, ERR_INVALID_MIME_MAPPING_VALUE);
+    err_meg =
+        ConfigError::make(origin_line, line, ERR_INVALID_MIME_MAPPING_VALUE);
     return false;
   }
 
@@ -217,13 +236,15 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
       const std::string &k = keys[i];
       if (k == "_") {
         if (!default_mime.empty()) {
-          err_meg = ConfigError::make(origin_line, value, ERR_DUPLICATE_DEFAULT_MIME_TYPE);
+          err_meg = ConfigError::make(origin_line, value,
+                                      ERR_DUPLICATE_DEFAULT_MIME_TYPE);
           return false;
         }
         default_mime = value;
         continue;
       } else if (type_map.find(k) != type_map.end()) {
-        err_meg = ConfigError::make(origin_line, k, ERR_DUPLICATE_MIME_EXTENSION);
+        err_meg =
+            ConfigError::make(origin_line, k, ERR_DUPLICATE_MIME_EXTENSION);
         return false;
       }
       type_map[k] = value;
@@ -265,13 +286,16 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   std::string temp(line);
   ServerConfig server(file, global_cgi, envp);
 
-  err_meg = configutils::string_to_unsigned_int(WebserverConfig::parse_server_port(temp), key);
+  err_meg = configutils::string_to_unsigned_int(
+      WebserverConfig::parse_server_port(temp), key);
   if (err_meg != "") {
-    err_meg = ConfigError::make(line, WebserverConfig::parse_server_port(temp), err_meg);
+    err_meg = ConfigError::make(line, WebserverConfig::parse_server_port(temp),
+                                err_meg);
     return false;
   }
   if (MIN_PORT_VALUE > key || key > MAX_PORT_VALUE) {
-    err_meg = ConfigError::make(line, WebserverConfig::parse_server_port(temp), ERR_INVALID_SERVER_PORT);
+    err_meg = ConfigError::make(line, WebserverConfig::parse_server_port(temp),
+                                ERR_INVALID_SERVER_PORT);
     return false;
   }
 

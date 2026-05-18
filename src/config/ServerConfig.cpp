@@ -47,7 +47,8 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
 
     if (is_header_block(line)) {
       if (is_route_parse == true) {
-        err_meg = ConfigError::make(origin_line, ERR_HEADER_DEFINED_AFTER_ROUTE);
+        err_meg =
+            ConfigError::make(origin_line, ERR_HEADER_DEFINED_AFTER_ROUTE);
         return false;
       } else if (is_header_parse == true &&
                  (is_route_parse || is_timeout_parse)) {
@@ -60,20 +61,22 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
       is_header_parse = true;
     } else if (is_valid_server_response_time(line)) {
       if (is_route_parse == true) {
-        err_meg = ConfigError::make(origin_line, ERR_TIMEOUT_DEFINED_AFTER_ROUTE);
+        err_meg =
+            ConfigError::make(origin_line, ERR_TIMEOUT_DEFINED_AFTER_ROUTE);
         return false;
       } else if (is_timeout_parse == true) {
         err_meg = ConfigError::make(origin_line, ERR_DUPLICATE_SERVER_TIMEOUT);
         return false;
       }
       err_meg = configutils::string_to_unsigned_int(line.substr(3),
-                                              server_response_time_ms);
+                                                    server_response_time_ms);
       if (err_meg != "") {
         err_meg = ConfigError::make(origin_line, line.substr(3), err_meg);
         return false;
       } else if (server_response_time_ms > MAX_SERVER_RESPONSE_TIME ||
                  MIN_SERVER_RESPONSE_TIME > server_response_time_ms) {
-        err_meg = ConfigError::make(origin_line, line.substr(3), ERR_INVALID_SERVER_RESPONSE_TIME);
+        err_meg = ConfigError::make(origin_line, line.substr(3),
+                                    ERR_INVALID_SERVER_RESPONSE_TIME);
         return false;
       }
       is_timeout_parse = true;
@@ -93,7 +96,8 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
       is_route_parse = true;
       end_flag += 1;
     } else {
-      err_meg = ConfigError::make(origin_line, "", ERR_INVALID_SERVER_CONFIG_LINE);
+      err_meg =
+          ConfigError::make(origin_line, "", ERR_INVALID_SERVER_CONFIG_LINE);
       return false;
     }
   }
@@ -118,12 +122,14 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
   std::string temp(line);
   if (temp.find(':') == std::string::npos) {
     std::size_t pos = temp.find("+<=") + 3;
-    err_meg = ConfigError::make(origin_line, temp.substr(pos), ERR_INVALID_HEADER_MISSING_COLON);
+    err_meg = ConfigError::make(origin_line, temp.substr(pos),
+                                ERR_INVALID_HEADER_MISSING_COLON);
     return false;
   } else if (utils::count_occurrences(temp, ":") != 1) {
     std::size_t pos = temp.find(":");
     pos = temp.find(":", pos + 1);
-    err_meg = ConfigError::make(origin_line, temp.substr(pos), ERR_INVALID_HEADER_COLON_COUNT);
+    err_meg = ConfigError::make(origin_line, temp.substr(pos),
+                                ERR_INVALID_HEADER_COLON_COUNT);
     return false;
   }
 
@@ -312,36 +318,42 @@ std::string ServerConfig::parse_max_body_size(std::string line,
   maxbody = 0;
   if (line[0] == '0') {
     if (line.size() != 1)
-      return ConfigError::make(origin_line, line, ERR_INVALID_UNSIGNED_INT_LEADING_ZERO);
+      return ConfigError::make(origin_line, line,
+                               ERR_INVALID_UNSIGNED_INT_LEADING_ZERO);
   }
   for (; i < line.size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(line[i])))
       break;
     maxbody = maxbody * 10 + static_cast<unsigned int>(line[i] - '0');
     if (maxbody > MAX_BODY_SIZE)
-      return ConfigError::make(origin_line, line, ERR_MAX_BODY_SIZE_OUT_OF_RANGE);
+      return ConfigError::make(origin_line, line,
+                               ERR_MAX_BODY_SIZE_OUT_OF_RANGE);
   }
   if (i == 0)
-    return ConfigError::make(origin_line, line, ERR_INVALID_MAX_BODY_SIZE_VALUE_SYNTAX);
+    return ConfigError::make(origin_line, line,
+                             ERR_INVALID_MAX_BODY_SIZE_VALUE_SYNTAX);
   std::string temp = line.substr(i);
   if (temp.empty() || temp == "KB" || temp == "KiB")
     return "";
   else if (temp == "MB") {
     if (static_cast<std::size_t>(maxbody) * 1000 > MAX_BODY_SIZE)
-      return ConfigError::make(origin_line, line, ERR_MAX_BODY_SIZE_OUT_OF_RANGE);
+      return ConfigError::make(origin_line, line,
+                               ERR_MAX_BODY_SIZE_OUT_OF_RANGE);
     maxbody = maxbody * 1000;
   } else if (temp == "MiB") {
     if (static_cast<std::size_t>(maxbody) * 1024 > MAX_BODY_SIZE)
-      return ConfigError::make(origin_line, line, ERR_MAX_BODY_SIZE_OUT_OF_RANGE);
+      return ConfigError::make(origin_line, line,
+                               ERR_MAX_BODY_SIZE_OUT_OF_RANGE);
     maxbody = maxbody * 1024;
   } else
-    return ConfigError::make(origin_line, line, ERR_INVALID_MAX_BODY_SIZE_VALUE_SYNTAX);
+    return ConfigError::make(origin_line, line,
+                             ERR_INVALID_MAX_BODY_SIZE_VALUE_SYNTAX);
   return "";
 }
 
-std::string ServerConfig::apply_err_page_entry(const std::string &origin_line,
-    const std::string &line, std::map<unsigned int, std::string> &err_map,
-    char **envp) {
+std::string ServerConfig::apply_err_page_entry(
+    const std::string &origin_line, const std::string &line,
+    std::map<unsigned int, std::string> &err_map, char **envp) {
   std::vector<std::string> split = utils::string_split(line, " ");
 
   if (split.size() != 2) {
@@ -351,41 +363,49 @@ std::string ServerConfig::apply_err_page_entry(const std::string &origin_line,
     std::string extra_tokens = "";
     for (std::size_t i = 2; i < split.size(); ++i)
       extra_tokens += " " + split[i];
-    return ConfigError::make(origin_line, extra_tokens, ERR_INVALID_ERROR_PAGE_FORMAT);
+    return ConfigError::make(origin_line, extra_tokens,
+                             ERR_INVALID_ERROR_PAGE_FORMAT);
   }
 
   std::size_t pos = split[1].find(":");
 
   if (pos == std::string::npos || utils::count_occurrences(split[1], ":") != 1)
-    return ConfigError::make(origin_line, split[1], ERR_INVALID_ERROR_PAGE_MAPPING);
-  
+    return ConfigError::make(origin_line, split[1],
+                             ERR_INVALID_ERROR_PAGE_MAPPING);
+
   std::vector<std::string> key_and_value = utils::string_split(split[1], ":");
 
   if (key_and_value.size() != 2)
-    return ConfigError::make(origin_line, split[1], ERR_INVALID_ERROR_PAGE_MAPPING);
+    return ConfigError::make(origin_line, split[1],
+                             ERR_INVALID_ERROR_PAGE_MAPPING);
 
   const std::string &status_code = key_and_value[0];
   const std::string &error_page_path = key_and_value[1];
 
   for (std::size_t i = 0; i < status_code.size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(status_code[i]))) {
-      return ConfigError::make(origin_line, status_code, ERR_INVALID_ERROR_PAGE_STATUS_CODE_FORMAT);
+      return ConfigError::make(origin_line, status_code,
+                               ERR_INVALID_ERROR_PAGE_STATUS_CODE_FORMAT);
     }
   }
-  if (status_code.size() != 3 || (status_code[0] != '4' && status_code[0] != '5'))
-    return ConfigError::make(origin_line, status_code, ERR_INVALID_ERROR_PAGE_STATUS_CODE);
+  if (status_code.size() != 3 ||
+      (status_code[0] != '4' && status_code[0] != '5'))
+    return ConfigError::make(origin_line, status_code,
+                             ERR_INVALID_ERROR_PAGE_STATUS_CODE);
 
   unsigned int status_number = 0;
-  std::string err_meg = configutils::string_to_unsigned_int(status_code, status_number);
+  std::string err_meg =
+      configutils::string_to_unsigned_int(status_code, status_number);
   if (err_meg != "")
     return ConfigError::make(origin_line, status_code, err_meg);
   else if (status_number < 400 || status_number > 599)
-    return ConfigError::make(origin_line, status_code, ERR_INVALID_ERROR_PAGE_STATUS_CODE_RANGE);
+    return ConfigError::make(origin_line, status_code,
+                             ERR_INVALID_ERROR_PAGE_STATUS_CODE_RANGE);
 
   err_meg = configutils::check_html_file(error_page_path, envp);
   if (err_meg != "")
     return ConfigError::make(origin_line, error_page_path, err_meg);
-  
+
   err_map[status_number] = key_and_value[1];
   return "";
 }
@@ -401,9 +421,12 @@ bool ServerConfig::apply_route_rule_entry(
     if (size > 2) {
       std::size_t pos = line.find(" ");
       pos = line.find(" ", pos + 1);
-      err_meg = ConfigError::make(origin_line, line.substr(pos), ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_FORMAT);
+      err_meg =
+          ConfigError::make(origin_line, line.substr(pos),
+                            ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_FORMAT);
     } else if (size == 1)
-      err_meg = ConfigError::make(origin_line, "", ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_FORMAT);
+      err_meg = ConfigError::make(
+          origin_line, "", ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_FORMAT);
     return false;
   }
 
@@ -418,22 +441,26 @@ bool ServerConfig::apply_route_rule_entry(
     } else if (rule[0] == "@") {
       std::string real_path = utils::get_env("PWD", envp) + "/" + rule[1];
       if (access(real_path.c_str(), F_OK) != 0) {
-        err_meg = ConfigError::make(origin_line, rule[1], ERR_AUTH_FILE_NOT_FOUND);;
+        err_meg =
+            ConfigError::make(origin_line, rule[1], ERR_AUTH_FILE_NOT_FOUND);
+        ;
         return false;
       }
       routes[route_indexes[i]].auth_info = rule[1];
     } else if (rule[0] == "->{}") {
-      err_meg = parse_max_body_size(rule[1], routes[route_indexes[i]].max_body_KB);
+      err_meg =
+          parse_max_body_size(rule[1], routes[route_indexes[i]].max_body_KB);
       if (err_meg != "")
         return false;
     } else if (rule[0] == "!") {
       std::string errPageLine = rule[1];
-      err_meg = ServerConfig::apply_err_page_entry(origin_line,
-          line, routes[route_indexes[i]].error_pages, envp);
+      err_meg = ServerConfig::apply_err_page_entry(
+          origin_line, line, routes[route_indexes[i]].error_pages, envp);
       if (err_meg != "")
         return false;
     } else {
-      err_meg = ConfigError::make(origin_line, line, ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_SYNTAX);
+      err_meg = ConfigError::make(
+          origin_line, line, ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_SYNTAX);
       return false;
     }
   }
@@ -504,7 +531,8 @@ bool ServerConfig::create_route_rules(
     route.method = mets[i];
     route.op = parse_rule_operator(data[2]);
     if (route.op == UNDEFINED) {
-      err_meg = ConfigError::make(origin_line, data[2], ERR_UNDEFINED_ROUTE_OPERATOR);
+      err_meg =
+          ConfigError::make(origin_line, data[2], ERR_UNDEFINED_ROUTE_OPERATOR);
       return false;
     }
     route.index = "";
@@ -515,7 +543,8 @@ bool ServerConfig::create_route_rules(
       route.path = path_url[j];
       route.root = root_url;
       if (!has_compatible_wildcards(route.path, route.root)) {
-        err_meg =ConfigError::make(origin_line, route.path.to_string() + ", " + route.root.to_string(),
+        err_meg = ConfigError::make(
+            origin_line, route.path.to_string() + ", " + route.root.to_string(),
             ERR_INVALID_WILDCARD_MAPPING);
         return false;
       }

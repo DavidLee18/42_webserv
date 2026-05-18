@@ -8,7 +8,7 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line,
   count_line = 0;
   origin_line = "\t" + line;
   this->file_extension = file_extension;
-  
+
   std::vector<std::string> temp = utils::string_split(line, " ");
 
   if (temp[0] == "GET")
@@ -25,7 +25,8 @@ std::string RouteRule_CGI::parse_cgi_block(FileDescriptor &fd, std::string line,
                                            char **envp) {
   std::vector<std::string> split = utils::string_split(line, " ");
   if (split[2][0] != '$')
-    return ConfigError::make(origin_line, split[2], ERR_CGI_SCRIPT_MISSING_DOLLAR_PREFIX);
+    return ConfigError::make(origin_line, split[2],
+                             ERR_CGI_SCRIPT_MISSING_DOLLAR_PREFIX);
   std::string file_line = utils::remove_char(split[2], '$');
 
   err_meg = RouteRule_CGI::parse_routerule_cgi_executable(
@@ -56,20 +57,23 @@ std::string RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
     file_line = utils::trim_whitespace(origin_line);
 
     if (utils::has_space(file_line))
-      return ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_EXTENSION_LINE);
+      return ConfigError::make(origin_line, file_line,
+                               ERR_INVALID_CGI_EXTENSION_LINE);
     else if (is_valid_timeout(file_line)) {
       file_line = file_line.substr(3);
       err_meg = configutils::string_to_unsigned_int(file_line, timeout_ms);
       if (err_meg != "")
         return ConfigError::make(origin_line, file_line, err_meg);
       else if (timeout_ms > CGI_MAX_TIMEOUT || CGI_MIN_TIMEOUT > timeout_ms)
-        return ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_TIMEOUT_RANGE);
+        return ConfigError::make(origin_line, file_line,
+                                 ERR_INVALID_CGI_TIMEOUT_RANGE);
     } else if (std::string::npos != file_line.find("=")) {
       err_meg = parse_env_entry(file_line, env);
       if (err_meg != "")
         return err_meg;
     } else
-      return ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_EXTENSION_LINE);
+      return ConfigError::make(origin_line, file_line,
+                               ERR_INVALID_CGI_EXTENSION_LINE);
   }
 }
 
@@ -116,11 +120,14 @@ std::string RouteRule_CGI::matches_route_cgi_syntax(const std::string &line,
     }
   }
   if (exec_end == 0)
-    return ConfigError::make(origin_line, line, ERR_UNDEFINED_GLOBAL_CGI_EXTENSION);
+    return ConfigError::make(origin_line, line,
+                             ERR_UNDEFINED_GLOBAL_CGI_EXTENSION);
   else if (exec_end < line.length() && line[exec_end] != '(')
-    return ConfigError::make(origin_line, line, ERR_INVALID_CGI_INLINE_ENV_SYNTAX);
+    return ConfigError::make(origin_line, line,
+                             ERR_INVALID_CGI_INLINE_ENV_SYNTAX);
   exec_path = line.substr(0, exec_end);
-  std::string err = RouteRule_CGI::is_executable_file(origin_line, exec_path, false, envp);
+  std::string err =
+      RouteRule_CGI::is_executable_file(origin_line, exec_path, false, envp);
   if (err != "")
     return err;
 
@@ -128,21 +135,27 @@ std::string RouteRule_CGI::matches_route_cgi_syntax(const std::string &line,
   if (i == line.length())
     return "";
   if (line[i] != '(')
-    return ConfigError::make(origin_line, line, ERR_INVALID_CGI_INLINE_ENV_SYNTAX);
+    return ConfigError::make(origin_line, line,
+                             ERR_INVALID_CGI_INLINE_ENV_SYNTAX);
 
   std::size_t equals = line.find('=', i + 1);
   std::size_t end = line.find(')', i + 1);
 
   if (equals == std::string::npos)
-    return ConfigError::make(origin_line, line, ERR_INVALID_CGI_ENV_MISSING_EQUAL);
+    return ConfigError::make(origin_line, line,
+                             ERR_INVALID_CGI_ENV_MISSING_EQUAL);
   else if (end == std::string::npos)
-    return ConfigError::make(origin_line, line, ERR_INVALID_CGI_ENV_MISSING_CLOSE_PAREN);
+    return ConfigError::make(origin_line, line,
+                             ERR_INVALID_CGI_ENV_MISSING_CLOSE_PAREN);
   else if (end + 1 != line.length())
-    return ConfigError::make(origin_line, line, ERR_INVALID_CGI_ENV_TRAILING_CHARS);
+    return ConfigError::make(origin_line, line,
+                             ERR_INVALID_CGI_ENV_TRAILING_CHARS);
   else if (line.find('=', equals + 1) != std::string::npos)
-    return ConfigError::make(origin_line, line, ERR_INVALID_CGI_ENV_MULTIPLE_DECLARATIONS);
+    return ConfigError::make(origin_line, line,
+                             ERR_INVALID_CGI_ENV_MULTIPLE_DECLARATIONS);
   else if (equals <= i + 1 || equals + 1 >= end)
-    return ConfigError::make(origin_line, line, ERR_INVALID_CGI_ENV_EMPTY_KEY_OR_VALUE);
+    return ConfigError::make(origin_line, line,
+                             ERR_INVALID_CGI_ENV_EMPTY_KEY_OR_VALUE);
   return "";
 }
 
@@ -178,13 +191,17 @@ RouteRule_CGI::parse_env_entry(const std::string &line,
     return ConfigError::make(origin_line, line, ERR_INVALID_CGI_ENV_FORMAT);
   else if (utils::count_occurrences(line, "=") != 1) {
     pos = line.find("=", pos + 1);
-    return ConfigError::make(origin_line, line.substr(pos), ERR_INVALID_CGI_ENV_FORMAT);
+    return ConfigError::make(origin_line, line.substr(pos),
+                             ERR_INVALID_CGI_ENV_FORMAT);
   } else if (key_and_value.size() != 2)
-    return ConfigError::make(origin_line, line.substr(line.find("=")), ERR_INVALID_CGI_ENV_KEY_VALUE);
+    return ConfigError::make(origin_line, line.substr(line.find("=")),
+                             ERR_INVALID_CGI_ENV_KEY_VALUE);
   else if (!RouteRule_CGI::is_valid_env_key(key_and_value[0]))
-    return ConfigError::make(origin_line, key_and_value[0], ERR_INVALID_CGI_ENV_KEY);
+    return ConfigError::make(origin_line, key_and_value[0],
+                             ERR_INVALID_CGI_ENV_KEY);
   else if (env.find(key_and_value[0]) != env.end())
-    return ConfigError::make(origin_line, key_and_value[0], ERR_DUPLICATE_CGI_ENV_KEY);
+    return ConfigError::make(origin_line, key_and_value[0],
+                             ERR_DUPLICATE_CGI_ENV_KEY);
   env[key_and_value[0]] = key_and_value[1];
   return "";
 }
@@ -209,28 +226,36 @@ std::string RouteRule_CGI::parse_global_cgi_block(
     if (err != "")
       return err;
     line = utils::trim_whitespace(origin_line);
-    
+
     std::size_t pos = line.find("->");
     if (pos == std::string::npos)
-      return ConfigError::make(origin_line, line, ERR_MISSING_GLOBAL_CGI_MAPPING_OPERATOR);
+      return ConfigError::make(origin_line, line,
+                               ERR_MISSING_GLOBAL_CGI_MAPPING_OPERATOR);
     if (utils::count_occurrences(line, "->") != 1) {
       pos = line.find("->", pos + 1);
-      return ConfigError::make(origin_line, line.substr(pos), ERR_INVALID_GLOBAL_CGI_MAPPING_SYNTAX);
+      return ConfigError::make(origin_line, line.substr(pos),
+                               ERR_INVALID_GLOBAL_CGI_MAPPING_SYNTAX);
     }
     std::vector<std::string> key_and_value = utils::string_split(line, "->");
     if (key_and_value.size() != 2)
-      return ConfigError::make(origin_line, line, ERR_INVALID_GLOBAL_CGI_MAPPING_VALUE);
+      return ConfigError::make(origin_line, line,
+                               ERR_INVALID_GLOBAL_CGI_MAPPING_VALUE);
 
     std::string key = utils::trim_whitespace(key_and_value[0]);
     std::string value = utils::trim_whitespace(key_and_value[1]);
     if (utils::has_space(key))
-      return ConfigError::make(origin_line, key, ERR_INVALID_GLOBAL_CGI_EXTENSION_WHITESPACE);
+      return ConfigError::make(origin_line, key,
+                               ERR_INVALID_GLOBAL_CGI_EXTENSION_WHITESPACE);
     else if (utils::has_invalid_char(key, "-_"))
-      return ConfigError::make(origin_line, key, ERR_INVALID_GLOBAL_CGI_EXTENSION_CHAR);
+      return ConfigError::make(origin_line, key,
+                               ERR_INVALID_GLOBAL_CGI_EXTENSION_CHAR);
     else if (utils::has_space(value))
-      return ConfigError::make(origin_line, value, ERR_INVALID_GLOBAL_CGI_EXECUTABLE_PATH_WHITESPACE);
+      return ConfigError::make(
+          origin_line, value,
+          ERR_INVALID_GLOBAL_CGI_EXECUTABLE_PATH_WHITESPACE);
     else if (global_cgi.find(key) != global_cgi.end())
-      return ConfigError::make(origin_line, key, ERR_DUPLICATE_GLOBAL_CGI_MAPPING);
+      return ConfigError::make(origin_line, key,
+                               ERR_DUPLICATE_GLOBAL_CGI_MAPPING);
     err = is_executable_file(origin_line, value, true, envp);
     if (err != "")
       return err;

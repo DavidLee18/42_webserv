@@ -232,9 +232,7 @@ Result<Void> CgiDelegate::register_(
     }
     _stdin = add_res.value();
   } else {
-    {
-      FileDescriptor stdin_drop(stdin);
-    }
+    { FileDescriptor stdin_drop(stdin); }
     _stdin = NULL;
   }
 

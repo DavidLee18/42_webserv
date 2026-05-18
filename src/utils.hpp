@@ -36,9 +36,9 @@ std::string get_env(std::string const &name, char **envp);
 unsigned char to_upper(unsigned char);
 } // namespace utils
 
-namespace configutils{
+namespace configutils {
 std::string string_to_unsigned_int(const std::string &str, unsigned int &num);
 std::string get_indent_whitespace_error(const std::string &line, size_t level);
 std::string check_html_file(const std::string &path, char **envp);
-}
+} // namespace configutils
 #endif
