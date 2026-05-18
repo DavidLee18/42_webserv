@@ -61,9 +61,9 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
         err_meg = ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION);
         return false;
       }
-      err_meg = RouteRule_CGI::parse_global_cgi_block(file, global_cgi,
+      Result<Void> Result = RouteRule_CGI::parse_global_cgi_block(file, global_cgi,
                                                       count_line, envp);
-      if (err_meg != "")
+      if (Result.error() != "")
         return false;
       is_cgi_parse = true;
     } else if (line[0] == '!') {
