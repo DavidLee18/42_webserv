@@ -1,7 +1,7 @@
 #ifndef PATHPATTERN_HPP
 #define PATHPATTERN_HPP
 
-#include "../utils.hpp"
+#include "ConfigError.hpp"
 
 class PathPattern {
 private:

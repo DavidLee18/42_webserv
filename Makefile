@@ -11,7 +11,8 @@ SRC_DIR := src
 SRC_FILES	:= errors.cpp epoll_kqueue.cpp file_descriptor.cpp \
 	utils.cpp json.cpp cgi_1_1.cpp main.cpp
 SERVER		:= Server.cpp Client.cpp Response.cpp DefaultError.cpp Session.cpp
-CONFIG		:= WebserverConfig.cpp ServerConfig.cpp RouteRule_CGI.cpp PathPattern.cpp
+CONFIG		:= WebserverConfig.cpp ServerConfig.cpp RouteRule_CGI.cpp PathPattern.cpp \
+	ConfigError.cpp
 
 SRC_DIRS	:= server config
 SRCS		:= $(SRC_FILES) $(CONFIG) $(SERVER)
