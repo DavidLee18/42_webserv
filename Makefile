@@ -1,5 +1,5 @@
 CXX				:= c++
-CXXFLAGS_COMMON	:= -Wall -Werror -Wextra -Wconversion -std=c++98
+CXXFLAGS_COMMON	:= -Wall -Werror -Wextra -Wconversion -std=c++98 -DCONFIG_DEBUG
 CXXFLAGS		:= -O2 -foptimize-sibling-calls
 DEBUG_CXXFLAGS	:= -fsanitize=address -g3 -O0 -fno-omit-frame-pointer -fno-inline
 NAME			:= webserv

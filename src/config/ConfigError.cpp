@@ -309,6 +309,10 @@ static const ErrorInfo g_error_infos[] = {
               "Missing global CGI mapping operator",
               "global CGI mapping operator",
               "the mapping must contain the '->' operator in the form 'extension -> executable', but it was not found"),
+    ErrorInfo(ERR_MISSING_MIME_MAPPING_OPERATOR,
+              "Missing MIME type mapping operator",
+              "MIME type mapping operator",
+              "the mapping must contain the '->' operator in the form 'extension -> MIME type', but it was not found"),
 };
 
 static const ErrorInfo &find_error_info(ConfigErrorCode code) {

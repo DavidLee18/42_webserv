@@ -3,6 +3,9 @@
 
 #include "ServerConfig.hpp"
 
+#define MAX_PORT_VALUE 49151
+#define MIN_PORT_VALUE 1024
+
 class WebserverConfig {
 private:
   std::string err_meg;

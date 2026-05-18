@@ -6,8 +6,9 @@ RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line,
   err_meg = "";
   timeout_ms = 3000;
   count_line = 0;
-
+  origin_line = "\t" + line;
   this->file_extension = file_extension;
+  
   std::vector<std::string> temp = utils::string_split(line, " ");
 
   if (temp[0] == "GET")
@@ -62,7 +63,7 @@ std::string RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
       if (err_meg != "")
         return ConfigError::make(origin_line, file_line, ERR_INVALID_MAX_BODY_SIZE);
       else if (timeout_ms > CGI_MAX_TIMEOUT || CGI_MIN_TIMEOUT > timeout_ms)
-        return ConfigError::make(file_line, file_line, ERR_INVALID_CGI_TIMEOUT_RANGE);
+        return ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_TIMEOUT_RANGE);
     } else if (std::string::npos != file_line.find("=")) {
       err_meg = parse_env_entry(file_line, env);
       if (err_meg != "")
