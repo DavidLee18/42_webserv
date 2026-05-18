@@ -389,6 +389,17 @@ std::string ConfigError::make(const std::string &line,
          ").";
 }
 
+std::string ConfigError::make(const std::string &line,
+                              const std::string &target,
+                              const std::string &message) {
+  return "on [" + line + "], [" + target + "]: " + message;
+}
+
+std::string ConfigError::make(const std::string &line,
+                              const std::string &message) {
+  return "on [" + line + "]: " + message;
+}
+
 std::string ConfigError::file_descriptor(const std::string &reason) {
   return "FileDescriptor Error: " + reason;
 }

@@ -84,4 +84,24 @@ types =
 
 
 :4040 =
+	[] +<= X-Content-Type-Options: nosniff
+	[] +<= X-Frame-Options: DENY
+	[] +<= Referrer-Policy: no-referrer
+	[] +<= Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'
 
+	...30000
+
+	GET /old_stuff/ =301> /new_stuff/
+
+	GET /old_stuff/* =301> /new_stuff/*
+
+	GET /download/*/mp3/* =301> /*/mp3/*
+
+	GET /download/ <i- /www-files/storage
+
+	GET *.(jpg|jpeg|gif) <- /www-files/*
+
+	GET|POST|DELETE * <- /www-files/*
+		? /www-files/index2.html
+		@ /www-files/auth_info
+		->{} 10MiB

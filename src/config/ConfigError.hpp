@@ -91,16 +91,22 @@ enum ConfigErrorCode {
 };
 
 class ConfigError {
+private:
+  static std::string to_string(std::size_t value);
+
 public:
   static std::string make(const std::string &line, ConfigErrorCode code);
   static std::string make(const std::string &line, const std::string &target,
                           ConfigErrorCode code);
+  static std::string make(const std::string &line,
+                        const std::string &target,
+                        const std::string &message);
+  static std::string make(const std::string &line,
+                        const std::string &message);
   static std::string file_descriptor(const std::string &reason);
   static std::string add_line_number(std::size_t line_number,
                                      const std::string &message);
 
-private:
-  static std::string to_string(std::size_t value);
 };
 
 #endif

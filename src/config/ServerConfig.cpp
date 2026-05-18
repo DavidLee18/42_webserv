@@ -40,7 +40,7 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
     end_flag = 0;
 
     origin_line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(origin_line, 1);
+    err_meg = configutils::get_indent_whitespace_error(origin_line, 1);
     if (err_meg != "")
       return false;
     line = utils::trim_whitespace(origin_line);
@@ -66,10 +66,10 @@ bool ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
         err_meg = ConfigError::make(origin_line, ERR_DUPLICATE_SERVER_TIMEOUT);
         return false;
       }
-      err_meg = utils::string_to_unsigned_int(line.substr(3),
+      err_meg = configutils::string_to_unsigned_int(line.substr(3),
                                               server_response_time_ms);
       if (err_meg != "") {
-        err_meg = ConfigError::make(origin_line, line.substr(3), ERR_INVALID_SERVER_RESPONSE_TIME);
+        err_meg = ConfigError::make(origin_line, line.substr(3), err_meg);
         return false;
       } else if (server_response_time_ms > MAX_SERVER_RESPONSE_TIME ||
                  MIN_SERVER_RESPONSE_TIME > server_response_time_ms) {
@@ -156,7 +156,7 @@ bool ServerConfig::parse_header_entry(FileDescriptor &fd,
     }
 
     origin_line = utils::remove_char(fd_line.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(origin_line, 2);
+    err_meg = configutils::get_indent_whitespace_error(origin_line, 2);
     if (err_meg != "")
       return false;
     temp = origin_line;
@@ -376,15 +376,15 @@ std::string ServerConfig::apply_err_page_entry(const std::string &origin_line,
     return ConfigError::make(origin_line, status_code, ERR_INVALID_ERROR_PAGE_STATUS_CODE);
 
   unsigned int status_number = 0;
-  std::string err = utils::string_to_unsigned_int(status_code, status_number);
-  if (err != "")
-    return ConfigError::make(origin_line, status_code, ERR_INVALID_ERROR_PAGE_STATUS_CODE_FORMAT);
+  std::string err_meg = configutils::string_to_unsigned_int(status_code, status_number);
+  if (err_meg != "")
+    return ConfigError::make(origin_line, status_code, err_meg);
   else if (status_number < 400 || status_number > 599)
     return ConfigError::make(origin_line, status_code, ERR_INVALID_ERROR_PAGE_STATUS_CODE_RANGE);
 
-  err = utils::check_html_file(error_page_path, envp);
-  if (err != "")
-    return ConfigError::make(origin_line, error_page_path, ERR_INVALID_ERROR_PAGE_PATH);
+  err_meg = configutils::check_html_file(error_page_path, envp);
+  if (err_meg != "")
+    return ConfigError::make(origin_line, error_page_path, err_meg);
   
   err_map[status_number] = key_and_value[1];
   return "";
@@ -409,9 +409,9 @@ bool ServerConfig::apply_route_rule_entry(
 
   for (std::size_t i = 0; i < route_indexes.size(); ++i) {
     if (rule[0] == "?") {
-      err_meg = utils::check_html_file(rule[1], envp);
+      err_meg = configutils::check_html_file(rule[1], envp);
       if (err_meg != "") {
-        err_meg = ConfigError::make(origin_line, rule[1], ERR_INVALID_INDEX_FILE_PATH);
+        err_meg = ConfigError::make(origin_line, rule[1], err_meg);
         return false;
       }
       routes[route_indexes[i]].index = rule[1];
@@ -563,7 +563,7 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
     }
 
     origin_line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(origin_line, 2);
+    err_meg = configutils::get_indent_whitespace_error(origin_line, 2);
     line = utils::trim_whitespace(origin_line);
     if (err_meg != "")
       return false;

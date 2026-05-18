@@ -50,7 +50,7 @@ std::string RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
       return "";
 
     origin_line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(origin_line, 2);
+    err_meg = configutils::get_indent_whitespace_error(origin_line, 2);
     if (err_meg != "")
       return err_meg;
     file_line = utils::trim_whitespace(origin_line);
@@ -59,9 +59,9 @@ std::string RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
       return ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_EXTENSION_LINE);
     else if (is_valid_timeout(file_line)) {
       file_line = file_line.substr(3);
-      err_meg = utils::string_to_unsigned_int(file_line, timeout_ms);
+      err_meg = configutils::string_to_unsigned_int(file_line, timeout_ms);
       if (err_meg != "")
-        return ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_TIMEOUT_VALUE);
+        return ConfigError::make(origin_line, file_line, err_meg);
       else if (timeout_ms > CGI_MAX_TIMEOUT || CGI_MIN_TIMEOUT > timeout_ms)
         return ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_TIMEOUT_RANGE);
     } else if (std::string::npos != file_line.find("=")) {
@@ -205,7 +205,7 @@ std::string RouteRule_CGI::parse_global_cgi_block(
       break;
 
     origin_line = utils::remove_char(temp.value(), '\n');
-    err = utils::get_indent_whitespace_error(origin_line, 1);
+    err = configutils::get_indent_whitespace_error(origin_line, 1);
     if (err != "")
       return err;
     line = utils::trim_whitespace(origin_line);

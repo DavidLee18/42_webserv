@@ -31,7 +31,7 @@ bool WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
       continue;
 
     origin_line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(origin_line, 0);
+    err_meg = configutils::get_indent_whitespace_error(origin_line, 0);
     if (err_meg != "")
       return false;
     line = utils::trim_whitespace(origin_line);
@@ -205,7 +205,7 @@ bool WebserverConfig::parse_types_block(FileDescriptor &file) {
       break;
 
     origin_line = utils::remove_char(temp.value(), '\n');
-    err_meg = utils::get_indent_whitespace_error(origin_line, 1);
+    err_meg = configutils::get_indent_whitespace_error(origin_line, 1);
     if (err_meg != "")
       return false;
     line = utils::trim_whitespace(origin_line);
@@ -265,7 +265,9 @@ bool WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   std::string temp(line);
   ServerConfig server(file, global_cgi, envp);
 
-  utils::string_to_unsigned_int(WebserverConfig::parse_server_port(temp), key);
+  err_meg = configutils::string_to_unsigned_int(WebserverConfig::parse_server_port(temp), key);
+  if (err_meg != "")
+    err_meg = ConfigError::make(line, WebserverConfig::parse_server_port(temp), err_meg);
   if (MIN_PORT_VALUE > key || key > MAX_PORT_VALUE) {
     err_meg = ConfigError::make(line, WebserverConfig::parse_server_port(temp), ERR_INVALID_SERVER_PORT);
     return false;
