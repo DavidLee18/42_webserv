@@ -556,32 +556,31 @@ Result<Void> ServerConfig::parse_route_rule_block(const std::string &route_line,
   return OKV;
 }
 
-RouteRule const *ServerConfig::find_route(Request::Method method,
+Result<const RouteRule *> ServerConfig::find_route(Request::Method method,
                                           const std::string &path) const {
   PathPattern pathPattern(path);
+  std::string err = "[DEBUG] find_route: NO ROUTE for ";
 
   for (size_t i = 0; i < routes.size(); ++i) {
     if (((method == Request::HEAD && routes[i].method == Request::GET) ||
          routes[i].method == method) &&
-        routes[i].path.matches(pathPattern)) {
-      return &routes[i];
-    }
+        routes[i].path.matches(pathPattern))
+      return OK(const RouteRule *, &routes[i]);
   }
-  return NULL;
+  return ERR(const RouteRule *, err + path);
 }
 
-RouteRule_CGI const *
-ServerConfig::find_route_cgi(Request::Method method,
+Result<const RouteRule_CGI *> ServerConfig::find_route_cgi(Request::Method method,
                              const std::string &path) const {
   PathPattern pathPattern(path);
+  std::string err = "[DEBUG] find_route_cgi: NO ROUTE for ";
 
   for (size_t i = 0; i < R_CGI.size(); ++i) {
     if (R_CGI[i].get_method() == method &&
-        R_CGI[i].get_path().matches(pathPattern)) {
-      return &R_CGI[i];
-    }
+        R_CGI[i].get_path().matches(pathPattern))
+      return OK(const RouteRule_CGI *, &R_CGI[i]);
   }
-  return NULL;
+  return ERR(const RouteRule_CGI *, err + path);
 }
 
 std::string normalize_slashes(const std::string &path) {
@@ -601,22 +600,23 @@ std::string normalize_slashes(const std::string &path) {
   return result;
 }
 
-std::string ServerConfig::get_rewritten_path(Request::Method method,
+Result<std::string> ServerConfig::get_rewritten_path(Request::Method method,
                                              const std::string &path) const {
-  const RouteRule *route = find_route(method, path);
-  if (!route) {
-    std::cout << utils::debug << "get_rewritten_path: NO ROUTE for " << path
-              << std::endl;
-    return "";
-  }
+  Result<const RouteRule *> route_result = find_route(method, path);
+  if (!route_result.error().empty())
+    return ERR(std::string, route_result.error());
+  
+  const RouteRule *route = route_result.value();
+
   std::cout << utils::debug << "route.path='" << route->path.to_string()
             << "' route.root='" << route->root.to_string() << "' req_path='"
             << PathPattern(path).to_string() << "'" << std::endl;
+
   const std::string result = normalize_slashes(
       route->path.rewrite_path(PathPattern(path), route->root));
   std::cout << utils::debug << "rewrite_path returned: '" << result << "'"
             << std::endl;
-  return result;
+  return OK(std::string, result);
 }
 
 std::ostream &operator<<(std::ostream &os, const PathPattern &data) {

@@ -82,12 +82,6 @@ public:
   ServerConfig()
       : header(), server_response_time_ms(3000), routes(), R_CGI(), file_extension(),
         end_flag(0), err_meg(), origin_line(),  count_line(0) {}
-  RouteRule const *find_route(Request::Method method,
-                              const std::string &path) const;
-  RouteRule_CGI const *find_route_cgi(Request::Method method,
-                                      const std::string &path) const;
-  std::string get_rewritten_path(Request::Method method,
-                                 const std::string &path) const;
 
   const std::map<std::string, std::string> &get_header(void) const {
     return header;
@@ -106,6 +100,12 @@ public:
   apply_err_page_entry(const std::string &origin_line, const std::string &line,
                                std::map<unsigned int, std::string> &err_map,
                                char **envp);
+  Result<const RouteRule *> find_route(Request::Method method,
+                              const std::string &path) const;
+  Result<const RouteRule_CGI *> find_route_cgi(Request::Method method,
+                                      const std::string &path) const;
+  Result<std::string> get_rewritten_path(Request::Method method,
+                                 const std::string &path) const;
 };
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data);
