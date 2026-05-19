@@ -518,8 +518,9 @@ CgiMetaVar::Parser::parse_remote_addr(const std::string &raw) {
         return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
     }
 
-    const long val = std::atol(octet.c_str());
-    if (val < 0 || val > 255)
+    char *end = NULL;
+    const long val = std::strtol(octet.c_str(), &end, 10);
+    if (end == NULL || *end != '\0' || val < 0 || val > 255)
       return ERR_PAIR(CgiMetaVar, size_t, Errors::invalid_format);
 
     octets.push_back(static_cast<unsigned char>(val));
