@@ -88,17 +88,17 @@ public:
 
 private:
   enum PathType { IS_DIR, IS_FILE, PATH_ERROR };
-  static int check_path_type(const std::string &path);
+  static Result<int> check_path_type(const std::string &path);
   static Target resolve_target(const RouteRule *rule,
                                const ServerConfig *config,
                                const Request *request, char **envp);
-  static std::string compute_etag(const std::string &path);
-  static std::string get_last_modified(const std::string &path);
+  static Result<std::string> compute_etag(const std::string &path);
+  static Result<std::string> get_last_modified(const std::string &path);
   static Response error_response(const ServerConfig *config,
                                  const RouteRule *rule,
                                  Response::StatusCode error_code, char **envp);
-  static std::string make_autoindex_page(const std::string &real_path,
-                                         const std::string &req_uri, DIR *dir);
+  static Result<std::string> make_autoindex_page(const std::string &real_path,
+                                                 const std::string &req_uri, DIR *dir);
   static std::string extract_boundary(const std::string &content_type);
   static std::size_t parse_multipart_part(
                        const std::string &body, const std::string &boundary,

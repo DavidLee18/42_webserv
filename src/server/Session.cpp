@@ -1,25 +1,27 @@
 #include "Session.hpp"
+#include "../errors.h"
+#include <cerrno>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 
-std::string Session::generate_session_id() {
+Result<std::string> Session::generate_session_id() {
   unsigned char random_bytes[16];
 
-  // 1. /dev/urandom에서 난수 추출 시도 (가장 안전한 방법)
   std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
-  if (urandom.is_open()) {
-    urandom.read(reinterpret_cast<char *>(random_bytes), 16);
-    urandom.close();
+  if (!urandom.is_open()) {
+    return ERR(std::string, "cannot open /dev/urandom for session ID generation");
   }
+  urandom.read(reinterpret_cast<char *>(random_bytes), 16);
+  if (urandom.fail() || urandom.gcount() != 16) {
+    return ERR(std::string, "cannot read from /dev/urandom");
+  }
+  urandom.close();
 
-  // 3. UUID v4 규칙 적용
-  random_bytes[6] = (random_bytes[6] & 0x0f) | 0x40; // M 위치: 4 (0100)
-  random_bytes[8] =
-      (random_bytes[8] & 0x3f) | 0x80; // N 위치: 8, 9, a, b (10xx)
+  random_bytes[6] = (random_bytes[6] & 0x0f) | 0x40;
+  random_bytes[8] = (random_bytes[8] & 0x3f) | 0x80;
 
-  // 4. 16진수 문자열 포맷팅
   std::ostringstream ss;
   ss << std::hex << std::setfill('0');
   for (int i = 0; i < 16; ++i) {
@@ -28,12 +30,14 @@ std::string Session::generate_session_id() {
     ss << std::setw(2) << static_cast<int>(random_bytes[i]);
   }
 
-  return ss.str();
+  return OK(std::string, ss.str());
 }
 
-std::string Session::create_session(const std::string &user_id,
-                                    const std::string &client_ip) {
-  std::string session_id = generate_session_id();
+Result<std::string> Session::create_session(const std::string &user_id,
+                                             const std::string &client_ip) {
+  std::string session_id;
+  TRY(std::string, std::string, session_id, generate_session_id());
+
   SessionData new_session;
   new_session.user_id = user_id;
   new_session.client_ip = client_ip;
@@ -41,7 +45,7 @@ std::string Session::create_session(const std::string &user_id,
   new_session.last_access = new_session.created_at;
 
   data[session_id] = new_session;
-  return session_id;
+  return OK(std::string, session_id);
 }
 
 SessionData *Session::get_session(const std::string &session_id) {

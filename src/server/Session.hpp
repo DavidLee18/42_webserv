@@ -1,6 +1,7 @@
 #ifndef SESSION_HPP
 #define SESSION_HPP
 
+#include "../result.h"
 #include <ctime>
 #include <map>
 #include <string>
@@ -19,11 +20,11 @@ struct SessionData {
 
 class Session {
   std::map<std::string, SessionData> data;
-  static std::string generate_session_id();
+  static Result<std::string> generate_session_id();
 
 public:
-  std::string create_session(const std::string &user_id,
-                             const std::string &client_ip);
+  Result<std::string> create_session(const std::string &user_id,
+                                     const std::string &client_ip);
   SessionData *get_session(const std::string &session_id);
   void delete_session(const std::string &session_id);
   void clean_expired_sessions(int timeout_seconds);

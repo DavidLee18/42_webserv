@@ -288,22 +288,25 @@ Result<Void> ServerResponse::register_cgi(
   return OKV;
 }
 
-int ServerResponse::check_path_type(const std::string &path) {
+Result<int> ServerResponse::check_path_type(const std::string &path) {
   struct stat info = {};
 
-  if (stat(path.c_str(), &info) != 0)
-    return Response::NOT_FOUND;
-  else if (access(path.c_str(), R_OK) != 0)
-    return Response::FORBIDDEN;
-  else if (S_ISDIR(info.st_mode))
-    return IS_DIR;
-  else if (S_ISREG(info.st_mode)) {
-    if (path.rfind(".cgi") == path.length() - 4) {
-      return Response::NOT_FOUND;
-    }
-    return IS_FILE;
+  if (stat(path.c_str(), &info) != 0) {
+    return ERR(int, Errors::not_found);
   }
-  return PATH_ERROR;
+  if (access(path.c_str(), R_OK) != 0) {
+    return ERR(int, Errors::access_denied);
+  }
+  if (S_ISDIR(info.st_mode)) {
+    return OK(int, IS_DIR);
+  }
+  if (S_ISREG(info.st_mode)) {
+    if (path.rfind(".cgi") == path.length() - 4) {
+      return ERR(int, "CGI files cannot be directly accessed");
+    }
+    return OK(int, IS_FILE);
+  }
+  return ERR(int, "path is neither file nor directory");
 }
 
 Target ServerResponse::resolve_target(const RouteRule *rule,
@@ -319,48 +322,59 @@ Target ServerResponse::resolve_target(const RouteRule *rule,
       config->get_rewritten_path(request->get_method(), request->get_path());
 
   target.path = utils::get_env("PWD", envp);
-  const int type = check_path_type(target.path + root);
-  if (type == IS_DIR) {
-    if (rule->op == SERVE_FROM && request->get_path() == "/") {
-      target.path += rule->index;
+  Result<int> type_result = check_path_type(target.path + root);
+
+  if (type_result.has_value()) {
+    const int type = type_result.value();
+    if (type == IS_DIR) {
+      if (rule->op == SERVE_FROM && request->get_path() == "/") {
+        target.path += rule->index;
+      } else {
+        target.path += root;
+      }
+      Result<int> check_result = check_path_type(target.path);
+      target.type = check_result.has_value() ? check_result.value() : Response::NOT_FOUND;
     } else {
       target.path += root;
+      Result<int> check_result = check_path_type(target.path);
+      target.type = check_result.has_value() ? check_result.value() : Response::NOT_FOUND;
     }
-    target.type = check_path_type(target.path);
-  } else if (type == Response::NOT_FOUND) {
-    target.path += get_string_from_map(rule->error_pages, Response::NOT_FOUND);
-    target.type = Response::NOT_FOUND; // Keep error code, don't check path type
-  } else if (type == Response::FORBIDDEN) {
-    target.path += get_string_from_map(rule->error_pages, Response::FORBIDDEN);
-    target.type = Response::FORBIDDEN; // Keep error code, don't check path type
   } else {
-    target.path += root;
-    target.type = check_path_type(target.path);
+    if (type_result.error() == Errors::not_found) {
+      target.path += get_string_from_map(rule->error_pages, Response::NOT_FOUND);
+      target.type = Response::NOT_FOUND;
+    } else if (type_result.error() == Errors::access_denied) {
+      target.path += get_string_from_map(rule->error_pages, Response::FORBIDDEN);
+      target.type = Response::FORBIDDEN;
+    } else {
+      target.path += root;
+      target.type = Response::NOT_FOUND;
+    }
   }
 
   return target;
 }
 
-std::string ServerResponse::compute_etag(const std::string &path) {
+Result<std::string> ServerResponse::compute_etag(const std::string &path) {
   struct stat st;
-  if (stat(path.c_str(), &st) == -1)
-    return "";
+  if (stat(path.c_str(), &st) == -1) {
+    return ERR(std::string, "cannot stat file for etag computation");
+  }
 
   std::ostringstream oss;
   oss << "\"" << st.st_ino << "-" << st.st_size << "-" << st.st_mtime << "\"";
-  return oss.str();
+  return OK(std::string, oss.str());
 }
 
-std::string ServerResponse::get_last_modified(const std::string &path) {
+Result<std::string> ServerResponse::get_last_modified(const std::string &path) {
   struct stat st;
   if (stat(path.c_str(), &st) == -1)
-    return "";
+    return ERR(std::string, "cannot stat file for last-modified header");
 
-  // Format time as RFC 7231 date
   char buf[100];
   struct tm *tm_info = gmtime(&st.st_mtime);
   strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", tm_info);
-  return std::string(buf);
+  return OK(std::string, std::string(buf));
 }
 
 Response ServerResponse::error_response(const ServerConfig *config,
@@ -372,14 +386,16 @@ Response ServerResponse::error_response(const ServerConfig *config,
 
   if (err_page.empty())
     return DefaultError::default_err_response(error_code);
-  if (check_path_type(err_page) != IS_FILE)
+
+  Result<int> path_type_result = check_path_type(err_page);
+  if (!path_type_result.has_value() || path_type_result.value() != IS_FILE)
     return DefaultError::default_err_response(error_code);
+
   std::ifstream file(err_page.c_str());
   if (file.is_open()) {
     Response response;
     response.status_code = error_code;
     response.headers = config->get_header();
-    // Use get_mime_type_for_extension helper instead of map lookup
     response.content_type =
         get_mime_type_for_extension(find_file_type(err_page));
     std::ostringstream ss;
@@ -414,9 +430,9 @@ static std::string escape_html(const std::string &input) {
   return escaped;
 }
 
-std::string ServerResponse::make_autoindex_page(const std::string &real_path,
-                                                const std::string &req_uri,
-                                                DIR *dir) {
+Result<std::string> ServerResponse::make_autoindex_page(const std::string &real_path,
+                                                       const std::string &req_uri,
+                                                       DIR *dir) {
   std::ostringstream html;
 
   html << "<!DOCTYPE html>\n"
@@ -469,7 +485,8 @@ std::string ServerResponse::make_autoindex_page(const std::string &real_path,
       continue;
 
     std::string full_item_path = real_path + name;
-    const int type = check_path_type(full_item_path);
+    Result<int> type_result = check_path_type(full_item_path);
+    const int type = type_result.has_value() ? type_result.value() : PATH_ERROR;
     std::string icon = "📄";
 
     if (type == IS_DIR) {
@@ -501,8 +518,10 @@ std::string ServerResponse::make_autoindex_page(const std::string &real_path,
        << "</div>\n"
        << "</body></html>";
 
-  closedir(dir);
-  return html.str();
+  if (closedir(dir) == -1) {
+    return ERR(std::string, "cannot close directory");
+  }
+  return OK(std::string, html.str());
 }
 
 std::string ServerResponse::extract_boundary(const std::string &content_type) {
@@ -701,14 +720,17 @@ Response ServerResponse::post_method(const Target &target, Response response,
         std::cout << utils::info << "Authentication SUCCESS for: " << id
                   << std::endl;
 
-        // 1. 브라우저에게 "이 주소로 가라"고 알리는 상태 코드 설정
-        // 일반적으로 다른 페이지 이동 시 302 혹은 303을 사용
+        Result<std::string> session_result = session->create_session(id, client->ip);
+        if (!session_result.has_value()) {
+          return error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
+        }
+
         response.status_code = Response::FOUND;
         response.redir = "/";
         response.content_type = "text/html";
         response.body = "<html><body>Redirecting...</body></html>";
         response.cookie =
-            "session_id=" + session->create_session(id, client->ip) +
+            "session_id=" + session_result.value() +
             "; Path=/; HttpOnly";
         return response;
       } else {
@@ -901,14 +923,20 @@ Response ServerResponse::get_method(Target target, Response response,
     }
     target.type = Response::OK;
     response.content_type = "text/html";
-    response.body = make_autoindex_page(target.path, request->get_path(), dir);
+    Result<std::string> autoindex_result = make_autoindex_page(target.path, request->get_path(), dir);
+    if (!autoindex_result.has_value()) {
+      closedir(dir);
+      return error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
+    }
+    response.body = autoindex_result.value();
     response.status_code = Response::OK;
   } else {
-    if (check_path_type(target.path) != IS_FILE)
+    Result<int> path_type_result = check_path_type(target.path);
+    if (!path_type_result.has_value() || path_type_result.value() != IS_FILE)
       return error_response(config, rule, Response::NOT_FOUND, envp);
+
     std::ifstream file(target.path.c_str());
     if (file.is_open()) {
-      // Stream large file responses instead of buffering whole file in memory.
       struct stat st;
       if (stat(target.path.c_str(), &st) != 0) {
         file.close();
@@ -919,9 +947,12 @@ Response ServerResponse::get_method(Target target, Response response,
       target.type = Response::OK;
       response.status_code = Response::OK;
       file.close();
-      // Add ETag and Last-Modified headers
-      response.headers["ETag"] = compute_etag(target.path);
-      response.headers["Last-Modified"] = get_last_modified(target.path);
+      Result<std::string> etag_result = compute_etag(target.path);
+      if (etag_result.has_value())
+        response.headers["ETag"] = etag_result.value();
+      Result<std::string> lm_result = get_last_modified(target.path);
+      if (lm_result.has_value())
+        response.headers["Last-Modified"] = lm_result.value();
     } else {
       return error_response(config, rule, Response::NOT_FOUND, envp);
     }
