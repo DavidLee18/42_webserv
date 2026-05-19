@@ -1,5 +1,5 @@
 #include "Session.hpp"
-#include "../errors.h"
+#include "../Errors.hpp"
 #include <cerrno>
 #include <cstdlib>
 #include <fstream>
