@@ -8,24 +8,26 @@
 
 class WebserverConfig {
 private:
-  std::string err_meg;
   std::string origin_line;
   std::string default_mime;
   std::map<std::string, std::string> global_cgi;
   std::map<std::string, std::string> type_map;
   std::map<unsigned int, ServerConfig> serverconfig_map;
   std::map<unsigned int, std::string> default_err_page;
+
+private:
+  std::string err_meg;
   std::size_t count_line;
 
-  bool file_parsing(FileDescriptor &file, char **envp);
-  bool parse_types_block(FileDescriptor &file);
-  bool parse_type_mapping(const std::string &line,
+  Result<Void> file_parsing(FileDescriptor &file, char **envp);
+  Result<Void> parse_types_block(FileDescriptor &file);
+  Result<Void> parse_type_mapping(const std::string &line,
                           std::vector<std::string> &keys_out,
                           std::string &value_out);
-  std::vector<std::string> parse_type_keys(const std::string &key);
-  bool is_valid_mime_type(const std::string &value);
+  Result<std::vector<std::string> >  parse_type_keys(const std::string &key);
+  Result<Void> is_valid_mime_type(const std::string &value);
   static bool is_server_config_header(const std::string &line);
-  bool parse_server_config_entry(FileDescriptor &file, const std::string &line,
+  Result<Void> parse_server_config_entry(FileDescriptor &file, const std::string &line,
                                  char **envp);
   static std::string parse_server_port(const std::string &line);
 
