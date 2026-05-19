@@ -101,7 +101,7 @@ SOURCES=(
   "$PROJECT_ROOT/src/server/Server.cpp"
   "$PROJECT_ROOT/src/server/Session.cpp"
   "$PROJECT_ROOT/src/cgi_1_1.cpp"
-  "$PROJECT_ROOT/src/epoll_kqueue.cpp"
+  "$PROJECT_ROOT/src/EPoll.cpp"
   "$PROJECT_ROOT/src/framing_test_dummy.cpp"
   "$PROJECT_ROOT/src/errors.cpp"
   "$PROJECT_ROOT/src/file_descriptor.cpp"
