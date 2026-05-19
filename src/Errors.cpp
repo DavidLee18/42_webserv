@@ -1,4 +1,4 @@
-#include "webserv.h"
+#include "Errors.hpp"
 
 const std::string Errors::invalid_fd = "Invalid file descriptor";
 const std::string Errors::iter_ended = "The Iterator reached end";

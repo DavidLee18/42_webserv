@@ -3,6 +3,9 @@
 
 #include "PathPattern.hpp"
 
+#define CGI_MAX_TIMEOUT 3600000
+#define CGI_MIN_TIMEOUT 1
+
 class RouteRule_CGI {
 private:
   Request::Method met;
@@ -10,12 +13,14 @@ private:
   std::string executable;
   std::map<std::string, std::string> env;
   unsigned int timeout_ms;
+
+private:
   std::string err_meg;
+  std::string origin_line;
   std::size_t count_line;
   std::vector<std::string> file_extension;
 
   static bool is_valid_timeout(const std::string &line);
-  std::string parse_timeout_value(std::string &line);
   std::string parse_cgi_block(FileDescriptor &fd, std::string line,
                               char **envp);
   std::string parse_env_entry(const std::string &line,
@@ -26,23 +31,27 @@ private:
 
   std::string matches_route_cgi_syntax(const std::string &line, char **envp);
   std::string parse_cgi_params(FileDescriptor &fd);
+  static std::string is_executable_file(const std::string &origin_line,
+                                        const std::string &path,
+                                        bool allow_absolute_path, char **envp);
 
 public:
   RouteRule_CGI()
-      : met(Request::GET), path(""), executable(""), env(), timeout_ms(3000),
-        err_meg(""), count_line(0){};
+      : met(Request::ERROR), path(), executable(), env(), timeout_ms(3000),
+        err_meg(), origin_line(), count_line(0), file_extension(){};
   RouteRule_CGI(FileDescriptor &fd, const std::string &line,
                 const std::vector<std::string> &file_extension, char **envp);
   RouteRule_CGI &operator=(const RouteRule_CGI &other) {
     if (this != &other) {
-      met = other.met;
-      path = other.path;
-      executable = other.executable;
-      env = other.env;
-      timeout_ms = other.timeout_ms;
-      err_meg = other.err_meg;
-      count_line = other.count_line;
-      file_extension = other.file_extension;
+      this->met = other.met;
+      this->path = other.path;
+      this->executable = other.executable;
+      this->env = other.env;
+      this->timeout_ms = other.timeout_ms;
+      this->err_meg = other.err_meg;
+      this->origin_line = other.origin_line;
+      this->count_line = other.count_line;
+      this->file_extension = other.file_extension;
     }
     return *this;
   }
@@ -56,8 +65,6 @@ public:
 
   static bool is_valid_env_key(const std::string &key);
   static bool is_valid_cgi_config(std::string line);
-  static std::string is_executable_file(const std::string &path,
-                                        bool allow_absolute_path, char **envp);
   static std::string
   parse_global_cgi_block(FileDescriptor &fd,
                          std::map<std::string, std::string> &global_cgi,

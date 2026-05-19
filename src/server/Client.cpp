@@ -1,5 +1,5 @@
 #include "Client.hpp"
-#include "../errors.h"
+#include "../Errors.hpp"
 
 // Helper parser implementations for Request::from_buff splitting.
 Result<Void> Request::parse_request_line(std::stringstream &ss,

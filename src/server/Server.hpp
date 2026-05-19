@@ -1,15 +1,19 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-#include "../cgi_1_1.h"
-#include "../config/WebserverConfig.hpp"
-#include "../epoll.h"
-#include "../errors.h"
+/**
+ * @file Server.hpp
+ * @brief Defines the main Server class that manages epoll, connections, and
+ * event loops.
+ */
 
+#include "../EPoll_KQueue.hpp"
+#include "../Errors.hpp"
+#include "../cgi_1_1/CgiDelegate.hpp"
+#include "../config/WebserverConfig.hpp"
 #include "Client.hpp"
 #include "Response.hpp"
 #include "Session.hpp"
-
 #include <csignal>
 #include <fcntl.h>
 #include <fstream>
@@ -23,8 +27,21 @@
 #include <unistd.h>
 #include <utility>
 
+#define NETWORK_BUFFER_SIZE 4096
+#define CHUNKED_PENDING_TIMEOUT 3
+
 class ServerConfig;
 
+extern volatile sig_atomic_t g_receivedSignal;
+
+/**
+ * @class Server
+ * @brief Core server class to initiate, configure, and run the event loop.
+ *
+ * The Server class is responsible for setting up listening sockets based on the
+ * configuration, managing multiplexed I/O using EPoll, and directing I/O events
+ * to the respective ClientSession handlers.
+ */
 class Server {
   EPoll epoll;
 

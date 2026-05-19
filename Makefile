@@ -1,5 +1,5 @@
 CXX				:= c++
-CXXFLAGS_COMMON	:= -Wall -Werror -Wextra -Wconversion -std=c++98
+CXXFLAGS_COMMON	:= -Wall -Werror -Wextra -Wconversion -std=c++98 -DCONFIG_DEBUG
 CXXFLAGS		:= -O2 -foptimize-sibling-calls
 DEBUG_CXXFLAGS	:= -fsanitize=address -g3 -O0 -fno-omit-frame-pointer -fno-inline
 NAME			:= webserv
@@ -7,14 +7,14 @@ NAME			:= webserv
 BUILD_DIR := build
 SRC_DIR := src
 
-
-SRC_FILES	:= errors.cpp epoll.cpp file_descriptor.cpp \
-	utils.cpp json.cpp cgi_1_1.cpp main.cpp
+SRC_FILES	:= Errors.cpp EPoll_KQueue.cpp FileDescriptor.cpp utils.cpp main.cpp
 SERVER		:= Server.cpp Client.cpp Response.cpp DefaultError.cpp Session.cpp
-CONFIG		:= WebserverConfig.cpp ServerConfig.cpp RouteRule_CGI.cpp PathPattern.cpp
+CONFIG		:= WebserverConfig.cpp ServerConfig.cpp RouteRule_CGI.cpp PathPattern.cpp ConfigError.cpp
+CGI         := CgiAuthType.cpp CgiMetaVar.cpp EtcMetaVar.cpp ServerName.cpp ContentType.cpp \
+	CgiDelegate.cpp CgiInput.cpp
 
-SRC_DIRS	:= server config
-SRCS		:= $(SRC_FILES) $(CONFIG) $(SERVER)
+SRC_DIRS	:= server config cgi_1_1
+SRCS		:= $(SRC_FILES) $(CONFIG) $(SERVER) $(CGI)
 
 OBJS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.o))
 DEPS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.d))

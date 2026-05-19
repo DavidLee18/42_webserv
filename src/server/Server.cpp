@@ -1,5 +1,4 @@
 #include "Server.hpp"
-#include "../webserv.h"
 #include "Response.hpp"
 #include <cstddef>
 #include <ctime>

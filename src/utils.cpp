@@ -1,4 +1,7 @@
-#include "webserv.h"
+#include "utils.hpp"
+#include <algorithm>
+#include <cerrno>
+#include <limits>
 
 int utils::count_occurrences(const std::string &line,
                              const std::string &delim) {
@@ -122,8 +125,61 @@ bool utils::has_trailing_space(const std::string &str) {
   return std::isspace(str[str.length() - 1]);
 }
 
-std::string utils::get_indent_whitespace_error(const std::string &line,
-                                               size_t level) {
+bool utils::is_header_name(const std::string &name) {
+  if (name.empty())
+    return false;
+  for (std::string::const_iterator it = name.begin(); it != name.end(); ++it) {
+    const char c = *it;
+    if (!std::isalnum(c) && c != '!' && c != '#' && c != '$' && c != '%' &&
+        c != '&' && c != '\'' && c != '*' && c != '+' && c != '-' && c != '.' &&
+        c != '^' && c != '_' && c != '`' && c != '|' && c != '~')
+      return false;
+  }
+  return true;
+}
+
+bool utils::is_header_value(const std::string &value) {
+  if (value.empty())
+    return true;
+  for (std::string::const_iterator it = value.begin(); it != value.end();
+       ++it) {
+    const char c = *it;
+    if ((c < 0x20 || c > 0x7e) && c != 0x09)
+      return false;
+  }
+  return true;
+}
+
+char utils::tolower(const char c) {
+  return static_cast<char>(std::tolower(static_cast<int>(c)));
+}
+
+std::ostream &utils::debug(std::ostream &os) { return os << "[DEBUG] "; }
+
+std::ostream &utils::info(std::ostream &os) { return os << "[INFO] "; }
+
+std::ostream &utils::warning(std::ostream &os) { return os << "[WARNING] "; }
+
+std::ostream &utils::error(std::ostream &os) { return os << "[ERROR] "; }
+
+std::ostream &utils::crlf(std::ostream &os) { return os << "\r" << std::endl; }
+
+std::string utils::get_env(std::string const &name, char **envp) {
+  if (envp == NULL || *envp == NULL)
+    return std::string();
+  for (size_t i = 0; envp[i] != NULL; i++) {
+    const std::string env_pair(envp[i]);
+    const size_t equals_pos = env_pair.find('=');
+    if (equals_pos == std::string::npos)
+      continue;
+    if (name == env_pair.substr(0, equals_pos))
+      return env_pair.substr(equals_pos + 1);
+  }
+  return std::string();
+}
+
+std::string configutils::get_indent_whitespace_error(const std::string &line,
+                                                     size_t level) {
   std::size_t indent_level = utils::return_indent_level(line);
   std::string err_line = "";
 
@@ -170,7 +226,32 @@ std::string utils::get_indent_whitespace_error(const std::string &line,
   return err_line;
 }
 
-std::string utils::check_html_file(const std::string &path, char **envp) {
+std::string configutils::string_to_unsigned_int(const std::string &str,
+                                                unsigned int &num) {
+  errno = 0;
+  char *end;
+  unsigned long temp = std::strtoul(str.c_str(), &end, 10);
+
+  if (str.empty())
+    return "Invalid value (the unsigned integer conversion rule is violated "
+           "because the value is empty).";
+
+  if (str[0] == '0') {
+    if (str.size() != 1)
+      return "Invalid value (the unsigned integer leading zero rule is "
+             "violated because the value must not contain leading zeros).";
+  } else if (*end != '\0')
+    return "Invalid value (the unsigned integer conversion rule is violated "
+           "because the value cannot be fully converted as a base-10 unsigned "
+           "integer)";
+  else if (errno == ERANGE || temp > std::numeric_limits<unsigned int>::max())
+    return "Invalid value (the unsigned integer range rule is violated because "
+           "the value is outside the range of unsigned int).";
+  num = static_cast<unsigned int>(temp);
+  return "";
+}
+
+std::string configutils::check_html_file(const std::string &path, char **envp) {
 
   std::string real_path = utils::get_env("PWD", envp) + "/" + path;
   struct stat st;
@@ -190,80 +271,6 @@ std::string utils::check_html_file(const std::string &path, char **envp) {
   return "";
 }
 
-bool utils::is_header_name(const std::string &name) {
-  if (name.empty())
-    return false;
-  for (std::string::const_iterator it = name.begin(); it != name.end(); ++it) {
-    const char c = *it;
-    if (!std::isalnum(c) && c != '!' && c != '#' && c != '$' && c != '%' &&
-        c != '&' && c != '\'' && c != '*' && c != '+' && c != '-' && c != '.' &&
-        c != '^' && c != '_' && c != '`' && c != '|' && c != '~')
-      return false;
-  }
-  return true;
-}
-
-bool utils::is_header_value(const std::string &value) {
-  if (value.empty())
-    return true;
-  for (std::string::const_iterator it = value.begin(); it != value.end();
-       ++it) {
-    const char c = *it;
-    if ((c < 0x20 || c > 0x7e) && c != 0x09)
-      return false;
-  }
-  return true;
-}
-
-char utils::tolower(const char c) {
-  return static_cast<char>(std::tolower(static_cast<int>(c)));
-}
-
-std::string utils::string_to_unsigned_int(const std::string &str,
-                                          unsigned int &num) {
-  errno = 0;
-  char *end;
-  unsigned long temp = std::strtoul(str.c_str(), &end, 10);
-
-  if (str.empty())
-    return "Invalid value (the unsigned integer conversion rule is violated "
-           "because the value is empty).";
-
-  if (str[0] == '0') {
-    if (str.size() != 1)
-      return "Invalid value (the unsigned integer leading zero rule is "
-             "violated because the value must not contain leading zeros).";
-  } else if (*end != '\0')
-    return "Invalid value (the unsigned integer conversion rule is violated "
-           "because the value cannot be fully converted as a base-10 unsigned "
-           "integer)";
-  else if (errno == ERANGE || temp > UINT_MAX)
-    return "Invalid value (the unsigned integer range rule is violated because "
-           "the value is outside the range of unsigned int).";
-  num = static_cast<unsigned int>(temp);
-  return "";
-}
-
-std::ostream &utils::debug(std::ostream &os) { return os << "[DEBUG] "; }
-
-std::ostream &utils::info(std::ostream &os) { return os << "[INFO] "; }
-
-std::ostream &utils::warning(std::ostream &os) { return os << "[WARNING] "; }
-
-std::ostream &utils::error(std::ostream &os) { return os << "[ERROR] "; }
-
-std::ostream &utils::crlf(std::ostream &os) { return os << "\r" << std::endl; }
-
-std::string utils::get_env(std::string const &name, char **envp) {
-  if (envp == NULL || *envp == NULL)
-    return std::string();
-  for (size_t i = 0; envp[i] != NULL; i++) {
-    const std::string env_pair(envp[i]);
-    const size_t equals_pos = env_pair.find('=');
-    if (equals_pos == std::string::npos)
-      continue;
-    if (name == env_pair.substr(0, equals_pos))
-      return env_pair.substr(equals_pos + 1);
-  }
-  return std::string();
+unsigned char utils::to_upper(const unsigned char c) {
+  return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
 }
