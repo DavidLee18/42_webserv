@@ -81,19 +81,4 @@ class ServerConfig;
 
 enum PathType { IS_DIR, IS_FILE, PATH_ERROR };
 
-class ServerResponse {
-public:
-  static Result<std::string> make_autoindex_page(const std::string &real_path,
-                                                 const std::string &req_uri, DIR *dir);
-};
-
-class DefaultError {
-  virtual int phantom() = 0;
-
-public:
-  static Response::StatusCode int_to_status_code(unsigned short status_code);
-  static std::string status_code_to_string(Response::StatusCode status_code);
-  static Response default_err_response(Response::StatusCode err_code);
-};
-
 #endif

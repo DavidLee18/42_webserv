@@ -1,4 +1,4 @@
-#include "Response.hpp"
+#include "DefaultError.hpp"
 
 static std::string generate_error_page(const std::string &heading) {
   return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta "

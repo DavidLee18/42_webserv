@@ -1,5 +1,6 @@
 #include "ResponseErrors.hpp"
 #include "ResponseUtils.hpp"
+#include "DefaultError.hpp"
 #include "../utils/utils.hpp"
 #include <fstream>
 #include <sstream>

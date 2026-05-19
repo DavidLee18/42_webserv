@@ -1,6 +1,7 @@
 #include "Server.hpp"
 #include "Response.hpp"
 #include "ResponseHandlers.hpp"
+#include "DefaultError.hpp"
 #include <cstddef>
 #include <ctime>
 #include <vector>

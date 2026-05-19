@@ -2,6 +2,8 @@
 #include "ResponseUtils.hpp"
 #include "ResponseErrors.hpp"
 #include "MultipartParser.hpp"
+#include "DefaultError.hpp"
+#include "AutoindexResponse.hpp"
 #include "../utils/utils.hpp"
 #include "../cgi_1_1/CgiDelegate.hpp"
 #include <iostream>
@@ -36,7 +38,7 @@ Result<Void> ResponseHandlers::register_cgi(
   return OKV;
 }
 
-Response ResponseHandlers::delete_method(const Target &target, Response response,
+Response ResponseHandlers::delete_method_response(const Target &target, Response response,
                                          const ServerConfig *config,
                                          const RouteRule *rule, char **envp) {
   if (unlink(target.path.c_str()) == 0) {
@@ -57,7 +59,7 @@ Response ResponseHandlers::delete_method(const Target &target, Response response
   }
 }
 
-Response ResponseHandlers::post_method(const Target &target, Response response,
+Response ResponseHandlers::post_method_response(const Target &target, Response response,
                                        const ClientSession *client,
                                        const RouteRule *rule,
                                        const Request *request, Session *session,
@@ -288,7 +290,7 @@ Response ResponseHandlers::post_method(const Target &target, Response response,
   return ResponseErrors::error_response(config, rule, Response::FORBIDDEN, envp);
 }
 
-Response ResponseHandlers::get_method(Target target, Response response,
+Response ResponseHandlers::get_method_response(Target target, Response response,
                                       const ServerConfig *config,
                                       const RouteRule *rule,
                                       const Request *request, char **envp) {
@@ -318,7 +320,7 @@ Response ResponseHandlers::get_method(Target target, Response response,
     }
     target.type = Response::OK;
     response.content_type = "text/html";
-    Result<std::string> autoindex_result = ServerResponse::make_autoindex_page(target.path, request->get_path(), dir);
+    Result<std::string> autoindex_result = AutoindexResponse::generate(target.path, request->get_path(), dir);
     if (!autoindex_result.has_value()) {
       closedir(dir);
       return ResponseErrors::error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
@@ -414,15 +416,15 @@ Response ResponseHandlers::http_response(
 
   switch (request->get_method()) {
   case Request::DELETE:
-    response = delete_method(target, response, config, rule, envp);
+    response = delete_method_response(target, response, config, rule, envp);
     break;
   case Request::POST:
-    response = post_method(target, response, client, rule,
+    response = post_method_response(target, response, client, rule,
                                            request, session, envp);
     break;
   case Request::HEAD:
   case Request::GET:
-    response = get_method(target, response, config, rule,
+    response = get_method_response(target, response, config, rule,
                                           request, envp);
     break;
   default:
