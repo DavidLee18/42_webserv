@@ -1,13 +1,4 @@
 #include "Response.hpp"
-#include "../Errors.hpp"
-#include "../cgi_1_1/CgiDelegate.hpp"
-#include "../utils.hpp"
-#include "Session.hpp"
-
-#include <algorithm>
-#include <cerrno>
-#include <ctime>
-#include <sys/stat.h>
 
 std::string get_string_from_map(const std::map<unsigned int, std::string> &map,
                                 const int key) {

@@ -1,7 +1,7 @@
 #ifndef ROUTERULE_CGI_HPP
 #define ROUTERULE_CGI_HPP
 
-#include "PathPattern.hpp"
+#include "../config/PathPattern.hpp"
 
 #define CGI_MAX_TIMEOUT 3600000
 #define CGI_MIN_TIMEOUT 1

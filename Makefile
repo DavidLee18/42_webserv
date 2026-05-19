@@ -7,14 +7,15 @@ NAME			:= webserv
 BUILD_DIR := build
 SRC_DIR := src
 
-SRC_FILES	:= Errors.cpp EPoll.cpp FileDescriptor.cpp utils.cpp main.cpp
+MAIN		:= main.cpp
 SERVER		:= Server.cpp Client.cpp Response.cpp DefaultError.cpp Session.cpp
 CONFIG		:= WebserverConfig.cpp ServerConfig.cpp RouteRule_CGI.cpp PathPattern.cpp ConfigError.cpp
 CGI         := CgiAuthType.cpp CgiMetaVar.cpp EtcMetaVar.cpp ServerName.cpp ContentType.cpp \
 				CgiDelegate.cpp CgiInput.cpp
+UTILS		:= Errors.cpp EPoll.cpp FileDescriptor.cpp utils.cpp 
 
-SRC_DIRS	:= server config cgi_1_1
-SRCS		:= $(SRC_FILES) $(CONFIG) $(SERVER) $(CGI)
+SRC_DIRS	:= server config cgi_1_1 utils
+SRCS		:= $(MAIN) $(CONFIG) $(SERVER) $(CGI) $(UTILS)
 
 OBJS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.o))
 DEPS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.d))

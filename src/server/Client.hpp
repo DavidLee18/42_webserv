@@ -6,7 +6,9 @@
  * @brief Defines the ClientSession struct and Request class for handling client
  * HTTP requests.
  */
-#include "../Result.hpp"
+#include "../utils/Result.hpp"
+#include "../utils/Errors.hpp"
+
 #include <cctype>
 #include <cstdlib>
 #include <ctime>

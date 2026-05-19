@@ -1,7 +1,7 @@
 #ifndef SERVER_NAME_HPP
 #define SERVER_NAME_HPP
 
-#include "../Result.hpp"
+#include "../utils/Result.hpp"
 #include <list>
 #include <string>
 

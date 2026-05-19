@@ -1,5 +1,5 @@
 #include "ServerName.hpp"
-#include "../Errors.hpp"
+#include "../utils/Errors.hpp"
 #include <cstdlib>
 #include <sstream>
 #include <vector>

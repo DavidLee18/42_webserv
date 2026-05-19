@@ -1,5 +1,8 @@
-#include "../EPoll.hpp"
-#include "../FileDescriptor.hpp"
+#ifndef CGIDELEGATE_HPP
+#define CGIDELEGATE_HPP
+
+#include "../utils/EPoll.hpp"
+#include "../utils/FileDescriptor.hpp"
 #include "../config/RouteRule_CGI.hpp"
 #include "CgiInput.hpp"
 #include <map>
@@ -62,3 +65,5 @@ private:
 
   CgiDelegate(Request const &, EPoll &);
 };
+
+#endif

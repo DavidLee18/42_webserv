@@ -1,4 +1,4 @@
-#include "FileDescriptor.hpp"
+#include "utils/FileDescriptor.hpp"
 #include "config/WebserverConfig.hpp"
 #include "server/Server.hpp"
 #include <csignal>
@@ -21,9 +21,6 @@ int main(const int argc, char *argv[], char **envp) {
       WebserverConfig::parse(fd.value_mut(), envp);
   PANIC(result_config)
 
-#ifdef CONFIG_DEBUG
-  std::cout << result_config.value() << std::endl;
-#else
   const WebserverConfig &config = result_config.value();
   std::map<unsigned int, ServerConfig> temp = config.get_serverconfig_map();
   Server server(config);
@@ -32,6 +29,5 @@ int main(const int argc, char *argv[], char **envp) {
   const Result<Void> server_result = server.start(envp);
   PANIC(server_result)
   std::cout << std::endl << utils::info << "Wrapping up..." << std::endl;
-#endif
   return 0;
 }

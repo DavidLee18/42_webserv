@@ -2,9 +2,17 @@
 #define RESPONSE_HPP
 
 #include "../config/ServerConfig.hpp"
+#include "../cgi_1_1/CgiDelegate.hpp"
+#include "../utils/Errors.hpp"
+#include "../utils/utils.hpp"
+
 #include "Client.hpp"
 #include "Session.hpp"
 
+#include <algorithm>
+#include <cerrno>
+#include <ctime>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <fstream>
 #include <sstream>
