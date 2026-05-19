@@ -1,5 +1,5 @@
-#ifndef FILE_DESCRIPTOR_H
-#define FILE_DESCRIPTOR_H
+#ifndef FILE_DESCRIPTOR_HPP
+#define FILE_DESCRIPTOR_HPP
 
 #include "Result.hpp"
 #include <sys/socket.h>

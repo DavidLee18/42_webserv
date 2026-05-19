@@ -1,5 +1,5 @@
-#ifndef EPOLL_H
-#define EPOLL_H
+#ifndef EPOLL_HPP
+#define EPOLL_HPP
 
 #include "FileDescriptor.hpp"
 #include <cstddef>
