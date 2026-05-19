@@ -50,9 +50,18 @@ private:
   std::string origin_line;
   std::size_t count_line;
 
-  bool parse_server_block(FileDescriptor &fd, char **envp);
+  Result<Void> parse_server_block(FileDescriptor &fd, char **envp);
+  Result<Void> parse_header_entry(FileDescriptor &fd, const std::string &line);
+  Result<Void> parse_max_body_size(std::string line, unsigned int &maxbody);
+  Result<Void> parse_route_rule_block(const std::string &method_line,
+                              FileDescriptor &fd, char **envp);
+  Result<Void> create_route_rules(const std::vector<std::string> &data,
+                          const std::vector<Request::Method> &mets,
+                          std::vector<std::size_t> &createdIndexes);
+  Result<Void> apply_route_rule_entry(const std::string &line,
+                              std::vector<std::size_t> &route_indexes,
+                              char **envp);
   bool is_header_block(const std::string &line);
-  bool parse_header_entry(FileDescriptor &fd, const std::string &line);
   bool is_valid_server_response_time(const std::string &line);
   bool is_path_pattern_segment(const std::string &line);
   std::vector<std::string> get_pattern_candidates(const std::string &line);
@@ -62,18 +71,9 @@ private:
                             std::size_t index);
   std::vector<PathPattern> expand_path_pattern(const std::string &line);
   bool has_valid_wildcard_usage(const std::string &url);
-  std::string parse_max_body_size(std::string line, unsigned int &maxbody);
   bool matches_route_rule_syntax(const std::string &line);
   bool has_compatible_wildcards(const PathPattern &path,
                                 const PathPattern &root);
-  bool parse_route_rule_block(const std::string &method_line,
-                              FileDescriptor &fd, char **envp);
-  bool create_route_rules(const std::vector<std::string> &data,
-                          const std::vector<Request::Method> &mets,
-                          std::vector<std::size_t> &createdIndexes);
-  bool apply_route_rule_entry(const std::string &line,
-                              std::vector<std::size_t> &route_indexes,
-                              char **envp);
   RuleOperator parse_rule_operator(const std::string &indicator);
 
 public:
@@ -102,7 +102,7 @@ public:
   const unsigned int &get_server_response_time(void) const {
     return server_response_time_ms;
   }
-  static std::string
+  static Result<Void>
   apply_err_page_entry(const std::string &origin_line, const std::string &line,
                                std::map<unsigned int, std::string> &err_map,
                                char **envp);

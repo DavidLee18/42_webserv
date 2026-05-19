@@ -27,7 +27,7 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
   while (true) {
     Result<std::string> temp = file.read_file_line();
     count_line++;
-    if (temp.error() != "") {
+    if (!temp.error().empty()) {
       err_meg = ConfigError::file_descriptor(temp.error());
       return ERR(Void, ConfigError::file_descriptor(temp.error()));
     } else if (temp.value() == "")
@@ -43,9 +43,9 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
 
     if (line == "types =" || line == "types=") {
       if (is_type_parse == true)
-        return ERR(Void, ConfigError::make(line, ERR_DUPLICATE_TYPE_BLOCK));
+        return ERR(Void, ConfigError::make(origin_line, ERR_DUPLICATE_TYPE_BLOCK));
       else if (is_server_parse == true)
-        return ERR(Void, ConfigError::make(line, ERR_INVALID_GLOBAL_BLOCK_LOCATION));
+        return ERR(Void, ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION));
       
       Result<Void> result = parse_types_block(file);
       if (!result.error().empty())
@@ -68,7 +68,7 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
 
       Result<Void> result = RouteRule_CGI::parse_global_cgi_block(file, global_cgi,
                                                       count_line, envp);
-      if (result.error() != "")
+      if (!result.error().empty())
         return result;
       
       is_cgi_parse = true;
@@ -80,7 +80,7 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
 
       Result<Void> result = ServerConfig::apply_err_page_entry(origin_line,
           line, default_err_page, envp);
-      if (result.error() != "")
+      if (!result.error().empty())
         return result;
       
       is_err_page_parse = true;
@@ -107,10 +107,10 @@ WebserverConfig::parse_type_keys(const std::string &key) {
   key_data = utils::string_split(temp, "|");
   number_of_key = utils::count_occurrences(temp, "|") + 1;
   if (key_data.size() != static_cast<std::size_t>(number_of_key))
-    ERR(std::vector<std::string>, ConfigError::make(origin_line, temp, ERR_MIME_EXTENSION_COUNT_MISMATCH));
+    return ERR(std::vector<std::string>, ConfigError::make(origin_line, temp, ERR_MIME_EXTENSION_COUNT_MISMATCH));
   for (std::size_t i = 0; i < key_data.size(); ++i) {
     if (type_map.find(key_data[i]) != type_map.end())
-      ERR(std::vector<std::string>, ConfigError::make(origin_line, key_data[i], ERR_DUPLICATE_MIME_EXTENSION));
+      return ERR(std::vector<std::string>, ConfigError::make(origin_line, key_data[i], ERR_DUPLICATE_MIME_EXTENSION));
   }
   return OK(std::vector<std::string>, key_data);
 }
@@ -164,7 +164,7 @@ Result<Void> WebserverConfig::parse_type_mapping(const std::string &line,
   if (!keys_result.error().empty())
     return ERR(Void, keys_result.error());
   
-    Result<Void> mime_result = is_valid_mime_type(utils::trim_whitespace(type_data[1]));
+  Result<Void> mime_result = is_valid_mime_type(utils::trim_whitespace(type_data[1]));
   if (!mime_result.error().empty())
     return mime_result;
 
@@ -181,7 +181,7 @@ Result<Void> WebserverConfig::parse_types_block(FileDescriptor &file) {
   while (true) {
     Result<std::string> temp = file.read_file_line();
     count_line++;
-    if (temp.error() != "") {
+    if (!temp.error().empty()) {
       err_meg = ConfigError::file_descriptor(temp.error());
       return ERR(Void, ConfigError::file_descriptor(temp.error()));
     } else if (temp.value() == "\n" || temp.value() == "")
@@ -240,17 +240,19 @@ Result<Void> WebserverConfig::parse_server_config_entry(FileDescriptor &file,
                                                 const std::string &line,
                                                 char **envp) {
   unsigned int key = 0;
-  std::string temp(line);
+  std::string port = WebserverConfig::parse_server_port(line);
   ServerConfig server(file, global_cgi, envp);
 
-  err_meg = configutils::string_to_unsigned_int(WebserverConfig::parse_server_port(temp), key);
+  err_meg = configutils::string_to_unsigned_int(port, key);
   if (err_meg != "")
-    return ERR(Void, ConfigError::make(line, WebserverConfig::parse_server_port(temp), err_meg));
+    return ERR(Void, ConfigError::make(origin_line, port, err_meg));
   if (MIN_PORT_VALUE > key || key > MAX_PORT_VALUE)
-    return ERR(Void, ConfigError::make(line, WebserverConfig::parse_server_port(temp), ERR_INVALID_SERVER_PORT));
+    return ERR(Void, ConfigError::make(origin_line, port, ERR_INVALID_SERVER_PORT));
 
-  if (server.get_err_meg() != "")
+  if (server.get_err_meg() != "") {
+    count_line += server.get_count_line();
     return ERR(Void, server.get_err_meg());
+  }
   else if (server.get_routes().size() == 0 &&
              server.get_route_rule_cgi().size() == 0) {
     return ERR(Void, ConfigError::make(origin_line, ERR_EMPTY_SERVER_BLOCK));
@@ -258,7 +260,7 @@ Result<Void> WebserverConfig::parse_server_config_entry(FileDescriptor &file,
     std::ostringstream oss;
     oss << key;
 
-    return ERR(Void, ConfigError::make(line, oss.str(), ERR_DUPLICATE_SERVER_PORT));
+    return ERR(Void, ConfigError::make(origin_line, oss.str(), ERR_DUPLICATE_SERVER_PORT));
   }
   count_line += server.get_count_line();
   serverconfig_map[key] = server;

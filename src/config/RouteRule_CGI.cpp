@@ -33,7 +33,7 @@ Result<Void> RouteRule_CGI::parse_cgi_block(FileDescriptor &fd, std::string line
 
   Result<Void> executable_result = parse_routerule_cgi_executable(
       file_line, this->executable, this->env, envp);
-  if (err_meg != "")
+  if (!executable_result.error().empty())
     return ERR(Void, executable_result.error());
 
   Result<Void> params_result = parse_cgi_params(fd);
@@ -48,7 +48,7 @@ Result<Void> RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
   while (true) {
     Result<std::string> temp = fd.read_file_line();
     count_line++;
-    if (temp.error() != "")
+    if (!temp.error().empty())
       return ERR(Void, ConfigError::file_descriptor(temp.error()));
     else if (temp.value() == "\n" || temp.value() == "")
       return OKV;
@@ -204,7 +204,7 @@ Result<Void> RouteRule_CGI::parse_global_cgi_block(
   while (true) {
     Result<std::string> temp = fd.read_file_line();
     count_line++;
-    if (temp.error() != "")
+    if (!temp.error().empty())
       return ERR(Void, ConfigError::file_descriptor(temp.error()));
     else if (temp.value() == "\n" || temp.value() == "")
       break;
@@ -237,7 +237,7 @@ Result<Void> RouteRule_CGI::parse_global_cgi_block(
     else if (global_cgi.find(key) != global_cgi.end())
       return ERR(Void, ConfigError::make(origin_line, key, ERR_DUPLICATE_GLOBAL_CGI_MAPPING));
     Result<Void> file_result = is_executable_file(origin_line, value, true, envp);
-    if (err != "")
+    if (!file_result.error().empty())
       return ERR(Void, file_result.error());
 
     global_cgi[key] = value;
@@ -264,7 +264,7 @@ Result<Void> RouteRule_CGI::parse_routerule_cgi_executable(
   std::string file_line = utils::remove_char(line, '$');
 
   Result<Void> syntax_result = matches_routerule_cgi_syntax(file_line, envp);
-  if (err_msg != "")
+  if (!syntax_result.error().empty())
     return ERR(Void, syntax_result.error());
 
   std::size_t start = file_line.find('(');
