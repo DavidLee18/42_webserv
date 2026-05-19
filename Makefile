@@ -8,7 +8,8 @@ BUILD_DIR := build
 SRC_DIR := src
 
 MAIN		:= main.cpp
-SERVER		:= Server.cpp Client.cpp Response.cpp DefaultError.cpp Session.cpp
+SERVER		:= Server.cpp Client.cpp Response.cpp ResponseUtils.cpp ResponseErrors.cpp \
+				   MultipartParser.cpp ResponseHandlers.cpp DefaultError.cpp Session.cpp
 CONFIG		:= WebserverConfig.cpp ServerConfig.cpp RouteRule_CGI.cpp PathPattern.cpp ConfigError.cpp
 CGI         := CgiAuthType.cpp CgiMetaVar.cpp EtcMetaVar.cpp ServerName.cpp ContentType.cpp \
 				CgiDelegate.cpp CgiInput.cpp

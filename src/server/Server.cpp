@@ -1,5 +1,6 @@
 #include "Server.hpp"
 #include "Response.hpp"
+#include "ResponseHandlers.hpp"
 #include <cstddef>
 #include <ctime>
 #include <vector>
@@ -28,7 +29,7 @@ void Server::dispatch_request(const FileDescriptor *client_fd,
 
   // Dispatch to CGI if applicable
   if (cgi_path != NULL) {
-    Result<Void> del_ = ServerResponse::register_cgi(
+    Result<Void> del_ = ResponseHandlers::register_cgi(
         *client.req, *cgi_path, &epoll, config.get_global_cgi(), cgis,
         client_fd, envp);
     if (!del_.has_value())
@@ -40,8 +41,8 @@ void Server::dispatch_request(const FileDescriptor *client_fd,
   }
 
   // Generate normal HTTP response
-  Response http = ServerResponse::http_response(client.req, &client, mime_type,
-                                                &sessions, envp);
+  Response http = ResponseHandlers::http_response(client.req, &client, mime_type,
+                                                   &sessions, envp);
   http.print_simple(std::cout);
 
   delete client.req;
