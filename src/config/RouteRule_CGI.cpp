@@ -31,14 +31,9 @@ Result<Void> RouteRule_CGI::parse_cgi_block(FileDescriptor &fd, std::string line
      return ERR(Void, ConfigError::make(origin_line, split[2], ERR_CGI_SCRIPT_MISSING_DOLLAR_PREFIX));
   std::string file_line = utils::remove_char(split[2], '$');
 
-  Result<Void> executable_result = parse_routerule_cgi_executable(
-      file_line, this->executable, this->env, envp);
-  if (!executable_result.error().empty())
-    return ERR(Void, executable_result.error());
+  TRY_(Void, Void, parse_routerule_cgi_executable(file_line, this->executable, this->env, envp));
+  TRY_(Void, Void, parse_cgi_params(fd));
 
-  Result<Void> params_result = parse_cgi_params(fd);
-  if (!params_result.error().empty())
-    return ERR(Void, params_result.error());
   return OKV;
 }
 
@@ -46,14 +41,12 @@ Result<Void> RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
   std::string file_line = "";
 
   while (true) {
-    Result<std::string> temp = fd.read_file_line();
     count_line++;
-    if (!temp.error().empty())
-      return ERR(Void, ConfigError::file_descriptor(temp.error()));
-    else if (temp.value() == "\n" || temp.value() == "")
+    TRY(Void, std::string, file_line, fd.read_file_line());
+    if (file_line == "\n" || file_line == "")
       return OKV;
 
-    origin_line = utils::remove_char(temp.value(), '\n');
+    origin_line = utils::remove_char(file_line, '\n');
     err_meg = configutils::get_indent_whitespace_error(origin_line, 2);
     if (err_meg != "")
       return ERR(Void, err_meg);
@@ -69,9 +62,7 @@ Result<Void> RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
       else if (timeout_ms > CGI_MAX_TIMEOUT || CGI_MIN_TIMEOUT > timeout_ms)
         return ERR(Void, ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_TIMEOUT_RANGE));
     } else if (std::string::npos != file_line.find("=")) {
-      Result<Void> env_result = parse_env_entry(file_line, env);
-      if (!env_result.error().empty())
-        return ERR(Void, env_result.error());
+      TRY_(Void, Void, parse_env_entry(file_line, env));
     } else
       return ERR(Void, ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_EXTENSION_LINE));
   }
@@ -125,9 +116,7 @@ Result<Void>  RouteRule_CGI::matches_routerule_cgi_syntax(const std::string &lin
     return ERR(Void, ConfigError::make(origin_line, line, ERR_INVALID_CGI_INLINE_ENV_SYNTAX));
   
   exec_path = line.substr(0, exec_end);
-  Result<Void> file_result = RouteRule_CGI::is_executable_file(origin_line, exec_path, false, envp);
-  if (!file_result.error().empty())
-    return ERR(Void, file_result.error());
+  TRY_(Void, Void, RouteRule_CGI::is_executable_file(origin_line, exec_path, false, envp));
 
   i = exec_end;
   if (i == line.length())
@@ -202,14 +191,12 @@ Result<Void> RouteRule_CGI::parse_global_cgi_block(
   std::string origin_line = "";
 
   while (true) {
-    Result<std::string> temp = fd.read_file_line();
     count_line++;
-    if (!temp.error().empty())
-      return ERR(Void, ConfigError::file_descriptor(temp.error()));
-    else if (temp.value() == "\n" || temp.value() == "")
+    TRY(Void, std::string, line, fd.read_file_line());
+    if (line == "\n" || line == "")
       break;
-
-    origin_line = utils::remove_char(temp.value(), '\n');
+    
+    origin_line = utils::remove_char(line, '\n');
     err = configutils::get_indent_whitespace_error(origin_line, 1);
     if (err != "")
       return ERR(Void, err);
@@ -236,10 +223,7 @@ Result<Void> RouteRule_CGI::parse_global_cgi_block(
       return ERR(Void, ConfigError::make(origin_line, value, ERR_INVALID_GLOBAL_CGI_EXECUTABLE_PATH_WHITESPACE));
     else if (global_cgi.find(key) != global_cgi.end())
       return ERR(Void, ConfigError::make(origin_line, key, ERR_DUPLICATE_GLOBAL_CGI_MAPPING));
-    Result<Void> file_result = is_executable_file(origin_line, value, true, envp);
-    if (!file_result.error().empty())
-      return ERR(Void, file_result.error());
-
+    TRY_(Void, Void, is_executable_file(origin_line, value, true, envp));
     global_cgi[key] = value;
   }
   return OKV;
@@ -263,9 +247,7 @@ Result<Void> RouteRule_CGI::parse_routerule_cgi_executable(
   std::string err_msg = "";
   std::string file_line = utils::remove_char(line, '$');
 
-  Result<Void> syntax_result = matches_routerule_cgi_syntax(file_line, envp);
-  if (!syntax_result.error().empty())
-    return ERR(Void, syntax_result.error());
+  TRY_(Void, Void, matches_routerule_cgi_syntax(file_line, envp));
 
   std::size_t start = file_line.find('(');
 
@@ -273,19 +255,13 @@ Result<Void> RouteRule_CGI::parse_routerule_cgi_executable(
     std::size_t end = file_line.find(')');
     executable = file_line.substr(0, start);
 
-    Result<Void> file_result = is_executable_file(origin_line, executable, false, envp);
-    if (!file_result.error().empty())
-      return ERR(Void, file_result.error());
+    TRY_(Void, Void, is_executable_file(origin_line, executable, false, envp));
 
     std::string env = file_line.substr(start + 1, end - start - 1);
-    Result<Void> env_result = parse_env_entry(env, map);
-    if (!env_result.error().empty())
-      return ERR(Void, env_result.error());
+    TRY_(Void, Void, parse_env_entry(env, map));
   } else {
     executable = file_line;
-    Result<Void> file_result = is_executable_file(origin_line, executable, false, envp);
-    if (!file_result.error().empty())
-      return ERR(Void, file_result.error());
+    TRY_(Void, Void, is_executable_file(origin_line, executable, false, envp));
   }
   return OKV;
 }
