@@ -556,7 +556,7 @@ Result<Void> ServerConfig::parse_route_rule_block(const std::string &route_line,
   return OKV;
 }
 
-Result<const RouteRule *> ServerConfig::find_route(Request::Method method,
+Result<const RouteRule &> ServerConfig::find_route(Request::Method method,
                                           const std::string &path) const {
   PathPattern pathPattern(path);
   std::string err = "[DEBUG] find_route: NO ROUTE for ";
@@ -565,12 +565,12 @@ Result<const RouteRule *> ServerConfig::find_route(Request::Method method,
     if (((method == Request::HEAD && routes[i].method == Request::GET) ||
          routes[i].method == method) &&
         routes[i].path.matches(pathPattern))
-      return OK(const RouteRule *, &routes[i]);
+      return OK(const RouteRule &, routes[i]);
   }
-  return ERR(const RouteRule *, err + path);
+  return ERR(const RouteRule &, err + path);
 }
 
-Result<const RouteRule_CGI *> ServerConfig::find_route_cgi(Request::Method method,
+Result<const RouteRule_CGI &> ServerConfig::find_route_cgi(Request::Method method,
                              const std::string &path) const {
   PathPattern pathPattern(path);
   std::string err = "[DEBUG] find_route_cgi: NO ROUTE for ";
@@ -578,9 +578,9 @@ Result<const RouteRule_CGI *> ServerConfig::find_route_cgi(Request::Method metho
   for (size_t i = 0; i < R_CGI.size(); ++i) {
     if (R_CGI[i].get_method() == method &&
         R_CGI[i].get_path().matches(pathPattern))
-      return OK(const RouteRule_CGI *, &R_CGI[i]);
+      return OK(const RouteRule_CGI &, R_CGI[i]);
   }
-  return ERR(const RouteRule_CGI *, err + path);
+  return ERR(const RouteRule_CGI &, err + path);
 }
 
 std::string normalize_slashes(const std::string &path) {
