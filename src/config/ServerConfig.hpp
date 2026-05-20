@@ -100,9 +100,9 @@ public:
   apply_err_page_entry(const std::string &origin_line, const std::string &line,
                                std::map<unsigned int, std::string> &err_map,
                                char **envp);
-  Result<const RouteRule &> find_route(Request::Method method,
+  Result<const RouteRule> find_route(Request::Method method,
                               const std::string &path) const;
-  Result<const RouteRule_CGI &> find_route_cgi(Request::Method method,
+  Result<const RouteRule_CGI> find_route_cgi(Request::Method method,
                                       const std::string &path) const;
   Result<std::string> get_rewritten_path(Request::Method method,
                                  const std::string &path) const;
