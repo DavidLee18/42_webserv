@@ -7,14 +7,29 @@ class PathPattern {
 private:
   std::vector<std::string> path;
 
-  std::string extract_relative_path(const std::string &pattern,
+  Result<std::string> extract_relative_path(const std::string &pattern,
                                     const std::string &target) const;
   bool wildcard_match(const std::string &pattern,
                       const std::string &target) const;
-  std::string apply_wildcards(const std::string &to_pattern,
+  Result<std::string>
+  rewrite_with_wildcards(const std::string &from,
+                         const std::string &target,
+                         const std::string &dest,
+                         std::size_t from_wc,
+                         std::size_t dest_wc) const;
+
+  Result<std::string>
+  rewrite_prefix_path(const std::string &from,
+                      const std::string &target,
+                      const std::string &dest) const;
+
+  Result<std::string>
+  rewrite_exact_path(const std::string &from,
+                     const std::string &target,
+                     const std::string &dest) const;
+  Result<std::string> apply_wildcards(const std::string &to_pattern,
                               const std::vector<std::string> &wildcards) const;
-  bool extract_wildcards(const std::string &pattern, const std::string &target,
-                         std::vector<std::string> &wildcards) const;
+  Result<std::vector<std::string> > extract_wildcards(const std::string &pattern, const std::string &target) const;
 
 public:
   PathPattern() : path() {}
@@ -38,7 +53,7 @@ public:
   const std::vector<std::string> &get_path(void) const { return path; }
   std::string to_string() const;
 
-  std::string rewrite_path(const PathPattern &request_path,
+  Result<std::string> rewrite_path(const PathPattern &request_path,
                            const PathPattern &to_pattern) const;
 };
 

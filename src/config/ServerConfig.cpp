@@ -26,7 +26,7 @@ Result<Void> ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
 
   while (true) {
     count_line++;
-    TRY(Void, std::string, line, fd.read_file_line());
+    TRY(Void, std::string, line, fd.read_file_line())
     if (line == "\n") {
       end_flag += 1;
       if (end_flag == 2)
@@ -50,7 +50,7 @@ Result<Void> ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
         return ERR(Void,
                    ConfigError::make(origin_line, ERR_DUPLICATE_HEADER_BLOCK));
 
-      TRY_(Void, Void, parse_header_entry(fd, line));
+      TRY_(Void, Void, parse_header_entry(fd, line))
 
       is_header_parse = true;
     } else if (is_valid_server_response_time(line)) {
@@ -72,7 +72,7 @@ Result<Void> ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
                                            ERR_INVALID_SERVER_RESPONSE_TIME));
       is_timeout_parse = true;
     } else if (matches_route_rule_syntax(line)) {
-      TRY_(Void, Void, parse_route_rule_block(line, fd, envp));
+      TRY_(Void, Void, parse_route_rule_block(line, fd, envp))
 
       is_route_parse = true;
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
@@ -136,7 +136,7 @@ Result<Void> ServerConfig::parse_header_entry(FileDescriptor &fd,
   std::string file_line = "";
   while (temp[temp.length() - 1] == ';') {
     count_line++;
-    TRY(Void, std::string, file_line, fd.read_file_line());
+    TRY(Void, std::string, file_line, fd.read_file_line())
     if (file_line == "\n" || file_line == "") {
       end_flag += 1;
       break;
@@ -439,11 +439,11 @@ ServerConfig::apply_route_rule_entry(const std::string &line,
       routes[route_indexes[i]].auth_info = rule[1];
     } else if (rule[0] == "->{}") {
       TRY_(Void, Void,
-           parse_max_body_size(rule[1], routes[route_indexes[i]].max_body_KB));
+           parse_max_body_size(rule[1], routes[route_indexes[i]].max_body_KB))
     } else if (rule[0] == "!") {
       TRY_(Void, Void,
            ServerConfig::apply_err_page_entry(
-               origin_line, line, routes[route_indexes[i]].error_pages, envp));
+               origin_line, line, routes[route_indexes[i]].error_pages, envp))
     } else
       return ERR(Void, ConfigError::make(
                            origin_line, line,
@@ -560,12 +560,12 @@ Result<Void> ServerConfig::parse_route_rule_block(const std::string &route_line,
       mets.push_back(Request::DELETE);
   }
 
-  TRY_(Void, Void, create_route_rules(route_line_data, mets, createdIndexes));
+  TRY_(Void, Void, create_route_rules(route_line_data, mets, createdIndexes))
 
   std::string line = "";
   while (true) {
     count_line++;
-    TRY(Void, std::string, line, fd.read_file_line());
+    TRY(Void, std::string, line, fd.read_file_line())
     if (line == "\n" || line == "") {
       end_flag += 1;
       break;
@@ -577,7 +577,7 @@ Result<Void> ServerConfig::parse_route_rule_block(const std::string &route_line,
     if (err != "")
       return ERR(Void, err);
 
-    TRY_(Void, Void, apply_route_rule_entry(line, createdIndexes, envp));
+    TRY_(Void, Void, apply_route_rule_entry(line, createdIndexes, envp))
   }
   return OKV;
 }
@@ -631,14 +631,15 @@ Result<std::string>
 ServerConfig::get_rewritten_path(Request::Method method,
                                  const std::string &path) const {
   RouteRule route;
-  TRY(std::string, RouteRule, route, find_route(method, path));
+  TRY(std::string, RouteRule, route, find_route(method, path))
 
   std::cout << utils::debug << "route.path='" << route.path.to_string()
             << "' route.root='" << route.root.to_string() << "' req_path='"
             << PathPattern(path).to_string() << "'" << std::endl;
 
-  const std::string result =
-      normalize_slashes(route.path.rewrite_path(PathPattern(path), route.root));
+  std::string result;
+  TRY(std::string, std::string, result, route.path.rewrite_path(PathPattern(path), route.root))
+  result = normalize_slashes(result);
   std::cout << utils::debug << "rewrite_path returned: '" << result << "'"
             << std::endl;
   return OK(std::string, result);
