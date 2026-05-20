@@ -584,11 +584,8 @@ std::string normalize_slashes(const std::string &path) {
 
 Result<std::string> ServerConfig::get_rewritten_path(Request::Method method,
                                              const std::string &path) const {
-  Result<RouteRule> route_result = find_route(method, path);
-  if (!route_result.error().empty())
-    return ERR(std::string, route_result.error());
-  
-  const RouteRule route = route_result.value();
+  RouteRule route;
+  TRY(std::string, RouteRule, route, find_route(method, path));
 
   std::cout << utils::debug << "route.path='" << route.path.to_string()
             << "' route.root='" << route.root.to_string() << "' req_path='"
