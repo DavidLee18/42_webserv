@@ -308,12 +308,12 @@ PathPattern::extract_relative_path(const std::string &pattern,
   if (pattern.find('*') == std::string::npos) {
     if (!pattern.empty() && pattern[pattern.size() - 1] == '/') {
       if (target.find(pattern) != 0)
-        return ERR(std::string, "Relative path extraction failed: target path does not start with the source directory prefix");
+        return ERR(std::string, PathPatternError::RELATIVE_SOURCE_PREFIX_MISMATCH);
       return OK(std::string, target.substr(pattern.size()));
     }
     if (pattern == target)
       return OK(std::string, "");
-    return ERR(std::string, "Relative path extraction failed: non-wildcard pattern must exactly match the target path");
+    return ERR(std::string, PathPatternError::RELATIVE_NON_WILDCARD_EXACT_MISMATCH);
   }
 
   std::size_t first_star = pattern.find('*');
@@ -324,26 +324,26 @@ PathPattern::extract_relative_path(const std::string &pattern,
 
   if (!prefix.empty()) {
     if (target.find(prefix) != 0)
-      return ERR(std::string, "Relative path extraction failed: target path does not start with the wildcard pattern prefix");
+      return ERR(std::string, PathPatternError::RELATIVE_WILDCARD_PREFIX_MISMATCH);
   }
 
   if (!suffix.empty()) {
     if (target.size() < suffix.size())
-      return ERR(std::string, "Relative path extraction failed: target path is shorter than the wildcard pattern suffix");
+      return ERR(std::string, PathPatternError::RELATIVE_WILDCARD_SUFFIX_TOO_SHORT);
     if (target.substr(target.size() - suffix.size()) != suffix)
-      return ERR(std::string, "Relative path extraction failed: target path does not end with the wildcard pattern suffix");
+      return ERR(std::string, PathPatternError::RELATIVE_WILDCARD_SUFFIX_MISMATCH);
   }
 
   std::size_t start = prefix.size();
   std::size_t end = target.size() - suffix.size();
 
   if (end < start)
-    return ERR(std::string, "Relative path extraction failed: wildcard capture range is invalid because the suffix starts before the prefix ends");
+    return ERR(std::string, PathPatternError::RELATIVE_INVALID_CAPTURE_RANGE);
 
   std::string result = target.substr(start, end - start);
   
   if (result.empty() && target != pattern)
-    return ERR(std::string, "Relative path extraction failed: wildcard requires at least one character");
+    return ERR(std::string, PathPatternError::RELATIVE_EMPTY_WILDCARD_CAPTURE);
   
   if (prefix.empty() && !result.empty() && result[0] == '/')
     result.erase(0, 1);
@@ -358,7 +358,7 @@ Result<std::vector<std::string> > PathPattern::extract_wildcards(const std::stri
 
   if (pattern == "*") {
     if (target.empty())
-      return ERR(std::vector<std::string>, "Wildcard extraction failed: '*' requires at least one character, but the target path is empty");
+      return ERR(std::vector<std::string>, PathPatternError::WILDCARD_EMPTY_TARGET);
     wildcards.push_back(target);
     return OK(std::vector<std::string>, wildcards);
   }
@@ -384,9 +384,9 @@ Result<std::vector<std::string> > PathPattern::extract_wildcards(const std::stri
 
   if (!starts_with_star) {
     if (parts.empty())
-      return ERR(std::vector<std::string>, "Wildcard extraction failed: pattern does not contain a valid prefix literal");
+      return ERR(std::vector<std::string>, PathPatternError::WILDCARD_INVALID_PREFIX_LITERAL);
     if (target.find(parts[0]) != 0)
-      return ERR(std::vector<std::string>, "Wildcard extraction failed: target path does not start with the required prefix literal");
+      return ERR(std::vector<std::string>, PathPatternError::WILDCARD_PREFIX_LITERAL_MISMATCH);
     pos = parts[0].size();
     first_literal = 1;
   }
@@ -397,9 +397,9 @@ Result<std::vector<std::string> > PathPattern::extract_wildcards(const std::stri
 
     std::size_t found = target.find(parts[i], pos);
     if (found == std::string::npos)
-      return ERR(std::vector<std::string>, "Wildcard extraction failed: target path does not contain the required literal segment after the wildcard");
+      return ERR(std::vector<std::string>, PathPatternError::WILDCARD_REQUIRED_LITERAL_NOT_FOUND);
     if (found == pos)
-      return ERR(std::vector<std::string>, "Wildcard extraction failed: wildcard requires at least one character between literal segments");
+      return ERR(std::vector<std::string>, PathPatternError::WILDCARD_EMPTY_BETWEEN_LITERALS);
 
     wildcards.push_back(target.substr(pos, found - pos));
     pos = found + parts[i].size();
@@ -409,20 +409,20 @@ Result<std::vector<std::string> > PathPattern::extract_wildcards(const std::stri
     const std::string &last = parts.back();
 
     if (target.size() < last.size())
-      return ERR(std::vector<std::string>, "Wildcard extraction failed: target path is shorter than the required suffix literal");
+      return ERR(std::vector<std::string>, PathPatternError::WILDCARD_SUFFIX_LITERAL_TOO_SHORT);
     if (target.substr(target.size() - last.size()) != last)
-      return ERR(std::vector<std::string>, "Wildcard extraction failed: target path does not end with the required suffix literal");
+      return ERR(std::vector<std::string>, PathPatternError::WILDCARD_SUFFIX_LITERAL_MISMATCH);
 
     std::size_t end_pos = target.size() - last.size();
     if (end_pos < pos)
-      return ERR(std::vector<std::string>, "Wildcard extraction failed: suffix literal appears before the current wildcard search position");
+      return ERR(std::vector<std::string>, PathPatternError::WILDCARD_SUFFIX_BEFORE_POSITION);
     if (end_pos == pos)
-      return ERR(std::vector<std::string>, "Wildcard extraction failed: wildcard requires at least one character before the suffix literal");
+      return ERR(std::vector<std::string>, PathPatternError::WILDCARD_EMPTY_BEFORE_SUFFIX);
 
     wildcards.push_back(target.substr(pos, end_pos - pos));
   } else {
     if (pos >= target.size())
-      return ERR(std::vector<std::string>, "Wildcard extraction failed: trailing wildcard requires at least one character");
+      return ERR(std::vector<std::string>, PathPatternError::WILDCARD_TRAILING_EMPTY);
     wildcards.push_back(target.substr(pos));
   }
 
@@ -438,7 +438,7 @@ PathPattern::apply_wildcards(const std::string &to_pattern,
   for (std::size_t i = 0; i < to_pattern.size(); ++i) {
     if (to_pattern[i] == '*') {
       if (wild_index >= wildcards.size())
-        return ERR(std::string, "Wildcard replacement failed: replacement pattern contains more '*' placeholders than captured wildcard values");
+        return ERR(std::string, PathPatternError::REPLACE_MORE_PLACEHOLDERS_THAN_VALUES);
 
       if (!result.empty() && result[result.size() - 1] == '/' &&
           !wildcards[wild_index].empty() && wildcards[wild_index][0] == '/') {
@@ -453,7 +453,7 @@ PathPattern::apply_wildcards(const std::string &to_pattern,
   }
 
   if (wild_index != wildcards.size())
-    return ERR(std::string, "Wildcard replacement failed: replacement pattern contains fewer '*' placeholders than captured wildcard values");
+    return ERR(std::string, PathPatternError::REPLACE_FEWER_PLACEHOLDERS_THAN_VALUES);
 
   return OK(std::string, result);
 }
@@ -471,7 +471,7 @@ PathPattern::rewrite_with_wildcards(const std::string &from,
 
     TRY(std::string, std::string, relative, extract_relative_path(from, target))
     if (relative.empty() && target != from)
-      return ERR(std::string, "Path rewrite failed: wildcard requires at least one character, but the request path has no relative segment");
+      return ERR(std::string, PathPatternError::REWRITE_EMPTY_RELATIVE_SEGMENT);
     std::vector<std::string> mapped;
     mapped.push_back(relative);
 
@@ -486,9 +486,7 @@ PathPattern::rewrite_with_wildcards(const std::string &from,
     TRY(std::string, std::string, new_path, apply_wildcards(dest, wildcards))
     return OK(std::string, new_path);
   }
-  return ERR(std::string,
-             "Path rewrite failed: source pattern and replacement pattern have "
-             "different wildcard counts");
+  return ERR(std::string, PathPatternError::REWRITE_WILDCARD_COUNT_MISMATCH);
 }
 
 Result<std::string>
@@ -496,9 +494,7 @@ PathPattern::rewrite_prefix_path(const std::string &from,
                                  const std::string &target,
                                  const std::string &dest) const {
   if (target.find(from) != 0) {
-    return ERR(std::string,
-               "Path rewrite failed: request path does not start with the "
-               "source prefix");
+    return ERR(std::string, PathPatternError::REWRITE_PREFIX_MISMATCH);
   }
 
   const std::string suffix = target.substr(from.size());
@@ -522,9 +518,7 @@ PathPattern::rewrite_exact_path(const std::string &from,
     return OK(std::string, dest);
   }
 
-  return ERR(std::string,
-             "Path rewrite failed: request path does not match the source "
-             "path");
+  return ERR(std::string, PathPatternError::REWRITE_EXACT_PATH_MISMATCH);
 }
 
 Result<std::string> PathPattern::rewrite_path(const PathPattern &request_path,
