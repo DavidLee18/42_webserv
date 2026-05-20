@@ -39,7 +39,7 @@ private:
 public:
   RouteRule_CGI()
       : met(Request::ERROR), path(), executable(), env(), timeout_ms(3000),
-        err_meg(), origin_line(), count_line(0), file_extension() {};
+        err_meg(), origin_line(), count_line(0), file_extension(){};
   RouteRule_CGI(FileDescriptor &fd, const std::string &line,
                 const std::vector<std::string> &file_extension, char **envp);
   RouteRule_CGI &operator=(const RouteRule_CGI &other) {
