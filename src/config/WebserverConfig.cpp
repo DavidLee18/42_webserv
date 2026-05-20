@@ -25,17 +25,14 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
   bool is_err_page_parse = false;
 
   while (true) {
-    Result<std::string> temp = file.read_file_line();
     count_line++;
-    if (!temp.error().empty()) {
-      err_meg = ConfigError::file_descriptor(temp.error());
-      return ERR(Void, ConfigError::file_descriptor(temp.error()));
-    } else if (temp.value() == "")
+    TRY(Void, std::string, line, file.read_file_line());
+    if (line == "")
       break;
-    else if (temp.value() == "\n")
+    else if (line == "\n")
       continue;
 
-    origin_line = utils::remove_char(temp.value(), '\n');
+    origin_line = utils::remove_char(line, '\n');
     err_meg = configutils::get_indent_whitespace_error(origin_line, 0);
     if (err_meg != "")
       return ERR(Void, err_meg);
@@ -47,30 +44,21 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
       else if (is_server_parse == true)
         return ERR(Void, ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION));
       
-      Result<Void> result = parse_types_block(file);
-      if (!result.error().empty())
-        return result;
-      
+      TRY_(Void, Void, parse_types_block(file));
       is_type_parse = true;
     } else if (WebserverConfig::is_server_config_header(line)) {
       if (is_type_parse == false)
         return ERR(Void, ConfigError::add_line_number(1, ConfigError::make("", "", ERR_REQUIRED_TYPE_BLOCK_MISSING)));
-      Result<Void> result = parse_server_config_entry(file, line, envp);
-      if (!result.error().empty())
-        return result;
-      
+
+      TRY_(Void, Void, parse_server_config_entry(file, line, envp));
       is_server_parse = true;
     } else if (line == "cgi =" || line == "cgi=") {
       if (is_cgi_parse == true)
         return ERR(Void, ConfigError::make(origin_line, ERR_DUPLICATE_GLOBAL_CGI_BLOCK));
       else if (is_server_parse == true)
         return ERR(Void, ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION));
-
-      Result<Void> result = RouteRule_CGI::parse_global_cgi_block(file, global_cgi,
-                                                      count_line, envp);
-      if (!result.error().empty())
-        return result;
       
+      TRY_(Void, Void, RouteRule_CGI::parse_global_cgi_block(file, global_cgi, count_line, envp));
       is_cgi_parse = true;
     } else if (line[0] == '!') {
       if (is_err_page_parse == true)
@@ -78,11 +66,7 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
       else if (is_server_parse == true)
         return ERR(Void, ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION));
 
-      Result<Void> result = ServerConfig::apply_err_page_entry(origin_line,
-          line, default_err_page, envp);
-      if (!result.error().empty())
-        return result;
-      
+      TRY_(Void, Void, ServerConfig::apply_err_page_entry(origin_line, line, default_err_page, envp));
       is_err_page_parse = true;
     } else
       return ERR(Void, ConfigError::make(origin_line, ERR_INVALID_TOP_LEVEL_FORMAT));
@@ -160,15 +144,12 @@ Result<Void> WebserverConfig::parse_type_mapping(const std::string &line,
   if (type_data.size() != 2)
     return ERR(Void, ConfigError::make(origin_line, line, ERR_INVALID_MIME_MAPPING_VALUE));
 
-  Result<std::vector<std::string> > keys_result = parse_type_keys(utils::trim_whitespace(type_data[0]));
-  if (!keys_result.error().empty())
-    return ERR(Void, keys_result.error());
-  
-  Result<Void> mime_result = is_valid_mime_type(utils::trim_whitespace(type_data[1]));
-  if (!mime_result.error().empty())
-    return mime_result;
+  std::vector<std::string> keys;
 
-  keys_out = keys_result.value();
+  TRY(Void, std::vector<std::string>, keys, parse_type_keys(utils::trim_whitespace(type_data[0])));
+  TRY_(Void, Void, is_valid_mime_type(utils::trim_whitespace(type_data[1])));
+
+  keys_out = keys;
   value_out = utils::trim_whitespace(type_data[1]);
   return OKV;
 }
@@ -179,24 +160,19 @@ Result<Void> WebserverConfig::parse_types_block(FileDescriptor &file) {
   std::vector<std::string> keys;
 
   while (true) {
-    Result<std::string> temp = file.read_file_line();
     count_line++;
-    if (!temp.error().empty()) {
-      err_meg = ConfigError::file_descriptor(temp.error());
-      return ERR(Void, ConfigError::file_descriptor(temp.error()));
-    } else if (temp.value() == "\n" || temp.value() == "")
+    TRY(Void, std::string, line, file.read_file_line());
+    if (line == "\n" || line == "")
       break;
 
-    origin_line = utils::remove_char(temp.value(), '\n');
+    origin_line = utils::remove_char(line, '\n');
     std::string err = configutils::get_indent_whitespace_error(origin_line, 1);
     if (err != "")
       return ERR(Void, err);
     line = utils::trim_whitespace(origin_line);
 
-    Result<Void> mapping_result = parse_type_mapping(line, keys, value);
-    if (!mapping_result.error().empty())
-      return mapping_result;
-
+    TRY_(Void, Void, parse_type_mapping(line, keys, value));
+  
     for (std::size_t i = 0; i < keys.size(); ++i) {
       const std::string &k = keys[i];
       if (k == "_") {
