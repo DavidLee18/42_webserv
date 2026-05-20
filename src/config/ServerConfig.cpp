@@ -25,20 +25,18 @@ Result<Void> ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
   bool is_timeout_parse = false;
 
   while (true) {
-    Result<std::string> temp = fd.read_file_line();
     count_line++;
-    if (!temp.error().empty())
-      return ERR(Void, ConfigError::file_descriptor(temp.error()));
-    else if (temp.value() == "\n") {
+    TRY(Void, std::string, line, fd.read_file_line());
+    if (line == "\n") {
       end_flag += 1;
       if (end_flag == 2)
         break;
       continue;
-    } else if (temp.value() == "")
+    } else if (line == "")
       break;
     end_flag = 0;
 
-    origin_line = utils::remove_char(temp.value(), '\n');
+    origin_line = utils::remove_char(line, '\n');
     err_meg = configutils::get_indent_whitespace_error(origin_line, 1);
     if (err_meg != "")
       return ERR(Void, err_meg);
@@ -49,9 +47,8 @@ Result<Void> ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
         return ERR(Void, ConfigError::make(origin_line, ERR_HEADER_DEFINED_AFTER_ROUTE));
       else if (is_header_parse == true && (is_route_parse || is_timeout_parse))
         return ERR(Void, ConfigError::make(origin_line, ERR_DUPLICATE_HEADER_BLOCK));
-      Result<Void> header_result = parse_header_entry(fd, line);
-      if (!header_result.error().empty())
-        return header_result;
+      
+      TRY_(Void, Void, parse_header_entry(fd, line));
 
       is_header_parse = true;
     } else if (is_valid_server_response_time(line)) {
@@ -70,9 +67,7 @@ Result<Void> ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
         
       is_timeout_parse = true;
     } else if (matches_route_rule_syntax(line)) {
-      Result<Void> route_result = parse_route_rule_block(line, fd, envp);
-      if (!route_result.error().empty())
-        return route_result;
+      TRY_(Void, Void, parse_route_rule_block(line, fd, envp));
       
       is_route_parse = true;
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
@@ -128,17 +123,16 @@ Result<Void> ServerConfig::parse_header_entry(FileDescriptor &fd,
   if (!utils::is_header_value(value))
     return ERR(Void, ConfigError::make(origin_line, value, ERR_INVALID_HEADER_VALUE));
 
+  std::string file_line = "";
   while (temp[temp.length() - 1] == ';') {
-    Result<std::string> fd_line = fd.read_file_line();
     count_line++;
-    if (!fd_line.error().empty())
-      return ERR(Void, ConfigError::file_descriptor(fd_line.error()));
-    else if (fd_line.value() == "\n" || fd_line.value() == "") {
+    TRY(Void, std::string, file_line, fd.read_file_line());
+    if (file_line == "\n" || file_line == "") {
       end_flag += 1;
       break;
     }
 
-    origin_line = utils::remove_char(fd_line.value(), '\n');
+    origin_line = utils::remove_char(file_line, '\n');
     std::string err = configutils::get_indent_whitespace_error(origin_line, 2);
     if (err != "")
       return ERR(Void, err);
@@ -408,14 +402,9 @@ Result<Void> ServerConfig::apply_route_rule_entry(
 
       routes[route_indexes[i]].auth_info = rule[1];
     } else if (rule[0] == "->{}") {
-      Result<Void> body_result = parse_max_body_size(rule[1], routes[route_indexes[i]].max_body_KB);
-      if (!body_result.error().empty())
-        return body_result;
+      TRY_(Void, Void, parse_max_body_size(rule[1], routes[route_indexes[i]].max_body_KB));
     } else if (rule[0] == "!") {
-      Result<Void> err_page_result = ServerConfig::apply_err_page_entry(origin_line,
-          line, routes[route_indexes[i]].error_pages, envp);
-      if (!err_page_result.error().empty())
-        return err_page_result;
+      TRY_(Void, Void, ServerConfig::apply_err_page_entry(origin_line, line, routes[route_indexes[i]].error_pages, envp));
     } else
       return ERR(Void, ConfigError::make(origin_line, line, ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_SYNTAX));
 
@@ -511,7 +500,6 @@ Result<Void> ServerConfig::create_route_rules(
 
 Result<Void> ServerConfig::parse_route_rule_block(const std::string &route_line,
                                           FileDescriptor &fd, char **envp) {
-  std::string line;
   std::vector<Request::Method> mets;
   std::vector<std::string> route_line_data =
       utils::string_split(route_line, " ");
@@ -528,35 +516,29 @@ Result<Void> ServerConfig::parse_route_rule_block(const std::string &route_line,
       mets.push_back(Request::DELETE);
   }
 
-  Result<Void> create_result = create_route_rules(route_line_data, mets, createdIndexes);
-  if (!create_result.error().empty())
-    return create_result;
+  TRY_(Void, Void, create_route_rules(route_line_data, mets, createdIndexes));
 
+  std::string line = "";
   while (true) {
-    Result<std::string> temp = fd.read_file_line();
     count_line++;
-    if (!temp.error().empty())
-      return ERR(Void, ConfigError::file_descriptor(temp.error()));
-
-    if (temp.value() == "\n" || temp.value() == "") {
+    TRY(Void, std::string, line, fd.read_file_line());
+    if (line == "\n" || line == "") {
       end_flag += 1;
       break;
     }
 
-    origin_line = utils::remove_char(temp.value(), '\n');
+    origin_line = utils::remove_char(line, '\n');
     std::string err = configutils::get_indent_whitespace_error(origin_line, 2);
     line = utils::trim_whitespace(origin_line);
     if (err != "")
       return ERR(Void, err);
 
-    Result<Void> entry_result = apply_route_rule_entry(line, createdIndexes, envp);
-    if (!entry_result.error().empty())
-      return entry_result;
+    TRY_(Void, Void, apply_route_rule_entry(line, createdIndexes, envp));
   }
   return OKV;
 }
 
-Result<const RouteRule> ServerConfig::find_route(Request::Method method,
+Result<RouteRule> ServerConfig::find_route(Request::Method method,
                                           const std::string &path) const {
   PathPattern pathPattern(path);
   std::string err = "[DEBUG] find_route: NO ROUTE for ";
@@ -565,12 +547,12 @@ Result<const RouteRule> ServerConfig::find_route(Request::Method method,
     if (((method == Request::HEAD && routes[i].method == Request::GET) ||
          routes[i].method == method) &&
         routes[i].path.matches(pathPattern))
-      return OK(const RouteRule, routes[i]);
+      return OK(RouteRule, routes[i]);
   }
-  return ERR(const RouteRule, err + path);
+  return ERR(RouteRule, err + path);
 }
 
-Result<const RouteRule_CGI> ServerConfig::find_route_cgi(Request::Method method,
+Result<RouteRule_CGI> ServerConfig::find_route_cgi(Request::Method method,
                              const std::string &path) const {
   PathPattern pathPattern(path);
   std::string err = "[DEBUG] find_route_cgi: NO ROUTE for ";
@@ -578,9 +560,9 @@ Result<const RouteRule_CGI> ServerConfig::find_route_cgi(Request::Method method,
   for (size_t i = 0; i < R_CGI.size(); ++i) {
     if (R_CGI[i].get_method() == method &&
         R_CGI[i].get_path().matches(pathPattern))
-      return OK(const RouteRule_CGI, R_CGI[i]);
+      return OK(RouteRule_CGI, R_CGI[i]);
   }
-  return ERR(const RouteRule_CGI, err + path);
+  return ERR(RouteRule_CGI, err + path);
 }
 
 std::string normalize_slashes(const std::string &path) {
@@ -602,7 +584,7 @@ std::string normalize_slashes(const std::string &path) {
 
 Result<std::string> ServerConfig::get_rewritten_path(Request::Method method,
                                              const std::string &path) const {
-  Result<const RouteRule> route_result = find_route(method, path);
+  Result<RouteRule> route_result = find_route(method, path);
   if (!route_result.error().empty())
     return ERR(std::string, route_result.error());
   
