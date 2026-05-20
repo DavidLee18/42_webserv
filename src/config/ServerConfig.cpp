@@ -12,96 +12,83 @@ ServerConfig::ServerConfig(FileDescriptor &file,
        it != global_cgi.end(); ++it)
     file_extension.push_back("." + it->first);
   file_extension.push_back(".cgi");
-  if (!parse_server_block(file, envp)) {
-    return;
-  }
-  return;
+
+  Result<Void> result = parse_server_block(file, envp);
+  if (!result.error().empty())
+    err_meg = result.error();
 }
 
-bool ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
+Result<Void> ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
   std::string line;
   bool is_route_parse = false;
   bool is_header_parse = false;
   bool is_timeout_parse = false;
 
   while (true) {
-    Result<std::string> temp = fd.read_file_line();
     count_line++;
-    if (temp.error() != "") {
-      err_meg = ConfigError::file_descriptor(temp.error());
-      return false;
-    } else if (temp.value() == "\n") {
+    TRY(Void, std::string, line, fd.read_file_line());
+    if (line == "\n") {
       end_flag += 1;
       if (end_flag == 2)
         break;
       continue;
-    } else if (temp.value() == "")
+    } else if (line == "")
       break;
     end_flag = 0;
 
-    origin_line = utils::remove_char(temp.value(), '\n');
+    origin_line = utils::remove_char(line, '\n');
     err_meg = configutils::get_indent_whitespace_error(origin_line, 1);
     if (err_meg != "")
-      return false;
+      return ERR(Void, err_meg);
     line = utils::trim_whitespace(origin_line);
 
     if (is_header_block(line)) {
-      if (is_route_parse == true) {
-        err_meg =
-            ConfigError::make(origin_line, ERR_HEADER_DEFINED_AFTER_ROUTE);
-        return false;
-      } else if (is_header_parse == true &&
-                 (is_route_parse || is_timeout_parse)) {
-        err_meg = ConfigError::make(origin_line, ERR_DUPLICATE_HEADER_BLOCK);
-        return false;
-      }
-      if (!parse_header_entry(fd, line)) {
-        return false;
-      }
+      if (is_route_parse == true)
+        return ERR(Void, ConfigError::make(origin_line,
+                                           ERR_HEADER_DEFINED_AFTER_ROUTE));
+      else if (is_header_parse == true && (is_route_parse || is_timeout_parse))
+        return ERR(Void,
+                   ConfigError::make(origin_line, ERR_DUPLICATE_HEADER_BLOCK));
+
+      TRY_(Void, Void, parse_header_entry(fd, line));
+
       is_header_parse = true;
     } else if (is_valid_server_response_time(line)) {
-      if (is_route_parse == true) {
-        err_meg =
-            ConfigError::make(origin_line, ERR_TIMEOUT_DEFINED_AFTER_ROUTE);
-        return false;
-      } else if (is_timeout_parse == true) {
-        err_meg = ConfigError::make(origin_line, ERR_DUPLICATE_SERVER_TIMEOUT);
-        return false;
-      }
+      if (is_route_parse == true)
+        return ERR(Void, ConfigError::make(origin_line,
+                                           ERR_TIMEOUT_DEFINED_AFTER_ROUTE));
+      else if (is_timeout_parse == true)
+        return ERR(
+            Void, ConfigError::make(origin_line, ERR_DUPLICATE_SERVER_TIMEOUT));
+
       err_meg = configutils::string_to_unsigned_int(line.substr(3),
                                                     server_response_time_ms);
-      if (err_meg != "") {
-        err_meg = ConfigError::make(origin_line, line.substr(3), err_meg);
-        return false;
-      } else if (server_response_time_ms > MAX_SERVER_RESPONSE_TIME ||
-                 MIN_SERVER_RESPONSE_TIME > server_response_time_ms) {
-        err_meg = ConfigError::make(origin_line, line.substr(3),
-                                    ERR_INVALID_SERVER_RESPONSE_TIME);
-        return false;
-      }
+      if (err_meg != "")
+        return ERR(Void,
+                   ConfigError::make(origin_line, line.substr(3), err_meg));
+      else if (server_response_time_ms > MAX_SERVER_RESPONSE_TIME ||
+               MIN_SERVER_RESPONSE_TIME > server_response_time_ms)
+        return ERR(Void, ConfigError::make(origin_line, line.substr(3),
+                                           ERR_INVALID_SERVER_RESPONSE_TIME));
       is_timeout_parse = true;
     } else if (matches_route_rule_syntax(line)) {
-      if (!parse_route_rule_block(line, fd, envp)) {
-        return false;
-      }
+      TRY_(Void, Void, parse_route_rule_block(line, fd, envp));
+
       is_route_parse = true;
     } else if (RouteRule_CGI::is_valid_cgi_config(line)) {
       RouteRule_CGI temp(fd, line, file_extension, envp);
       count_line += temp.get_count_line();
-      if (temp.get_err_meg() != "") {
-        err_meg = temp.get_err_meg();
-        return false;
-      }
+      if (temp.get_err_meg() != "")
+        return ERR(Void, temp.get_err_meg());
+
       R_CGI.push_back(temp);
       is_route_parse = true;
       end_flag += 1;
-    } else {
-      err_meg =
-          ConfigError::make(origin_line, "", ERR_INVALID_SERVER_CONFIG_LINE);
-      return false;
-    }
+    } else
+      return ERR(Void, ConfigError::make(origin_line, "",
+                                         ERR_INVALID_SERVER_CONFIG_LINE));
   }
-  return true;
+  return OKV;
 }
 
 bool ServerConfig::is_header_block(const std::string &line) {
@@ -117,64 +104,59 @@ bool ServerConfig::is_header_block(const std::string &line) {
   return true;
 }
 
-bool ServerConfig::parse_header_entry(FileDescriptor &fd,
-                                      const std::string &line) {
+Result<Void> ServerConfig::parse_header_entry(FileDescriptor &fd,
+                                              const std::string &line) {
   std::string temp(line);
   if (temp.find(':') == std::string::npos) {
     std::size_t pos = temp.find("+<=") + 3;
-    err_meg = ConfigError::make(origin_line, temp.substr(pos),
-                                ERR_INVALID_HEADER_MISSING_COLON);
-    return false;
+    return ERR(Void, ConfigError::make(origin_line, temp.substr(pos),
+                                       ERR_INVALID_HEADER_MISSING_COLON));
   } else if (utils::count_occurrences(temp, ":") != 1) {
     std::size_t pos = temp.find(":");
     pos = temp.find(":", pos + 1);
-    err_meg = ConfigError::make(origin_line, temp.substr(pos),
-                                ERR_INVALID_HEADER_COLON_COUNT);
-    return false;
+    return ERR(Void, ConfigError::make(origin_line, temp.substr(pos),
+                                       ERR_INVALID_HEADER_COLON_COUNT));
   }
 
   std::vector<std::string> key_value =
       utils::string_split(temp.substr(temp.find("+<=") + 4), ":");
-  if (key_value.size() != 2) {
-    err_meg = ConfigError::make(origin_line, ERR_INVALID_HEADER_FORMAT);
-    return false;
-  }
-  std::string key = utils::trim_whitespace(key_value[0]);
-  if (!utils::is_header_name(key)) {
-    err_meg = ConfigError::make(origin_line, key, ERR_INVALID_HEADER_NAME);
-    return false;
-  }
-  std::string value = utils::trim_whitespace(key_value[1]);
-  if (!utils::is_header_value(value)) {
-    err_meg = ConfigError::make(origin_line, value, ERR_INVALID_HEADER_VALUE);
-    return false;
-  }
+  if (key_value.size() != 2)
+    return ERR(Void, ConfigError::make(origin_line, ERR_INVALID_HEADER_FORMAT));
 
+  std::string key = utils::trim_whitespace(key_value[0]);
+  if (!utils::is_header_name(key))
+    return ERR(Void,
+               ConfigError::make(origin_line, key, ERR_INVALID_HEADER_NAME));
+
+  std::string value = utils::trim_whitespace(key_value[1]);
+  if (!utils::is_header_value(value))
+    return ERR(Void,
+               ConfigError::make(origin_line, value, ERR_INVALID_HEADER_VALUE));
+
+  std::string file_line = "";
   while (temp[temp.length() - 1] == ';') {
-    Result<std::string> fd_line = fd.read_file_line();
     count_line++;
-    if (fd_line.error() != "") {
-      err_meg = ConfigError::file_descriptor(fd_line.error());
-      return false;
-    } else if (fd_line.value() == "\n" || fd_line.value() == "") {
+    TRY(Void, std::string, file_line, fd.read_file_line());
+    if (file_line == "\n" || file_line == "") {
       end_flag += 1;
       break;
     }
 
-    origin_line = utils::remove_char(fd_line.value(), '\n');
-    err_meg = configutils::get_indent_whitespace_error(origin_line, 2);
-    if (err_meg != "")
-      return false;
+    origin_line = utils::remove_char(file_line, '\n');
+    std::string err = configutils::get_indent_whitespace_error(origin_line, 2);
+    if (err != "")
+      return ERR(Void, err);
     temp = origin_line;
 
-    if (!utils::is_header_value(temp)) {
-      err_meg = ConfigError::make(origin_line, temp, ERR_INVALID_HEADER_VALUE);
-      return false;
-    }
+    if (!utils::is_header_value(temp))
+      return ERR(
+          Void, ConfigError::make(origin_line, temp, ERR_INVALID_HEADER_VALUE));
+
     value += " " + utils::trim_whitespace(temp);
   }
+
   header[key] = utils::remove_char(value, ';');
-  return true;
+  return OKV;
 }
 
 bool ServerConfig::is_valid_server_response_time(const std::string &line) {
@@ -312,107 +294,118 @@ bool ServerConfig::matches_route_rule_syntax(const std::string &line) {
   return true;
 }
 
-std::string ServerConfig::parse_max_body_size(std::string line,
-                                              unsigned int &maxbody) {
+Result<Void> ServerConfig::parse_max_body_size(std::string line,
+                                               unsigned int &maxbody) {
   size_t i = 0;
   maxbody = 0;
-  if (line[0] == '0') {
+
+  if (line.empty())
+    return ERR(Void, ConfigError::make(origin_line, line,
+                                       ERR_INVALID_MAX_BODY_SIZE_VALUE_SYNTAX));
+
+  if (line[0] == '0')
     if (line.size() != 1)
-      return ConfigError::make(origin_line, line,
-                               ERR_INVALID_UNSIGNED_INT_LEADING_ZERO);
-  }
+      return ERR(Void,
+                 ConfigError::make(origin_line, line,
+                                   ERR_INVALID_UNSIGNED_INT_LEADING_ZERO));
+
   for (; i < line.size(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(line[i])))
       break;
     maxbody = maxbody * 10 + static_cast<unsigned int>(line[i] - '0');
     if (maxbody > MAX_BODY_SIZE)
-      return ConfigError::make(origin_line, line,
-                               ERR_MAX_BODY_SIZE_OUT_OF_RANGE);
+      return ERR(Void, ConfigError::make(origin_line, line,
+                                         ERR_MAX_BODY_SIZE_OUT_OF_RANGE));
   }
+
   if (i == 0)
-    return ConfigError::make(origin_line, line,
-                             ERR_INVALID_MAX_BODY_SIZE_VALUE_SYNTAX);
+    return ERR(Void, ConfigError::make(origin_line, line,
+                                       ERR_INVALID_MAX_BODY_SIZE_VALUE_SYNTAX));
+
   std::string temp = line.substr(i);
   if (temp.empty() || temp == "KB" || temp == "KiB")
-    return "";
+    return OKV;
   else if (temp == "MB") {
     if (static_cast<std::size_t>(maxbody) * 1000 > MAX_BODY_SIZE)
-      return ConfigError::make(origin_line, line,
-                               ERR_MAX_BODY_SIZE_OUT_OF_RANGE);
+      return ERR(Void, ConfigError::make(origin_line, line,
+                                         ERR_MAX_BODY_SIZE_OUT_OF_RANGE));
     maxbody = maxbody * 1000;
   } else if (temp == "MiB") {
     if (static_cast<std::size_t>(maxbody) * 1024 > MAX_BODY_SIZE)
-      return ConfigError::make(origin_line, line,
-                               ERR_MAX_BODY_SIZE_OUT_OF_RANGE);
+      return ERR(Void, ConfigError::make(origin_line, line,
+                                         ERR_MAX_BODY_SIZE_OUT_OF_RANGE));
     maxbody = maxbody * 1024;
   } else
-    return ConfigError::make(origin_line, line,
-                             ERR_INVALID_MAX_BODY_SIZE_VALUE_SYNTAX);
-  return "";
+    return ERR(Void, ConfigError::make(origin_line, line,
+                                       ERR_INVALID_MAX_BODY_SIZE_VALUE_SYNTAX));
+  return OKV;
 }
 
-std::string ServerConfig::apply_err_page_entry(
+Result<Void> ServerConfig::apply_err_page_entry(
     const std::string &origin_line, const std::string &line,
     std::map<unsigned int, std::string> &err_map, char **envp) {
   std::vector<std::string> split = utils::string_split(line, " ");
 
   if (split.size() != 2) {
     if (split.size() == 1)
-      return ConfigError::make(origin_line, "", ERR_INVALID_ERROR_PAGE_FORMAT);
+      return ERR(Void, ConfigError::make(origin_line, "",
+                                         ERR_INVALID_ERROR_PAGE_FORMAT));
 
     std::string extra_tokens = "";
     for (std::size_t i = 2; i < split.size(); ++i)
       extra_tokens += " " + split[i];
-    return ConfigError::make(origin_line, extra_tokens,
-                             ERR_INVALID_ERROR_PAGE_FORMAT);
+    return ERR(Void, ConfigError::make(origin_line, extra_tokens,
+                                       ERR_INVALID_ERROR_PAGE_FORMAT));
   }
 
   std::size_t pos = split[1].find(":");
 
   if (pos == std::string::npos || utils::count_occurrences(split[1], ":") != 1)
-    return ConfigError::make(origin_line, split[1],
-                             ERR_INVALID_ERROR_PAGE_MAPPING);
+    return ERR(Void, ConfigError::make(origin_line, split[1],
+                                       ERR_INVALID_ERROR_PAGE_MAPPING));
 
   std::vector<std::string> key_and_value = utils::string_split(split[1], ":");
 
   if (key_and_value.size() != 2)
-    return ConfigError::make(origin_line, split[1],
-                             ERR_INVALID_ERROR_PAGE_MAPPING);
+    return ERR(Void, ConfigError::make(origin_line, split[1],
+                                       ERR_INVALID_ERROR_PAGE_MAPPING));
 
   const std::string &status_code = key_and_value[0];
   const std::string &error_page_path = key_and_value[1];
 
-  for (std::size_t i = 0; i < status_code.size(); ++i) {
-    if (!std::isdigit(static_cast<unsigned char>(status_code[i]))) {
-      return ConfigError::make(origin_line, status_code,
-                               ERR_INVALID_ERROR_PAGE_STATUS_CODE_FORMAT);
-    }
-  }
+  for (std::size_t i = 0; i < status_code.size(); ++i)
+    if (!std::isdigit(static_cast<unsigned char>(status_code[i])))
+      return ERR(Void,
+                 ConfigError::make(origin_line, status_code,
+                                   ERR_INVALID_ERROR_PAGE_STATUS_CODE_FORMAT));
+
   if (status_code.size() != 3 ||
       (status_code[0] != '4' && status_code[0] != '5'))
-    return ConfigError::make(origin_line, status_code,
-                             ERR_INVALID_ERROR_PAGE_STATUS_CODE);
+    return ERR(Void, ConfigError::make(origin_line, status_code,
+                                       ERR_INVALID_ERROR_PAGE_STATUS_CODE));
 
   unsigned int status_number = 0;
-  std::string err_meg =
+  std::string err =
       configutils::string_to_unsigned_int(status_code, status_number);
-  if (err_meg != "")
-    return ConfigError::make(origin_line, status_code, err_meg);
+  if (err != "")
+    return ERR(Void, ConfigError::make(origin_line, status_code, err));
   else if (status_number < 400 || status_number > 599)
-    return ConfigError::make(origin_line, status_code,
-                             ERR_INVALID_ERROR_PAGE_STATUS_CODE_RANGE);
+    return ERR(Void,
+               ConfigError::make(origin_line, status_code,
+                                 ERR_INVALID_ERROR_PAGE_STATUS_CODE_RANGE));
 
-  err_meg = configutils::check_html_file(error_page_path, envp);
-  if (err_meg != "")
-    return ConfigError::make(origin_line, error_page_path, err_meg);
+  err = configutils::check_html_file(error_page_path, envp);
+  if (err != "")
+    return ERR(Void, ConfigError::make(origin_line, error_page_path, err));
 
   err_map[status_number] = key_and_value[1];
-  return "";
+  return OKV;
 }
 
-bool ServerConfig::apply_route_rule_entry(
-    const std::string &line, std::vector<std::size_t> &route_indexes,
-    char **envp) {
+Result<Void>
+ServerConfig::apply_route_rule_entry(const std::string &line,
+                                     std::vector<std::size_t> &route_indexes,
+                                     char **envp) {
 
   std::vector<std::string> rule = utils::string_split(line, " ");
   std::size_t size = rule.size();
@@ -421,50 +414,42 @@ bool ServerConfig::apply_route_rule_entry(
     if (size > 2) {
       std::size_t pos = line.find(" ");
       pos = line.find(" ", pos + 1);
-      err_meg =
-          ConfigError::make(origin_line, line.substr(pos),
-                            ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_FORMAT);
+      return ERR(Void, ConfigError::make(
+                           origin_line, line.substr(pos),
+                           ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_FORMAT));
     } else if (size == 1)
-      err_meg = ConfigError::make(
-          origin_line, "", ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_FORMAT);
-    return false;
+      return ERR(Void, ConfigError::make(
+                           origin_line, "",
+                           ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_FORMAT));
   }
 
   for (std::size_t i = 0; i < route_indexes.size(); ++i) {
     if (rule[0] == "?") {
-      err_meg = configutils::check_html_file(rule[1], envp);
-      if (err_meg != "") {
-        err_meg = ConfigError::make(origin_line, rule[1], err_meg);
-        return false;
-      }
+      std::string err = configutils::check_html_file(rule[1], envp);
+      if (err != "")
+        return ERR(Void, ConfigError::make(origin_line, rule[1], err));
+
       routes[route_indexes[i]].index = rule[1];
     } else if (rule[0] == "@") {
       std::string real_path = utils::get_env("PWD", envp) + "/" + rule[1];
-      if (access(real_path.c_str(), F_OK) != 0) {
-        err_meg =
-            ConfigError::make(origin_line, rule[1], ERR_AUTH_FILE_NOT_FOUND);
-        ;
-        return false;
-      }
+      if (access(real_path.c_str(), F_OK) != 0)
+        return ERR(Void, ConfigError::make(origin_line, rule[1],
+                                           ERR_AUTH_FILE_NOT_FOUND));
+
       routes[route_indexes[i]].auth_info = rule[1];
     } else if (rule[0] == "->{}") {
-      err_meg =
-          parse_max_body_size(rule[1], routes[route_indexes[i]].max_body_KB);
-      if (err_meg != "")
-        return false;
+      TRY_(Void, Void,
+           parse_max_body_size(rule[1], routes[route_indexes[i]].max_body_KB));
     } else if (rule[0] == "!") {
-      std::string errPageLine = rule[1];
-      err_meg = ServerConfig::apply_err_page_entry(
-          origin_line, line, routes[route_indexes[i]].error_pages, envp);
-      if (err_meg != "")
-        return false;
-    } else {
-      err_meg = ConfigError::make(
-          origin_line, line, ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_SYNTAX);
-      return false;
-    }
+      TRY_(Void, Void,
+           ServerConfig::apply_err_page_entry(
+               origin_line, line, routes[route_indexes[i]].error_pages, envp));
+    } else
+      return ERR(Void, ConfigError::make(
+                           origin_line, line,
+                           ERR_INVALID_ROUTE_RULE_ADDITIONAL_INFO_SYNTAX));
   }
-  return true;
+  return OKV;
 }
 
 RuleOperator ServerConfig::parse_rule_operator(const std::string &indicator) {
@@ -518,10 +503,10 @@ bool ServerConfig::has_compatible_wildcards(const PathPattern &path,
   return true;
 }
 
-bool ServerConfig::create_route_rules(
-    const std::vector<std::string> &data,
-    const std::vector<Request::Method> &mets,
-    std::vector<std::size_t> &createdIndexes) {
+Result<Void>
+ServerConfig::create_route_rules(const std::vector<std::string> &data,
+                                 const std::vector<Request::Method> &mets,
+                                 std::vector<std::size_t> &createdIndexes) {
 
   RouteRule route;
   std::vector<PathPattern> path_url = expand_path_pattern(data[1]);
@@ -530,11 +515,10 @@ bool ServerConfig::create_route_rules(
   for (size_t i = 0; i < mets.size(); ++i) {
     route.method = mets[i];
     route.op = parse_rule_operator(data[2]);
-    if (route.op == UNDEFINED) {
-      err_meg =
-          ConfigError::make(origin_line, data[2], ERR_UNDEFINED_ROUTE_OPERATOR);
-      return false;
-    }
+    if (route.op == UNDEFINED)
+      return ERR(Void, ConfigError::make(origin_line, data[2],
+                                         ERR_UNDEFINED_ROUTE_OPERATOR));
+
     route.index = "";
     route.auth_info = "";
     route.max_body_KB = 0;
@@ -542,24 +526,24 @@ bool ServerConfig::create_route_rules(
     for (size_t j = 0; j < path_url.size(); ++j) {
       route.path = path_url[j];
       route.root = root_url;
-      if (!has_compatible_wildcards(route.path, route.root)) {
-        err_meg = ConfigError::make(
-            origin_line, route.path.to_string() + ", " + route.root.to_string(),
-            ERR_INVALID_WILDCARD_MAPPING);
-        return false;
-      }
+      if (!has_compatible_wildcards(route.path, route.root))
+        return ERR(Void, ConfigError::make(origin_line,
+                                           route.path.to_string() + ", " +
+                                               route.root.to_string(),
+                                           ERR_INVALID_WILDCARD_MAPPING));
+
       if (route.op == REDIRECT)
         route.redirect_target = route.root;
       routes.push_back(route);
       createdIndexes.push_back(routes.size() - 1);
     }
   }
-  return true;
+  return OKV;
 }
 
-bool ServerConfig::parse_route_rule_block(const std::string &route_line,
-                                          FileDescriptor &fd, char **envp) {
-  std::string line;
+Result<Void> ServerConfig::parse_route_rule_block(const std::string &route_line,
+                                                  FileDescriptor &fd,
+                                                  char **envp) {
   std::vector<Request::Method> mets;
   std::vector<std::string> route_line_data =
       utils::string_split(route_line, " ");
@@ -576,59 +560,54 @@ bool ServerConfig::parse_route_rule_block(const std::string &route_line,
       mets.push_back(Request::DELETE);
   }
 
-  if (!create_route_rules(route_line_data, mets, createdIndexes))
-    return false;
+  TRY_(Void, Void, create_route_rules(route_line_data, mets, createdIndexes));
 
+  std::string line = "";
   while (true) {
-    Result<std::string> temp = fd.read_file_line();
     count_line++;
-    if (temp.error() != "") {
-      err_meg = ConfigError::file_descriptor(temp.error());
-      return false;
-    }
-    if (temp.value() == "\n" || temp.value() == "") {
+    TRY(Void, std::string, line, fd.read_file_line());
+    if (line == "\n" || line == "") {
       end_flag += 1;
       break;
     }
 
-    origin_line = utils::remove_char(temp.value(), '\n');
-    err_meg = configutils::get_indent_whitespace_error(origin_line, 2);
+    origin_line = utils::remove_char(line, '\n');
+    std::string err = configutils::get_indent_whitespace_error(origin_line, 2);
     line = utils::trim_whitespace(origin_line);
-    if (err_meg != "")
-      return false;
-    else if (!apply_route_rule_entry(line, createdIndexes, envp))
-      return false;
+    if (err != "")
+      return ERR(Void, err);
+
+    TRY_(Void, Void, apply_route_rule_entry(line, createdIndexes, envp));
   }
-  err_meg = "";
-  return true;
+  return OKV;
 }
 
-RouteRule const *ServerConfig::find_route(Request::Method method,
-                                          const std::string &path) const {
+Result<RouteRule> ServerConfig::find_route(Request::Method method,
+                                           const std::string &path) const {
   PathPattern pathPattern(path);
+  std::string err = "[DEBUG] find_route: NO ROUTE for ";
 
   for (size_t i = 0; i < routes.size(); ++i) {
     if (((method == Request::HEAD && routes[i].method == Request::GET) ||
          routes[i].method == method) &&
-        routes[i].path.matches(pathPattern)) {
-      return &routes[i];
-    }
+        routes[i].path.matches(pathPattern))
+      return OK(RouteRule, routes[i]);
   }
-  return NULL;
+  return ERR(RouteRule, err + path);
 }
 
-RouteRule_CGI const *
+Result<RouteRule_CGI>
 ServerConfig::find_route_cgi(Request::Method method,
                              const std::string &path) const {
   PathPattern pathPattern(path);
+  std::string err = "[DEBUG] find_route_cgi: NO ROUTE for ";
 
   for (size_t i = 0; i < R_CGI.size(); ++i) {
     if (R_CGI[i].get_method() == method &&
-        R_CGI[i].get_path().matches(pathPattern)) {
-      return &R_CGI[i];
-    }
+        R_CGI[i].get_path().matches(pathPattern))
+      return OK(RouteRule_CGI, R_CGI[i]);
   }
-  return NULL;
+  return ERR(RouteRule_CGI, err + path);
 }
 
 std::string normalize_slashes(const std::string &path) {
@@ -648,22 +627,21 @@ std::string normalize_slashes(const std::string &path) {
   return result;
 }
 
-std::string ServerConfig::get_rewritten_path(Request::Method method,
-                                             const std::string &path) const {
-  const RouteRule *route = find_route(method, path);
-  if (!route) {
-    std::cout << utils::debug << "get_rewritten_path: NO ROUTE for " << path
-              << std::endl;
-    return "";
-  }
-  std::cout << utils::debug << "route.path='" << route->path.to_string()
-            << "' route.root='" << route->root.to_string() << "' req_path='"
+Result<std::string>
+ServerConfig::get_rewritten_path(Request::Method method,
+                                 const std::string &path) const {
+  RouteRule route;
+  TRY(std::string, RouteRule, route, find_route(method, path));
+
+  std::cout << utils::debug << "route.path='" << route.path.to_string()
+            << "' route.root='" << route.root.to_string() << "' req_path='"
             << PathPattern(path).to_string() << "'" << std::endl;
-  const std::string result = normalize_slashes(
-      route->path.rewrite_path(PathPattern(path), route->root));
+
+  const std::string result =
+      normalize_slashes(route.path.rewrite_path(PathPattern(path), route.root));
   std::cout << utils::debug << "rewrite_path returned: '" << result << "'"
             << std::endl;
-  return result;
+  return OK(std::string, result);
 }
 
 std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
