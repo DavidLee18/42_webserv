@@ -92,6 +92,14 @@ INCLUDES=(-I"$PROJECT_ROOT" -I"$PROJECT_ROOT/src" -I"$PROJECT_ROOT/src/server")
 # fails — typically you'll need the file that defines frame_cgi_output and
 # whatever Result<>/Errors symbols it pulls in.
 SOURCES=(
+  "$PROJECT_ROOT/src/cgi_1_1/CgiAuthType.cpp"
+  "$PROJECT_ROOT/src/cgi_1_1/CgiDelegate.cpp"
+  "$PROJECT_ROOT/src/cgi_1_1/CgiInput.cpp"
+  "$PROJECT_ROOT/src/cgi_1_1/CgiMetaVar.cpp"
+  "$PROJECT_ROOT/src/cgi_1_1/ContentType.cpp"
+  "$PROJECT_ROOT/src/cgi_1_1/EtcMetaVar.cpp"
+  "$PROJECT_ROOT/src/cgi_1_1/ServerName.cpp"
+  "$PROJECT_ROOT/src/config/ConfigError.cpp"
   "$PROJECT_ROOT/src/config/PathPattern.cpp"
   "$PROJECT_ROOT/src/config/RouteRule_CGI.cpp"
   "$PROJECT_ROOT/src/config/ServerConfig.cpp"
@@ -100,11 +108,10 @@ SOURCES=(
   "$PROJECT_ROOT/src/server/Client.cpp"
   "$PROJECT_ROOT/src/server/Server.cpp"
   "$PROJECT_ROOT/src/server/Session.cpp"
-  "$PROJECT_ROOT/src/cgi_1_1.cpp"
-  "$PROJECT_ROOT/src/epoll_kqueue.cpp"
+  "$PROJECT_ROOT/src/EPoll_KQueue.cpp"
   "$PROJECT_ROOT/src/framing_test_dummy.cpp"
-  "$PROJECT_ROOT/src/errors.cpp"
-  "$PROJECT_ROOT/src/file_descriptor.cpp"
+  "$PROJECT_ROOT/src/Errors.cpp"
+  "$PROJECT_ROOT/src/FileDescriptor.cpp"
   "$PROJECT_ROOT/src/utils.cpp"
 )
 

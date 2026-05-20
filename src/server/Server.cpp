@@ -200,7 +200,7 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
       // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
       std::cout << "\n"
                 << utils::info << "client ip: " << client.ip << std::endl;
-      std::cout << utils::info << "[Request] "
+      std::cout << utils::info << " [Request] "
                 << client.req->get_method_string() << " "
                 << client.req->get_path() << " (Body: ";
       if (content_length.has_value())
@@ -211,7 +211,7 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
       for (std::map<std::string, std::string>::const_iterator it =
                client.req->get_headers().begin();
            it != client.req->get_headers().end(); ++it) {
-        std::cout << utils::info << "[Request]" << it->first << ": "
+        std::cout << utils::info << " [Request] " << it->first << ": "
                   << it->second << std::endl;
       }
 
@@ -281,7 +281,7 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
       // 완벽히 조립된 단일 HTTP 요청 문자열 잘라내기
       std::cout << "\n"
                 << utils::info << "client ip: " << client.ip << std::endl;
-      std::cout << utils::info << "[Request] "
+      std::cout << utils::info << " [Request] "
                 << client.req->get_method_string() << " "
                 << client.req->get_path() << " (Body: ";
       if (content_length.has_value())
@@ -292,7 +292,7 @@ void Server::client_read(const FileDescriptor *client_fd, char **envp) {
       for (std::map<std::string, std::string>::const_iterator it =
                client.req->get_headers().begin();
            it != client.req->get_headers().end(); ++it) {
-        std::cout << utils::info << "[Request]" << it->first << ": "
+        std::cout << utils::info << " [Request] " << it->first << ": "
                   << it->second << std::endl;
       }
 
@@ -615,38 +615,47 @@ Result<Void> Server::start(char **envp) {
                  std::pair<FileDescriptor const *, CgiDelegate *> >::iterator
             it = cgis.find(fd);
 
-        if (it != cgis.end()) {
-          FileDescriptor const *client_fd = it->second.first;
-          CgiDelegate *cgi = it->second.second;
-          Result<Void> res = cgi->handle_event(event);
-          std::ostringstream oss;
-          Response resp;
-          if (!res.has_value()) {
-            if (res.error() == Errors::gateway_timeout)
-              resp =
-                  DefaultError::default_err_response(Response::GATEWAY_TIMEOUT);
-            else // res.error() == Errors::bad_gateway
+        if (it == cgis.end())
+          continue; // Already reaped; stale event.
+
+        FileDescriptor const *client_fd = it->second.first;
+        CgiDelegate *cgi = it->second.second;
+
+        std::map<FileDescriptor const *, ClientSession>::iterator client_it =
+            clients.find(client_fd);
+        if (client_it == clients.end()) {
+          // Client gone; reap orphaned CGI and skip.
+          reap_cgi(cgi);
+          continue;
+        }
+
+        Result<Void> res = cgi->handle_event(event);
+        std::ostringstream oss;
+        Response resp;
+        if (!res.has_value()) {
+          if (res.error() == Errors::gateway_timeout)
+            resp =
+                DefaultError::default_err_response(Response::GATEWAY_TIMEOUT);
+          else // res.error() == Errors::bad_gateway
+            resp = DefaultError::default_err_response(Response::BAD_GATEWAY);
+        } else {
+          Result<std::string> output = cgi->poll();
+          if (output.has_value()) {
+            const Result<Response> res_ = Response::from_cgi_outbuff(
+                output.value(), clients.at(client_fd).config->get_header());
+            if (res_.has_value())
+              resp = res_.value();
+            else
               resp = DefaultError::default_err_response(Response::BAD_GATEWAY);
-          } else {
-            Result<std::string> output = cgi->poll();
-            if (output.has_value()) {
-              const Result<Response> res_ = Response::from_cgi_outbuff(
-                  output.value(), clients.at(client_fd).config->get_header());
-              if (res_.has_value())
-                resp = res_.value();
-              else
-                resp =
-                    DefaultError::default_err_response(Response::BAD_GATEWAY);
-            } else
-              continue;
-            resp.print_simple(std::cout);
-            oss << resp;
-            if (!resp.keep_alive)
-              clients.at(client_fd).dropping = true;
-            clients.at(client_fd).out_buff = oss.str();
-            client_write(client_fd);
-            reap_cgi(cgi);
-          }
+          } else
+            continue;
+          resp.print_simple(std::cout);
+          oss << resp;
+          if (!resp.keep_alive)
+            clients.at(client_fd).dropping = true;
+          clients.at(client_fd).out_buff = oss.str();
+          client_write(client_fd);
+          reap_cgi(cgi);
         }
       }
     }

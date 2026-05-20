@@ -51,7 +51,7 @@ print()
 sys.stdout.flush()
 chunks = []
 try:
-    for _ in range(4096):
+    for _ in range(4096000000):
         chunks.append(b'X' * (1024 * 1024))
 except MemoryError:
     print("memory error caught")
@@ -66,7 +66,7 @@ sys.stdout.flush()
 try:
     with tempfile.NamedTemporaryFile(delete=True) as f:
         chunk = b'X' * (1024 * 1024)
-        for _ in range(4096):
+        for _ in range(4096000000):
             f.write(chunk)
         print("done")
 except Exception as e:
@@ -81,7 +81,7 @@ print()
 sys.stdout.flush()
 fds = []
 try:
-    for _ in range(20000):
+    for _ in range(200000000):
         fds.append(open('/dev/null', 'r'))
 except OSError as e:
     print(f"opened {len(fds)} fds, then: {e}")

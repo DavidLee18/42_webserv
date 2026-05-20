@@ -8,6 +8,10 @@ types =
 	mp3      -> audio/mpeg
 	_        -> application/octet-stream
 
+cgi =
+	php -> /usr/bin/php-cgi
+	py  -> /usr/bin/python3
+
 :8080 =
 	[] +<= X-Content-Type-Options: nosniff
 	[] +<= X-Frame-Options: DENY
@@ -43,6 +47,18 @@ types =
 
 	POST /cgi-test/echo     $/www-files/cgi-bin/echo.cgi
 		...10000
+
+	GET /multi-cgi/echo.py $/www-files/cgi-bin/echo.py
+		...5000
+
+	POST /multi-cgi/echo.py $/www-files/cgi-bin/echo.py
+		...5000
+
+	GET /multi-cgi/echo.php $/www-files/cgi-bin/echo.php
+		...5000
+
+	POST /multi-cgi/echo.php $/www-files/cgi-bin/echo.php
+		...5000
 
 	GET /old_stuff/ =301> /new_stuff/
 
