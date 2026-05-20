@@ -66,6 +66,7 @@ Result<Void> RouteRule_CGI::parse_cgi_params(FileDescriptor &fd) {
     } else
       return ERR(Void, ConfigError::make(origin_line, file_line, ERR_INVALID_CGI_EXTENSION_LINE));
   }
+  return OKV;
 }
 
 Result<Void> RouteRule_CGI::is_executable_file(const std::string &origin_line,
