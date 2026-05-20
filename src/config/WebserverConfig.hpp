@@ -22,13 +22,13 @@ private:
   Result<Void> file_parsing(FileDescriptor &file, char **envp);
   Result<Void> parse_types_block(FileDescriptor &file);
   Result<Void> parse_type_mapping(const std::string &line,
-                          std::vector<std::string> &keys_out,
-                          std::string &value_out);
-  Result<std::vector<std::string> >  parse_type_keys(const std::string &key);
+                                  std::vector<std::string> &keys_out,
+                                  std::string &value_out);
+  Result<std::vector<std::string> > parse_type_keys(const std::string &key);
   Result<Void> is_valid_mime_type(const std::string &value);
   static bool is_server_config_header(const std::string &line);
-  Result<Void> parse_server_config_entry(FileDescriptor &file, const std::string &line,
-                                 char **envp);
+  Result<Void> parse_server_config_entry(FileDescriptor &file,
+                                         const std::string &line, char **envp);
   static std::string parse_server_port(const std::string &line);
 
   WebserverConfig(FileDescriptor &file, char **envp);

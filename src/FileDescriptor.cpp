@@ -1,4 +1,10 @@
-#include "webserv.h"
+#include "FileDescriptor.hpp"
+#include "Errors.hpp"
+#include "utils.hpp"
+#include <cerrno>
+#include <cstdio>
+#include <fcntl.h>
+#include <netdb.h>
 
 Result<FileDescriptor> FileDescriptor::socket_new() {
   const int sock = socket(AF_INET, SOCK_STREAM, 0);

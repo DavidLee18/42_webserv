@@ -40,42 +40,60 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
 
     if (line == "types =" || line == "types=") {
       if (is_type_parse == true)
-        return ERR(Void, ConfigError::make(origin_line, ERR_DUPLICATE_TYPE_BLOCK));
+        return ERR(Void,
+                   ConfigError::make(origin_line, ERR_DUPLICATE_TYPE_BLOCK));
       else if (is_server_parse == true)
-        return ERR(Void, ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION));
-      
+        return ERR(Void, ConfigError::make(origin_line,
+                                           ERR_INVALID_GLOBAL_BLOCK_LOCATION));
+
       TRY_(Void, Void, parse_types_block(file));
       is_type_parse = true;
     } else if (WebserverConfig::is_server_config_header(line)) {
       if (is_type_parse == false)
-        return ERR(Void, ConfigError::add_line_number(1, ConfigError::make("", "", ERR_REQUIRED_TYPE_BLOCK_MISSING)));
+        return ERR(Void, ConfigError::add_line_number(
+                             1, ConfigError::make(
+                                    "", "", ERR_REQUIRED_TYPE_BLOCK_MISSING)));
 
       TRY_(Void, Void, parse_server_config_entry(file, line, envp));
       is_server_parse = true;
     } else if (line == "cgi =" || line == "cgi=") {
       if (is_cgi_parse == true)
-        return ERR(Void, ConfigError::make(origin_line, ERR_DUPLICATE_GLOBAL_CGI_BLOCK));
+        return ERR(Void, ConfigError::make(origin_line,
+                                           ERR_DUPLICATE_GLOBAL_CGI_BLOCK));
       else if (is_server_parse == true)
-        return ERR(Void, ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION));
-      
-      TRY_(Void, Void, RouteRule_CGI::parse_global_cgi_block(file, global_cgi, count_line, envp));
+        return ERR(Void, ConfigError::make(origin_line,
+                                           ERR_INVALID_GLOBAL_BLOCK_LOCATION));
+
+      TRY_(Void, Void,
+           RouteRule_CGI::parse_global_cgi_block(file, global_cgi, count_line,
+                                                 envp));
       is_cgi_parse = true;
     } else if (line[0] == '!') {
       if (is_err_page_parse == true)
-        return ERR(Void, ConfigError::make(origin_line, ERR_DUPLICATE_DEFAULT_ERROR_PAGE_BLOCK));
+        return ERR(Void,
+                   ConfigError::make(origin_line,
+                                     ERR_DUPLICATE_DEFAULT_ERROR_PAGE_BLOCK));
       else if (is_server_parse == true)
-        return ERR(Void, ConfigError::make(origin_line, ERR_INVALID_GLOBAL_BLOCK_LOCATION));
+        return ERR(Void, ConfigError::make(origin_line,
+                                           ERR_INVALID_GLOBAL_BLOCK_LOCATION));
 
-      TRY_(Void, Void, ServerConfig::apply_err_page_entry(origin_line, line, default_err_page, envp));
+      TRY_(Void, Void,
+           ServerConfig::apply_err_page_entry(origin_line, line,
+                                              default_err_page, envp));
       is_err_page_parse = true;
     } else
-      return ERR(Void, ConfigError::make(origin_line, ERR_INVALID_TOP_LEVEL_FORMAT));
+      return ERR(Void,
+                 ConfigError::make(origin_line, ERR_INVALID_TOP_LEVEL_FORMAT));
   }
 
   if (type_map.empty())
-    return ERR(Void, ConfigError::add_line_number(1, ConfigError::make("", "", ERR_REQUIRED_TYPE_BLOCK_MISSING)));
+    return ERR(Void, ConfigError::add_line_number(
+                         1, ConfigError::make(
+                                "", "", ERR_REQUIRED_TYPE_BLOCK_MISSING)));
   else if (serverconfig_map.empty())
-    return ERR(Void, ConfigError::add_line_number(1, ConfigError::make("", "", ERR_REQUIRED_SERVER_BLOCK_MISSING)));
+    return ERR(Void, ConfigError::add_line_number(
+                         1, ConfigError::make(
+                                "", "", ERR_REQUIRED_SERVER_BLOCK_MISSING)));
   return OKV;
 }
 
@@ -86,15 +104,21 @@ WebserverConfig::parse_type_keys(const std::string &key) {
   std::vector<std::string> key_data;
 
   if (utils::has_invalid_char(temp, "_|"))
-    return ERR(std::vector<std::string>, ConfigError::make(origin_line, temp, ERR_INVALID_MIME_EXTENSION_CHAR));
+    return ERR(
+        std::vector<std::string>,
+        ConfigError::make(origin_line, temp, ERR_INVALID_MIME_EXTENSION_CHAR));
 
   key_data = utils::string_split(temp, "|");
   number_of_key = utils::count_occurrences(temp, "|") + 1;
   if (key_data.size() != static_cast<std::size_t>(number_of_key))
-    return ERR(std::vector<std::string>, ConfigError::make(origin_line, temp, ERR_MIME_EXTENSION_COUNT_MISMATCH));
+    return ERR(std::vector<std::string>,
+               ConfigError::make(origin_line, temp,
+                                 ERR_MIME_EXTENSION_COUNT_MISMATCH));
   for (std::size_t i = 0; i < key_data.size(); ++i) {
     if (type_map.find(key_data[i]) != type_map.end())
-      return ERR(std::vector<std::string>, ConfigError::make(origin_line, key_data[i], ERR_DUPLICATE_MIME_EXTENSION));
+      return ERR(std::vector<std::string>,
+                 ConfigError::make(origin_line, key_data[i],
+                                   ERR_DUPLICATE_MIME_EXTENSION));
   }
   return OK(std::vector<std::string>, key_data);
 }
@@ -103,50 +127,62 @@ Result<Void> WebserverConfig::is_valid_mime_type(const std::string &value) {
   std::vector<std::string> value_data;
 
   if (utils::has_invalid_char(value, "/-"))
-    return ERR(Void, ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_CHAR));
+    return ERR(Void, ConfigError::make(origin_line, value,
+                                       ERR_INVALID_MIME_TYPE_CHAR));
   else if (value[0] == '-' || value[0] == '/')
-    return ERR(Void, ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT));
-  
+    return ERR(Void, ConfigError::make(origin_line, value,
+                                       ERR_INVALID_MIME_TYPE_FORMAT));
+
   for (std::size_t i = 1; i < value.size(); ++i)
     if (value[i] == '-' && value[i - 1] == '-') {
-      return ERR(Void, ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT));
-  }
+      return ERR(Void, ConfigError::make(origin_line, value,
+                                         ERR_INVALID_MIME_TYPE_FORMAT));
+    }
 
   value_data = utils::string_split(value, "/");
   if (value_data.size() != 2)
-    return ERR(Void, ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT));
+    return ERR(Void, ConfigError::make(origin_line, value,
+                                       ERR_INVALID_MIME_TYPE_FORMAT));
   else if (utils::count_occurrences(value, "/") != 1)
-    return ERR(Void, ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT));
+    return ERR(Void, ConfigError::make(origin_line, value,
+                                       ERR_INVALID_MIME_TYPE_FORMAT));
 
   for (std::size_t i = 0; i < value.size(); ++i) {
     if (value[i] == '-') {
       if (i == value.size() - 1)
-        return ERR(Void, ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT));
-      
+        return ERR(Void, ConfigError::make(origin_line, value,
+                                           ERR_INVALID_MIME_TYPE_FORMAT));
+
       if (!std::isalnum(static_cast<unsigned char>(value[i - 1])) ||
           !std::isalnum(static_cast<unsigned char>(value[i + 1])))
-        return ERR(Void, ConfigError::make(origin_line, value, ERR_INVALID_MIME_TYPE_FORMAT));
+        return ERR(Void, ConfigError::make(origin_line, value,
+                                           ERR_INVALID_MIME_TYPE_FORMAT));
     }
   }
   return OKV;
 }
 
-Result<Void> WebserverConfig::parse_type_mapping(const std::string &line,
-                                         std::vector<std::string> &keys_out,
-                                         std::string &value_out) {
+Result<Void>
+WebserverConfig::parse_type_mapping(const std::string &line,
+                                    std::vector<std::string> &keys_out,
+                                    std::string &value_out) {
   std::size_t pos = line.find("->");
   if (pos == std::string::npos)
-    return ERR(Void, ConfigError::make(origin_line, line, ERR_MISSING_MIME_MAPPING_OPERATOR));
+    return ERR(Void, ConfigError::make(origin_line, line,
+                                       ERR_MISSING_MIME_MAPPING_OPERATOR));
   else if (utils::count_occurrences(line, "->") != 1)
-    return ERR(Void, ConfigError::make(origin_line, line, ERR_INVALID_MIME_MAPPING_SYNTAX));
-  
+    return ERR(Void, ConfigError::make(origin_line, line,
+                                       ERR_INVALID_MIME_MAPPING_SYNTAX));
+
   std::vector<std::string> type_data = utils::string_split(line, "->");
   if (type_data.size() != 2)
-    return ERR(Void, ConfigError::make(origin_line, line, ERR_INVALID_MIME_MAPPING_VALUE));
+    return ERR(Void, ConfigError::make(origin_line, line,
+                                       ERR_INVALID_MIME_MAPPING_VALUE));
 
   std::vector<std::string> keys;
 
-  TRY(Void, std::vector<std::string>, keys, parse_type_keys(utils::trim_whitespace(type_data[0])));
+  TRY(Void, std::vector<std::string>, keys,
+      parse_type_keys(utils::trim_whitespace(type_data[0])));
   TRY_(Void, Void, is_valid_mime_type(utils::trim_whitespace(type_data[1])));
 
   keys_out = keys;
@@ -172,16 +208,18 @@ Result<Void> WebserverConfig::parse_types_block(FileDescriptor &file) {
     line = utils::trim_whitespace(origin_line);
 
     TRY_(Void, Void, parse_type_mapping(line, keys, value));
-  
+
     for (std::size_t i = 0; i < keys.size(); ++i) {
       const std::string &k = keys[i];
       if (k == "_") {
         if (!default_mime.empty())
-          return ERR(Void, ConfigError::make(origin_line, value, ERR_DUPLICATE_DEFAULT_MIME_TYPE));
+          return ERR(Void, ConfigError::make(origin_line, value,
+                                             ERR_DUPLICATE_DEFAULT_MIME_TYPE));
         default_mime = value;
         continue;
-      } else if (type_map.find(k) != type_map.end()) 
-        return ERR(Void, ConfigError::make(origin_line, k, ERR_DUPLICATE_MIME_EXTENSION));
+      } else if (type_map.find(k) != type_map.end())
+        return ERR(Void, ConfigError::make(origin_line, k,
+                                           ERR_DUPLICATE_MIME_EXTENSION));
       type_map[k] = value;
     }
   }
@@ -213,8 +251,8 @@ bool WebserverConfig::is_server_config_header(const std::string &line) {
 }
 
 Result<Void> WebserverConfig::parse_server_config_entry(FileDescriptor &file,
-                                                const std::string &line,
-                                                char **envp) {
+                                                        const std::string &line,
+                                                        char **envp) {
   unsigned int key = 0;
   std::string port = WebserverConfig::parse_server_port(line);
   ServerConfig server(file, global_cgi, envp);
@@ -223,20 +261,21 @@ Result<Void> WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   if (err_meg != "")
     return ERR(Void, ConfigError::make(origin_line, port, err_meg));
   if (MIN_PORT_VALUE > key || key > MAX_PORT_VALUE)
-    return ERR(Void, ConfigError::make(origin_line, port, ERR_INVALID_SERVER_PORT));
+    return ERR(Void,
+               ConfigError::make(origin_line, port, ERR_INVALID_SERVER_PORT));
 
   if (server.get_err_meg() != "") {
     count_line += server.get_count_line();
     return ERR(Void, server.get_err_meg());
-  }
-  else if (server.get_routes().size() == 0 &&
+  } else if (server.get_routes().size() == 0 &&
              server.get_route_rule_cgi().size() == 0) {
     return ERR(Void, ConfigError::make(origin_line, ERR_EMPTY_SERVER_BLOCK));
   } else if (serverconfig_map.find(key) != serverconfig_map.end()) {
     std::ostringstream oss;
     oss << key;
 
-    return ERR(Void, ConfigError::make(origin_line, oss.str(), ERR_DUPLICATE_SERVER_PORT));
+    return ERR(Void, ConfigError::make(origin_line, oss.str(),
+                                       ERR_DUPLICATE_SERVER_PORT));
   }
   count_line += server.get_count_line();
   serverconfig_map[key] = server;

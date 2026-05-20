@@ -1,8 +1,10 @@
 #ifndef FILE_DESCRIPTOR_H
 #define FILE_DESCRIPTOR_H
 
-#include "result.h"
+#include "Result.hpp"
 #include <sys/socket.h>
+
+#define BUFFER_SIZE 42
 
 class Event;
 

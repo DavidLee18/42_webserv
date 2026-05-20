@@ -3,7 +3,6 @@
 
 #include "../utils.hpp"
 
-
 enum ConfigErrorCode {
   ERR_AUTH_FILE_NOT_FOUND,
   ERR_CGI_SCRIPT_MISSING_DOLLAR_PREFIX,
@@ -83,14 +82,11 @@ private:
 
 public:
   static std::string make(const std::string &line, ConfigErrorCode code);
-  static std::string make(const std::string &line,
-                          const std::string &target,
+  static std::string make(const std::string &line, const std::string &target,
                           ConfigErrorCode code);
 
-  static std::string make(const std::string &line,
-                          const std::string &message);
-  static std::string make(const std::string &line,
-                          const std::string &target,
+  static std::string make(const std::string &line, const std::string &message);
+  static std::string make(const std::string &line, const std::string &target,
                           const std::string &message);
 
   static std::string file_descriptor(const std::string &reason);
