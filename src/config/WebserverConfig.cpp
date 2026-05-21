@@ -30,12 +30,7 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
       break;
     else if (line == "\n")
       continue;
-
-    origin_line = utils::remove_char(line, '\n');
-    err_meg = configutils::get_indent_whitespace_error(origin_line, 0);
-    if (err_meg != "")
-      return ERR(Void, err_meg);
-    line = utils::trim_whitespace(origin_line);
+    TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 0))
 
     if (line == "types =" || line == "types=") {
       if (is_type_parse == true)
@@ -186,12 +181,7 @@ Result<Void> WebserverConfig::parse_types_block(FileDescriptor &file) {
     TRY(Void, std::string, line, file.read_file_line())
     if (line == "\n" || line == "")
       break;
-
-    origin_line = utils::remove_char(line, '\n');
-    std::string err = configutils::get_indent_whitespace_error(origin_line, 1);
-    if (err != "")
-      return ERR(Void, err);
-    line = utils::trim_whitespace(origin_line);
+    TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 1))
 
     TRY_(Void, Void, parse_type_mapping(line, keys, value))
 

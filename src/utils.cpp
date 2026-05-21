@@ -271,6 +271,16 @@ std::string configutils::check_html_file(const std::string &path, char **envp) {
   return "";
 }
 
+Result<Void> configutils::prepare_config_line(std::string &origin_line, std::string &line, size_t level) {
+  origin_line = utils::remove_char(line, '\n');
+  std::string err_meg = configutils::get_indent_whitespace_error(origin_line, level);
+  if (err_meg != "")
+    return ERR(Void, err_meg);
+  line = utils::trim_whitespace(origin_line);
+  return OKV;
+}
+
+
 unsigned char utils::to_upper(const unsigned char c) {
   return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
 }

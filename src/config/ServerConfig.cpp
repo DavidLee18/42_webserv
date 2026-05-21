@@ -35,12 +35,7 @@ Result<Void> ServerConfig::parse_server_block(FileDescriptor &fd, char **envp) {
     } else if (line == "")
       break;
     end_flag = 0;
-
-    origin_line = utils::remove_char(line, '\n');
-    err_meg = configutils::get_indent_whitespace_error(origin_line, 1);
-    if (err_meg != "")
-      return ERR(Void, err_meg);
-    line = utils::trim_whitespace(origin_line);
+    TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 1))
 
     if (is_header_block(line)) {
       if (is_route_parse == true)
@@ -141,12 +136,7 @@ Result<Void> ServerConfig::parse_header_entry(FileDescriptor &fd,
       end_flag += 1;
       break;
     }
-
-    origin_line = utils::remove_char(file_line, '\n');
-    std::string err = configutils::get_indent_whitespace_error(origin_line, 2);
-    if (err != "")
-      return ERR(Void, err);
-    temp = origin_line;
+    TRY_(Void, Void, configutils::prepare_config_line(origin_line, file_line, 2))
 
     if (!utils::is_header_value(temp))
       return ERR(
@@ -570,12 +560,7 @@ Result<Void> ServerConfig::parse_route_rule_block(const std::string &route_line,
       end_flag += 1;
       break;
     }
-
-    origin_line = utils::remove_char(line, '\n');
-    std::string err = configutils::get_indent_whitespace_error(origin_line, 2);
-    line = utils::trim_whitespace(origin_line);
-    if (err != "")
-      return ERR(Void, err);
+    TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 2))
 
     TRY_(Void, Void, apply_route_rule_entry(line, createdIndexes, envp))
   }
