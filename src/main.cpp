@@ -22,7 +22,6 @@ int main(const int argc, char *argv[], char **envp) {
   PANIC(result_config)
 
   const WebserverConfig &config = result_config.value();
-  std::map<unsigned int, ServerConfig> temp = config.get_serverconfig_map();
   Server server(config);
   const Result<Void> init_result = server.init();
   PANIC(init_result)

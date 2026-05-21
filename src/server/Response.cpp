@@ -19,7 +19,7 @@ static void write_response_head(std::ostream &os, const Response &resp,
     os << prefix << "Location: " << resp.redir << utils::crlf;
   os << prefix << "Content-Type: " << resp.content_type << utils::crlf;
   if (!resp.cookie.empty())
-    os << prefix << "Set-Cookie:" << resp.cookie << utils::crlf;
+    os << prefix << "Set-Cookie: " << resp.cookie << utils::crlf;
   for (std::map<std::string, std::string>::const_iterator it =
            resp.headers.begin();
        it != resp.headers.end(); ++it)

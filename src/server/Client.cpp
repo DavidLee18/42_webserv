@@ -103,11 +103,9 @@ Result<Void> Request::parse_body_or_chunked(std::stringstream &ss,
     if (pos == std::streampos(-1)) {
       return ERR(Void, "streampos error");
     }
-    req->body = buff.substr(static_cast<size_t>(pos));
-
-    if (req->body.empty() ||
-        req->body.size() == static_cast<size_t>(req->content_length))
-      req->remnants.clear();
+    req->body = buff.substr(static_cast<size_t>(pos),
+                            static_cast<size_t>(req->content_length));
+    req->remnants.clear();
     buff.erase(0, total_request_len);
     return OKV;
   } else {
