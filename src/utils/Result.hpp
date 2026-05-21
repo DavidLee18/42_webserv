@@ -114,12 +114,20 @@ public:
 
 #define ERR(t, e) (Result<t>(e))
 
-#define TRY(t, rt, v, r)                                                       \
+#define TRY(t, rt, v, r)   {                                                    \
   Result<rt> _result = r;                                                      \
   if (!_result.error().empty()) {                                              \
     return ERR(t, _result.error());                                            \
   } else {                                                                     \
     ((v)) = _result.value();                                                   \
+  } }
+
+#define TRY_(t, rt, r)                                                         \
+  {                                                                            \
+    Result<rt> _result = r;                                                    \
+    if (!_result.error().empty()) {                                            \
+      return ERR(t, _result.error());                                          \
+    }                                                                          \
   }
 
 #define TRYF(t, rt, v, r, f)                                                   \

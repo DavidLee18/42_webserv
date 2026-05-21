@@ -22,17 +22,19 @@ private:
 
   static bool is_valid_timeout(const std::string &line);
   Result<Void> parse_cgi_block(FileDescriptor &fd, std::string line,
-                              char **envp);
+                               char **envp);
   Result<Void> parse_env_entry(const std::string &line,
-                              std::map<std::string, std::string> &env);
+                               std::map<std::string, std::string> &env);
   Result<Void> parse_routerule_cgi_executable(
       const std::string &line, std::string &executable,
       std::map<std::string, std::string> &env, char **envp);
 
-  Result<Void> matches_routerule_cgi_syntax(const std::string &line, char **envp);
+  Result<Void> matches_routerule_cgi_syntax(const std::string &line,
+                                            char **envp);
   Result<Void> parse_cgi_params(FileDescriptor &fd);
-  static Result<Void> is_executable_file(const std::string &origin_line, const std::string &path,
-                                        bool allow_absolute_path, char **envp);
+  static Result<Void> is_executable_file(const std::string &origin_line,
+                                         const std::string &path,
+                                         bool allow_absolute_path, char **envp);
 
 public:
   RouteRule_CGI()

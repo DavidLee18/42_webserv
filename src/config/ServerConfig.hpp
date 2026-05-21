@@ -54,13 +54,13 @@ private:
   Result<Void> parse_header_entry(FileDescriptor &fd, const std::string &line);
   Result<Void> parse_max_body_size(std::string line, unsigned int &maxbody);
   Result<Void> parse_route_rule_block(const std::string &method_line,
-                              FileDescriptor &fd, char **envp);
+                                      FileDescriptor &fd, char **envp);
   Result<Void> create_route_rules(const std::vector<std::string> &data,
-                          const std::vector<Request::Method> &mets,
-                          std::vector<std::size_t> &createdIndexes);
+                                  const std::vector<Request::Method> &mets,
+                                  std::vector<std::size_t> &createdIndexes);
   Result<Void> apply_route_rule_entry(const std::string &line,
-                              std::vector<std::size_t> &route_indexes,
-                              char **envp);
+                                      std::vector<std::size_t> &route_indexes,
+                                      char **envp);
   bool is_header_block(const std::string &line);
   bool is_valid_server_response_time(const std::string &line);
   bool is_path_pattern_segment(const std::string &line);
@@ -80,14 +80,9 @@ public:
   ServerConfig(FileDescriptor &, std::map<std::string, std::string> &global_cgi,
                char **envp);
   ServerConfig()
-      : header(), server_response_time_ms(3000), routes(), R_CGI(), file_extension(),
-        end_flag(0), err_meg(), origin_line(),  count_line(0) {}
-  RouteRule const *find_route(Request::Method method,
-                              const std::string &path) const;
-  RouteRule_CGI const *find_route_cgi(Request::Method method,
-                                      const std::string &path) const;
-  std::string get_rewritten_path(Request::Method method,
-                                 const std::string &path) const;
+      : header(), server_response_time_ms(3000), routes(), R_CGI(),
+        file_extension(), end_flag(0), err_meg(), origin_line(), count_line(0) {
+  }
 
   const std::map<std::string, std::string> &get_header(void) const {
     return header;
@@ -106,6 +101,12 @@ public:
   apply_err_page_entry(const std::string &origin_line, const std::string &line,
                        std::map<unsigned int, std::string> &err_map,
                        char **envp);
+  Result<RouteRule> find_route(Request::Method method,
+                               const std::string &path) const;
+  Result<RouteRule_CGI> find_route_cgi(Request::Method method,
+                                       const std::string &path) const;
+  Result<std::string> get_rewritten_path(Request::Method method,
+                                         const std::string &path) const;
 };
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data);
