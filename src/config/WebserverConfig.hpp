@@ -13,7 +13,6 @@ private:
   std::map<std::string, std::string> global_cgi;
   std::map<std::string, std::string> type_map;
   std::map<unsigned int, ServerConfig> serverconfig_map;
-  std::map<unsigned int, std::string> default_err_page;
 
 private:
   std::string err_meg;
@@ -42,7 +41,6 @@ public:
       this->global_cgi = other.global_cgi;
       this->type_map = other.type_map;
       this->serverconfig_map = other.serverconfig_map;
-      this->default_err_page = other.default_err_page;
       this->count_line = other.count_line;
     }
     return *this;
@@ -57,9 +55,6 @@ public:
   }
   const std::map<unsigned int, ServerConfig> &get_serverconfig_map(void) const {
     return serverconfig_map;
-  }
-  const std::map<unsigned int, std::string> &get_default_err_page(void) const {
-    return default_err_page;
   }
   static Result<WebserverConfig> parse(FileDescriptor &file, char **envp) {
     WebserverConfig temp(file, envp);

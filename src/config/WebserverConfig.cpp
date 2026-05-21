@@ -22,7 +22,6 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
   bool is_type_parse = false;
   bool is_cgi_parse = false;
   bool is_server_parse = false;
-  bool is_err_page_parse = false;
 
   while (true) {
     count_line++;
@@ -68,19 +67,6 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
            RouteRule_CGI::parse_global_cgi_block(file, global_cgi, count_line,
                                                  envp))
       is_cgi_parse = true;
-    } else if (line[0] == '!') {
-      if (is_err_page_parse == true)
-        return ERR(Void,
-                   ConfigError::make(origin_line,
-                                     ERR_DUPLICATE_DEFAULT_ERROR_PAGE_BLOCK));
-      else if (is_server_parse == true)
-        return ERR(Void, ConfigError::make(origin_line,
-                                           ERR_INVALID_GLOBAL_BLOCK_LOCATION));
-
-      TRY_(Void, Void,
-           ServerConfig::apply_err_page_entry(origin_line, line,
-                                              default_err_page, envp))
-      is_err_page_parse = true;
     } else
       return ERR(Void,
                  ConfigError::make(origin_line, ERR_INVALID_TOP_LEVEL_FORMAT));
@@ -294,7 +280,6 @@ std::string WebserverConfig::parse_server_port(const std::string &key) {
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.get_type_map();
   const std::map<std::string, std::string> &cgi = data.get_global_cgi();
-  const std::map<unsigned int, std::string> &d_e = data.get_default_err_page();
   std::map<std::string, std::string>::const_iterator ty_it;
   std::map<std::string, std::string>::const_iterator cgi_it;
 
@@ -316,17 +301,7 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   os << "\n\n\n========================================================"
      << std::endl;
 
-  os << "<<DefaultErrPage>>\n" << std::endl;
-
-  std::map<unsigned int, std::string>::const_iterator er_it;
-
-  os << "\nerr_page\n";
-  for (er_it = d_e.begin(); er_it != d_e.end(); ++er_it) {
-    os << utils::debug << "\terr_page key: " << er_it->first
-       << ", err_page value: " << er_it->second << std::endl;
-  }
-  os << utils::debug
-     << "========================================================" << std::endl;
+  os << "========================================================" << std::endl;
   os << "\n\n\n"
      << utils::debug
      << "========================================================" << std::endl;
