@@ -41,6 +41,7 @@ Result<Void> ResponseHandlers::register_cgi(
 Response ResponseHandlers::delete_method_response(const Target &target, Response response,
                                          const ServerConfig *config,
                                          const RouteRule *rule, char **envp) {
+  std::cout << utils::debug << "target path: " << target.path << std::endl;
   if (unlink(target.path.c_str()) == 0) {
     response.status_code = Response::NO_CONTENT;
     return response;
@@ -64,24 +65,15 @@ Response ResponseHandlers::post_method_response(const Target &target, Response r
                                        const RouteRule *rule,
                                        const Request *request, Session *session,
                                        char **envp) {
-  std::cout << utils::debug << "target path: " << target.path << std::endl;
-  std::cout << utils::debug << "POST request path: " << request->get_path()
-            << std::endl;
-  std::cout << utils::debug << "rewritten path: "
-            << client->config->get_rewritten_path(request->get_method(),
-                                                  request->get_path())
-            << std::endl;
   const ServerConfig *config = client->config;
 
+  std::cout << utils::debug << "target path: " << target.path << std::endl;
   if (request->get_path() == rule->path.to_string() &&
       rule->op == LOGIN_USING) {
     const std::string &body = request->get_body();
 
     std::string auth_target =
         utils::get_env("PWD", envp) + rule->root.to_string();
-    std::cout << "\n"
-              << utils::debug << "auth info: " << auth_target << "\n"
-              << std::endl;
     std::ifstream file(auth_target.c_str());
     if (file.is_open()) {
       std::string pw;
@@ -462,9 +454,14 @@ Response ResponseHandlers::http_response(
     }
   }
 
-  if (response.content_type.empty())
-    response.content_type =
-        get_string_from_map(mime_type, ResponseUtils::find_file_type(target.path));
+  if (response.content_type.empty()) {
+    std::string ext = ResponseUtils::find_file_type(target.path);
+    std::string mapped = get_string_from_map(mime_type, ext);
+    if (!mapped.empty())
+      response.content_type = mapped;
+    else
+      response.content_type = ResponseUtils::get_mime_type_for_extension(ext);
+  }
   if (request->get_path() == "/api/session-info") {
     if (request->get_method() == Request::GET) {
       response.content_type = "application/json";

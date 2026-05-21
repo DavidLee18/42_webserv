@@ -41,15 +41,17 @@
       var y = e.offsetY;
       var rotateY = -1/5 * x + 20;
       var rotateX = 4/30 * y - 20;
+  overlay.style.backgroundPosition = (x/5 + y/5) + "%";
+  overlay.style.opacity = (x/200).toString();
+  overlay.style.filter = "brightness(1.2)";
 
-      overlay.style = `background-position : ${x/5 + y/5}%; filter : opacity(${x/200}) brightness(1.2)`;
-
-      container.style = `transform : perspective(350px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+  container.style.transform = `perspective(350px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
     });
 
     container.addEventListener('mouseout', function(){
-      overlay.style = 'filter : opacity(0)';
-      container.style = 'transform : perspective(350px) rotateY(0deg) rotateX(0deg)';
+  overlay.style.opacity = '0';
+  overlay.style.filter = '';
+  container.style.transform = 'perspective(350px) rotateY(0deg) rotateX(0deg)';
     });
   });
 
@@ -145,12 +147,14 @@
     rgba(255, 219, 112, 0.8) 45%,
     rgba(132, 50, 255 ,0.6) 50%,
     transparent 54%);
-    filter: brightness(1.1) opacity(0.8);
+  filter: brightness(1.1);
+  opacity: 0;
     mix-blend-mode: color-dodge;
     background-size: 150% 150%;
     background-position: 100%;
-    transition: all 0.1s;
+  transition: all 0.1s;
     border-radius: 10px;
+  pointer-events: none;
   }
   .pikachu {
     width: 220px; height: 310px;

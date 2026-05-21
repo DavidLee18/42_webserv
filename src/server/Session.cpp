@@ -11,7 +11,8 @@ Result<std::string> Session::generate_session_id() {
 
   std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
   if (!urandom.is_open()) {
-    return ERR(std::string, "cannot open /dev/urandom for session ID generation");
+    return ERR(std::string,
+               "cannot open /dev/urandom for session ID generation");
   }
   urandom.read(reinterpret_cast<char *>(random_bytes), 16);
   if (urandom.fail() || urandom.gcount() != 16) {
@@ -34,9 +35,9 @@ Result<std::string> Session::generate_session_id() {
 }
 
 Result<std::string> Session::create_session(const std::string &user_id,
-                                             const std::string &client_ip) {
+                                            const std::string &client_ip) {
   std::string session_id;
-  TRY(std::string, std::string, session_id, generate_session_id());
+  TRY(std::string, std::string, session_id, generate_session_id())
 
   SessionData new_session;
   new_session.user_id = user_id;

@@ -29,6 +29,8 @@
 #include <unistd.h>
 #include <utility>
 
+#include "../utils/Result.hpp"
+
 #define IDLE_TIMEOUT 300
 #define NETWORK_BUFFER_SIZE 4096
 #define CHUNKED_PENDING_TIMEOUT 3
@@ -60,14 +62,15 @@ class Server {
   std::map<const FileDescriptor *, ClientSession> clients;
   Session sessions;
 
-  void new_connection(const FileDescriptor *server_fd);
-  void disconnect(const FileDescriptor *client_fd);
-  void client_read(const FileDescriptor *client_fd, char **envp);
-  void client_write(const FileDescriptor *client_fd);
-  void dispatch_request(const FileDescriptor *client_fd, ClientSession &client,
-                        char **envp);
-  void queue_response(const FileDescriptor *client_fd, const Response &response);
-  void reap_cgi(CgiDelegate *cgi);
+  Result<Void> new_connection(const FileDescriptor *server_fd);
+  Result<Void> disconnect(const FileDescriptor *client_fd);
+  Result<Void> client_read(const FileDescriptor *client_fd, char **envp);
+  Result<Void> client_write(const FileDescriptor *client_fd);
+  Result<Void> dispatch_request(const FileDescriptor *client_fd,
+                                ClientSession &client, char **envp);
+  Result<Void> queue_response(const FileDescriptor *client_fd,
+                              const Response &response);
+  Result<Void> reap_cgi(CgiDelegate *cgi);
 
 public:
   explicit Server(const WebserverConfig &config)

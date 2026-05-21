@@ -62,6 +62,8 @@ std::string ResponseUtils::get_mime_type_for_extension(const std::string &ext) {
     return "image/png";
   else if (ext == "gif")
     return "image/gif";
+  else if (ext == "webp")
+    return "image/webp";
   return "text/html";
 }
 

@@ -24,8 +24,8 @@ Response ResponseErrors::error_response(const ServerConfig *config,
     Response response;
     response.status_code = error_code;
     response.headers = config->get_header();
-    response.content_type =
-        ResponseUtils::get_mime_type_for_extension(ResponseUtils::find_file_type(err_page));
+    std::string ext = ResponseUtils::find_file_type(err_page);
+    response.content_type = ResponseUtils::get_mime_type_for_extension(ext);
     std::ostringstream ss;
     ss << file.rdbuf();
     response.body = ss.str();
