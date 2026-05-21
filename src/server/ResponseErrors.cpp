@@ -46,8 +46,12 @@ Target ResponseErrors::resolve_target(const RouteRule *rule,
     return target;
   }
 
-  const std::string root =
-      config->get_rewritten_path(request->get_method(), request->get_path());
+  Result<std::string> rewritten = config->get_rewritten_path(request->get_method(), request->get_path());
+  if (!rewritten.has_value()) {
+    target.type = Response::NOT_FOUND;
+    return target;
+  }
+  const std::string root = rewritten.value();
 
   target.path = utils::get_env("PWD", envp);
   Result<int> type_result = ResponseUtils::check_path_type(target.path + root);

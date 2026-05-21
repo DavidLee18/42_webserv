@@ -5,8 +5,16 @@
 
 Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
                                       ClientSession &client, char **envp) {
-  RouteRule_CGI const *cgi_path = client.config->find_route_cgi(
+  Result<RouteRule_CGI> cgi_path_res = client.config->find_route_cgi(
       client.req->get_method(), client.req->get_path());
+  const RouteRule_CGI *cgi_path = NULL;
+  if (cgi_path_res.has_value()) {
+    // Note: We can't store a reference to a temporary, so we store as pointer
+    // This is safe because cgi_path_res.value() is a copy
+    static RouteRule_CGI cgi_path_copy;
+    cgi_path_copy = cgi_path_res.value();
+    cgi_path = &cgi_path_copy;
+  }
 
   // Log request details
   Result<size_t> content_length = client.req->get_content_length();

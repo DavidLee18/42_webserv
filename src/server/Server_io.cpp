@@ -76,10 +76,14 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
 
       client.req = req_.value();
       const Result<size_t> req_cl = client.req->get_content_length();
-      const RouteRule *rule = client.config->find_route(
+      RouteRule rule;
+      Result<RouteRule> rule_res = client.config->find_route(
           client.req->get_method(), client.req->get_path());
-      if (rule != NULL && req_cl.has_value() &&
-          req_cl.value() > static_cast<size_t>(rule->max_body_KB) * 1024) {
+      if (!rule_res.has_value())
+        return OK(Void, VOID);
+      rule = rule_res.value();
+      if (req_cl.has_value() &&
+          req_cl.value() > static_cast<size_t>(rule.max_body_KB) * 1024) {
         Response resp(
             DefaultError::default_err_response(Response::PAYLOAD_TOO_LARGE));
         resp.headers = client.config->get_header();
@@ -125,10 +129,25 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
         return OK(Void, VOID);
       }
       const Result<size_t> content_len = client.req->get_content_length();
-      const RouteRule *const rule = client.config->find_route(
+      Result<RouteRule> rule_res = client.config->find_route(
           client.req->get_method(), client.req->get_path());
-      if (content_len.has_value() && rule != NULL &&
-          (static_cast<size_t>(rule->max_body_KB) * 1024 <
+      if (!rule_res.has_value()) {
+        Response resp(
+            DefaultError::default_err_response(Response::NOT_FOUND));
+        resp.headers = client.config->get_header();
+        resp.print_simple(std::cout);
+        {
+          Result<Void> qr = queue_response(client_fd, resp);
+          if (!qr.has_value())
+            return ERR(Void, qr.error());
+        }
+        delete client.req;
+        client.req = NULL;
+        return OK(Void, VOID);
+      }
+      const RouteRule rule = rule_res.value();
+      if (content_len.has_value() &&
+          (static_cast<size_t>(rule.max_body_KB) * 1024 <
                content_len.value() ||
            (client.req->is_partial() &&
             content_len.value() <= client.req->get_body().size()) ||
@@ -220,10 +239,6 @@ Result<Void> Server::client_write(const FileDescriptor *client_fd) {
       if (read_bytes > 0) {
         client.out_file_offset += static_cast<size_t>(read_bytes);
         client.out_buff.append(buf.data(), static_cast<size_t>(read_bytes));
-        std::cout << utils::info << "stream: read_bytes=" << read_bytes
-                  << " offset=" << client.out_file_offset
-                  << " out_buff=" << client.out_buff.size()
-                  << " path=" << client.out_file_path << std::endl;
         // Try sending what we just read
         while (!client.out_buff.empty()) {
           Result<ssize_t> send_res = client_fd->sock_send(
@@ -234,9 +249,6 @@ Result<Void> Server::client_write(const FileDescriptor *client_fd) {
             break;
           }
           const ssize_t bytes = send_res.value();
-          std::cout << utils::info << "stream: sent_bytes=" << bytes
-                    << " remaining_before=" << client.out_buff.size()
-                    << std::endl;
           if (bytes == 0)
             break;
           client.out_buff.erase(0, static_cast<std::size_t>(bytes));

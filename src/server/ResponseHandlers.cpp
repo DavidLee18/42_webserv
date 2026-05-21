@@ -313,8 +313,12 @@ Response ResponseHandlers::get_method_response(Target target, Response response,
   std::cout << utils::debug << "target path: " << target.path << std::endl;
   if (rule->op == REDIRECT) {
     target.type = Response::MOVED_PERMANENTLY;
-    response.redir =
-        config->get_rewritten_path(request->get_method(), request->get_path());
+    Result<std::string> rewritten = config->get_rewritten_path(request->get_method(), request->get_path());
+    if (rewritten.has_value()) {
+      response.redir = rewritten.value();
+    } else {
+      response.redir = "/";
+    }
     response.status_code = Response::MOVED_PERMANENTLY;
     response.content_type = "text/html";
     response.body = "<html><body><h1>301 Moved Permanently</h1></body></html>";
@@ -393,13 +397,16 @@ Response ResponseHandlers::http_response(
     return DefaultError::default_err_response(Response::INTERNAL_SERVER_ERR);
 
   Response response;
-  const RouteRule *rule =
+  Result<RouteRule> rule_res =
       config->find_route(request->get_method(), request->get_path());
-  if (rule == NULL) {
+  if (!rule_res.has_value()) {
     response = DefaultError::default_err_response(Response::NOT_FOUND);
     response.headers = config->get_header();
     return response;
-  } else if (request->get_path().find("../") != std::string::npos) {
+  }
+  RouteRule rule_copy = rule_res.value();
+  const RouteRule *rule = &rule_copy;
+  if (request->get_path().find("../") != std::string::npos) {
     std::cerr << utils::error << "request path: " << request->get_path()
               << std::endl;
     response = DefaultError::default_err_response(Response::BAD_REQUEST);
