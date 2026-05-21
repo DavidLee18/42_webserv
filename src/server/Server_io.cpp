@@ -132,8 +132,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
       Result<RouteRule> rule_res = client.config->find_route(
           client.req->get_method(), client.req->get_path());
       if (!rule_res.has_value()) {
-        Response resp(
-            DefaultError::default_err_response(Response::NOT_FOUND));
+        Response resp(DefaultError::default_err_response(Response::NOT_FOUND));
         resp.headers = client.config->get_header();
         resp.print_simple(std::cout);
         {
@@ -147,8 +146,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
       }
       const RouteRule rule = rule_res.value();
       if (content_len.has_value() &&
-          (static_cast<size_t>(rule.max_body_KB) * 1024 <
-               content_len.value() ||
+          (static_cast<size_t>(rule.max_body_KB) * 1024 < content_len.value() ||
            (client.req->is_partial() &&
             content_len.value() <= client.req->get_body().size()) ||
            (!client.req->is_partial() &&

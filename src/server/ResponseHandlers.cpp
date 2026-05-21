@@ -313,7 +313,8 @@ Response ResponseHandlers::get_method_response(Target target, Response response,
   std::cout << utils::debug << "target path: " << target.path << std::endl;
   if (rule->op == REDIRECT) {
     target.type = Response::MOVED_PERMANENTLY;
-    Result<std::string> rewritten = config->get_rewritten_path(request->get_method(), request->get_path());
+    Result<std::string> rewritten =
+        config->get_rewritten_path(request->get_method(), request->get_path());
     if (rewritten.has_value()) {
       response.redir = rewritten.value();
     } else {
