@@ -243,6 +243,7 @@ This project also leveraged Google Gemini as a supplementary learning and develo
 * **HTTP Protocol & Architecture:** Clarified RFC standards, request/response structures, and state management to design a compliant web server.
 * **I/O Multiplexing (epoll):** Explored the core mechanics of Linux `epoll` (including interest lists, readiness events, and edge-triggered vs. level-triggered behaviors) to implement an efficient event loop.
 * **Test Case Generation:** Assisted in formulating diverse and rigorous edge-case scenarios to validate the server's stability, error handling, and performance under high concurrency.
+* **HTML/UI Design:** Assisted in scaffolding clean, responsive HTML/CSS templates for the server's default landing and error pages.
 
 No source file in `src/` was machine-generated. Every line of submitted
 code was authored or transcribed manually by one of the three named
