@@ -2,7 +2,7 @@
 #define RESPONSE_HANDLERS_HPP
 
 #include "../config/ServerConfig.hpp"
-#include "../utils/Errors.hpp"
+#include "../core/Errors.hpp"
 #include "Response.hpp"
 
 class EPoll;

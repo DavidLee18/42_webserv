@@ -77,11 +77,8 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
       client.req = req_.value();
       const Result<size_t> req_cl = client.req->get_content_length();
       RouteRule rule;
-      Result<RouteRule> rule_res = client.config->find_route(
-          client.req->get_method(), client.req->get_path());
-      if (!rule_res.has_value())
-        return OK(Void, VOID);
-      rule = rule_res.value();
+      TRY(Void, RouteRule, rule, client.config->find_route(
+          client.req->get_method(), client.req->get_path()))
       if (req_cl.has_value() &&
           req_cl.value() > static_cast<size_t>(rule.max_body_KB) * 1024) {
         Response resp(
@@ -119,11 +116,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
             DefaultError::default_err_response(Response::BAD_REQUEST));
         resp.headers = client.config->get_header();
         resp.print_simple(std::cout);
-        {
-          Result<Void> qr = queue_response(client_fd, resp);
-          if (!qr.has_value())
-            return ERR(Void, qr.error());
-        }
+        TRY_(Void, Void, queue_response(client_fd, resp))
         delete client.req;
         client.req = NULL;
         return OK(Void, VOID);
@@ -135,11 +128,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
         Response resp(DefaultError::default_err_response(Response::NOT_FOUND));
         resp.headers = client.config->get_header();
         resp.print_simple(std::cout);
-        {
-          Result<Void> qr = queue_response(client_fd, resp);
-          if (!qr.has_value())
-            return ERR(Void, qr.error());
-        }
+        TRY_(Void, Void, queue_response(client_fd, resp))
         delete client.req;
         client.req = NULL;
         return OK(Void, VOID);
@@ -155,11 +144,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
             DefaultError::default_err_response(Response::PAYLOAD_TOO_LARGE));
         resp.headers = client.config->get_header();
         resp.print_simple(std::cout);
-        {
-          Result<Void> qr = queue_response(client_fd, resp);
-          if (!qr.has_value())
-            return ERR(Void, qr.error());
-        }
+        TRY_(Void, Void, queue_response(client_fd, resp))
         delete client.req;
         client.req = NULL;
         return OK(Void, VOID);
@@ -174,11 +159,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
       continue;
     }
   }
-  {
-    Result<Void> cw = client_write(client_fd);
-    if (!cw.has_value())
-      return ERR(Void, cw.error());
-  }
+  TRY_(Void, Void, client_write(client_fd))
   // EPOLLIN | EPOLLOUT
   return OK(Void, VOID);
 }

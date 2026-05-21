@@ -133,7 +133,7 @@ public:
 #define TRYF(t, rt, v, r, f)                                                   \
   Result<rt> _result = r;                                                      \
   if (!_result.error().empty()) {                                              \
-    (f) return ERR(t, _result.error());                                        \
+    (f); return ERR(t, _result.error());                                       \
   } else {                                                                     \
     (v) = _result.value();                                                     \
   }

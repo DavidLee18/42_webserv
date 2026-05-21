@@ -35,12 +35,10 @@ Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
 
   // Dispatch to CGI if applicable
   if (cgi_path != NULL) {
-    Result<Void> del_ = ResponseHandlers::register_cgi(
-        *client.req, *cgi_path, &epoll, config.get_global_cgi(), cgis,
-        client_fd, envp);
-    if (!del_.has_value()) {
-      return ERR(Void, std::string("CGI registration failed: ") + del_.error());
-    }
+    TRY_(Void, Void,
+         ResponseHandlers::register_cgi(*client.req, *cgi_path, &epoll,
+                                        config.get_global_cgi(), cgis,
+                                        client_fd, envp);)
     delete client.req;
     client.req = NULL;
     return OK(Void, VOID);
@@ -54,9 +52,7 @@ Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
   delete client.req;
   client.req = NULL;
 
-  Result<Void> qr = queue_response(client_fd, http);
-  if (!qr.has_value())
-    return ERR(Void, qr.error());
+  TRY_(Void, Void, queue_response(client_fd, http))
   return OK(Void, VOID);
 }
 

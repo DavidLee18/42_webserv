@@ -3,8 +3,8 @@
 
 #include "../cgi_1_1/CgiDelegate.hpp"
 #include "../config/ServerConfig.hpp"
-#include "../utils/Errors.hpp"
-#include "../utils/utils.hpp"
+#include "../core/Errors.hpp"
+#include "../core/utils.hpp"
 
 #include "Client.hpp"
 #include "Session.hpp"

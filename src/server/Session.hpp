@@ -1,7 +1,7 @@
 #ifndef SESSION_HPP
 #define SESSION_HPP
 
-#include "../utils/Result.hpp"
+#include "../core/Result.hpp"
 
 #include <ctime>
 #include <map>

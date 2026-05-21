@@ -23,6 +23,7 @@ public:
   const static std::string addr_loop;
   const static std::string name_too_long;
   const static std::string not_found;
+  const static std::string forbidden;
   const static std::string readonly_filesys;
   const static std::string try_again;
   const static std::string conn_aborted;

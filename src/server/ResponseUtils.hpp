@@ -2,7 +2,7 @@
 #define RESPONSE_UTILS_HPP
 
 #include "../config/ServerConfig.hpp"
-#include "../utils/Errors.hpp"
+#include "../core/Errors.hpp"
 #include "Response.hpp"
 #include <map>
 #include <string>

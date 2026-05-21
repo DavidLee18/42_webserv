@@ -1,5 +1,5 @@
 #include "ResponseUtils.hpp"
-#include "../utils/utils.hpp"
+#include "../core/utils.hpp"
 #include <cerrno>
 #include <cstring>
 #include <ctime>
@@ -93,11 +93,11 @@ Result<int> ResponseUtils::check_path_type(const std::string &path) {
   }
   if (S_ISREG(info.st_mode)) {
     if (path.rfind(".cgi") == path.length() - 4) {
-      return ERR(int, "CGI files cannot be directly accessed");
+      return ERR(int, Errors::forbidden);
     }
     return OK(int, IS_FILE);
   }
-  return ERR(int, "path is neither file nor directory");
+  return ERR(int, Errors::bad_request);
 }
 
 Result<std::string> ResponseUtils::compute_etag(const std::string &path) {

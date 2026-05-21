@@ -124,10 +124,9 @@ Result<Void> Request::parse_body_or_chunked(std::stringstream &ss,
           (crlf_zero == std::string::npos) ? std::string::npos : crlf_zero + 2;
     }
     if (chunk_end != std::string::npos) {
-      const Result<size_t> unchunked = req->unchunk(chunk_end);
-      if (!unchunked.has_value())
-        return ERR(Void, Errors::bad_request);
-      buff.erase(0, static_cast<size_t>(body_start) + unchunked.value());
+      size_t unchunked;
+      TRY(Void, size_t, unchunked, req->unchunk(chunk_end))
+      buff.erase(0, static_cast<size_t>(body_start) + unchunked);
     } else {
       const size_t clrf_pos = req->remnants.find("\r\n");
       if (clrf_pos != std::string::npos) { // first chunk arrived
@@ -261,25 +260,16 @@ Result<Request *> Request::from_buff(std::string &buff) {
   std::string req_path;
   std::string req_version;
   // 1. Parse request line
-  {
-    Result<Void> _prl = Request::parse_request_line(
-        ss, method, req_path, req_version, cl_pos, te_pos, line);
-    if (!_prl.error().empty())
-      return ERR(Request *, _prl.error());
-  }
+  TRY_(Request *, Void, Request::parse_request_line(ss, method, req_path, req_version, cl_pos, te_pos, line))
+
   Request *req;
   if (!decode_chunked)
     req = new Request(method, req_path, req_version, content_length);
   else
     req = new Request(method, req_path, req_version);
   // Parse header lines into req->header
-  {
-    Result<Void> _rh = Request::parse_headers(ss, req);
-    if (!_rh.error().empty()) {
-      delete req;
-      return ERR(Request *, _rh.error());
-    }
-  }
+  Void _v;
+  TRYF(Request *, Void, _v, Request::parse_headers(ss, req), delete req)
 
   std::string connection_header =
       get_string_from_map(req->header, "Connection");
@@ -292,11 +282,8 @@ Result<Request *> Request::from_buff(std::string &buff) {
     req->header.erase(req->header.find("Connection"));
 
   req->cookie = get_string_from_map(req->header, "Cookie");
-  Result<Void> _pb = Request::parse_body_or_chunked(ss, buff, req, header_end);
-  if (!_pb.error().empty()) {
-    delete req;
-    return ERR(Request *, _pb.error());
-  }
+  Void _v;
+  TRYF(Request *, Void, _v, Request::parse_body_or_chunked(ss, buff, req, header_end), delete req)
   return OK(Request *, req);
 }
 
@@ -332,9 +319,8 @@ Result<Void> Request::continue_parsing(std::string &buff) {
           (crlf_zero == std::string::npos) ? std::string::npos : crlf_zero + 2;
     }
     if (chunk_end != std::string::npos) {
-      const Result<size_t> unchunked = unchunk(chunk_end);
-      if (!unchunked.has_value())
-        return ERR(Void, Errors::bad_request);
+      size_t unchunked;
+      TRY(Void, size_t, unchunked, unchunk(chunk_end))
     } else {
       const size_t clrf_pos = remnants.find("\r\n");
       if (clrf_pos != std::string::npos) { // first chunk arrived

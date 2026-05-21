@@ -9,8 +9,8 @@
 
 #include "../cgi_1_1/CgiDelegate.hpp"
 #include "../config/WebserverConfig.hpp"
-#include "../utils/EPoll.hpp"
-#include "../utils/Errors.hpp"
+#include "../core/EPoll.hpp"
+#include "../core/Errors.hpp"
 
 #include "Client.hpp"
 #include "Response.hpp"
@@ -29,7 +29,7 @@
 #include <unistd.h>
 #include <utility>
 
-#include "../utils/Result.hpp"
+#include "../core/Result.hpp"
 
 #define IDLE_TIMEOUT 300
 #define NETWORK_BUFFER_SIZE 4096

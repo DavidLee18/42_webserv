@@ -1,6 +1,6 @@
 #include "ResponseHandlers.hpp"
 #include "../cgi_1_1/CgiDelegate.hpp"
-#include "../utils/utils.hpp"
+#include "../core/utils.hpp"
 #include "AutoindexResponse.hpp"
 #include "DefaultError.hpp"
 #include "MultipartParser.hpp"

@@ -1,7 +1,7 @@
 #ifndef CONFIGERROR_HPP
 #define CONFIGERROR_HPP
 
-#include "../utils/utils.hpp"
+#include "../core/utils.hpp"
 
 enum ConfigErrorCode {
   ERR_AUTH_FILE_NOT_FOUND,

@@ -10,6 +10,7 @@ const std::string Errors::out_of_mem = "Out of memory";
 const std::string Errors::epoll_full = "EPoll queue is full";
 const std::string Errors::not_supported = "Operation not supported";
 const std::string Errors::access_denied = "Access denied";
+const std::string Errors::forbidden = "Forbidden";
 const std::string Errors::fd_too_many =
     "File descriptors are too many, reached to a limit";
 const std::string Errors::addr_not_available = "Address not available";

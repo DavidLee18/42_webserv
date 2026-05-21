@@ -55,8 +55,8 @@ Result<std::string> AutoindexResponse::generate(const std::string &real_path,
       continue;
 
     std::string full_item_path = real_path + name;
-    Result<int> type_result = ResponseUtils::check_path_type(full_item_path);
-    const int type = type_result.has_value() ? type_result.value() : PATH_ERROR;
+    int type;
+    TRY(std::string, int, type, ResponseUtils::check_path_type(full_item_path))
     std::string icon = "📄";
 
     if (type == IS_DIR) {

@@ -1,5 +1,5 @@
 #include "ContentType.hpp"
-#include "../utils/Errors.hpp"
+#include "../core/Errors.hpp"
 
 ContentType::ContentType(const ContentType::Type ty, std::string const &subty)
     : type(ty), subtype(subty), params() {}

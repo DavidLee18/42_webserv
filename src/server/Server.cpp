@@ -7,10 +7,7 @@
 
 Result<Void> Server::init() {
   // EPoll init
-  Result<EPoll> epoll_result = EPoll::create(1024);
-  if (!epoll_result.has_value())
-    return ERR(Void, "Epoll create fail: " + epoll_result.error());
-  epoll = epoll_result.value();
+  TRY(Void, EPoll, epoll, EPoll::create(1024))
 
   // Init server socket for every port listed on configuration file
   const std::map<unsigned int, ServerConfig> &servers =
@@ -21,50 +18,35 @@ Result<Void> Server::init() {
     unsigned short port = static_cast<unsigned short>(it->first);
 
     // Init socket
-    Result<FileDescriptor> sock_result = FileDescriptor::socket_new();
-    if (!sock_result.has_value())
-      return ERR(Void, "Socket fail: " + sock_result.error());
-    FileDescriptor server_fd = sock_result.value();
+    FileDescriptor server_fd;
+    TRY(Void, FileDescriptor, server_fd, FileDescriptor::socket_new())
 
     // Non-blocking socket for ET (edge-triggered)
-    Result<Void> nb_result = server_fd.set_nonblocking();
-    if (!nb_result.has_value())
-      return ERR(Void, "set nonblocking fail: " + nb_result.error());
+    TRY_(Void, Void, server_fd.set_nonblocking())
 
-    Result<Void> close_on_exec_result = server_fd.close_on_exec();
-    if (!close_on_exec_result.has_value())
-      return ERR(Void, "close on exec fail: " + close_on_exec_result.error());
+    TRY_(Void, Void, server_fd.close_on_exec())
 
     // Port reusing option
     int opt = 1;
-    Result<Void> reuseaddr_result = server_fd.set_socket_option(
-        SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    if (!reuseaddr_result.has_value())
-      return ERR(Void, "SO_REUSEADDR failed: " + reuseaddr_result.error());
+    TRY_(Void, Void, server_fd.set_socket_option(SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))
 
     // Bind (associate IP and port)
     in_addr addr = {};
     addr.s_addr = htonl(INADDR_ANY); // All IPs
-    Result<Void> bind_result = server_fd.socket_bind(addr, port);
-    if (!bind_result.has_value())
-      return ERR(Void, "Bind fail: " + bind_result.error());
+    TRY_(Void, Void, server_fd.socket_bind(addr, port))
 
     // Listen (max queue length)
-    Result<Void> listen_result = server_fd.socket_listen(SOMAXCONN);
-    if (!listen_result.has_value())
-      return ERR(Void, "Listen fail: " + listen_result.error());
+    TRY_(Void, Void, server_fd.socket_listen(SOMAXCONN))
 
     // EPoll event and option setting
     Event event(NULL, true, false, false, false, false, false); // in=true
     Option op(true, false, false, false);                       // et=true
 
     // Add server socket to EPoll
-    Result<FileDescriptor *> add_result = epoll.add_fd(server_fd, event, op);
-    if (!add_result.has_value())
-      return ERR(Void, "Server register fail: " + add_result.error());
+    FileDescriptor *fd_ptr;
+    TRY(Void, FileDescriptor *, fd_ptr, epoll.add_fd(server_fd, event, op))
 
     // Save pointer to distinguish server sockets from client sockets
-    FileDescriptor *fd_ptr = add_result.value();
     listeners[fd_ptr] = &it->second;
     const unsigned char *octets =
         reinterpret_cast<const unsigned char *>(&addr);
@@ -158,23 +140,13 @@ Result<Void> Server::start(char **envp) {
       if (!resp.keep_alive)
         jt->second.dropping = true;
       jt->second.out_buff = oss.str();
-      {
-        Result<Void> cw = client_write(jt->first);
-        if (!cw.has_value())
-          return ERR(Void, cw.error());
-      }
-      if (clients.find(fd) != clients.end() && jt->second.dropping) {
-        Result<Void> d = disconnect(fd);
-        if (!d.has_value())
-          return ERR(Void, d.error());
-      }
+      TRY_(Void, Void, client_write(jt->first))
+      if (clients.find(fd) != clients.end() && jt->second.dropping)
+        TRY_(Void, Void, disconnect(fd))
     }
 
-    for (size_t i = 0; i < clients_to_disconnect.size(); ++i) {
-      Result<Void> d = disconnect(clients_to_disconnect[i]);
-      if (!d.has_value())
-        return ERR(Void, d.error());
-    }
+    for (size_t i = 0; i < clients_to_disconnect.size(); ++i)
+      TRY_(Void, Void, disconnect(clients_to_disconnect[i]))
 
     if (clients.begin() != clients.end()) {
       const unsigned int session_timeout_ms =
@@ -202,11 +174,7 @@ Result<Void> Server::start(char **envp) {
           if (!resp.keep_alive)
             jt->second.dropping = true;
           jt->second.out_buff = oss.str();
-          {
-            Result<Void> cw = client_write(jt->first);
-            if (!cw.has_value())
-              return ERR(Void, cw.error());
-          }
+          TRY_(Void, Void, client_write(jt->first))
         }
         cgis_to_reap.insert(cgi);
       } else if (it->second.second->wait_or_reap()) {
@@ -251,11 +219,8 @@ Result<Void> Server::start(char **envp) {
       }
     }
     for (std::set<CgiDelegate *>::const_iterator it = cgis_to_reap.begin();
-         it != cgis_to_reap.end(); ++it) {
-      Result<Void> rr = reap_cgi(*it);
-      if (!rr.has_value())
-        return ERR(Void, rr.error());
-    }
+         it != cgis_to_reap.end(); ++it)
+      TRY_(Void, Void, reap_cgi(*it))
 
     Result<Events> events_result = epoll.wait(static_cast<int>(epoll_timeout));
     if (!events_result.has_value()) {
@@ -274,31 +239,16 @@ Result<Void> Server::start(char **envp) {
       const FileDescriptor *fd = event->fd;
       std::cerr << utils::debug << "epoll event on fd=" << fd->_fd << std::endl;
       if (listeners.find(fd) != listeners.end()) {
-        {
-          Result<Void> nc = new_connection(fd);
-          if (!nc.has_value())
-            return ERR(Void, nc.error());
-        }
+          TRY_(Void, Void, new_connection(fd))
       } else if (clients.find(fd) != clients.end()) {
-        if (event->in) {
-          Result<Void> cr = client_read(fd, envp);
-          if (!cr.has_value())
-            return ERR(Void, cr.error());
-        }
-        if (event->out) {
-          Result<Void> cw = client_write(fd);
-          if (!cw.has_value())
-            return ERR(Void, cw.error());
-        }
+        if (event->in)
+          TRY_(Void, Void, client_read(fd, envp))
+        if (event->out)
+          TRY_(Void, Void, client_write(fd))
         if (event->err || event->hup || event->rdhup) {
-          if (clients.find(fd) != clients.end()) {
-            Result<Void> cr = client_read(fd, envp);
-            if (!cr.has_value())
-              return ERR(Void, cr.error());
-          }
-          Result<Void> d = disconnect(fd);
-          if (!d.has_value())
-            return ERR(Void, d.error());
+          if (clients.find(fd) != clients.end())
+            TRY_(Void, Void, client_read(fd, envp))
+          TRY_(Void, Void, disconnect(fd))
         }
       } else {
         std::map<FileDescriptor const *,
@@ -321,9 +271,7 @@ Result<Void> Server::start(char **envp) {
             std::map<FileDescriptor const *, ClientSession>::iterator jt =
                 clients.find(client_fd);
             if (jt == clients.end()) {
-              Result<Void> rr = reap_cgi(cgi);
-              if (!rr.has_value())
-                return ERR(Void, rr.error());
+              TRY_(Void, Void, reap_cgi(cgi))
               continue;
             }
             if (output.has_value()) {
@@ -342,16 +290,8 @@ Result<Void> Server::start(char **envp) {
             if (!resp.keep_alive)
               jt->second.dropping = true;
             jt->second.out_buff = oss.str();
-            {
-              Result<Void> cw = client_write(client_fd);
-              if (!cw.has_value())
-                return ERR(Void, cw.error());
-            }
-            {
-              Result<Void> rr = reap_cgi(cgi);
-              if (!rr.has_value())
-                return ERR(Void, rr.error());
-            }
+            TRY_(Void, Void, client_write(client_fd))
+            TRY_(Void, Void, reap_cgi(cgi))
           }
         }
       }
