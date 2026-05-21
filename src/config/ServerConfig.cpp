@@ -603,7 +603,8 @@ ServerConfig::find_route_cgi(Request::Method method,
   std::string err = "[DEBUG] find_route_cgi: NO ROUTE for ";
 
   for (size_t i = 0; i < R_CGI.size(); ++i) {
-    if (R_CGI[i].get_method() == method &&
+    if (((method == Request::HEAD && R_CGI[i].get_method() == Request::GET) ||
+         R_CGI[i].get_method() == method) &&
         R_CGI[i].get_path().matches(pathPattern))
       return OK(RouteRule_CGI, R_CGI[i]);
   }
