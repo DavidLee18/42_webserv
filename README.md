@@ -205,7 +205,7 @@ adherence and engineering risk this close to submission.
 
 ### Use of AI
 
-Anthropic's Claude was used throughout development in an advisory and
+Anthropic's Claude Opus 4.7 was used throughout development in an advisory and
 diagnostic role, never as a code-generation tool for unreviewed output.
 Specifically:
 
@@ -227,6 +227,16 @@ Specifically:
 - **Test-harness design review** — the `zsh` harnesses in `tests/`
   were drafted by hand and submitted to Claude for coverage-gap
   analysis and edge-case suggestions.
+
+OpenAI's chatGPT 5.5 was used only as an auxiliary learning and review resource.
+
+In this project, AI assistance was used for:
+
+- Clarifying concepts related to HTTP, CGI, sockets, request parsing, and response handling.
+- Reviewing C++98 code for possible logic errors, unsafe behavior, and maintainability issues.
+- Improving the clarity of error messages.
+- Discussing edge cases such as path rewriting, wildcard matching, empty paths, invalid requests, and configuration parsing.
+- Helping structure documentation and explanations.
 
 No source file in `src/` was machine-generated. Every line of submitted
 code was authored or transcribed manually by one of the three named
