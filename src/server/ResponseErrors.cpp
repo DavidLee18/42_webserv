@@ -32,9 +32,8 @@ Response ResponseErrors::error_response(const ServerConfig *config,
     response.content_length = response.body.length();
     file.close();
     return response;
-  } else {
-    return DefaultError::default_err_response(error_code);
   }
+  return DefaultError::default_err_response(error_code);
 }
 
 Target ResponseErrors::resolve_target(const RouteRule *rule,

@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <dirent.h>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <sys/stat.h>
@@ -85,7 +86,6 @@ Response ResponseHandlers::post_method_response(const Target &target,
     if (file.is_open()) {
       std::string pw;
       std::string id;
-      std::map<std::string, std::string> auth_info;
       size_t id_pos = body.find("id=");
       if (id_pos != std::string::npos) {
         size_t amp_pos = body.find('&', id_pos);
@@ -153,8 +153,6 @@ Response ResponseHandlers::post_method_response(const Target &target,
 
   std::cout << utils::info << "matched rule path: '" << rule->path
             << "' upload_dir = '" << rule->root.to_string() << "'" << std::endl;
-  if (rule->root.to_string().empty())
-    const_cast<RouteRule *>(rule)->root.to_string() = rule->root.to_string();
   if (!rule->root.to_string().empty()) {
     const std::string &body = request->get_body();
     const std::map<std::string, std::string> &headers = request->get_headers();
@@ -245,7 +243,11 @@ Response ResponseHandlers::post_method_response(const Target &target,
         std::cout << utils::info << "First 20 bytes (hex): ";
         for (size_t i = 0;
              i < std::min(static_cast<size_t>(20), part_data.length()); i++) {
-          printf("%02x ", static_cast<unsigned char>(part_data[i]));
+          std::cout << std::hex << std::uppercase << std::setw(2)
+                    << std::setfill('0')
+                    << static_cast<unsigned int>(
+                           static_cast<unsigned char>(part_data[i]))
+                    << ' ';
         }
         std::cout << std::endl;
 
@@ -420,7 +422,7 @@ Response ResponseHandlers::http_response(
     return ResponseErrors::error_response(config, rule, Response::FORBIDDEN,
                                           envp);
   size_t content_len = res_content_len.value();
-  if (content_len > static_cast<size_t>(rule->max_body_KB * 1000))
+  if (content_len > static_cast<size_t>(rule->max_body_KB * 1024))
     return ResponseErrors::error_response(config, rule,
                                           Response::PAYLOAD_TOO_LARGE, envp);
 
@@ -450,6 +452,16 @@ Response ResponseHandlers::http_response(
                 << "[Authentication] No valid session. Guest user."
                 << std::endl;
     }
+  }
+
+  if (!user_session && !rule->auth_info.empty()) {
+      std::cerr << utils::error
+                << "[Authentication] Blocked DELETE request. No valid session."
+                << std::endl;
+      response = ResponseErrors::error_response(config, rule,
+                                                Response::UNAUTHORIZED, envp);
+      response.headers = config->get_header();
+      return response;
   }
 
   switch (request->get_method()) {

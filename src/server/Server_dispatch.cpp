@@ -8,13 +8,8 @@ Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
   Result<RouteRule_CGI> cgi_path_res = client.config->find_route_cgi(
       client.req->get_method(), client.req->get_path());
   const RouteRule_CGI *cgi_path = NULL;
-  if (cgi_path_res.has_value()) {
-    // Note: We can't store a reference to a temporary, so we store as pointer
-    // This is safe because cgi_path_res.value() is a copy
-    static RouteRule_CGI cgi_path_copy;
-    cgi_path_copy = cgi_path_res.value();
-    cgi_path = &cgi_path_copy;
-  }
+  if (cgi_path_res.has_value())
+    cgi_path = &cgi_path_res.value();
 
   // Log request details
   Result<size_t> content_length = client.req->get_content_length();
@@ -38,7 +33,7 @@ Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
     TRY_(Void, Void,
          ResponseHandlers::register_cgi(*client.req, *cgi_path, &epoll,
                                         config.get_global_cgi(), cgis,
-                                        client_fd, envp);)
+                                        client_fd, envp))
     delete client.req;
     client.req = NULL;
     return OKV;

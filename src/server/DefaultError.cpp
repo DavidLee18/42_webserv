@@ -99,5 +99,6 @@ DefaultError::default_err_response(const Response::StatusCode err_code) {
   response.keep_alive = false;
   response.body =
       generate_error_page(status_code_to_string(err_code) + " Error");
+  response.content_length = response.body.length();
   return response;
 }

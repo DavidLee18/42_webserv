@@ -92,8 +92,10 @@ Result<int> ResponseUtils::check_path_type(const std::string &path) {
     return OK(int, IS_DIR);
   }
   if (S_ISREG(info.st_mode)) {
-    if (path.rfind(".cgi") == path.length() - 4) {
-      return ERR(int, Errors::forbidden);
+    if (path.length() > 4) {
+      if (path.rfind(".cgi") == path.length() - 4) {
+        return ERR(int, Errors::forbidden);
+      }
     }
     return OK(int, IS_FILE);
   }

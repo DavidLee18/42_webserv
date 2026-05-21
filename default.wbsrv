@@ -44,13 +44,11 @@ types =
 	POST /cgi-test/echo     $/www-files/cgi-bin/echo.cgi
 		...10000
 
-	GET /old_stuff/ =301> /new_stuff/
-
 	GET /old_stuff/* =301> /new_stuff/*
 
 	GET /download/*/mp3/*.mp3 =301> /*/mp3/*
 
-	GET /download/ <i- /www-files/storage
+	GET /download/ <i- /www-files/download
 
 	GET *.(jpg|jpeg|gif) <- /www-files/*
 
@@ -59,6 +57,10 @@ types =
 	POST /login    # /www-files/auth_info
 		->{} 10MiB
 
+	GET /storage/ <i- /www-files/storage/
+		->{} 10MiB
+		@ /www-files/auth_info
+
 	POST /storage/ -> /www-files/storage/
 		->{} 10MiB
 		@ /www-files/auth_info
@@ -66,13 +68,11 @@ types =
 	DELETE /storage/* <- /www-files/storage/*
 		@ /www-files/auth_info
 
-	DELETE /download/* <- /www-files/storage/*
+	DELETE /download/* <- /www-files/download/*
 		@ /www-files/auth_info
 
 	GET * <- /www-files/*
 		? /www-files/index.html
-		@ /www-files/auth_info
-		->{} 10MiB
 		! 400:/www-files/error/400.html
 		! 401:/www-files/error/401.html
 		! 403:/www-files/error/403.html
@@ -103,5 +103,4 @@ types =
 
 	GET|POST|DELETE * <- /www-files/*
 		? /www-files/index2.html
-		@ /www-files/auth_info
 		->{} 10MiB
