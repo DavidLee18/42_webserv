@@ -122,12 +122,13 @@ public:
     ((v)) = _result.value();                                                   \
   } }
 
-#define TRY_(t, rt, r) { \
-  Result<rt> _result = r; \
-  if (!_result.error().empty()) { \
-    return ERR(t, _result.error()); \
-  } \
-}
+#define TRY_(t, rt, r)                                                         \
+  {                                                                            \
+    Result<rt> _result = r;                                                    \
+    if (!_result.error().empty()) {                                            \
+      return ERR(t, _result.error());                                          \
+    }                                                                          \
+  }
 
 #define TRYF(t, rt, v, r, f)                                                   \
   Result<rt> _result = r;                                                      \
