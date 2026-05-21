@@ -5,7 +5,7 @@
 
 Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
   if (clients.find(client_fd) == clients.end()) {
-    return OK(Void, VOID);
+    return OKV;
   }
   ClientSession &client = clients.at(client_fd);
   if (client.config == NULL) {
@@ -13,7 +13,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
         DefaultError::default_err_response(Response::INTERNAL_SERVER_ERR));
     resp.print_simple(std::cout);
     queue_response(client_fd, resp);
-    return OK(Void, VOID);
+    return OKV;
   }
   if (clock_gettime(CLOCK_MONOTONIC, &client.last_activity_time) != 0) {
     std::cerr << utils::error << "failed to update client activity time"
@@ -51,7 +51,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
         if (req_.error() == Errors::incomplete_header) {
           if (client.dropping)
             disconnect(client_fd);
-          return OK(Void, VOID);
+          return OKV;
         } else if (req_.error() == Errors::malformed_header ||
                    req_.error() == Errors::bad_request) {
           Response resp(
@@ -63,14 +63,14 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
             if (!qr.has_value())
               return ERR(Void, qr.error());
           }
-          return OK(Void, VOID);
+          return OKV;
         } else if (req_.error() == Errors::not_implemented) {
           Response resp =
               DefaultError::default_err_response(Response::NOT_IMPLEMENTED);
           resp.headers = client.config->get_header();
           resp.print_simple(std::cout);
           queue_response(client_fd, resp);
-          return OK(Void, VOID);
+          return OKV;
         }
       }
 
@@ -90,23 +90,23 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
           if (!qr.has_value())
             return ERR(Void, qr.error());
         }
-        return OK(Void, VOID);
+        return OKV;
       }
       if (client.req->is_partial()) {
         if (client.dropping)
           disconnect(client_fd);
-        return OK(Void, VOID);
+        return OKV;
       }
 
       dispatch_request(client_fd, client, envp);
       // Client may have been disconnected in dispatch_request, check existence
       if (clients.find(client_fd) == clients.end())
-        return OK(Void, VOID);
+        return OKV;
       continue;
     } else {
       // Refresh client reference before continuing
       if (clients.find(client_fd) == clients.end())
-        return OK(Void, VOID);
+        return OKV;
       const Result<Void> parse_more = client.req->continue_parsing(in_buffer);
       if (!parse_more.has_value()) {
         std::cerr << utils::error
@@ -119,7 +119,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
         TRY_(Void, Void, queue_response(client_fd, resp))
         delete client.req;
         client.req = NULL;
-        return OK(Void, VOID);
+        return OKV;
       }
       const Result<size_t> content_len = client.req->get_content_length();
       Result<RouteRule> rule_res = client.config->find_route(
@@ -131,7 +131,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
         TRY_(Void, Void, queue_response(client_fd, resp))
         delete client.req;
         client.req = NULL;
-        return OK(Void, VOID);
+        return OKV;
       }
       const RouteRule rule = rule_res.value();
       if (content_len.has_value() &&
@@ -147,26 +147,26 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
         TRY_(Void, Void, queue_response(client_fd, resp))
         delete client.req;
         client.req = NULL;
-        return OK(Void, VOID);
+        return OKV;
       }
       if (client.req->is_partial())
-        return OK(Void, VOID);
+        return OKV;
 
       dispatch_request(client_fd, client, envp);
       // Client may have been disconnected in dispatch_request, check existence
       if (clients.find(client_fd) == clients.end())
-        return OK(Void, VOID);
+        return OKV;
       continue;
     }
   }
   TRY_(Void, Void, client_write(client_fd))
   // EPOLLIN | EPOLLOUT
-  return OK(Void, VOID);
+  return OKV;
 }
 
 Result<Void> Server::client_write(const FileDescriptor *client_fd) {
   if (clients.find(client_fd) == clients.end())
-    return OK(Void, VOID);
+    return OKV;
   ClientSession &client = clients.at(client_fd);
   if (clock_gettime(CLOCK_MONOTONIC, &client.last_activity_time) != 0) {
     std::cerr << utils::error << "failed to update client activity time"
@@ -189,12 +189,12 @@ Result<Void> Server::client_write(const FileDescriptor *client_fd) {
       if (write_buffer.empty()) {
         if (client.dropping)
           disconnect(client_fd);
-        return OK(Void, VOID);
+        return OKV;
       }
     }
   } else if (client.dropping) {
     disconnect(client_fd);
-    return OK(Void, VOID);
+    return OKV;
   }
 
   // Stream file in chunks: keep reading and queuing until EOF or buffer fills
@@ -210,7 +210,7 @@ Result<Void> Server::client_write(const FileDescriptor *client_fd) {
         client.streaming_file = false;
         if (client.dropping)
           disconnect(client_fd);
-        return OK(Void, VOID);
+        return OKV;
       }
       infile.seekg(static_cast<std::streamoff>(client.out_file_offset));
       infile.read(buf.data(), static_cast<std::streamsize>(CHUNK));
@@ -246,5 +246,5 @@ Result<Void> Server::client_write(const FileDescriptor *client_fd) {
     if (!write_buffer.empty())
       break;
   }
-  return OK(Void, VOID);
+  return OKV;
 }

@@ -54,11 +54,11 @@ Result<Void> Server::new_connection(const FileDescriptor *server_fd) {
     clients[client_ptr] = client;
     std::cout << utils::info << "New client connected!" << std::endl;
   }
-  return OK(Void, VOID);
+  return OKV;
 }
 
 Result<Void> Server::disconnect(const FileDescriptor *client_fd) {
   epoll.del_fd(client_fd);
   clients.erase(client_fd);
-  return OK(Void, VOID);
+  return OKV;
 }

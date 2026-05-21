@@ -41,7 +41,7 @@ Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
                                         client_fd, envp);)
     delete client.req;
     client.req = NULL;
-    return OK(Void, VOID);
+    return OKV;
   }
 
   // Generate normal HTTP response
@@ -53,13 +53,13 @@ Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
   client.req = NULL;
 
   TRY_(Void, Void, queue_response(client_fd, http))
-  return OK(Void, VOID);
+  return OKV;
 }
 
 Result<Void> Server::queue_response(const FileDescriptor *client_fd,
                                     const Response &response) {
   if (clients.find(client_fd) == clients.end())
-    return OK(Void, VOID);
+    return OKV;
   ClientSession &client = clients.at(client_fd);
 
   const size_t STREAM_THRESHOLD = 64 * 1024; // 64 KiB
@@ -109,7 +109,7 @@ Result<Void> Server::queue_response(const FileDescriptor *client_fd,
   // Mark for disconnection if client doesn't want keep-alive
   if (!response.keep_alive)
     client.dropping = true;
-  return OK(Void, VOID);
+  return OKV;
 }
 
 Result<Void> Server::reap_cgi(CgiDelegate *cgi) {
@@ -124,5 +124,5 @@ Result<Void> Server::reap_cgi(CgiDelegate *cgi) {
   }
   cgi->~CgiDelegate();
   operator delete(cgi);
-  return OK(Void, VOID);
+  return OKV;
 }
