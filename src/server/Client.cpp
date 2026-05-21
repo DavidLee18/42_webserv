@@ -282,8 +282,8 @@ Result<Request *> Request::from_buff(std::string &buff) {
     req->header.erase(req->header.find("Connection"));
 
   req->cookie = get_string_from_map(req->header, "Cookie");
-  Void _v;
-  TRYF(Request *, Void, _v, Request::parse_body_or_chunked(ss, buff, req, header_end), delete req)
+  Void _vv;
+  TRYF(Request *, Void, _vv, Request::parse_body_or_chunked(ss, buff, req, header_end), delete req)
   return OK(Request *, req);
 }
 
