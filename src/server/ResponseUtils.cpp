@@ -1,10 +1,10 @@
 #include "ResponseUtils.hpp"
 #include "../utils/utils.hpp"
+#include <cerrno>
+#include <cstring>
+#include <ctime>
 #include <iomanip>
 #include <sstream>
-#include <cerrno>
-#include <ctime>
-#include <cstring>
 
 std::string get_string_from_map(const std::map<unsigned int, std::string> &map,
                                 const int key) {
@@ -65,6 +65,18 @@ std::string ResponseUtils::get_mime_type_for_extension(const std::string &ext) {
   else if (ext == "webp")
     return "image/webp";
   return "text/html";
+}
+
+std::string ResponseUtils::get_mime_type_for_extension(
+    const std::string &ext,
+    const std::map<std::string, std::string> &mime_map) {
+  // First, check the config mime_map (from types block in config)
+  std::map<std::string, std::string>::const_iterator it = mime_map.find(ext);
+  if (it != mime_map.end())
+    return it->second;
+
+  // Fallback to hardcoded mappings if not in config
+  return get_mime_type_for_extension(ext);
 }
 
 Result<int> ResponseUtils::check_path_type(const std::string &path) {

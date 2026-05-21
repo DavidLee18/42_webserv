@@ -1,18 +1,18 @@
 #include "ResponseHandlers.hpp"
-#include "ResponseUtils.hpp"
-#include "ResponseErrors.hpp"
-#include "MultipartParser.hpp"
-#include "DefaultError.hpp"
-#include "AutoindexResponse.hpp"
-#include "../utils/utils.hpp"
 #include "../cgi_1_1/CgiDelegate.hpp"
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <cstdlib>
+#include "../utils/utils.hpp"
+#include "AutoindexResponse.hpp"
+#include "DefaultError.hpp"
+#include "MultipartParser.hpp"
+#include "ResponseErrors.hpp"
+#include "ResponseUtils.hpp"
 #include <cerrno>
-#include <sys/stat.h>
+#include <cstdlib>
 #include <dirent.h>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <sys/stat.h>
 
 Result<Void> ResponseHandlers::register_cgi(
     const Request &request, const RouteRule_CGI &rule, EPoll *epoll,
@@ -38,9 +38,11 @@ Result<Void> ResponseHandlers::register_cgi(
   return OKV;
 }
 
-Response ResponseHandlers::delete_method_response(const Target &target, Response response,
-                                         const ServerConfig *config,
-                                         const RouteRule *rule, char **envp) {
+Response ResponseHandlers::delete_method_response(const Target &target,
+                                                  Response response,
+                                                  const ServerConfig *config,
+                                                  const RouteRule *rule,
+                                                  char **envp) {
   std::cout << utils::debug << "target path: " << target.path << std::endl;
   if (unlink(target.path.c_str()) == 0) {
     response.status_code = Response::NO_CONTENT;
@@ -49,22 +51,27 @@ Response ResponseHandlers::delete_method_response(const Target &target, Response
 
   switch (errno) {
   case ENOENT:
-    return ResponseErrors::error_response(config, rule, Response::NOT_FOUND, envp);
+    return ResponseErrors::error_response(config, rule, Response::NOT_FOUND,
+                                          envp);
   case EISDIR:
-    return ResponseErrors::error_response(config, rule, Response::CONFLICT, envp);
+    return ResponseErrors::error_response(config, rule, Response::CONFLICT,
+                                          envp);
   case EACCES:
   case EPERM:
-    return ResponseErrors::error_response(config, rule, Response::FORBIDDEN, envp);
+    return ResponseErrors::error_response(config, rule, Response::FORBIDDEN,
+                                          envp);
   default:
-    return ResponseErrors::error_response(config, rule, Response::FORBIDDEN, envp);
+    return ResponseErrors::error_response(config, rule, Response::FORBIDDEN,
+                                          envp);
   }
 }
 
-Response ResponseHandlers::post_method_response(const Target &target, Response response,
-                                       const ClientSession *client,
-                                       const RouteRule *rule,
-                                       const Request *request, Session *session,
-                                       char **envp) {
+Response ResponseHandlers::post_method_response(const Target &target,
+                                                Response response,
+                                                const ClientSession *client,
+                                                const RouteRule *rule,
+                                                const Request *request,
+                                                Session *session, char **envp) {
   const ServerConfig *config = client->config;
 
   std::cout << utils::debug << "target path: " << target.path << std::endl;
@@ -113,9 +120,11 @@ Response ResponseHandlers::post_method_response(const Target &target, Response r
         std::cout << utils::info << "Authentication SUCCESS for: " << id
                   << std::endl;
 
-        Result<std::string> session_result = session->create_session(id, client->ip);
+        Result<std::string> session_result =
+            session->create_session(id, client->ip);
         if (!session_result.has_value()) {
-          return ResponseErrors::error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
+          return ResponseErrors::error_response(
+              config, rule, Response::INTERNAL_SERVER_ERR, envp);
         }
 
         response.status_code = Response::FOUND;
@@ -123,8 +132,7 @@ Response ResponseHandlers::post_method_response(const Target &target, Response r
         response.content_type = "text/html";
         response.body = "<html><body>Redirecting...</body></html>";
         response.cookie =
-            "session_id=" + session_result.value() +
-            "; Path=/; HttpOnly";
+            "session_id=" + session_result.value() + "; Path=/; HttpOnly";
         return response;
       } else {
         std::cout << utils::info << "Authentication FAILED for: " << id
@@ -139,7 +147,8 @@ Response ResponseHandlers::post_method_response(const Target &target, Response r
         return response;
       }
     } else
-      return ResponseErrors::error_response(config, rule, Response::NOT_FOUND, envp);
+      return ResponseErrors::error_response(config, rule, Response::NOT_FOUND,
+                                            envp);
   }
 
   std::cout << utils::info << "matched rule path: '" << rule->path
@@ -153,23 +162,27 @@ Response ResponseHandlers::post_method_response(const Target &target, Response r
     std::map<std::string, std::string>::const_iterator content_type_it =
         headers.find("Content-Type");
     if (content_type_it == headers.end())
-      return ResponseErrors::error_response(config, rule, Response::BAD_REQUEST, envp);
+      return ResponseErrors::error_response(config, rule, Response::BAD_REQUEST,
+                                            envp);
 
     std::string content_type = content_type_it->second;
     if (content_type.find("multipart/form-data") == std::string::npos)
-      return ResponseErrors::error_response(config, rule, Response::BAD_REQUEST, envp);
+      return ResponseErrors::error_response(config, rule, Response::BAD_REQUEST,
+                                            envp);
 
     const unsigned int max_body_KB = rule->max_body_KB;
     if (body.length() > static_cast<size_t>(max_body_KB) * 1024) {
       std::cout << utils::warning << "Upload rejected: body size "
                 << body.length() << " exceeds limit " << (max_body_KB * 1024)
                 << std::endl;
-      return ResponseErrors::error_response(config, rule, Response::PAYLOAD_TOO_LARGE, envp);
+      return ResponseErrors::error_response(config, rule,
+                                            Response::PAYLOAD_TOO_LARGE, envp);
     }
 
     std::string boundary = MultipartParser::extract_boundary(content_type);
     if (boundary.empty())
-      return ResponseErrors::error_response(config, rule, Response::BAD_REQUEST, envp);
+      return ResponseErrors::error_response(config, rule, Response::BAD_REQUEST,
+                                            envp);
 
     std::cout << utils::info << "Boundary: " << boundary << std::endl;
 
@@ -180,21 +193,26 @@ Response ResponseHandlers::post_method_response(const Target &target, Response r
       std::cerr << utils::warning << "upload dir missing: " << upload_path
                 << " - operator must pre-create" << std::endl;
       if (errno == EACCES) {
-        return ResponseErrors::error_response(config, rule, Response::FORBIDDEN, envp);
+        return ResponseErrors::error_response(config, rule, Response::FORBIDDEN,
+                                              envp);
       }
-      return ResponseErrors::error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
+      return ResponseErrors::error_response(
+          config, rule, Response::INTERNAL_SERVER_ERR, envp);
     }
     if (!S_ISDIR(st.st_mode)) {
       std::cerr << utils::warning << "upload path exists yet not a directory"
                 << std::endl;
-      return ResponseErrors::error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
+      return ResponseErrors::error_response(
+          config, rule, Response::INTERNAL_SERVER_ERR, envp);
     }
     if (access(upload_path.c_str(), W_OK) != 0) {
       std::cerr << utils::warning << "upload dir not writable" << std::endl;
       if (errno == EACCES) {
-        return ResponseErrors::error_response(config, rule, Response::FORBIDDEN, envp);
+        return ResponseErrors::error_response(config, rule, Response::FORBIDDEN,
+                                              envp);
       }
-      return ResponseErrors::error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
+      return ResponseErrors::error_response(
+          config, rule, Response::INTERNAL_SERVER_ERR, envp);
     }
 
     std::size_t pos = 0;
@@ -203,8 +221,8 @@ Response ResponseHandlers::post_method_response(const Target &target, Response r
 
     while (true) {
       std::string filename, fieldname, part_data;
-      std::size_t next_pos = MultipartParser::parse_multipart_part(body, boundary, pos, filename,
-                                                  fieldname, part_data);
+      std::size_t next_pos = MultipartParser::parse_multipart_part(
+          body, boundary, pos, filename, fieldname, part_data);
 
       if (filename.empty() && fieldname.empty())
         break;
@@ -237,9 +255,11 @@ Response ResponseHandlers::post_method_response(const Target &target, Response r
                     << "Failed to open file for writing: " << file_path
                     << std::endl;
           if (errno == EACCES || errno == EPERM) {
-            return ResponseErrors::error_response(config, rule, Response::FORBIDDEN, envp);
+            return ResponseErrors::error_response(config, rule,
+                                                  Response::FORBIDDEN, envp);
           }
-          return ResponseErrors::error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
+          return ResponseErrors::error_response(
+              config, rule, Response::INTERNAL_SERVER_ERR, envp);
         }
 
         outfile.write(part_data.c_str(),
@@ -248,7 +268,8 @@ Response ResponseHandlers::post_method_response(const Target &target, Response r
           std::cout << utils::warning << "Failed to write file: " << file_path
                     << std::endl;
           outfile.close();
-          return ResponseErrors::error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
+          return ResponseErrors::error_response(
+              config, rule, Response::INTERNAL_SERVER_ERR, envp);
         }
 
         outfile.close();
@@ -262,7 +283,8 @@ Response ResponseHandlers::post_method_response(const Target &target, Response r
     }
 
     if (!error_msg.empty())
-      return ResponseErrors::error_response(config, rule, Response::BAD_REQUEST, envp);
+      return ResponseErrors::error_response(config, rule, Response::BAD_REQUEST,
+                                            envp);
 
     if (files_uploaded > 0) {
       response.status_code = Response::OK;
@@ -279,13 +301,15 @@ Response ResponseHandlers::post_method_response(const Target &target, Response r
     }
   }
 
-  return ResponseErrors::error_response(config, rule, Response::FORBIDDEN, envp);
+  return ResponseErrors::error_response(config, rule, Response::FORBIDDEN,
+                                        envp);
 }
 
 Response ResponseHandlers::get_method_response(Target target, Response response,
-                                      const ServerConfig *config,
-                                      const RouteRule *rule,
-                                      const Request *request, char **envp) {
+                                               const ServerConfig *config,
+                                               const RouteRule *rule,
+                                               const Request *request,
+                                               char **envp) {
   std::cout << utils::debug << "target path: " << target.path << std::endl;
   if (rule->op == REDIRECT) {
     target.type = Response::MOVED_PERMANENTLY;
@@ -298,52 +322,63 @@ Response ResponseHandlers::get_method_response(Target target, Response response,
   }
 
   if (target.type == Response::NOT_FOUND)
-    return ResponseErrors::error_response(config, rule, Response::NOT_FOUND, envp);
+    return ResponseErrors::error_response(config, rule, Response::NOT_FOUND,
+                                          envp);
   if (target.type == Response::FORBIDDEN)
-    return ResponseErrors::error_response(config, rule, Response::FORBIDDEN, envp);
+    return ResponseErrors::error_response(config, rule, Response::FORBIDDEN,
+                                          envp);
 
   if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     DIR *dir = opendir(target.path.c_str());
     if (dir == NULL) {
       if (errno == EACCES)
-        return ResponseErrors::error_response(config, rule, Response::FORBIDDEN, envp);
+        return ResponseErrors::error_response(config, rule, Response::FORBIDDEN,
+                                              envp);
       else if (errno == ENOENT)
-        return ResponseErrors::error_response(config, rule, Response::NOT_FOUND, envp);
+        return ResponseErrors::error_response(config, rule, Response::NOT_FOUND,
+                                              envp);
     }
     target.type = Response::OK;
     response.content_type = "text/html";
-    Result<std::string> autoindex_result = AutoindexResponse::generate(target.path, request->get_path(), dir);
+    Result<std::string> autoindex_result =
+        AutoindexResponse::generate(target.path, request->get_path(), dir);
     if (!autoindex_result.has_value()) {
       closedir(dir);
-      return ResponseErrors::error_response(config, rule, Response::INTERNAL_SERVER_ERR, envp);
+      return ResponseErrors::error_response(
+          config, rule, Response::INTERNAL_SERVER_ERR, envp);
     }
     response.body = autoindex_result.value();
     response.status_code = Response::OK;
   } else {
     Result<int> path_type_result = ResponseUtils::check_path_type(target.path);
     if (!path_type_result.has_value() || path_type_result.value() != IS_FILE)
-      return ResponseErrors::error_response(config, rule, Response::NOT_FOUND, envp);
+      return ResponseErrors::error_response(config, rule, Response::NOT_FOUND,
+                                            envp);
 
     std::ifstream file(target.path.c_str());
     if (file.is_open()) {
       struct stat st;
       if (stat(target.path.c_str(), &st) != 0) {
         file.close();
-        return ResponseErrors::error_response(config, rule, Response::NOT_FOUND, envp);
+        return ResponseErrors::error_response(config, rule, Response::NOT_FOUND,
+                                              envp);
       }
       response.content_length = static_cast<size_t>(st.st_size);
       response.file_path = target.path;
       target.type = Response::OK;
       response.status_code = Response::OK;
       file.close();
-      Result<std::string> etag_result = ResponseUtils::compute_etag(target.path);
+      Result<std::string> etag_result =
+          ResponseUtils::compute_etag(target.path);
       if (etag_result.has_value())
         response.headers["ETag"] = etag_result.value();
-      Result<std::string> lm_result = ResponseUtils::get_last_modified(target.path);
+      Result<std::string> lm_result =
+          ResponseUtils::get_last_modified(target.path);
       if (lm_result.has_value())
         response.headers["Last-Modified"] = lm_result.value();
     } else {
-      return ResponseErrors::error_response(config, rule, Response::NOT_FOUND, envp);
+      return ResponseErrors::error_response(config, rule, Response::NOT_FOUND,
+                                            envp);
     }
   }
   return response;
@@ -356,47 +391,50 @@ Response ResponseHandlers::http_response(
   const ServerConfig *config = client->config;
   if (config == NULL)
     return DefaultError::default_err_response(Response::INTERNAL_SERVER_ERR);
+
+  Response response;
   const RouteRule *rule =
       config->find_route(request->get_method(), request->get_path());
-  Response response;
   if (rule == NULL) {
     response = DefaultError::default_err_response(Response::NOT_FOUND);
     response.headers = config->get_header();
     return response;
   } else if (request->get_path().find("../") != std::string::npos) {
-    std::cout << utils::info << "request path: " << request->get_path()
+    std::cout << utils::error << "request path: " << request->get_path()
               << std::endl;
     response = DefaultError::default_err_response(Response::BAD_REQUEST);
     response.headers = config->get_header();
     return response;
   }
-  Result<size_t>res_content_len = request->get_content_length();
+
+  Result<size_t> res_content_len = request->get_content_length();
   if (!res_content_len.has_value())
-    return ResponseErrors::error_response(config, rule, Response::FORBIDDEN, envp);
+    return ResponseErrors::error_response(config, rule, Response::FORBIDDEN,
+                                          envp);
   size_t content_len = res_content_len.value();
   if (content_len > static_cast<size_t>(rule->max_body_KB * 1000))
-    return ResponseErrors::error_response(config, rule, Response::PAYLOAD_TOO_LARGE, envp);
+    return ResponseErrors::error_response(config, rule,
+                                          Response::PAYLOAD_TOO_LARGE, envp);
 
   response.headers = config->get_header();
-  const Target target = ResponseErrors::resolve_target(rule, config, request, envp);
-
+  const Target target =
+      ResponseErrors::resolve_target(rule, config, request, envp);
   const std::string session_id = request->get_cookie_value("session_id");
   const SessionData *user_session = NULL;
 
-  if (!session_id.empty()) {
+  if (!session_id.empty())
     user_session = session->get_session(session_id);
-  }
-
   if (user_session) {
     std::cout << utils::info
               << "[Authentication] Valid user session found! User ID: "
               << user_session->user_id << std::endl;
   } else {
     if (request->get_method() == Request::DELETE) {
-      std::cout << utils::info
+      std::cout << utils::error
                 << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
-      response = ResponseErrors::error_response(config, rule, Response::UNAUTHORIZED, envp);
+      response = ResponseErrors::error_response(config, rule,
+                                                Response::UNAUTHORIZED, envp);
       response.headers = config->get_header();
       return response;
     } else {
@@ -412,15 +450,19 @@ Response ResponseHandlers::http_response(
     break;
   case Request::POST:
     response = post_method_response(target, response, client, rule,
-                                           request, session, envp);
+                                    request, session, envp);
     break;
   case Request::HEAD:
   case Request::GET:
-    response = get_method_response(target, response, config, rule,
-                                          request, envp);
+    response =
+        get_method_response(target, response, config, rule, request, envp);
     break;
   default:
-    response = ResponseErrors::error_response(config, rule, Response::METHOD_NOT_ALLOWED, envp);
+    std::cerr << utils::error
+              << "method not allowed: " << request->get_method_string()
+              << std::endl;
+    response = ResponseErrors::error_response(
+        config, rule, Response::METHOD_NOT_ALLOWED, envp);
     break;
   }
 
@@ -434,7 +476,8 @@ Response ResponseHandlers::http_response(
   if (response.status_code == Response::OK ||
       response.status_code == Response::MOVED_PERMANENTLY ||
       response.status_code == Response::FOUND) {
-    std::string if_none_match = get_string_from_map(request->get_headers(), "If-None-Match");
+    std::string if_none_match =
+        get_string_from_map(request->get_headers(), "If-None-Match");
     if (!if_none_match.empty() && !response.headers["ETag"].empty()) {
       if (if_none_match == "*" || if_none_match == response.headers["ETag"]) {
         response.status_code = Response::NOT_MODIFIED;
@@ -443,8 +486,10 @@ Response ResponseHandlers::http_response(
         return response;
       }
     }
-    std::string if_modified_since = get_string_from_map(request->get_headers(), "If-Modified-Since");
-    if (!if_modified_since.empty() && !response.headers["Last-Modified"].empty()) {
+    std::string if_modified_since =
+        get_string_from_map(request->get_headers(), "If-Modified-Since");
+    if (!if_modified_since.empty() &&
+        !response.headers["Last-Modified"].empty()) {
       if (response.headers["Last-Modified"] <= if_modified_since) {
         response.status_code = Response::NOT_MODIFIED;
         response.body.clear();
@@ -460,7 +505,8 @@ Response ResponseHandlers::http_response(
     if (!mapped.empty())
       response.content_type = mapped;
     else
-      response.content_type = ResponseUtils::get_mime_type_for_extension(ext);
+      response.content_type =
+          ResponseUtils::get_mime_type_for_extension(ext, mime_type);
   }
   if (request->get_path() == "/api/session-info") {
     if (request->get_method() == Request::GET) {
@@ -494,7 +540,8 @@ Response ResponseHandlers::http_response(
       }
       return response;
     } else {
-      return ResponseErrors::error_response(config, rule, Response::METHOD_NOT_ALLOWED, envp);
+      return ResponseErrors::error_response(config, rule,
+                                            Response::METHOD_NOT_ALLOWED, envp);
     }
   } else {
     return response;

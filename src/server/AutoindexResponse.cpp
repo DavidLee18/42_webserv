@@ -1,8 +1,8 @@
 #include "AutoindexResponse.hpp"
 
 Result<std::string> AutoindexResponse::generate(const std::string &real_path,
-                                                       const std::string &req_uri,
-                                                       DIR *dir) {
+                                                const std::string &req_uri,
+                                                DIR *dir) {
   std::ostringstream html;
 
   html << "<!DOCTYPE html>\n"
@@ -71,9 +71,11 @@ Result<std::string> AutoindexResponse::generate(const std::string &real_path,
 
     html << "    <li class=\"item\">\n"
          << "      <div class=\"entry\">\n"
-         << "        <a href=\"" << ResponseUtils::escape_html(name) << "\" class=\"link\">\n"
+         << "        <a href=\"" << ResponseUtils::escape_html(name)
+         << "\" class=\"link\">\n"
          << "          <span class=\"icon\">" << icon << "</span>\n"
-         << "          <span>" << ResponseUtils::escape_html(name) << "</span>\n"
+         << "          <span>" << ResponseUtils::escape_html(name)
+         << "</span>\n"
          << "        </a>\n";
     if (deletable) {
       html << "        <button type=\"button\" class=\"delete-btn\" "
