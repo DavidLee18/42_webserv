@@ -1,7 +1,7 @@
-#include "Server.hpp"
+#include "DefaultError.hpp"
 #include "Response.hpp"
 #include "ResponseHandlers.hpp"
-#include "DefaultError.hpp"
+#include "Server.hpp"
 #include <ctime>
 
 Result<Void> Server::new_connection(const FileDescriptor *server_fd) {
@@ -24,12 +24,18 @@ Result<Void> Server::new_connection(const FileDescriptor *server_fd) {
     FileDescriptor client_fd = client_result.value();
     Result<Void> nb_res = client_fd.set_nonblocking();
     if (!nb_res.has_value()) {
-      return ERR(Void, std::string("failed to set client socket to non-blocking mode: ") + nb_res.error());
+      return ERR(
+          Void,
+          std::string("failed to set client socket to non-blocking mode: ") +
+              nb_res.error());
     }
 
     Result<Void> clo_res = client_fd.close_on_exec();
     if (!clo_res.has_value()) {
-      return ERR(Void, std::string("failed to set client socket to close-on-exec mode: ") + clo_res.error());
+      return ERR(
+          Void,
+          std::string("failed to set client socket to close-on-exec mode: ") +
+              clo_res.error());
     }
 
     ClientSession client;
@@ -52,7 +58,8 @@ Result<Void> Server::new_connection(const FileDescriptor *server_fd) {
     Event client_event(NULL, true, true, true, false, false, false);
     Option client_option(true, false, false, false);
 
-    Result<FileDescriptor *> add_result = epoll.add_fd(client_fd, client_event, client_option);
+    Result<FileDescriptor *> add_result =
+        epoll.add_fd(client_fd, client_event, client_option);
     if (!add_result.has_value()) {
       return ERR(Void, std::string("epoll add failed: ") + add_result.error());
     }

@@ -449,8 +449,8 @@ Response ResponseHandlers::http_response(
     response = delete_method_response(target, response, config, rule, envp);
     break;
   case Request::POST:
-    response = post_method_response(target, response, client, rule,
-                                    request, session, envp);
+    response = post_method_response(target, response, client, rule, request,
+                                    session, envp);
     break;
   case Request::HEAD:
   case Request::GET:

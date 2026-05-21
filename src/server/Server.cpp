@@ -1,6 +1,6 @@
 #include "Server.hpp"
-#include "Response.hpp"
 #include "DefaultError.hpp"
+#include "Response.hpp"
 #include <cstddef>
 #include <ctime>
 #include <vector>
@@ -250,7 +250,8 @@ Result<Void> Server::start(char **envp) {
           epoll_timeout = static_cast<long>(cgi_remaining);
       }
     }
-    for (std::set<CgiDelegate *>::const_iterator it = cgis_to_reap.begin(); it != cgis_to_reap.end(); ++it) {
+    for (std::set<CgiDelegate *>::const_iterator it = cgis_to_reap.begin();
+         it != cgis_to_reap.end(); ++it) {
       Result<Void> rr = reap_cgi(*it);
       if (!rr.has_value())
         return ERR(Void, rr.error());
@@ -360,5 +361,3 @@ Result<Void> Server::start(char **envp) {
   clients.clear();
   return OKV;
 }
-
-

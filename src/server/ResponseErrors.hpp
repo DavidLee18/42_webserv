@@ -1,8 +1,8 @@
 #ifndef RESPONSE_ERRORS_HPP
 #define RESPONSE_ERRORS_HPP
 
-#include "Response.hpp"
 #include "../config/ServerConfig.hpp"
+#include "Response.hpp"
 
 struct Target;
 

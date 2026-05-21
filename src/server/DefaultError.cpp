@@ -7,8 +7,10 @@ static std::string generate_error_page(const std::string &heading) {
          "50px; }\na { display: inline-block; margin: 15px; padding: 10px "
          "20px; background-color: #007bff; color: white; text-decoration: "
          "none; border-radius: 5px; }\na:hover { background-color: #0056b3; "
-         "}\n</style>\n</head>\n<body>\n<h1>" + heading +
-         "</h1>\n<p> </p>\n<a href=\"/\">Back to main</a>\n<br>\n</body>\n</html>";
+         "}\n</style>\n</head>\n<body>\n<h1>" +
+         heading +
+         "</h1>\n<p> </p>\n<a href=\"/\">Back to "
+         "main</a>\n<br>\n</body>\n</html>";
 }
 
 Response::StatusCode
@@ -95,6 +97,7 @@ DefaultError::default_err_response(const Response::StatusCode err_code) {
   response.content_type = "text/html";
   response.status_code = err_code;
   response.keep_alive = false;
-  response.body = generate_error_page(status_code_to_string(err_code) + " Error");
+  response.body =
+      generate_error_page(status_code_to_string(err_code) + " Error");
   return response;
 }

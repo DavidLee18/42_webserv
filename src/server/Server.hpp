@@ -7,10 +7,10 @@
  * event loops.
  */
 
-#include "../utils/EPoll.hpp"
-#include "../utils/Errors.hpp"
 #include "../cgi_1_1/CgiDelegate.hpp"
 #include "../config/WebserverConfig.hpp"
+#include "../utils/EPoll.hpp"
+#include "../utils/Errors.hpp"
 
 #include "Client.hpp"
 #include "Response.hpp"
@@ -52,7 +52,7 @@ class Server {
 
   WebserverConfig config; ///< Holds the fully parsed configuration
   std::map<std::string, std::string> mime_type; ///< Map containing MIME types.
-  std::set<const FileDescriptor *> server_fds; ///< Set of server fds.
+  std::set<const FileDescriptor *> server_fds;  ///< Set of server fds.
 
   std::map<const FileDescriptor *,
            std::pair<const FileDescriptor *, CgiDelegate *> >

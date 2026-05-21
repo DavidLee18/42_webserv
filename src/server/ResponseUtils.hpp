@@ -1,11 +1,11 @@
 #ifndef RESPONSE_UTILS_HPP
 #define RESPONSE_UTILS_HPP
 
-#include "../utils/Errors.hpp"
 #include "../config/ServerConfig.hpp"
+#include "../utils/Errors.hpp"
 #include "Response.hpp"
-#include <string>
 #include <map>
+#include <string>
 #include <sys/stat.h>
 
 class ServerResponse;
@@ -19,8 +19,9 @@ class ResponseUtils {
 public:
   static std::string find_file_type(const std::string &path);
   static std::string get_mime_type_for_extension(const std::string &ext);
-  static std::string get_mime_type_for_extension(const std::string &ext,
-                                                   const std::map<std::string, std::string> &mime_map);
+  static std::string get_mime_type_for_extension(
+      const std::string &ext,
+      const std::map<std::string, std::string> &mime_map);
   static Result<int> check_path_type(const std::string &path);
   static Result<std::string> compute_etag(const std::string &path);
   static Result<std::string> get_last_modified(const std::string &path);

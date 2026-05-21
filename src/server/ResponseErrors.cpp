@@ -1,7 +1,7 @@
 #include "ResponseErrors.hpp"
-#include "ResponseUtils.hpp"
-#include "DefaultError.hpp"
 #include "../utils/utils.hpp"
+#include "DefaultError.hpp"
+#include "ResponseUtils.hpp"
 #include <fstream>
 #include <sstream>
 
@@ -61,18 +61,22 @@ Target ResponseErrors::resolve_target(const RouteRule *rule,
         target.path += root;
       }
       Result<int> check_result = ResponseUtils::check_path_type(target.path);
-      target.type = check_result.has_value() ? check_result.value() : Response::NOT_FOUND;
+      target.type =
+          check_result.has_value() ? check_result.value() : Response::NOT_FOUND;
     } else {
       target.path += root;
       Result<int> check_result = ResponseUtils::check_path_type(target.path);
-      target.type = check_result.has_value() ? check_result.value() : Response::NOT_FOUND;
+      target.type =
+          check_result.has_value() ? check_result.value() : Response::NOT_FOUND;
     }
   } else {
     if (type_result.error() == Errors::not_found) {
-      target.path += get_string_from_map(rule->error_pages, Response::NOT_FOUND);
+      target.path +=
+          get_string_from_map(rule->error_pages, Response::NOT_FOUND);
       target.type = Response::NOT_FOUND;
     } else if (type_result.error() == Errors::access_denied) {
-      target.path += get_string_from_map(rule->error_pages, Response::FORBIDDEN);
+      target.path +=
+          get_string_from_map(rule->error_pages, Response::FORBIDDEN);
       target.type = Response::FORBIDDEN;
     } else {
       target.path += root;

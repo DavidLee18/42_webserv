@@ -1,10 +1,10 @@
-#include "Server.hpp"
+#include "DefaultError.hpp"
 #include "Response.hpp"
 #include "ResponseHandlers.hpp"
-#include "DefaultError.hpp"
+#include "Server.hpp"
 
 Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
-                                     ClientSession &client, char **envp) {
+                                      ClientSession &client, char **envp) {
   RouteRule_CGI const *cgi_path = client.config->find_route_cgi(
       client.req->get_method(), client.req->get_path());
 
@@ -27,7 +27,9 @@ Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
 
   // Dispatch to CGI if applicable
   if (cgi_path != NULL) {
-    Result<Void> del_ = ResponseHandlers::register_cgi(*client.req, *cgi_path, &epoll, config.get_global_cgi(), cgis, client_fd, envp);
+    Result<Void> del_ = ResponseHandlers::register_cgi(
+        *client.req, *cgi_path, &epoll, config.get_global_cgi(), cgis,
+        client_fd, envp);
     if (!del_.has_value()) {
       return ERR(Void, std::string("CGI registration failed: ") + del_.error());
     }
@@ -37,8 +39,8 @@ Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
   }
 
   // Generate normal HTTP response
-  Response http = ResponseHandlers::http_response(client.req, &client, mime_type,
-                                                   &sessions, envp);
+  Response http = ResponseHandlers::http_response(client.req, &client,
+                                                  mime_type, &sessions, envp);
   http.print_simple(std::cout);
 
   delete client.req;
@@ -51,7 +53,7 @@ Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
 }
 
 Result<Void> Server::queue_response(const FileDescriptor *client_fd,
-                                  const Response &response) {
+                                    const Response &response) {
   if (clients.find(client_fd) == clients.end())
     return OK(Void, VOID);
   ClientSession &client = clients.at(client_fd);

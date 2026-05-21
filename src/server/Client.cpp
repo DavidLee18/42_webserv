@@ -1,13 +1,11 @@
 #include "Client.hpp"
 
 // Helper parser implementations for Request::from_buff splitting.
-Result<Void> Request::parse_request_line(std::stringstream &ss,
-                                         Request::Method &method,
-                                         std::string &req_path,
-                                         std::string &req_version,
-                                         const size_t cl_pos,
-                                         const size_t te_pos,
-                                         std::string &line) {
+Result<Void>
+Request::parse_request_line(std::stringstream &ss, Request::Method &method,
+                            std::string &req_path, std::string &req_version,
+                            const size_t cl_pos, const size_t te_pos,
+                            std::string &line) {
   if (std::getline(ss, line) && !ss.fail()) {
     if (!line.empty() && line[line.size() - 1] == '\r')
       line.erase(line.size() - 1);
@@ -93,9 +91,8 @@ Result<Void> Request::parse_body_or_chunked(std::stringstream &ss,
                                             std::string &buff, Request *req,
                                             const size_t header_end) {
   if (req->decode_chunk_state == NOT_CHUNKED) {
-    const size_t total_request_len =
-        header_end + std::strlen("\r\n\r\n") +
-        static_cast<size_t>(req->content_length);
+    const size_t total_request_len = header_end + std::strlen("\r\n\r\n") +
+                                     static_cast<size_t>(req->content_length);
     if (buff.length() < total_request_len) {
       req->remnants = buff.substr(header_end + std::strlen("\r\n\r\n"));
       buff.clear();
@@ -125,8 +122,8 @@ Result<Void> Request::parse_body_or_chunked(std::stringstream &ss,
       chunk_end = 0;
     } else {
       const size_t crlf_zero = req->remnants.find("\r\n0\r\n");
-      chunk_end = (crlf_zero == std::string::npos) ? std::string::npos
-                                                   : crlf_zero + 2;
+      chunk_end =
+          (crlf_zero == std::string::npos) ? std::string::npos : crlf_zero + 2;
     }
     if (chunk_end != std::string::npos) {
       const Result<size_t> unchunked = req->unchunk(chunk_end);
@@ -267,9 +264,8 @@ Result<Request *> Request::from_buff(std::string &buff) {
   std::string req_version;
   // 1. Parse request line
   {
-    Result<Void> _prl = Request::parse_request_line(ss, method, req_path,
-                                                   req_version, cl_pos, te_pos,
-                                                   line);
+    Result<Void> _prl = Request::parse_request_line(
+        ss, method, req_path, req_version, cl_pos, te_pos, line);
     if (!_prl.error().empty())
       return ERR(Request *, _prl.error());
   }

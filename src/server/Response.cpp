@@ -1,9 +1,9 @@
 #include "Response.hpp"
-#include "ResponseUtils.hpp"
 #include "DefaultError.hpp"
+#include "ResponseUtils.hpp"
+#include <algorithm>
 #include <iostream>
 #include <sstream>
-#include <algorithm>
 
 static std::ostream &identity_stream(std::ostream &os) { return os; }
 

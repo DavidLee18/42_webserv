@@ -1,6 +1,6 @@
-#include "Server.hpp"
-#include "Response.hpp"
 #include "DefaultError.hpp"
+#include "Response.hpp"
+#include "Server.hpp"
 #include <vector>
 
 Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
@@ -18,7 +18,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
   if (clock_gettime(CLOCK_MONOTONIC, &client.last_activity_time) != 0) {
     std::cerr << utils::error << "failed to update client activity time"
               << std::endl;
-  return ERR(Void, "failed to update client activity time");
+    return ERR(Void, "failed to update client activity time");
   }
   while (true) { // repeat until nothing to read
     char buf[NETWORK_BUFFER_SIZE];
@@ -29,7 +29,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
     if (clock_gettime(CLOCK_MONOTONIC, &client.last_activity_time) != 0) {
       std::cerr << utils::error << "failed to update client activity time"
                 << std::endl;
-  return ERR(Void, "failed to update client activity time");
+      return ERR(Void, "failed to update client activity time");
     }
     ssize_t bytes = recv_res.value();
     if (bytes == 0) { // (EOF)
@@ -48,7 +48,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
       if (!req_.has_value()) {
         std::cerr << utils::error << "request parsing failed: " << req_.error()
                   << std::endl;
-    if (req_.error() == Errors::incomplete_header) { 
+        if (req_.error() == Errors::incomplete_header) {
           if (client.dropping)
             disconnect(client_fd);
           return OK(Void, VOID);
@@ -58,7 +58,11 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
               DefaultError::default_err_response(Response::BAD_REQUEST));
           resp.headers = client.config->get_header();
           resp.print_simple(std::cout);
-           { Result<Void> qr = queue_response(client_fd, resp); if (!qr.has_value()) return ERR(Void, qr.error()); }
+          {
+            Result<Void> qr = queue_response(client_fd, resp);
+            if (!qr.has_value())
+              return ERR(Void, qr.error());
+          }
           return OK(Void, VOID);
         } else if (req_.error() == Errors::not_implemented) {
           Response resp =
@@ -80,7 +84,11 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
             DefaultError::default_err_response(Response::PAYLOAD_TOO_LARGE));
         resp.headers = client.config->get_header();
         resp.print_simple(std::cout);
-          { Result<Void> qr = queue_response(client_fd, resp); if (!qr.has_value()) return ERR(Void, qr.error()); }
+        {
+          Result<Void> qr = queue_response(client_fd, resp);
+          if (!qr.has_value())
+            return ERR(Void, qr.error());
+        }
         return OK(Void, VOID);
       }
       if (client.req->is_partial()) {
@@ -107,7 +115,11 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
             DefaultError::default_err_response(Response::BAD_REQUEST));
         resp.headers = client.config->get_header();
         resp.print_simple(std::cout);
-          { Result<Void> qr = queue_response(client_fd, resp); if (!qr.has_value()) return ERR(Void, qr.error()); }
+        {
+          Result<Void> qr = queue_response(client_fd, resp);
+          if (!qr.has_value())
+            return ERR(Void, qr.error());
+        }
         delete client.req;
         client.req = NULL;
         return OK(Void, VOID);
@@ -126,7 +138,11 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
             DefaultError::default_err_response(Response::PAYLOAD_TOO_LARGE));
         resp.headers = client.config->get_header();
         resp.print_simple(std::cout);
-          { Result<Void> qr = queue_response(client_fd, resp); if (!qr.has_value()) return ERR(Void, qr.error()); }
+        {
+          Result<Void> qr = queue_response(client_fd, resp);
+          if (!qr.has_value())
+            return ERR(Void, qr.error());
+        }
         delete client.req;
         client.req = NULL;
         return OK(Void, VOID);
@@ -141,8 +157,12 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
       continue;
     }
   }
-    { Result<Void> cw = client_write(client_fd); if (!cw.has_value()) return ERR(Void, cw.error()); }
-                           // EPOLLIN | EPOLLOUT
+  {
+    Result<Void> cw = client_write(client_fd);
+    if (!cw.has_value())
+      return ERR(Void, cw.error());
+  }
+  // EPOLLIN | EPOLLOUT
   return OK(Void, VOID);
 }
 
@@ -153,7 +173,7 @@ Result<Void> Server::client_write(const FileDescriptor *client_fd) {
   if (clock_gettime(CLOCK_MONOTONIC, &client.last_activity_time) != 0) {
     std::cerr << utils::error << "failed to update client activity time"
               << std::endl;
-      return ERR(Void, "failed to update client activity time");
+    return ERR(Void, "failed to update client activity time");
   }
   std::string &write_buffer = client.out_buff;
   if (!write_buffer.empty()) {

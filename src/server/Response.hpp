@@ -1,8 +1,8 @@
 #ifndef RESPONSE_HPP
 #define RESPONSE_HPP
 
-#include "../config/ServerConfig.hpp"
 #include "../cgi_1_1/CgiDelegate.hpp"
+#include "../config/ServerConfig.hpp"
 #include "../utils/Errors.hpp"
 #include "../utils/utils.hpp"
 
@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <cerrno>
 #include <ctime>
-#include <sys/stat.h>
 #include <dirent.h>
 #include <fstream>
 #include <sstream>
@@ -25,7 +24,7 @@ class CgiDelegate;
 
 struct Target {
   std::string path; ///< The absolute path to the target resource.
-  int type; ///< The type or status of the target.
+  int type;         ///< The type or status of the target.
 };
 
 struct StatusInfo {
