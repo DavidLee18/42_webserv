@@ -304,7 +304,6 @@ Result<Void> Server::start(char **envp) {
         std::map<FileDescriptor const *,
                  std::pair<const FileDescriptor *, CgiDelegate *> >::iterator
             it = cgis.find(fd);
-
         if (it != cgis.end()) {
           FileDescriptor const *client_fd = it->second.first;
           CgiDelegate *cgi = it->second.second;

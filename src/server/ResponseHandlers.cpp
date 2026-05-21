@@ -400,7 +400,7 @@ Response ResponseHandlers::http_response(
     response.headers = config->get_header();
     return response;
   } else if (request->get_path().find("../") != std::string::npos) {
-    std::cout << utils::error << "request path: " << request->get_path()
+    std::cerr << utils::error << "request path: " << request->get_path()
               << std::endl;
     response = DefaultError::default_err_response(Response::BAD_REQUEST);
     response.headers = config->get_header();
@@ -430,7 +430,7 @@ Response ResponseHandlers::http_response(
               << user_session->user_id << std::endl;
   } else {
     if (request->get_method() == Request::DELETE) {
-      std::cout << utils::error
+      std::cerr << utils::error
                 << "[Authentication] Blocked DELETE request. No valid session."
                 << std::endl;
       response = ResponseErrors::error_response(config, rule,
