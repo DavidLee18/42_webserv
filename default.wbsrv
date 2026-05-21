@@ -60,8 +60,6 @@ cgi =
 	POST /multi-cgi/echo.php $/www-files/cgi-bin/echo.php
 		...5000
 
-	GET /old_stuff/ =301> /new_stuff/
-
 	GET /old_stuff/* =301> /new_stuff/*
 
 	GET /download/*/mp3/*.mp3 =301> /*/mp3/*
