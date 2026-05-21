@@ -27,7 +27,7 @@ PY_URL=${PY_URL:-/multi-cgi/echo.py}
 PHP_URL=${PHP_URL:-/multi-cgi/echo.php}
 VERBOSE=${VERBOSE:-0}
 
-PY_BIN=${PY_BIN:-/opt/pyenv/versions/3.13.1/bin/python3}
+PY_BIN=${PY_BIN:-/usr/bin/python3}
 PHP_BIN=${PHP_BIN:-/usr/bin/php-cgi}
 
 if [[ -t 1 ]]; then
@@ -60,52 +60,6 @@ if (( PY_AVAIL == 0 && PHP_AVAIL == 0 )); then
   exit 0
 fi
 
-# -----------------------------------------------------------------------------
-# Deploy CGI scripts
-# -----------------------------------------------------------------------------
-
-if [[ ! -d $CGI_DIR ]]; then
-  print -- "${C_FAIL}ERROR${C_OFF} CGI_DIR=$CGI_DIR does not exist"
-  exit 2
-fi
-
-if (( PY_AVAIL )); then
-  cat > "$CGI_DIR/echo.py" <<'PY'
-import os, sys, platform
-sys.stdout.write("Content-Type: text/plain\r\n\r\n")
-sys.stdout.write("INTERPRETER=python\n")
-sys.stdout.write(f"PYTHON_VERSION={platform.python_version()}\n")
-sys.stdout.write(f"QUERY_STRING={os.environ.get('QUERY_STRING','')}\n")
-sys.stdout.write(f"CONTENT_TYPE={os.environ.get('CONTENT_TYPE','')}\n")
-sys.stdout.write(f"CONTENT_LENGTH={os.environ.get('CONTENT_LENGTH','')}\n")
-sys.stdout.write(f"REQUEST_METHOD={os.environ.get('REQUEST_METHOD','')}\n")
-try:
-    cl = int(os.environ.get('CONTENT_LENGTH','0') or '0')
-except ValueError:
-    cl = 0
-body = sys.stdin.read(cl) if cl > 0 else ''
-sys.stdout.write(f"BODY={body}\n")
-PY
-  print -- "${C_DIM}deployed: $CGI_DIR/echo.py${C_OFF}"
-fi
-
-if (( PHP_AVAIL )); then
-  cat > "$CGI_DIR/echo.php" <<'PHP'
-<?php
-header("Content-Type: text/plain");
-echo "INTERPRETER=php\n";
-echo "PHP_VERSION=" . phpversion() . "\n";
-echo "QUERY_STRING=" . getenv('QUERY_STRING') . "\n";
-echo "CONTENT_TYPE=" . getenv('CONTENT_TYPE') . "\n";
-echo "CONTENT_LENGTH=" . getenv('CONTENT_LENGTH') . "\n";
-echo "REQUEST_METHOD=" . getenv('REQUEST_METHOD') . "\n";
-$cl = intval(getenv('CONTENT_LENGTH') ?: 0);
-$body = $cl > 0 ? file_get_contents('php://input') : '';
-echo "BODY=" . $body . "\n";
-PHP
-  print -- "${C_DIM}deployed: $CGI_DIR/echo.php${C_OFF}"
-fi
-print -- ""
 
 # -----------------------------------------------------------------------------
 # Route block reminder

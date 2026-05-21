@@ -13,9 +13,7 @@ WebserverConfig::WebserverConfig(FileDescriptor &file, char **envp) {
         !std::isdigit(static_cast<unsigned char>(err_meg[0])))
       err_meg = oss.str() + " " + err_meg;
     return;
-  }
-  return;
-}
+}}
 
 Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
   std::string line;
@@ -214,28 +212,6 @@ Result<Void> WebserverConfig::parse_types_block(FileDescriptor &file) {
   return OKV;
 }
 
-bool WebserverConfig::is_server_config_header(const std::string &line) {
-  std::size_t i = 1;
-
-  if (line.empty())
-    return false;
-  if (line[0] != ':')
-    return false;
-  if (i >= line.size() || !std::isdigit(static_cast<unsigned char>(line[i])))
-    return false;
-  while (i < line.size() && std::isdigit(static_cast<unsigned char>(line[i])))
-    ++i;
-  if (i < line.size() && line[i] == ' ') {
-    ++i;
-    if (i < line.size() && line[i] == ' ')
-      return false;
-  }
-  if (i >= line.size() || line[i] != '=')
-    return false;
-  ++i;
-  return (i == line.size());
-}
-
 Result<Void> WebserverConfig::parse_server_config_entry(FileDescriptor &file,
                                                         const std::string &line,
                                                         char **envp) {
@@ -268,13 +244,13 @@ Result<Void> WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   return OKV;
 }
 
-std::string WebserverConfig::parse_server_port(const std::string &key) {
-  std::size_t i = 1;
-  std::size_t start = i;
+std::string WebserverConfig::parse_server_port(const std::string& key) {
+    std::size_t i     = 1;
+    std::size_t start = i;
 
-  while (i < key.size() && std::isdigit(static_cast<unsigned char>(key[i])))
-    ++i;
-  return key.substr(start, i - start);
+    while (i < key.size() && std::isdigit(static_cast<unsigned char>(key[i])))
+        ++i;
+    return key.substr(start, i - start);
 }
 
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {

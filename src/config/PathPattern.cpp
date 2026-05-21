@@ -1,79 +1,72 @@
 #include "PathPattern.hpp"
 
-bool PathPattern::wildcard_match(const std::string &pattern,
-                                 const std::string &target) const {
-  std::size_t p = 0;
-  std::size_t t = 0;
+bool PathPattern::wildcard_match(const std::string& pattern,
+                                 const std::string& target) const {
+    std::size_t p          = 0;
+    std::size_t t          = 0;
 
-  std::size_t last_star = std::string::npos;
-  std::size_t last_match = std::string::npos;
+    std::size_t last_star  = std::string::npos;
+    std::size_t last_match = std::string::npos;
 
-  while (t < target.size()) {
-    if (p < pattern.size() && pattern[p] != '*' && pattern[p] == target[t]) {
-      ++p;
-      ++t;
-    } else if (p < pattern.size() && pattern[p] == '*') {
-      last_star = p;
-      last_match = t;
-      ++p;
-      ++t;
-    } else if (last_star != std::string::npos) {
-      ++last_match;
-      if (last_match >= target.size())
-        return false;
-      p = last_star + 1;
-      t = last_match + 1;
-    } else {
-      return false;
+    while (t < target.size()) {
+        if (p < pattern.size() && pattern[p] != '*' &&
+            pattern[p] == target[t]) {
+            ++p;
+            ++t;
+        } else if (p < pattern.size() && pattern[p] == '*') {
+            last_star  = p;
+            last_match = t;
+            ++p;
+            ++t;
+        } else if (last_star != std::string::npos) {
+            ++last_match;
+            if (last_match >= target.size()) return false;
+            p = last_star + 1;
+            t = last_match + 1;
+        } else {
+            return false;
+        }
     }
-  }
 
-  if (p < pattern.size())
-    return false;
+    if (p < pattern.size()) return false;
 
-  return true;
+    return true;
 }
 
-bool PathPattern::matches(const PathPattern &other) const {
-  std::string pattern = this->to_string();
-  std::string target = other.to_string();
+bool PathPattern::matches(const PathPattern& other) const {
+    std::string pattern = this->to_string();
+    std::string target  = other.to_string();
 
-  if (pattern.find('*') != std::string::npos)
-    return wildcard_match(pattern, target);
+    if (pattern.find('*') != std::string::npos)
+        return wildcard_match(pattern, target);
 
-  if (!pattern.empty() && pattern[pattern.size() - 1] == '/')
-    return target.find(pattern) == 0;
+    if (!pattern.empty() && pattern[pattern.size() - 1] == '/')
+        return target.find(pattern) == 0;
 
-  return pattern == target;
+    return pattern == target;
 }
 
-bool PathPattern::matches(const std::string &pathStr) const {
-  return matches(PathPattern(pathStr));
+bool PathPattern::matches(const std::string& pathStr) const {
+    return matches(PathPattern(pathStr));
 }
 
 std::string PathPattern::to_string() const {
-  if (path.empty()) {
-    return "";
-  }
-  if (path.size() == 1)
-    return path[0];
-  std::string result;
-  for (size_t i = 0; i < path.size(); ++i) {
-    if (i != 0)
-      result += "/";
-    if (path[i] != "/")
-      result += path[i];
-  }
-  return result;
+    if (path.empty()) { return ""; }
+    if (path.size() == 1) return path[0];
+    std::string result;
+    for (size_t i = 0; i < path.size(); ++i) {
+        if (i != 0) result += "/";
+        if (path[i] != "/") result += path[i];
+    }
+    return result;
 }
 
-static std::size_t count_wildcards(const std::string &str) {
-  std::size_t count = 0;
-  for (std::size_t i = 0; i < str.size(); ++i) {
-    if (str[i] == '*')
-      ++count;
-  }
-  return count;
+static std::size_t count_wildcards(const std::string& str) {
+    std::size_t count = 0;
+    for (std::size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '*') ++count;
+    }
+    return count;
 }
 
 Result<std::string>
@@ -235,7 +228,7 @@ PathPattern::replace_wildcards(const std::string &rewrite_target,
     } else {
       result += rewrite_target[i];
     }
-  }
+    }
 
   if (wild_index != wildcards.size())
     return ERR(std::string, PathPatternError::REPLACE_FEWER_PLACEHOLDERS_THAN_VALUES);
