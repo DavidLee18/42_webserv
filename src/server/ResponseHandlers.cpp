@@ -418,13 +418,12 @@ Response ResponseHandlers::http_response(
   }
 
   Result<size_t> res_content_len = request->get_content_length();
-  if (!res_content_len.has_value())
-    return ResponseErrors::error_response(config, rule, Response::FORBIDDEN,
-                                          envp);
-  size_t content_len = res_content_len.value();
-  if (content_len > static_cast<size_t>(rule->max_body_KB * 1024))
-    return ResponseErrors::error_response(config, rule,
-                                          Response::PAYLOAD_TOO_LARGE, envp);
+  if (res_content_len.has_value()) {
+    size_t content_len = res_content_len.value();
+    if (content_len > static_cast<size_t>(rule->max_body_KB * 1024))
+      return ResponseErrors::error_response(config, rule,
+                                            Response::PAYLOAD_TOO_LARGE, envp);
+  }
 
   response.headers = config->get_header();
   const Target target =
@@ -455,13 +454,13 @@ Response ResponseHandlers::http_response(
   }
 
   if (!user_session && !rule->auth_info.empty()) {
-      std::cerr << utils::error
-                << "[Authentication] Blocked DELETE request. No valid session."
-                << std::endl;
-      response = ResponseErrors::error_response(config, rule,
-                                                Response::UNAUTHORIZED, envp);
-      response.headers = config->get_header();
-      return response;
+    std::cerr << utils::error
+              << "[Authentication] Blocked DELETE request. No valid session."
+              << std::endl;
+    response = ResponseErrors::error_response(config, rule,
+                                              Response::UNAUTHORIZED, envp);
+    response.headers = config->get_header();
+    return response;
   }
 
   switch (request->get_method()) {
