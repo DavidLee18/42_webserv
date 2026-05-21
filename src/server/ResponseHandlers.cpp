@@ -375,14 +375,6 @@ Response ResponseHandlers::get_method_response(Target target, Response response,
       target.type = Response::OK;
       response.status_code = Response::OK;
       file.close();
-      Result<std::string> etag_result =
-          ResponseUtils::compute_etag(target.path);
-      if (etag_result.has_value())
-        response.headers["ETag"] = etag_result.value();
-      Result<std::string> lm_result =
-          ResponseUtils::get_last_modified(target.path);
-      if (lm_result.has_value())
-        response.headers["Last-Modified"] = lm_result.value();
     } else {
       return ResponseErrors::error_response(config, rule, Response::NOT_FOUND,
                                             envp);
@@ -471,7 +463,6 @@ Response ResponseHandlers::http_response(
     response = post_method_response(target, response, client, rule, request,
                                     session, envp);
     break;
-  case Request::HEAD:
   case Request::GET:
     response =
         get_method_response(target, response, config, rule, request, envp);
@@ -485,38 +476,8 @@ Response ResponseHandlers::http_response(
     break;
   }
 
-  response.headers = config->get_header();
-  response.keep_alive = request->has_keep_alive();
   if (response.file_path.empty())
     response.content_length = response.body.length();
-  if (request->get_method() == Request::HEAD)
-    response.body.clear();
-
-  if (response.status_code == Response::OK ||
-      response.status_code == Response::MOVED_PERMANENTLY ||
-      response.status_code == Response::FOUND) {
-    std::string if_none_match =
-        get_string_from_map(request->get_headers(), "If-None-Match");
-    if (!if_none_match.empty() && !response.headers["ETag"].empty()) {
-      if (if_none_match == "*" || if_none_match == response.headers["ETag"]) {
-        response.status_code = Response::NOT_MODIFIED;
-        response.body.clear();
-        response.content_length = 0;
-        return response;
-      }
-    }
-    std::string if_modified_since =
-        get_string_from_map(request->get_headers(), "If-Modified-Since");
-    if (!if_modified_since.empty() &&
-        !response.headers["Last-Modified"].empty()) {
-      if (response.headers["Last-Modified"] <= if_modified_since) {
-        response.status_code = Response::NOT_MODIFIED;
-        response.body.clear();
-        response.content_length = 0;
-        return response;
-      }
-    }
-  }
 
   if (response.content_type.empty()) {
     std::string ext = ResponseUtils::find_file_type(target.path);

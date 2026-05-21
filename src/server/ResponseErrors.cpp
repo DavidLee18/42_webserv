@@ -11,7 +11,6 @@ Response ResponseErrors::error_response(const ServerConfig *config,
                                         char **envp) {
   std::string err_page = utils::get_env("PWD", envp) +
                          get_string_from_map(rule->error_pages, error_code);
-
   if (err_page.empty())
     return DefaultError::default_err_response(error_code);
 

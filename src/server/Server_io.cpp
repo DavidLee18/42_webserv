@@ -73,28 +73,7 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
           return OKV;
         }
       }
-
       client.req = req_.value();
-      const Result<size_t> req_cl = client.req->get_content_length();
-      Result<RouteRule> rule_res = client.config->find_route(
-          client.req->get_method(), client.req->get_path());
-      if (!rule_res.has_value()) {
-        Response resp(DefaultError::default_err_response(Response::NOT_FOUND));
-        resp.headers = client.config->get_header();
-        resp.print_simple(std::cout);
-        TRY_(Void, Void, queue_response(client_fd, resp))
-        return OKV;
-      }
-      RouteRule rule = rule_res.value();
-      if (req_cl.has_value() &&
-          req_cl.value() > static_cast<size_t>(rule.max_body_KB) * 1024) {
-        Response resp(
-            DefaultError::default_err_response(Response::PAYLOAD_TOO_LARGE));
-        resp.headers = client.config->get_header();
-        resp.print_simple(std::cout);
-        TRY_(Void, Void, queue_response(client_fd, resp))
-        return OKV;
-      }
       if (client.req->is_partial()) {
         if (client.dropping)
           disconnect(client_fd);
