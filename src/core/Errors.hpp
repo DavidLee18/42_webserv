@@ -1,10 +1,10 @@
-#ifndef ERRORS_H
-#define ERRORS_H
+#ifndef ERRORS_HPP
+#define ERRORS_HPP
 
 #include <string>
 
 class Errors {
-  virtual void phantom() = 0;
+    virtual void phantom() = 0;
 
 public:
   const static std::string invalid_fd;
@@ -23,6 +23,7 @@ public:
   const static std::string addr_loop;
   const static std::string name_too_long;
   const static std::string not_found;
+  const static std::string forbidden;
   const static std::string readonly_filesys;
   const static std::string try_again;
   const static std::string conn_aborted;

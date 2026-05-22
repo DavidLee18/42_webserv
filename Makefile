@@ -1,5 +1,5 @@
 CXX				:= c++
-CXXFLAGS_COMMON	:= -Wall -Werror -Wextra -Wconversion -std=c++98 -DCONFIG_DEBUG
+CXXFLAGS_COMMON	:= -Wall -Werror -Wextra -Wconversion -std=c++98
 CXXFLAGS		:= -O2 -foptimize-sibling-calls
 DEBUG_CXXFLAGS	:= -fsanitize=address -g3 -O0 -fno-omit-frame-pointer -fno-inline
 NAME			:= webserv
@@ -7,14 +7,18 @@ NAME			:= webserv
 BUILD_DIR := build
 SRC_DIR := src
 
-SRC_FILES	:= Errors.cpp EPoll_KQueue.cpp FileDescriptor.cpp utils.cpp main.cpp
-SERVER		:= Server.cpp Client.cpp Response.cpp DefaultError.cpp Session.cpp
+MAIN		:= main.cpp
+SERVER		:= Server.cpp Server_connections.cpp Server_io.cpp Server_dispatch.cpp \
+				Client.cpp Response.cpp ResponseUtils.cpp ResponseErrors.cpp	\
+				MultipartParser.cpp ResponseHandlers.cpp DefaultError.cpp Session.cpp	\
+				AutoindexResponse.cpp
 CONFIG		:= WebserverConfig.cpp ServerConfig.cpp RouteRule_CGI.cpp PathPattern.cpp ConfigError.cpp
 CGI         := CgiAuthType.cpp CgiMetaVar.cpp EtcMetaVar.cpp ServerName.cpp ContentType.cpp \
-	CgiDelegate.cpp CgiInput.cpp
+				CgiDelegate.cpp CgiInput.cpp
+CORE		:= Errors.cpp EPoll.cpp FileDescriptor.cpp utils.cpp 
 
-SRC_DIRS	:= server config cgi_1_1
-SRCS		:= $(SRC_FILES) $(CONFIG) $(SERVER) $(CGI)
+SRC_DIRS	:= server config cgi_1_1 core
+SRCS		:= $(MAIN) $(CONFIG) $(SERVER) $(CGI) $(CORE)
 
 OBJS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.o))
 DEPS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.d))
