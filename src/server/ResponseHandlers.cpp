@@ -452,7 +452,7 @@ Response ResponseHandlers::http_response(
 
   if (!user_session && !rule->auth_info.empty()) {
     std::cerr << utils::error
-              << "[Authentication] Blocked DELETE request. No valid session."
+              << "[Authentication] No valid session."
               << std::endl;
     response = ResponseErrors::error_response(config, rule,
                                               Response::UNAUTHORIZED, envp);

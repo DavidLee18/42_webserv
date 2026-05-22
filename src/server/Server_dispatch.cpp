@@ -44,10 +44,12 @@ Result<Void> Server::dispatch_request(const FileDescriptor *client_fd,
                                                   mime_type, &sessions, envp);
   http.print_simple(std::cout);
 
+  Result<Void> qr = queue_response(client_fd, http);
   delete client.req;
   client.req = NULL;
+  if (!qr.has_value())
+    return ERR(Void, qr.error());
 
-  TRY_(Void, Void, queue_response(client_fd, http))
   return OKV;
 }
 
@@ -84,7 +86,7 @@ Result<Void> Server::queue_response(const FileDescriptor *client_fd,
       client.out_buff += ss.str();
       client.out_file_path = response.file_path;
       client.out_file_offset = 0;
-      if (!client.out_file_path.empty() && client.req) {
+      if (!client.out_file_path.empty()) {
         if (client.req->get_method() == Request::GET)
           client.streaming_file = true;
       } else {
