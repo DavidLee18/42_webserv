@@ -112,16 +112,10 @@ bool utils::has_trailing_space(const std::string& str) {
 
 bool utils::is_header_name(const std::string& name) {
     if (name.empty()) return false;
-    for (std::string::const_iterator it = name.begin(); it != name.end();
-         ++it) {
-        const char c = *it;
-        if (!std::isalnum(c) && c != '!' && c != '#' && c != '$' && c != '%' &&
-            c != '&' && c != '\'' && c != '*' && c != '+' && c != '-' &&
-            c != '.' && c != '^' && c != '_' && c != '`' && c != '|' &&
-            c != '~')
-            return false;
-    }
-    return true;
+    const size_t not_headder_name_pos =
+        name.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTU"
+                               "VWXYZ0123456789!#$%&\'*+-.^_`|~");
+    return not_headder_name_pos == std::string::npos;
 }
 
 bool utils::is_header_value(const std::string& value) {
@@ -255,6 +249,16 @@ std::string configutils::check_html_file(const std::string& path, char** envp) {
         return "Invalid HTML file (no read permission).";
 
     return "";
+}
+
+Result<Void> configutils::prepare_config_line(std::string& origin_line,
+                                              std::string& line, size_t level) {
+    origin_line = utils::remove_char(line, '\n');
+    std::string err_meg =
+        configutils::get_indent_whitespace_error(origin_line, level);
+    if (err_meg != "") return ERR(Void, err_meg);
+    line = utils::trim_whitespace(origin_line);
+    return OKV;
 }
 
 unsigned char utils::to_upper(const unsigned char c) {

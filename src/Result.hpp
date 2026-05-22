@@ -126,11 +126,13 @@ template <typename T> class Result {
     }
 
 #define TRYF(t, rt, v, r, f)                                                   \
-    Result<rt> _result = r;                                                    \
-    if (!_result.error().empty()) {                                            \
-        (f) return ERR(t, _result.error());                                    \
-    } else {                                                                   \
-        (v) = _result.value();                                                 \
+    {                                                                          \
+        Result<rt> _result = r;                                                \
+        if (!_result.error().empty()) {                                        \
+            (f) return ERR(t, _result.error());                                \
+        } else {                                                               \
+            (v) = _result.value();                                             \
+        }                                                                      \
     }
 
 struct Void {};
@@ -151,10 +153,13 @@ struct Void {};
 #define ERR_PAIR(t1, t2, e) Result<std::pair<t1, t2> >(e)
 
 #define TRY_PAIR(t1, t2, v, r)                                                 \
-    if ((r).error().empty()) {                                                 \
-        (v) = (r).value();                                                     \
-    } else {                                                                   \
-        return (r);                                                            \
+    {                                                                          \
+        Result<t1, t2> _result = r;                                            \
+        if ((_result).error().empty()) {                                       \
+            (v) = (_result).value();                                           \
+        } else {                                                               \
+            return (_result);                                                  \
+        }                                                                      \
     }
 
 #endif // RESULT_H

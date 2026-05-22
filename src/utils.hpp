@@ -37,8 +37,10 @@ unsigned char to_upper(unsigned char);
 } // namespace utils
 
 namespace configutils {
-std::string string_to_unsigned_int(const std::string& str, unsigned int& num);
-std::string get_indent_whitespace_error(const std::string& line, size_t level);
-std::string check_html_file(const std::string& path, char** envp);
+std::string  string_to_unsigned_int(const std::string& str, unsigned int& num);
+std::string  get_indent_whitespace_error(const std::string& line, size_t level);
+std::string  check_html_file(const std::string& path, char** envp);
+Result<Void> prepare_config_line(std::string& origin_line, std::string& line,
+                                 size_t level);
 } // namespace configutils
 #endif

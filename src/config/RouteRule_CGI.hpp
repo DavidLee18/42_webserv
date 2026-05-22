@@ -20,21 +20,22 @@ class RouteRule_CGI {
     std::size_t              count_line;
     std::vector<std::string> file_extension;
 
-  static bool is_valid_timeout(const std::string &line);
-  Result<Void> parse_cgi_block(FileDescriptor &fd, std::string line,
-                               char **envp);
-  Result<Void> parse_env_entry(const std::string &line,
-                               std::map<std::string, std::string> &env);
-  Result<Void> parse_routerule_cgi_executable(
-      const std::string &line, std::string &executable,
-      std::map<std::string, std::string> &env, char **envp);
+    static bool              is_valid_timeout(const std::string& line);
+    Result<Void> parse_cgi_block(FileDescriptor& fd, std::string line,
+                                 char** envp);
+    Result<Void> parse_env_entry(const std::string&                  line,
+                                 std::map<std::string, std::string>& env);
+    Result<Void> parse_routerule_cgi_executable(
+        const std::string& line, std::string& executable,
+        std::map<std::string, std::string>& env, char** envp);
 
-  Result<Void> matches_routerule_cgi_syntax(const std::string &line,
-                                            char **envp);
-  Result<Void> parse_cgi_params(FileDescriptor &fd);
-  static Result<Void> is_executable_file(const std::string &origin_line,
-                                         const std::string &path,
-                                         bool allow_absolute_path, char **envp);
+    Result<Void>        matches_routerule_cgi_syntax(const std::string& line,
+                                                     char**             envp);
+    Result<Void>        parse_cgi_params(FileDescriptor& fd);
+    static Result<Void> is_executable_file(const std::string& origin_line,
+                                           const std::string& path,
+                                           bool   allow_absolute_path,
+                                           char** envp);
 
   public:
     RouteRule_CGI()
@@ -66,12 +67,12 @@ class RouteRule_CGI {
     const std::size_t&  get_count_line(void) const { return count_line; }
     const unsigned int& get_timeout_ms() const { return timeout_ms; }
 
-  static bool is_valid_env_key(const std::string &key);
-  static bool is_valid_cgi_config(std::string line);
-  static Result<Void>
-  parse_global_cgi_block(FileDescriptor &fd,
-                         std::map<std::string, std::string> &global_cgi,
-                         std::size_t &count_line, char **envp);
+    static bool         is_valid_env_key(const std::string& key);
+    static bool         is_valid_cgi_config(std::string line);
+    static Result<Void>
+    parse_global_cgi_block(FileDescriptor&                     fd,
+                           std::map<std::string, std::string>& global_cgi,
+                           std::size_t& count_line, char** envp);
 };
 
 std::ostream& operator<<(std::ostream& os, const RouteRule_CGI& data);

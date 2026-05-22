@@ -8,20 +8,7 @@
 
 #include <sys/epoll.h>
 
-/**
- * @class Option
- * @brief A class representing configuration options for epoll events.
- *
- * Option encapsulates a set of flags that define the behavior of epoll
- * operations, such as edge-triggered mode, one-shot behavior, wake-up events,
- * and exclusive event handling.
- *
- * IMPORTANT: When using edge-triggered mode (et=true), file descriptors MUST be
- * set to non-blocking mode using FileDescriptor::set_nonblocking(). This is
- * because edge-triggered mode only notifies once per state change, requiring
- * the application to drain all available data in a loop. Without non-blocking
- * mode, operations could block indefinitely, freezing the event loop.
- */
+// A class representing configuration options for epoll events.
 class Option {
   public:
     Option(const bool et, const bool oneshot, const bool wakeup,
@@ -39,15 +26,7 @@ class Option {
     Option& operator=(const Option&); // Immutable - no assignment
 };
 
-/**
- * @class Event
- * @brief A class to encapsulate event data for epoll-based operations.
- *
- * The Event class represents an individual event associated with a file
- * descriptor, capturing various event flags such as readability, writability,
- * and error states. It is used for monitoring the state and activity of file
- * descriptors in the context of an epoll event loop.
- */
+// A class to encapsulate event data for epoll-based operations.
 class Event {
   public:
     Event(const FileDescriptor* fd, const bool in, const bool out,
@@ -69,18 +48,7 @@ class Event {
     Event& operator=(const Event&); // Immutable - no assignment
 };
 
-/**
- * @class Events
- * @brief An input iterator class for traversing epoll events.
- *
- * The Events class provides an interface to iterate over a collection of
- * epoll events. It encapsulates event data and supports standard input iterator
- * operations such as increment, equality comparison, and dereferencing.
- *
- * This class is specifically designed to work with epoll-based event
- * collections, facilitating efficient iteration over the events with proper
- * handling of underlying resources.
- */
+// An input iterator class for traversing epoll events.
 class Events : public std::iterator<std::input_iterator_tag, Event, long,
                                     const Event*, const Event&> {
     size_t _curr;
@@ -114,20 +82,7 @@ class Events : public std::iterator<std::input_iterator_tag, Event, long,
     Events& operator=(const Events&);
 };
 
-/**
- * @class EPoll
- * @brief A simple epoll wrapper class.
- *
- * This class wraps the Linux epoll API for scalable I/O event notification.
- * When using edge-triggered mode (EPOLLET), file descriptors MUST be set to
- * non-blocking mode. See Option class documentation for details.
- *
- * Typical usage pattern:
- * 1. Create EPoll instance with EPoll::create()
- * 2. Create socket and call FileDescriptor::set_nonblocking()
- * 3. Add socket to EPoll with add_fd() using edge-triggered Option
- * 4. In event loop, drain all data with while(!EWOULDBLOCK) pattern
- */
+// A simple epoll wrapper class.
 class EPoll {
     FileDescriptor            _fd;
     std::list<FileDescriptor> _events;
