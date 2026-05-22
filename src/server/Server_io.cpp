@@ -191,49 +191,64 @@ Result<Void> Server::client_write(const FileDescriptor *client_fd) {
   }
 
   // Stream file in chunks: keep reading and queuing until EOF or buffer fills
+  std::ifstream infile(client.out_file_path.c_str(), std::ios::binary);
+  if (!infile.is_open()) {
+    if (client.dropping)
+      disconnect(client_fd);
+    return OKV;
+  }
+  infile.seekg(static_cast<std::streamoff>(client.out_file_offset));
+  if (infile.fail()) {
+    std::cerr << utils::error << "Stream error: Failed to seek to offset "
+              << client.out_file_offset << " for file " << client.out_file_path
+              << std::endl;
+    client.streaming_file = false;
+    client.out_file_path.clear();
+    if (client.dropping && client.out_buff.empty()) {
+      disconnect(client_fd);
+    }
+    return OKV;
+  }
   while (client.streaming_file && write_buffer.empty()) {
     const size_t CHUNK = NETWORK_BUFFER_SIZE; // 4096
     std::vector<char> buf(CHUNK);
-    if (client.out_file_path.empty()) {
+    infile.read(buf.data(), static_cast<std::streamsize>(CHUNK));
+    std::streamsize read_bytes = infile.gcount();
+    if (infile.fail() && !infile.eof()) {
+      std::cerr << utils::error << "Stream error: I/O read failure on "
+                << client.out_file_path << std::endl;
       client.streaming_file = false;
-      break;
-    } else {
-      std::ifstream infile(client.out_file_path.c_str(), std::ios::binary);
-      if (!infile.is_open()) {
-        client.streaming_file = false;
-        if (client.dropping)
-          disconnect(client_fd);
-        return OKV;
+      client.out_file_path.clear();
+      if (client.dropping && client.out_buff.empty()) {
+        disconnect(client_fd);
       }
-      infile.seekg(static_cast<std::streamoff>(client.out_file_offset));
-      infile.read(buf.data(), static_cast<std::streamsize>(CHUNK));
-      std::streamsize read_bytes = infile.gcount();
-      if (read_bytes > 0) {
-        client.out_file_offset += static_cast<size_t>(read_bytes);
-        client.out_buff.append(buf.data(), static_cast<size_t>(read_bytes));
-        // Try sending what we just read
-        while (!client.out_buff.empty()) {
-          Result<ssize_t> send_res = client_fd->sock_send(
-              client.out_buff.c_str(), client.out_buff.length());
-          if (!send_res.has_value()) {
-            std::cout << utils::info << "stream: send would block, remaining="
-                      << client.out_buff.size() << std::endl;
-            break;
-          }
-          const ssize_t bytes = send_res.value();
-          if (bytes == 0)
-            break;
-          client.out_buff.erase(0, static_cast<std::size_t>(bytes));
+      return OKV;
+    }
+    if (read_bytes > 0) {
+      client.out_file_offset += static_cast<size_t>(read_bytes);
+      client.out_buff.append(buf.data(), static_cast<size_t>(read_bytes));
+      // Try sending what we just read
+      while (!client.out_buff.empty()) {
+        Result<ssize_t> send_res = client_fd->sock_send(
+            client.out_buff.c_str(), client.out_buff.length());
+        if (!send_res.has_value()) {
+          std::cout << utils::info << "stream: send would block, remaining="
+                    << client.out_buff.size() << std::endl;
+          break;
         }
+        const ssize_t bytes = send_res.value();
+        if (bytes == 0)
+          break;
+        client.out_buff.erase(0, static_cast<std::size_t>(bytes));
       }
+    }
 
-      if (infile.eof()) {
-        client.streaming_file = false;
-        client.out_file_path.clear();
-        if (client.dropping && client.out_buff.empty())
-          disconnect(client_fd);
-        break;
-      }
+    if (infile.eof()) {
+      client.streaming_file = false;
+      client.out_file_path.clear();
+      if (client.dropping && client.out_buff.empty())
+        disconnect(client_fd);
+      break;
     }
     // If buffer is not empty after send, break to wait for next EPOLLOUT event
     if (!write_buffer.empty())
