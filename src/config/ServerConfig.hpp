@@ -38,13 +38,13 @@ struct RouteRule {
 
 class ServerConfig {
 private:
+  // Final parsed values for this server block.
   std::map<std::string, std::string> header;
   unsigned int server_response_time_ms;
   std::vector<RouteRule> routes;
   std::vector<RouteRule_CGI> R_CGI;
   std::vector<std::string> file_extension;
-
-private:
+  // Temporary state used only while parsing this server block.
   int end_flag;
   std::string err_meg;
   std::string origin_line;

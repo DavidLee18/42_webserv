@@ -8,13 +8,13 @@
 
 class WebserverConfig {
 private:
-  std::string origin_line;
+  // Final parsed configuration values.
   std::string default_mime;
   std::map<std::string, std::string> global_cgi;
   std::map<std::string, std::string> type_map;
   std::map<unsigned int, ServerConfig> serverconfig_map;
-
-private:
+  // Temporary state used only during config parsing.
+  std::string origin_line;
   std::string err_meg;
   std::size_t count_line;
 
