@@ -112,10 +112,10 @@ bool utils::has_trailing_space(const std::string& str) {
 
 bool utils::is_header_name(const std::string& name) {
     if (name.empty()) return false;
-    const size_t not_headder_name_pos =
+    const size_t not_header_name_pos =
         name.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTU"
                                "VWXYZ0123456789!#$%&\'*+-.^_`|~");
-    return not_headder_name_pos == std::string::npos;
+    return not_header_name_pos == std::string::npos;
 }
 
 bool utils::is_header_value(const std::string& value) {
