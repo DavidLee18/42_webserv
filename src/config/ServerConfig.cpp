@@ -631,11 +631,6 @@ ServerConfig::get_rewritten_path(Request::Method method,
   return OK(std::string, result);
 }
 
-std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
-  os << data.to_string();
-  return (os);
-}
-
 static std::string what_RuleOperator(const RuleOperator op) {
   if (op == MULTIPLE_CHOICES)
     return ("MULTIPLE_CHOICES (=300>)");

@@ -110,6 +110,5 @@ public:
 };
 
 std::ostream &operator<<(std::ostream &os, const ServerConfig &data);
-std::ostream &operator<<(std::ostream &os, const PathPattern &data);
 
 #endif

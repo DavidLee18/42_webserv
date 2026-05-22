@@ -181,7 +181,8 @@ std::string utils::get_env(std::string const &name, char **envp) {
 std::string configutils::get_indent_whitespace_error(const std::string &line,
                                                      size_t level) {
   std::size_t indent_level = utils::return_indent_level(line);
-  std::string err_line = "";
+  std::string prefix = "on [" + line + "]: ";
+  std::string err_line;
 
   if (line.empty()) {
     if (level == 0)
@@ -193,8 +194,7 @@ std::string configutils::get_indent_whitespace_error(const std::string &line,
            l_oss.str() + ", found: 0)";
   }
   if (level != 0 && line[0] != '\t') {
-    err_line += "on [" + line +
-                "]: It is not a valid indentation character (expected "
+    err_line = prefix + "It is not a valid indentation character (expected "
                 "indentation character: ['\\t'], found: [" +
                 line[0] + "])";
   } else if ((level == 0 && std::isspace(line[0])) || indent_level != level) {
@@ -211,16 +211,15 @@ std::string configutils::get_indent_whitespace_error(const std::string &line,
     }
     i_oss << indent_level;
 
-    err_line +=
-        "on [" + line +
-        "]: It is not a valid indentation level(expected indentation level: " +
+    err_line =
+        prefix + "It is not a valid indentation level(expected indentation level: " +
         l_oss.str() + ", found: " + i_oss.str() + ")";
     return err_line;
   } else if (utils::has_leading_space(line.substr(level))) {
-    err_line += "on [" + line + "]: Leading whitespace exists.";
+    err_line = prefix + "Leading whitespace exists.";
     return err_line;
   } else if (utils::has_trailing_space(line)) {
-    err_line += "on [" + line + "]: Trailing whitespace exists.";
+    err_line = prefix + "Trailing whitespace exists.";
     return err_line;
   }
   return err_line;
@@ -231,22 +230,18 @@ std::string configutils::string_to_unsigned_int(const std::string &str,
   errno = 0;
   char *end;
   unsigned long temp = std::strtoul(str.c_str(), &end, 10);
+  std::string prefix = "Invalid unsigned integer ";
 
   if (str.empty())
-    return "Invalid value (the unsigned integer conversion rule is violated "
-           "because the value is empty).";
+    return  prefix + "(value is empty.)";
 
   if (str[0] == '0') {
     if (str.size() != 1)
-      return "Invalid value (the unsigned integer leading zero rule is "
-             "violated because the value must not contain leading zeros).";
+      return "(leading zeros are not allowed).";;
   } else if (*end != '\0')
-    return "Invalid value (the unsigned integer conversion rule is violated "
-           "because the value cannot be fully converted as a base-10 unsigned "
-           "integer)";
+    return prefix + "(value contains non-digit characters).";
   else if (errno == ERANGE || temp > std::numeric_limits<unsigned int>::max())
-    return "Invalid value (the unsigned integer range rule is violated because "
-           "the value is outside the range of unsigned int).";
+    return prefix + "(value is out of unsigned int range).";
   num = static_cast<unsigned int>(temp);
   return "";
 }
@@ -254,19 +249,20 @@ std::string configutils::string_to_unsigned_int(const std::string &str,
 std::string configutils::check_html_file(const std::string &path, char **envp) {
 
   std::string real_path = utils::get_env("PWD", envp) + "/" + path;
+  std::string prefix = "Invalid HTML file ";
   struct stat st;
   if (stat(real_path.c_str(), &st) != 0)
-    return "Invalid HTML file (file does not exist or cannot be accessed).";
+    return prefix + "(file does not exist or cannot be accessed).";
 
   if (!S_ISREG(st.st_mode))
-    return "Invalid HTML file (path is not a regular file).";
+    return prefix + "(path is not a regular file).";
 
   if (real_path.length() < 5 ||
       real_path.substr(real_path.length() - 5) != ".html")
-    return "Invalid HTML file (file extension must be .html).";
+    return prefix + "(file extension must be .html).";
 
   if (access(real_path.c_str(), R_OK) != 0)
-    return "Invalid HTML file (no read permission).";
+    return prefix + "(no read permission).";
 
   return "";
 }

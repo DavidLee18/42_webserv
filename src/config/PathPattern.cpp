@@ -329,3 +329,8 @@ Result<std::string> PathPattern::rewrite_path(const PathPattern &request_pattern
   TRY(std::string, std::string, new_path, rewrite_exact_path(route_pattern, request_path, rewrite_target))
   return OK(std::string, new_path);
 }
+
+std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
+  os << data.to_string();
+  return (os);
+}
