@@ -13,16 +13,21 @@ Result<CgiDelegate> CgiDelegate::from_req(
     const Request& req, EPoll& ep, const RouteRule_CGI& rule,
     std::map<std::string, std::string> const& cgi_interpreters, char** envp) {
     CgiDelegate del(req, ep);
+
     TRY(CgiDelegate, CgiInput, del._env, CgiInput::Parser::parse(req))
+
     std::string pwd(utils::get_env("PWD", envp));
     if (pwd.empty()) return ERR(CgiDelegate, "getting PWD failed");
+
     del._script_path          = pwd + rule.get_executable();
     const size_t last_dot_pos = del._script_path.rfind('.');
     if (last_dot_pos == std::string::npos)
         return ERR(CgiDelegate, "no extension for cgi executable");
+
     const std::string ext(del._script_path.substr(last_dot_pos + 1));
     std::cout << utils::debug << "found script\'s extension: " << ext
               << std::endl;
+
     std::map<std::string, std::string>::const_iterator it =
         cgi_interpreters.find(ext);
     if (it != cgi_interpreters.end()) {
@@ -31,14 +36,17 @@ Result<CgiDelegate> CgiDelegate::from_req(
         del._interpreter = it->second;
         del._env.add_mvar("SCRIPT_FILENAME", del._script_path);
     }
+
     if (rule.get_timeout_ms() == 0)
         return ERR(CgiDelegate, "timeout must be positive");
     del._timeout_ns = static_cast<size_t>(rule.get_timeout_ms() * 1e6);
+
     std::map<std::string, std::string> vars(rule.get_env());
     for (std::map<std::string, std::string>::const_iterator it = vars.begin();
          it != vars.end(); ++it) {
         del._env.add_mvar(it->first, it->second);
     }
+
     return OK(CgiDelegate, del);
 }
 
@@ -84,6 +92,7 @@ Result<Void> CgiDelegate::register_(
 
     if (!stdin_pipe_res.has_value())
         return ERR(Void, "Failed to create stdin pipe");
+
     if (!stdout_pipe_res.has_value()) {
         {
             FileDescriptor stdin0(stdin_pipe_res.value().first);
@@ -91,6 +100,7 @@ Result<Void> CgiDelegate::register_(
         }
         return ERR(Void, "Failed to create stdout pipe");
     }
+
     if (!const_cast<FileDescriptor&>(stdin_pipe_res.value().first)
              .close_on_exec()
              .has_value()) {
@@ -102,6 +112,7 @@ Result<Void> CgiDelegate::register_(
         }
         return ERR(Void, "Failed to set stdin pipe to close-on-exec mode");
     }
+
     if (!const_cast<FileDescriptor&>(stdout_pipe_res.value().second)
              .close_on_exec()
              .has_value()) {
@@ -116,6 +127,7 @@ Result<Void> CgiDelegate::register_(
 
     std::cout << utils::debug << "interpreter: \"" << _interpreter << "\""
               << std::endl;
+
     pid_t pid = fork();
     if (pid == -1) {
         {
@@ -203,8 +215,6 @@ Result<Void> CgiDelegate::register_(
     FileDescriptor stdin  = stdin_pipe_res.value().second;
     FileDescriptor stdout = stdout_pipe_res.value().first;
 
-    // Non-blocking is mandatory: epoll readiness does not imply non-blocking
-    // semantics of read/write, and partial IO is expected in the event loop.
     Result<Void>   res    = stdin.set_nonblocking();
     if (!res.has_value()) {
         _state = Failed;
@@ -223,12 +233,14 @@ Result<Void> CgiDelegate::register_(
     if (!_req.get_body().empty()) {
         Event  write_event(NULL, false, true, false, false, true, true);
         Option write_option(false, false, false, false);
+
         Result<FileDescriptor*> add_res =
             _epoll.add_fd(stdin, write_event, write_option);
         if (!add_res.has_value()) {
             _state = Failed;
             return ERR(Void, "Failed to add stdin to epoll");
         }
+
         _stdin = add_res.value();
     } else {
         { FileDescriptor stdin_drop(stdin); }
@@ -238,6 +250,7 @@ Result<Void> CgiDelegate::register_(
     // Register stdout for EPOLLIN (plus err/hup so we notice child exit).
     Event  read_event(NULL, true, false, true, false, true, true);
     Option read_option(false, false, false, false);
+
     Result<FileDescriptor*> add_out_res =
         _epoll.add_fd(stdout, read_event, read_option);
     if (!add_out_res.has_value()) {
@@ -255,10 +268,12 @@ Result<Void> CgiDelegate::register_(
         return ERR(Void, "Failed to add stdout to epoll");
     }
     _stdout = add_out_res.value();
+
     if (clock_gettime(CLOCK_MONOTONIC, &_start_time) != 0) {
         _state = Failed;
         return ERR(Void, "Failed to get start time for CGI process");
     }
+
     cgis[_stdin]  = std::make_pair(client_fd, this);
     cgis[_stdout] = std::make_pair(client_fd, this);
     _state        = Waiting;
@@ -273,9 +288,11 @@ Result<Void> CgiDelegate::handle_event(const Event* ev) {
               << "handle_event called: ev_fd=" << (ev ? ev->fd->_fd : -1)
               << " stdin=" << (_stdin ? _stdin->_fd : -1)
               << " stdout=" << (_stdout ? _stdout->_fd : -1) << std::endl;
+
     if (ev == NULL) return OKV;
     if (_state == Failed) return ERR(Void, Errors::bad_gateway);
     if (_state != Waiting) return ERR(Void, Errors::invalid_operation);
+
     timespec now = {};
     if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
         _state = Failed;
@@ -314,6 +331,7 @@ Result<Void> CgiDelegate::handle_event(const Event* ev) {
                 const Result<ssize_t> written = _stdin->pipe_write(
                     _req.get_body().c_str() + _total_written,
                     _req.get_body().length() - _total_written);
+
                 if (written.has_value() && written.value() > 0)
                     _total_written += static_cast<size_t>(written.value());
                 else if (written.has_value() && written.value() == 0) {
@@ -349,10 +367,12 @@ Result<Void> CgiDelegate::handle_event(const Event* ev) {
             char                  buffer[4096];
             const Result<ssize_t> bytes_read =
                 _stdout->pipe_read(buffer, sizeof(buffer));
+
             if (bytes_read.has_value() && bytes_read.value() > 0) {
                 _output.append(buffer, static_cast<size_t>(bytes_read.value()));
                 return OKV;
             }
+
             if (!bytes_read.has_value() || bytes_read.value() < 0) {
                 kill(_pid, SIGKILL);
                 _state = Reaping;
@@ -377,16 +397,19 @@ Result<Void> CgiDelegate::handle_event(const Event* ev) {
 
             int status   = 0;
             int wait_res = waitpid(_pid, &status, WNOHANG);
+
             if (wait_res == 0) {
                 kill(_pid, SIGKILL);
                 _state = Reaping;
                 if (wait_or_reap()) _state = Failed;
                 return ERR(Void, Errors::bad_gateway);
             }
+
             if (wait_res < 0) {
                 _state = Failed;
                 return ERR(Void, Errors::bad_gateway);
             }
+
             (void)wait_or_reap();
             return OKV;
         }
@@ -424,8 +447,10 @@ size_t CgiDelegate::remaining_ns() const {
     if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) { return 0; }
     const size_t now_ns =
         static_cast<size_t>(now.tv_sec * 1000000000 + now.tv_nsec);
+
     const size_t start_ns = static_cast<size_t>(
         _start_time.tv_sec * 1000000000 + _start_time.tv_nsec);
+
     if (now_ns >= start_ns + _timeout_ns) {
         return 0;
     } else {
@@ -438,10 +463,12 @@ CgiDelegate::~CgiDelegate() {
         _epoll.del_fd(_stdin);
         _stdin = NULL;
     }
+
     if (_stdout != NULL) {
         _epoll.del_fd(_stdout);
         _stdout = NULL;
     }
+
     if (_pid > 0) {
         kill(_pid, SIGKILL);
         waitpid(_pid, NULL, 0);

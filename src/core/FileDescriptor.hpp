@@ -48,6 +48,7 @@ class FileDescriptor {
 
     Result<std::string>    try_read_to_end() const;
 
+
   // Sets the file descriptor to non-blocking mode.
   Result<Void> set_nonblocking();
 

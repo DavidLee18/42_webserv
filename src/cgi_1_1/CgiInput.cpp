@@ -22,23 +22,10 @@ CgiInput& CgiInput::operator=(const CgiInput& other) {
 
 Result<CgiInput> CgiInput::Parser::parse(Request const& req) {
     CgiInput input;
-    input.req_body = req.get_body();
+    input.req_body                 = req.get_body();
 
     // Convert Request::Method to Request::Method for backwards compatibility
-    Request::Method h_method;
-    switch (req.get_method()) {
-    case Request::GET: h_method = Request::GET; break;
-    case Request::HEAD: h_method = Request::HEAD; break;
-    case Request::POST: h_method = Request::POST; break;
-    case Request::PUT: h_method = Request::PUT; break;
-    case Request::DELETE: h_method = Request::DELETE; break;
-    case Request::OPTIONS: h_method = Request::OPTIONS; break;
-    case Request::CONNECT: h_method = Request::CONNECT; break;
-    case Request::TRACE: h_method = Request::TRACE; break;
-    case Request::PATCH: h_method = Request::PATCH; break;
-    default: h_method = Request::GET; break;
-    }
-
+    const Request::Method h_method = req.get_method();
     input.mvars.push_back(CgiMetaVar::request_method(h_method));
     input.mvars.push_back(CgiMetaVar::server_protocol(Http_1_1));
     input.mvars.push_back(CgiMetaVar::gateway_interface(Cgi_1_1));
