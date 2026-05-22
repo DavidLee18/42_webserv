@@ -1,4 +1,5 @@
 #include "Client.hpp"
+#include <cstddef>
 
 // Helper parser implementations for Request::from_buff splitting.
 Result<Void>

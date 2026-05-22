@@ -115,9 +115,8 @@ Result<Void> Server::start(char** envp) {
                             (!session.req->is_partial() &&
                              session.in_buff.empty()))) {
                     clients_to_disconnect.push_back(client_fd);
-                } else if (elapsed_ms >= chunked_pending_ms &&
-                           (session.req && (session.req->is_partial() ||
-                                            !session.in_buff.empty()))) {
+                } else if (elapsed_ms >= chunked_pending_ms && session.req &&
+                           session.req->is_partial()) {
                     Response resp = DefaultError::default_err_response(
                         Response::REQUEST_TIMEOUT);
                     clients_to_flush.push_back(std::make_pair(client_fd, resp));
@@ -126,6 +125,8 @@ Result<Void> Server::start(char** envp) {
                     if (session.req == NULL && session.in_buff.empty())
                         remaining_ms =
                             static_cast<long>(idle_timeout_ms - elapsed_ms);
+                    else if (session.req != NULL && session.req->is_partial())
+                        remaining_ms = chunked_pending_ms - elapsed_ms;
                     else
                         remaining_ms =
                             static_cast<long>(timeout_ms - elapsed_ms);

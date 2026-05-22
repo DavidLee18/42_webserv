@@ -29,10 +29,12 @@ Result<Void> Server::dispatch_request(const FileDescriptor* client_fd,
 
     // Dispatch to CGI if applicable
     if (cgi_path != NULL) {
-        TRY_(Void, Void,
+        Void _v;
+        TRYF(Void, Void, _v,
              ResponseHandlers::register_cgi(*client.req, *cgi_path, &epoll,
                                             config.get_global_cgi(), cgis,
-                                            client_fd, envp))
+                                            client_fd, envp),
+             (delete client.req, client.req = NULL))
         delete client.req;
         client.req = NULL;
         return OKV;

@@ -100,9 +100,13 @@ Result<Void> Server::client_read(const FileDescriptor* client_fd, char** envp) {
                     DefaultError::default_err_response(Response::BAD_REQUEST));
                 resp.headers = client.config->get_header();
                 resp.print_simple(std::cout);
-                TRY_(Void, Void, queue_response(client_fd, resp))
+                Void _v;
+                TRYF(Void, Void, _v, queue_response(client_fd, resp),
+                     (delete client.req, client.req = NULL))
                 delete client.req;
                 client.req = NULL;
+                return OKV;
+            } else if (client.req->is_partial()) {
                 return OKV;
             }
             const Result<size_t> content_len = client.req->get_content_length();
@@ -121,7 +125,9 @@ Result<Void> Server::client_read(const FileDescriptor* client_fd, char** envp) {
                         Response::PAYLOAD_TOO_LARGE));
                     resp.headers = client.config->get_header();
                     resp.print_simple(std::cout);
-                    TRY_(Void, Void, queue_response(client_fd, resp))
+                    Void _v;
+                    TRYF(Void, Void, _v, queue_response(client_fd, resp),
+                         (delete client.req, client.req = NULL))
                     delete client.req;
                     client.req = NULL;
                     return OKV;
