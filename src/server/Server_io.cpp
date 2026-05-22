@@ -71,6 +71,13 @@ Result<Void> Server::client_read(const FileDescriptor *client_fd, char **envp) {
           resp.print_simple(std::cout);
           queue_response(client_fd, resp);
           return OKV;
+        } else {
+          Response resp =
+              DefaultError::default_err_response(Response::INTERNAL_SERVER_ERR);
+          resp.headers = client.config->get_header();
+          resp.print_simple(std::cout);
+          queue_response(client_fd, resp);
+          return OKV;
         }
       }
       client.req = req_.value();

@@ -338,12 +338,16 @@ Response ResponseHandlers::get_method_response(Target target, Response response,
   if (target.type == IS_DIR && rule->op == AUTOINDEX) {
     DIR *dir = opendir(target.path.c_str());
     if (dir == NULL) {
-      if (errno == EACCES)
+      if (errno == EACCES) {
         return ResponseErrors::error_response(config, rule, Response::FORBIDDEN,
                                               envp);
-      else if (errno == ENOENT)
+      } else if (errno == ENOENT) {
         return ResponseErrors::error_response(config, rule, Response::NOT_FOUND,
                                               envp);
+      } else {
+        return ResponseErrors::error_response(
+            config, rule, Response::INTERNAL_SERVER_ERR, envp);
+      }
     }
     target.type = Response::OK;
     response.content_type = "text/html";
@@ -392,6 +396,7 @@ Response ResponseHandlers::http_response(
     return DefaultError::default_err_response(Response::INTERNAL_SERVER_ERR);
 
   Response response;
+  response.keep_alive = request->has_keep_alive();
   Result<RouteRule> rule_res =
       config->find_route(request->get_method(), request->get_path());
   if (!rule_res.has_value()) {

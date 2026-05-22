@@ -84,11 +84,9 @@ Result<Void> Server::queue_response(const FileDescriptor *client_fd,
       client.out_buff += ss.str();
       client.out_file_path = response.file_path;
       client.out_file_offset = 0;
-      if (!client.out_file_path.empty()) {
+      if (!client.out_file_path.empty() && client.req) {
         if (client.req->get_method() == Request::GET)
           client.streaming_file = true;
-        if (client.req->get_method() == Request::HEAD)
-          client.streaming_file = false;
       } else {
         // Could not open: send 404
         Response err = DefaultError::default_err_response(Response::NOT_FOUND);
