@@ -1,12 +1,6 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-/**
- * @file Server.hpp
- * @brief Defines the main Server class that manages epoll, connections, and
- * event loops.
- */
-
 #include "../cgi_1_1/CgiDelegate.hpp"
 #include "../config/WebserverConfig.hpp"
 #include "../core/EPoll.hpp"
@@ -39,14 +33,6 @@ class ServerConfig;
 
 extern volatile sig_atomic_t g_receivedSignal;
 
-/**
- * @class Server
- * @brief Core server class to initiate, configure, and run the event loop.
- *
- * The Server class is responsible for setting up listening sockets based on the
- * configuration, managing multiplexed I/O using EPoll, and directing I/O events
- * to the respective ClientSession handlers.
- */
 class Server {
   EPoll epoll;
 

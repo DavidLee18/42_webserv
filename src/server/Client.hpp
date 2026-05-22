@@ -1,11 +1,6 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
-/**
- * @file Client.hpp
- * @brief Defines the ClientSession struct and Request class for handling client
- * HTTP requests.
- */
 #include "../core/Errors.hpp"
 #include "../core/Result.hpp"
 
@@ -41,10 +36,7 @@ struct ClientSession {
   ~ClientSession();
 };
 
-/**
- * @class Request
- * @brief Parses and stores information from an HTTP request.
- */
+// Class to parse and store information from an HTTP request.
 class Request {
 public:
   enum Method {
@@ -61,12 +53,12 @@ public:
   };
   enum UnchunkState { NOT_CHUNKED, READING, DONE };
 
-  // Request(Request const &other)
-  //     : method(other.method), path(other.path), version(other.version),
-  //       header(other.header), keep_alive(other.keep_alive),
-  //       content_length(other.content_length), cookie(other.cookie),
-  //       body(other.body), remnants(other.remnants),
-  //       decode_chunk_state(other.decode_chunk_state) {}
+  Request(Request const &other)
+      : method(other.method), path(other.path), version(other.version),
+        header(other.header), keep_alive(other.keep_alive),
+        content_length(other.content_length), cookie(other.cookie),
+        body(other.body), remnants(other.remnants),
+        decode_chunk_state(other.decode_chunk_state) {}
 
   static Result<Request *> from_buff(std::string &);
   std::string get_connection_string() const;
