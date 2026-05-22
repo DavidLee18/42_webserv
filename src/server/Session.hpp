@@ -10,13 +10,13 @@
 #define TIMEOUT_SECONDS 300
 
 struct SessionData {
-  std::string user_id; ///< login user id
-  std::string client_ip;
+    std::string user_id; ///< login user id
+    std::string client_ip;
 
-  time_t created_at;
-  time_t last_access;
+    time_t      created_at;
+    time_t      last_access;
 
-  SessionData() : created_at(0), last_access(0) {}
+    SessionData() : created_at(0), last_access(0) {}
 };
 
 class Session {

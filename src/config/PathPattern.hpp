@@ -57,57 +57,56 @@ namespace PathPatternError {
 }
 
 class PathPattern {
-private:
-  std::vector<std::string> path;
+  private:
+    std::vector<std::string> path;
 
-  Result<std::string> extract_relative_path(const std::string &pattern,
-                                    const std::string &target) const;
+  Result<std::string> extract_relative_path(const std::string &route_pattern,
+                                    const std::string &request_path) const;
   bool wildcard_match(const std::string &pattern,
                       const std::string &target) const;
   Result<std::string>
-  rewrite_with_wildcards(const std::string &from,
-                         const std::string &target,
-                         const std::string &dest,
-                         std::size_t from_wc,
-                         std::size_t dest_wc) const;
+  rewrite_with_wildcards(const std::string &route_pattern,
+                         const std::string &request_path,
+                         const std::string &rewrite_target,
+                         std::size_t route_wc,
+                         std::size_t target_wc) const;
 
   Result<std::string>
-  rewrite_prefix_path(const std::string &from,
-                      const std::string &target,
-                      const std::string &dest) const;
+  rewrite_prefix_path(const std::string &route_pattern,
+                      const std::string &request_path,
+                      const std::string &rewrite_target) const;
 
   Result<std::string>
-  rewrite_exact_path(const std::string &from,
-                     const std::string &target,
-                     const std::string &dest) const;
-  Result<std::string> apply_wildcards(const std::string &to_pattern,
+  rewrite_exact_path(const std::string &route_pattern,
+                     const std::string &request_path,
+                     const std::string &rewrite_target) const;
+  Result<std::string> replace_wildcards(const std::string &rewrite_target,
                               const std::vector<std::string> &wildcards) const;
-  Result<std::vector<std::string> > extract_wildcards(const std::string &pattern, const std::string &target) const;
+  Result<std::vector<std::string> > extract_wildcards(const std::string &route_pattern, const std::string &request_path) const;
 
-public:
-  PathPattern() : path() {}
-  PathPattern(const std::string &pathStr) {
-    if (pathStr == "/" || pathStr.empty()) {
-      path.push_back("/");
-      return;
+  public:
+    PathPattern() : path() {}
+    PathPattern(const std::string& pathStr) {
+        if (pathStr == "/" || pathStr.empty()) {
+            path.push_back("/");
+            return;
+        }
+        path = utils::string_split(pathStr, "/");
+        if (!pathStr.empty() && pathStr[pathStr.length() - 1] == '/')
+            path.push_back("/");
+        if (pathStr[0] == '/') path[0] = "/" + path[0];
     }
-    path = utils::string_split(pathStr, "/");
-    if (!pathStr.empty() && pathStr[pathStr.length() - 1] == '/')
-      path.push_back("/");
-    if (pathStr[0] == '/')
-      path[0] = "/" + path[0];
-  }
-  PathPattern(const PathPattern &other) : path(other.path) {}
+    PathPattern(const PathPattern& other) : path(other.path) {}
 
-  void change_path(std::size_t i, std::string data) { path[i] = data; }
-  bool is_wildcard() const { return (path.size() == 1 && path[0] == "*"); }
-  bool matches(const PathPattern &other) const;
-  bool matches(const std::string &pathStr) const;
-  const std::vector<std::string> &get_path(void) const { return path; }
-  std::string to_string() const;
+    void change_path(std::size_t i, std::string data) { path[i] = data; }
+    bool is_wildcard() const { return (path.size() == 1 && path[0] == "*"); }
+    bool matches(const PathPattern& other) const;
+    bool matches(const std::string& pathStr) const;
+    const std::vector<std::string>& get_path(void) const { return path; }
+    std::string                     to_string() const;
 
   Result<std::string> rewrite_path(const PathPattern &request_path,
-                           const PathPattern &to_pattern) const;
+                           const PathPattern &rewrite_target_pattern) const;
 };
 
 #endif

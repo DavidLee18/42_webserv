@@ -28,8 +28,8 @@ struct Target {
 };
 
 struct StatusInfo {
-  std::string message;   ///< Status message.
-  std::string file_path; ///< Path to the error file.
+    std::string message;   ///< Status message.
+    std::string file_path; ///< Path to the error file.
 };
 
 struct Response {
@@ -63,17 +63,17 @@ struct Response {
   bool keep_alive;          ///< Connection keep-alive status.
   std::map<std::string, std::string> headers;
 
-  Response()
-      : version("HTTP/1.1"), status_code(INTERNAL_SERVER_ERR),
-        content_length(0), content_type(), cookie(), body(), redir(),
-        keep_alive(false), headers() {}
-  static Result<Response>
-  from_cgi_outbuff(std::string const &,
-                   std::map<std::string, std::string> const &);
-  void print_simple(std::ostream &) const;
+    Response()
+        : version("HTTP/1.1"), status_code(INTERNAL_SERVER_ERR),
+          content_length(0), content_type(), cookie(), body(), redir(),
+          keep_alive(false), headers() {}
+    static Result<Response>
+         from_cgi_outbuff(std::string const&,
+                          std::map<std::string, std::string> const&);
+    void print_simple(std::ostream&) const;
 };
 
-std::ostream &operator<<(std::ostream &, Response const &);
+std::ostream& operator<<(std::ostream&, Response const&);
 
 class Request;
 class ServerConfig;

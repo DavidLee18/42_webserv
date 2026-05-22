@@ -17,8 +17,8 @@ class ServerConfig;
 class Request;
 
 struct ClientSession {
-  std::string in_buff;  ///< Buffer for incoming data.
-  std::string out_buff; ///< Buffer for outgoing data.
+    std::string in_buff;  ///< Buffer for incoming data.
+    std::string out_buff; ///< Buffer for outgoing data.
 
   const ServerConfig *config; ///< Pointer to the server configuration.
   std::string cookie;
@@ -75,15 +75,15 @@ public:
   const std::string &get_body() const { return body; }
   Result<size_t> get_content_length() const;
 
-  bool is_partial() const;
+    bool               is_partial() const;
 
-  bool is_chunked() const;
+    bool               is_chunked() const;
 
-  bool has_keep_alive() const { return keep_alive; }
+    bool               has_keep_alive() const { return keep_alive; }
 
-  Result<Void> continue_parsing(std::string &);
+    Result<Void>       continue_parsing(std::string&);
 
-  Result<size_t> unchunk(size_t remnant_end);
+    Result<size_t>     unchunk(size_t remnant_end);
 
   // Helper parsers broken out from from_buff for clarity and testability.
   static Result<Void> parse_request_line(std::stringstream &ss, Method &method,
@@ -112,31 +112,31 @@ private:
   std::string remnants; ///< remaining string to parse.
   UnchunkState decode_chunk_state;
 
-  Request()
-      : method(ERROR), path(), version(), query(), header(), keep_alive(true),
-        content_length(-1), cookie(), body(), remnants(),
-        decode_chunk_state(NOT_CHUNKED) {}
-  Request(const Method method, std::string const &path,
-          std::string const &version, const size_t content_length)
-      : method(method), path(path), version(version), keep_alive(true),
-        content_length(static_cast<ssize_t>(content_length)),
-        decode_chunk_state(NOT_CHUNKED) {
-    const size_t query_pos = path.find('?');
-    if (query_pos != std::string::npos) {
-      query = path.substr(query_pos + 1);
-      this->path = path.substr(0, query_pos);
+    Request()
+        : method(ERROR), path(), version(), query(), header(), keep_alive(true),
+          content_length(-1), cookie(), body(), remnants(),
+          decode_chunk_state(NOT_CHUNKED) {}
+    Request(const Method method, std::string const& path,
+            std::string const& version, const size_t content_length)
+        : method(method), path(path), version(version), keep_alive(true),
+          content_length(static_cast<ssize_t>(content_length)),
+          decode_chunk_state(NOT_CHUNKED) {
+        const size_t query_pos = path.find('?');
+        if (query_pos != std::string::npos) {
+            query      = path.substr(query_pos + 1);
+            this->path = path.substr(0, query_pos);
+        }
     }
-  }
-  Request(const Method method, std::string const &path,
-          std::string const &version)
-      : method(method), path(path), version(version), keep_alive(true),
-        content_length(-1), decode_chunk_state(READING) {
-    const size_t query_pos = path.find('?');
-    if (query_pos != std::string::npos) {
-      query = path.substr(query_pos + 1);
-      this->path = path.substr(0, query_pos);
+    Request(const Method method, std::string const& path,
+            std::string const& version)
+        : method(method), path(path), version(version), keep_alive(true),
+          content_length(-1), decode_chunk_state(READING) {
+        const size_t query_pos = path.find('?');
+        if (query_pos != std::string::npos) {
+            query      = path.substr(query_pos + 1);
+            this->path = path.substr(0, query_pos);
+        }
     }
-  }
 };
 
 std::string get_string_from_map(const std::map<std::string, std::string> &map,

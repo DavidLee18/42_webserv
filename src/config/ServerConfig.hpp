@@ -5,50 +5,50 @@
 
 #define MAX_SERVER_RESPONSE_TIME 60000
 #define MIN_SERVER_RESPONSE_TIME 1
-#define MAX_BODY_SIZE 1048576
+#define MAX_BODY_SIZE            1048576
 
 typedef std::map<std::string, std::map<std::string, std::string> > CGI;
 
 enum RuleOperator {
-  MULTIPLE_CHOICES,
-  REDIRECT,
-  FOUND,
-  SEE_OTHER,
-  NOT_MODIFIED,
-  TEMPORARY_REDIRECT,
-  PERMANENT_REDIRECT,
-  AUTOINDEX,
-  UPLOAD_TO,
-  SERVE_FROM,
-  LOGIN_USING,
-  UNDEFINED,
+    MULTIPLE_CHOICES,
+    REDIRECT,
+    FOUND,
+    SEE_OTHER,
+    NOT_MODIFIED,
+    TEMPORARY_REDIRECT,
+    PERMANENT_REDIRECT,
+    AUTOINDEX,
+    UPLOAD_TO,
+    SERVE_FROM,
+    LOGIN_USING,
+    UNDEFINED,
 };
 
 struct RouteRule {
-  Request::Method method;
-  PathPattern path;
-  RuleOperator op;
-  PathPattern redirect_target;
-  PathPattern root;
-  std::string index;
-  std::string auth_info;
-  unsigned int max_body_KB;
-  std::map<unsigned int, std::string> error_pages;
+    Request::Method                     method;
+    PathPattern                         path;
+    RuleOperator                        op;
+    PathPattern                         redirect_target;
+    PathPattern                         root;
+    std::string                         index;
+    std::string                         auth_info;
+    unsigned int                        max_body_KB;
+    std::map<unsigned int, std::string> error_pages;
 };
 
 class ServerConfig {
-private:
-  std::map<std::string, std::string> header;
-  unsigned int server_response_time_ms;
-  std::vector<RouteRule> routes;
-  std::vector<RouteRule_CGI> R_CGI;
-  std::vector<std::string> file_extension;
+  private:
+    std::map<std::string, std::string> header;
+    unsigned int                       server_response_time_ms;
+    std::vector<RouteRule>             routes;
+    std::vector<RouteRule_CGI>         R_CGI;
+    std::vector<std::string>           file_extension;
 
-private:
-  int end_flag;
-  std::string err_meg;
-  std::string origin_line;
-  std::size_t count_line;
+  private:
+    int         end_flag;
+    std::string err_meg;
+    std::string origin_line;
+    std::size_t count_line;
 
   Result<Void> parse_server_block(FileDescriptor &fd, char **envp);
   Result<Void> parse_header_entry(FileDescriptor &fd, const std::string &line);
@@ -109,7 +109,7 @@ public:
                                          const std::string &path) const;
 };
 
-std::ostream &operator<<(std::ostream &os, const ServerConfig &data);
-std::ostream &operator<<(std::ostream &os, const PathPattern &data);
+std::ostream& operator<<(std::ostream& os, const ServerConfig& data);
+std::ostream& operator<<(std::ostream& os, const PathPattern& data);
 
 #endif

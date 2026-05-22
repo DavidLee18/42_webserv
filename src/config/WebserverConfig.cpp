@@ -13,16 +13,13 @@ WebserverConfig::WebserverConfig(FileDescriptor &file, char **envp) {
         !std::isdigit(static_cast<unsigned char>(err_meg[0])))
       err_meg = oss.str() + " " + err_meg;
     return;
-  }
-  return;
-}
+}}
 
 Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
   std::string line;
   bool is_type_parse = false;
   bool is_cgi_parse = false;
   bool is_server_parse = false;
-  bool is_err_page_parse = false;
 
   while (true) {
     count_line++;
@@ -68,19 +65,6 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor &file, char **envp) {
            RouteRule_CGI::parse_global_cgi_block(file, global_cgi, count_line,
                                                  envp))
       is_cgi_parse = true;
-    } else if (line[0] == '!') {
-      if (is_err_page_parse == true)
-        return ERR(Void,
-                   ConfigError::make(origin_line,
-                                     ERR_DUPLICATE_DEFAULT_ERROR_PAGE_BLOCK));
-      else if (is_server_parse == true)
-        return ERR(Void, ConfigError::make(origin_line,
-                                           ERR_INVALID_GLOBAL_BLOCK_LOCATION));
-
-      TRY_(Void, Void,
-           ServerConfig::apply_err_page_entry(origin_line, line,
-                                              default_err_page, envp))
-      is_err_page_parse = true;
     } else
       return ERR(Void,
                  ConfigError::make(origin_line, ERR_INVALID_TOP_LEVEL_FORMAT));
@@ -228,28 +212,6 @@ Result<Void> WebserverConfig::parse_types_block(FileDescriptor &file) {
   return OKV;
 }
 
-bool WebserverConfig::is_server_config_header(const std::string &line) {
-  std::size_t i = 1;
-
-  if (line.empty())
-    return false;
-  if (line[0] != ':')
-    return false;
-  if (i >= line.size() || !std::isdigit(static_cast<unsigned char>(line[i])))
-    return false;
-  while (i < line.size() && std::isdigit(static_cast<unsigned char>(line[i])))
-    ++i;
-  if (i < line.size() && line[i] == ' ') {
-    ++i;
-    if (i < line.size() && line[i] == ' ')
-      return false;
-  }
-  if (i >= line.size() || line[i] != '=')
-    return false;
-  ++i;
-  return (i == line.size());
-}
-
 Result<Void> WebserverConfig::parse_server_config_entry(FileDescriptor &file,
                                                         const std::string &line,
                                                         char **envp) {
@@ -282,19 +244,18 @@ Result<Void> WebserverConfig::parse_server_config_entry(FileDescriptor &file,
   return OKV;
 }
 
-std::string WebserverConfig::parse_server_port(const std::string &key) {
-  std::size_t i = 1;
-  std::size_t start = i;
+std::string WebserverConfig::parse_server_port(const std::string& key) {
+    std::size_t i     = 1;
+    std::size_t start = i;
 
-  while (i < key.size() && std::isdigit(static_cast<unsigned char>(key[i])))
-    ++i;
-  return key.substr(start, i - start);
+    while (i < key.size() && std::isdigit(static_cast<unsigned char>(key[i])))
+        ++i;
+    return key.substr(start, i - start);
 }
 
 std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
   const std::map<std::string, std::string> &ty = data.get_type_map();
   const std::map<std::string, std::string> &cgi = data.get_global_cgi();
-  const std::map<unsigned int, std::string> &d_e = data.get_default_err_page();
   std::map<std::string, std::string>::const_iterator ty_it;
   std::map<std::string, std::string>::const_iterator cgi_it;
 
@@ -313,20 +274,6 @@ std::ostream &operator<<(std::ostream &os, const WebserverConfig &data) {
        << " Global CGI value: " << cgi_it->second << " " << std::endl;
   }
   os << "========================================================" << std::endl;
-  os << "\n\n\n========================================================"
-     << std::endl;
-
-  os << "<<DefaultErrPage>>\n" << std::endl;
-
-  std::map<unsigned int, std::string>::const_iterator er_it;
-
-  os << "\nerr_page\n";
-  for (er_it = d_e.begin(); er_it != d_e.end(); ++er_it) {
-    os << utils::debug << "\terr_page key: " << er_it->first
-       << ", err_page value: " << er_it->second << std::endl;
-  }
-  os << utils::debug
-     << "========================================================" << std::endl;
   os << "\n\n\n"
      << utils::debug
      << "========================================================" << std::endl;

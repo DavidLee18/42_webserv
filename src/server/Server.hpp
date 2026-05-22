@@ -40,9 +40,9 @@ class Server {
   std::map<std::string, std::string> mime_type; ///< Map containing MIME types.
   std::set<const FileDescriptor *> server_fds;  ///< Set of server fds.
 
-  std::map<const FileDescriptor *,
-           std::pair<const FileDescriptor *, CgiDelegate *> >
-      cgis;
+    std::map<const FileDescriptor*,
+             std::pair<const FileDescriptor*, CgiDelegate*> >
+                                                         cgis;
 
   std::map<const FileDescriptor *, const ServerConfig *> listeners;
   std::map<const FileDescriptor *, ClientSession> clients;

@@ -9,13 +9,13 @@ Result<Void> Server::init() {
   // EPoll init
   TRY(Void, EPoll, epoll, EPoll::create(1024))
 
-  // Init server socket for every port listed on configuration file
-  const std::map<unsigned int, ServerConfig> &servers =
-      config.get_serverconfig_map();
-  for (std::map<unsigned int, ServerConfig>::const_iterator it =
-           servers.begin();
-       it != servers.end(); ++it) {
-    unsigned short port = static_cast<unsigned short>(it->first);
+    // Init server socket for every port listed on configuration file
+    const std::map<unsigned int, ServerConfig>& servers =
+        config.get_serverconfig_map();
+    for (std::map<unsigned int, ServerConfig>::const_iterator it =
+             servers.begin();
+         it != servers.end(); ++it) {
+        unsigned short         port = static_cast<unsigned short>(it->first);
 
     // Init socket
     FileDescriptor server_fd;
@@ -38,9 +38,9 @@ Result<Void> Server::init() {
     // Listen (max queue length)
     TRY_(Void, Void, server_fd.socket_listen(SOMAXCONN))
 
-    // EPoll event and option setting
-    Event event(NULL, true, false, false, false, false, false); // in=true
-    Option op(true, false, false, false);                       // et=true
+        // EPoll event and option setting
+        Event  event(NULL, true, false, false, false, false, false); // in=true
+        Option op(true, false, false, false);                        // et=true
 
     // Add server socket to EPoll
     FileDescriptor *fd_ptr;
@@ -79,14 +79,13 @@ Result<Void> Server::start(char **envp) {
     std::vector<const FileDescriptor *> clients_to_disconnect;
     std::vector<std::pair<const FileDescriptor *, Response> > clients_to_flush;
 
-    for (std::map<const FileDescriptor *, ClientSession>::iterator it =
-             clients.begin();
-         it != clients.end(); ++it) {
-      const FileDescriptor *client_fd = it->first;
-      ClientSession &session = it->second;
+        for (std::map<const FileDescriptor*, ClientSession>::iterator it =
+                 clients.begin();
+             it != clients.end(); ++it) {
+            const FileDescriptor* client_fd = it->first;
+            ClientSession&        session   = it->second;
 
-      if (session.config == NULL)
-        continue;
+            if (session.config == NULL) continue;
 
       const long timeout_ms =
           static_cast<long>(session.config->get_server_response_time());
@@ -197,9 +196,9 @@ Result<Void> Server::start(char **envp) {
           resp = DefaultError::default_err_response(Response::BAD_GATEWAY);
         }
 
-        resp.print_simple(std::cout);
-        std::ostringstream oss;
-        oss << resp;
+                resp.print_simple(std::cout);
+                std::ostringstream oss;
+                oss << resp;
 
         std::map<FileDescriptor const *, ClientSession>::iterator jt =
             clients.find(it->second.first);
@@ -230,10 +229,10 @@ Result<Void> Server::start(char **envp) {
       break;
     }
 
-    for (Events events = events_result.value(); !events.is_end(); ++events) {
-      Result<const Event *> ev_result = *events;
-      if (!ev_result.has_value())
-        continue;
+        for (Events events = events_result.value(); !events.is_end();
+             ++events) {
+            Result<const Event*> ev_result = *events;
+            if (!ev_result.has_value()) continue;
 
       const Event *event = ev_result.value();
       const FileDescriptor *fd = event->fd;

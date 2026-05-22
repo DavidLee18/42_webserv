@@ -1,15 +1,15 @@
 #include "RouteRule_CGI.hpp"
 
-RouteRule_CGI::RouteRule_CGI(FileDescriptor &fd, const std::string &line,
-                             const std::vector<std::string> &file_extension,
-                             char **envp) {
-  err_meg = "";
-  timeout_ms = 3000;
-  count_line = 0;
-  origin_line = "\t" + line;
-  this->file_extension = file_extension;
+RouteRule_CGI::RouteRule_CGI(FileDescriptor& fd, const std::string& line,
+                             const std::vector<std::string>& file_extension,
+                             char**                          envp) {
+    err_meg                       = "";
+    timeout_ms                    = 3000;
+    count_line                    = 0;
+    origin_line                   = "\t" + line;
+    this->file_extension          = file_extension;
 
-  std::vector<std::string> temp = utils::string_split(line, " ");
+    std::vector<std::string> temp = utils::string_split(line, " ");
 
   if (temp[0] == "GET")
     met = Request::GET;
@@ -163,26 +163,25 @@ RouteRule_CGI::matches_routerule_cgi_syntax(const std::string &line,
   return OKV;
 }
 
-bool RouteRule_CGI::is_valid_timeout(const std::string &line) {
-  if (line.length() < 4 || line[0] != '.' || line[1] != '.' || line[2] != '.')
-    return false;
-  return true;
+bool RouteRule_CGI::is_valid_timeout(const std::string& line) {
+    if (line.length() < 4 || line[0] != '.' || line[1] != '.' || line[2] != '.')
+        return false;
+    return true;
 }
 
-bool RouteRule_CGI::is_valid_env_key(const std::string &key) {
-  std::size_t i = 0;
+bool RouteRule_CGI::is_valid_env_key(const std::string& key) {
+    std::size_t i = 0;
 
-  if (key.empty())
-    return false;
+    if (key.empty()) return false;
 
-  while (i < key.length()) {
-    if (std::isupper(key[i]) || key[i] == '_' ||
-        (i != 0 && std::isdigit(static_cast<unsigned char>(key[i]))))
-      i++;
-    else
-      return false;
-  }
-  return true;
+    while (i < key.length()) {
+        if (std::isupper(key[i]) || key[i] == '_' ||
+            (i != 0 && std::isdigit(static_cast<unsigned char>(key[i]))))
+            i++;
+        else
+            return false;
+    }
+    return true;
 }
 
 Result<Void>
@@ -270,15 +269,15 @@ Result<Void> RouteRule_CGI::parse_global_cgi_block(
 }
 
 bool RouteRule_CGI::is_valid_cgi_config(std::string line) {
-  std::vector<std::string> split_line = utils::string_split(line, " ");
-  if (split_line.size() != 3)
-    return false;
-  else if (split_line[0] != "POST" && split_line[0] != "GET" &&
-           split_line[0] != "DELETE")
-    return false;
-  else if (utils::has_space(split_line[1]))
-    return false;
-  return true;
+    std::vector<std::string> split_line = utils::string_split(line, " ");
+    if (split_line.size() != 3)
+        return false;
+    else if (split_line[0] != "POST" && split_line[0] != "GET" &&
+             split_line[0] != "DELETE")
+        return false;
+    else if (utils::has_space(split_line[1]))
+        return false;
+    return true;
 }
 
 Result<Void> RouteRule_CGI::parse_routerule_cgi_executable(
@@ -306,18 +305,18 @@ Result<Void> RouteRule_CGI::parse_routerule_cgi_executable(
   return OKV;
 }
 
-std::ostream &operator<<(std::ostream &os, const RouteRule_CGI &data) {
-  std::map<std::string, std::string> env = data.get_env();
-  std::map<std::string, std::string>::const_iterator env_it;
+std::ostream& operator<<(std::ostream& os, const RouteRule_CGI& data) {
+    std::map<std::string, std::string>                 env = data.get_env();
+    std::map<std::string, std::string>::const_iterator env_it;
 
-  os << "\tExecutable: " << data.get_executable();
-  os << "\n\tEnv";
-  for (env_it = env.begin(); env_it != env.end(); ++env_it) {
-    os << "\n"
-       << utils::debug << "\t\tEnv key: " << env_it->first
-       << ", Env value: " << env_it->second;
-  }
-  os << "\n\tTimeout(ms): " << data.get_timeout_ms() << "\n";
+    os << "\tExecutable: " << data.get_executable();
+    os << "\n\tEnv";
+    for (env_it = env.begin(); env_it != env.end(); ++env_it) {
+        os << "\n"
+           << utils::debug << "\t\tEnv key: " << env_it->first
+           << ", Env value: " << env_it->second;
+    }
+    os << "\n\tTimeout(ms): " << data.get_timeout_ms() << "\n";
 
   return (os);
 }

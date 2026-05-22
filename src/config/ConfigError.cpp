@@ -1,14 +1,14 @@
 #include "ConfigError.hpp"
 
 struct ErrorInfo {
-  ConfigErrorCode code;
-  std::string summary;
-  std::string rule;
-  std::string reason;
+    ConfigErrorCode code;
+    std::string     summary;
+    std::string     rule;
+    std::string     reason;
 
-  ErrorInfo(ConfigErrorCode code, const std::string &summary,
-            const std::string &rule, const std::string &reason)
-      : code(code), summary(summary), rule(rule), reason(reason) {}
+    ErrorInfo(ConfigErrorCode code, const std::string& summary,
+              const std::string& rule, const std::string& reason)
+        : code(code), summary(summary), rule(rule), reason(reason) {}
 };
 
 static const ErrorInfo g_error_infos[] = {
@@ -276,54 +276,53 @@ static const ErrorInfo g_error_infos[] = {
     ErrorInfo(ERR_UNKNOWN_CONFIG_ERROR, "Unknown config error", "unknown",
               "an unknown configuration validation error occurred")};
 
-static const ErrorInfo &find_error_info(ConfigErrorCode code) {
-  const std::size_t count = sizeof(g_error_infos) / sizeof(g_error_infos[0]);
+static const ErrorInfo& find_error_info(ConfigErrorCode code) {
+    const std::size_t count = sizeof(g_error_infos) / sizeof(g_error_infos[0]);
 
-  for (std::size_t i = 0; i < count; ++i) {
-    if (g_error_infos[i].code == code)
-      return g_error_infos[i];
-  }
-  return g_error_infos[count - 1];
+    for (std::size_t i = 0; i < count; ++i) {
+        if (g_error_infos[i].code == code) return g_error_infos[i];
+    }
+    return g_error_infos[count - 1];
 }
 
-std::string ConfigError::make(const std::string &line, ConfigErrorCode code) {
-  const ErrorInfo &info = find_error_info(code);
+std::string ConfigError::make(const std::string& line, ConfigErrorCode code) {
+    const ErrorInfo& info = find_error_info(code);
 
-  return "on [" + line + "]: " + info.summary + " (the " + info.rule +
-         " rule is violated because " + info.reason + ").";
+    return "on [" + line + "]: " + info.summary + " (the " + info.rule +
+           " rule is violated because " + info.reason + ").";
 }
 
-std::string ConfigError::make(const std::string &line,
-                              const std::string &target, ConfigErrorCode code) {
-  const ErrorInfo &info = find_error_info(code);
+std::string ConfigError::make(const std::string& line,
+                              const std::string& target, ConfigErrorCode code) {
+    const ErrorInfo& info = find_error_info(code);
 
-  return "on [" + line + "], [" + target + "]: " + info.summary + " (the " +
-         info.rule + " rule is violated because " + info.reason + ").";
+    return "on [" + line + "], [" + target + "]: " + info.summary + " (the " +
+           info.rule + " rule is violated because " + info.reason + ").";
 }
 
-std::string ConfigError::make(const std::string &line,
-                              const std::string &target,
-                              const std::string &message) {
-  return "on [" + line + "], [" + target + "]: " + message;
+std::string ConfigError::make(const std::string& line,
+                              const std::string& target,
+                              const std::string& message) {
+    return "on [" + line + "], [" + target + "]: " + message;
 }
 
-std::string ConfigError::make(const std::string &line,
-                              const std::string &message) {
-  return "on [" + line + "]: " + message;
+std::string ConfigError::make(const std::string& line,
+                              const std::string& message) {
+    return "on [" + line + "]: " + message;
 }
 
-std::string ConfigError::file_descriptor(const std::string &reason) {
-  return "FileDescriptor Error: " + reason;
+std::string ConfigError::file_descriptor(const std::string& reason) {
+    return "FileDescriptor Error: " + reason;
 }
 
-std::string ConfigError::add_line_number(std::size_t line_number,
-                                         const std::string &message) {
-  return to_string(line_number) + " " + message;
+std::string ConfigError::add_line_number(std::size_t        line_number,
+                                         const std::string& message) {
+    return to_string(line_number) + " " + message;
 }
 
 std::string ConfigError::to_string(std::size_t value) {
-  std::ostringstream oss;
+    std::ostringstream oss;
 
-  oss << value;
-  return oss.str();
+    oss << value;
+    return oss.str();
 }

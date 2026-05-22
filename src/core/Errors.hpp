@@ -4,7 +4,7 @@
 #include <string>
 
 class Errors {
-  virtual void phantom() = 0;
+    virtual void phantom() = 0;
 
 public:
   const static std::string invalid_fd;
