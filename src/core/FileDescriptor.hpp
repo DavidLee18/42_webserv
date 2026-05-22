@@ -1,5 +1,5 @@
-#ifndef FILE_DESCRIPTOR_H
-#define FILE_DESCRIPTOR_H
+#ifndef FILE_DESCRIPTOR_HPP
+#define FILE_DESCRIPTOR_HPP
 
 #include "Result.hpp"
 #include <sys/socket.h>
@@ -48,7 +48,9 @@ class FileDescriptor {
 
     Result<std::string>    try_read_to_end() const;
 
-    Result<Void>           set_nonblocking();
+
+  // Sets the file descriptor to non-blocking mode.
+  Result<Void> set_nonblocking();
 
     Result<Void>           set_socket_option(int, int, const void*, socklen_t);
 

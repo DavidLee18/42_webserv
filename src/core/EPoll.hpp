@@ -1,5 +1,5 @@
-#ifndef EPOLL_KQUEUE_H
-#define EPOLL_KQUEUE_H
+#ifndef EPOLL_HPP
+#define EPOLL_HPP
 
 #include "FileDescriptor.hpp"
 #include <cstddef>

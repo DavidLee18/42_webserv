@@ -1,3 +1,6 @@
+#ifndef CGIINPUT_HPP
+#define CGIINPUT_HPP
+
 #include "CgiMetaVar.hpp"
 #include <string>
 #include <vector>
@@ -26,3 +29,5 @@ class CgiInput {
     Result<Void> add_mvar(std::string const&, std::string const&);
     char**       to_envp() const;
 };
+
+#endif
