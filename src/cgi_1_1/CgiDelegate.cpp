@@ -1,5 +1,5 @@
 #include "CgiDelegate.hpp"
-#include "../Errors.hpp"
+#include "../core/Errors.hpp"
 #include <cerrno>
 #include <fcntl.h>
 #include <sys/wait.h>

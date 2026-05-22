@@ -1,6 +1,6 @@
 #include "CgiInput.hpp"
-#include "../Errors.hpp"
-#include "../utils.hpp"
+#include "../core/Errors.hpp"
+#include "../core/utils.hpp"
 
 CgiInput::CgiInput() : mvars(), req_body() {}
 

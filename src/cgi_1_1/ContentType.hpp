@@ -1,7 +1,8 @@
 #ifndef CONTENT_TYPE_HPP
 #define CONTENT_TYPE_HPP
 
-#include "../Result.hpp"
+#include "../core/Result.hpp"
+
 #include <map>
 #include <string>
 

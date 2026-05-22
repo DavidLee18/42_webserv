@@ -1,5 +1,5 @@
-#ifndef CGI_AUTH_TYPE_H
-#define CGI_AUTH_TYPE_H
+#ifndef CGI_AUTH_TYPE_HPP
+#define CGI_AUTH_TYPE_HPP
 
 #include <string>
 

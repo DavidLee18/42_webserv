@@ -1,5 +1,5 @@
-#ifndef RESULT_H
-#define RESULT_H
+#ifndef RESULT_HPP
+#define RESULT_HPP
 
 #include <cassert>
 #include <cstddef>
@@ -157,4 +157,4 @@ struct Void {};
         return (r);                                                            \
     }
 
-#endif // RESULT_H
+#endif // RESULT_HPP

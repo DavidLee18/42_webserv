@@ -1,6 +1,6 @@
 #include "CgiMetaVar.hpp"
-#include "../Errors.hpp"
-#include "../utils.hpp"
+#include "../core/Errors.hpp"
+#include "../core/utils.hpp"
 #include <algorithm>
 #include <limits>
 
