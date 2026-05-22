@@ -4,7 +4,7 @@
 
 이 문서는 config 작성자가 지켜야 할 문법을 중심으로 설명하며, 실제 코드의 파싱 흐름과 검증 조건을 기준으로 작성한다.
 
-> 참고: 파일 시스템 경로를 어떤 기준 디렉토리에서 해석할지에 대한 정책은 추후 `base_root` 방식으로 별도 정리할 예정이므로, 이 문서에서는 문법과 검증 규칙만 정리한다.
+> 참고: 이 문서는 config 문법과 검증 규칙을 중심으로 정리한다. 파일 시스템 경로를 어떤 기준 디렉토리에서 해석할지는 문법 규칙과 분리하여 별도 정책으로 다룬다.
 
 ---
 
@@ -19,8 +19,6 @@ types =
 cgi =
 	...
 
-! 404:/errors/404.html
-
 :8080 =
 	...
 ```
@@ -31,10 +29,10 @@ cgi =
 - `types` 블록은 server 블록보다 먼저 작성해야 한다.
 - `cgi =` 또는 `cgi=` 는 선택 항목이다.
 - `cgi` 블록도 server 블록보다 먼저 작성해야 한다.
-- 전역 기본 에러 페이지 `! <status>:<path>` 는 선택 항목이다.
-- 전역 기본 에러 페이지도 server 블록보다 먼저 작성해야 한다.
 - server 블록은 하나 이상 필요하다.
 - 최상위에서 정의되지 않은 형식은 오류로 처리된다.
+- 최상위 level 0에서 전역 기본 에러 페이지는 파싱하지 않는다.
+- 에러 페이지는 route 하위 설정에서만 `! <status>:<path>` 형식으로 작성한다.
 
 ---
 
@@ -115,35 +113,14 @@ cgi =
 - 전역 CGI 블록은 최대 한 번만 정의할 수 있다.
 - 전역 CGI에 등록된 확장자는 Route CGI executable 검사에 사용된다.
 - 전역 CGI 확장자와 별개로 `.cgi` 확장자는 기본 허용된다.
-- Route CGI executable은 `.cgi` 또는 전역 CGI에 등록된 확장자로 끝나야 한다. 경로 중간에 같은 확장자 문자열이 있어도 executable 끝 확장자가 아니면 인정하지 않는다.
+- Route CGI executable은 `.cgi` 또는 전역 CGI에 등록된 확장자로 끝나야 한다.
+- 경로 중간에 같은 확장자 문자열이 있어도 executable 끝 확장자가 아니면 인정하지 않는다.
 - 전역 CGI 실행파일 경로는 실행 가능한 regular file이어야 한다.
-- 파일 시스템 경로의 기준 디렉토리 정책은 추후 별도로 정리한다.
+- 파일 시스템 경로 기준 정책은 문법 규칙과 분리하여 별도로 다룬다.
 
 ---
 
-## 5. 전역 기본 에러 페이지
-
-전역 기본 에러 페이지는 최상위에서 `!` 로 선언한다.
-
-### 형식
-
-```conf
-! 404:/errors/404.html
-```
-
-### 규칙
-
-- 형식은 `! <status>:<path>` 이다.
-- status는 3자리 HTTP error status code여야 한다.
-- status는 `400 ~ 599` 범위여야 한다.
-- `:` 구분자는 정확히 한 번만 사용해야 한다.
-- path는 존재하고 읽기 가능한 regular file이어야 한다.
-- path 확장자는 `.html` 이어야 한다.
-- 전역 기본 에러 페이지 선언은 최대 한 번만 허용된다.
-
----
-
-## 6. Server 블록
+## 5. Server 블록
 
 server 블록은 port 번호를 기준으로 선언한다.
 
@@ -175,7 +152,7 @@ server 블록은 port 번호를 기준으로 선언한다.
 
 ---
 
-## 7. Header와 Server response time
+## 6. Header와 Server response time
 
 ### Header 형식
 
@@ -206,9 +183,10 @@ server 블록은 port 번호를 기준으로 선언한다.
 - 단위는 millisecond이다.
 - server 블록 안에서 최대 한 번만 정의할 수 있다.
 
+
 ---
 
-## 8. Route Rule
+## 7. Route Rule
 
 일반 route는 요청 method, 요청 path, operator, 대상 path로 구성된다.
 
@@ -250,7 +228,7 @@ server 블록은 port 번호를 기준으로 선언한다.
 
 ---
 
-## 9. Route 하위 설정
+## 8. Route 하위 설정
 
 일반 route 선언 다음 줄에서 route별 추가 설정을 작성할 수 있다.
 
@@ -277,6 +255,16 @@ server 블록은 port 번호를 기준으로 선언한다.
 | `->{}` | max body size | `KB`, `KiB`, `MB`, `MiB` 허용 |
 | `!` | route error page | `400 ~ 599` 상태코드와 `.html` 파일 |
 
+### Route error page 규칙
+
+- route error page는 route 하위 설정에서만 작성한다.
+- 형식은 `! <status>:<path>` 이다.
+- status는 3자리 HTTP error status code여야 한다.
+- status는 `400 ~ 599` 범위여야 한다.
+- `:` 구분자는 정확히 한 번만 사용해야 한다.
+- path는 존재하고 읽기 가능한 regular file이어야 한다.
+- path 확장자는 `.html` 이어야 한다.
+
 ### Max body size 규칙
 
 - 숫자만 쓰면 KB 단위로 해석한다.
@@ -287,7 +275,7 @@ server 블록은 port 번호를 기준으로 선언한다.
 
 ---
 
-## 10. Route CGI
+## 9. Route CGI
 
 Route 단위 CGI를 선언한다.
 
@@ -361,9 +349,10 @@ inline env 없이 작성할 수도 있다.
 - KEY의 첫 글자는 숫자가 될 수 없다.
 - 같은 CGI context 안에서 같은 KEY를 중복 선언할 수 없다.
 
+
 ---
 
-## 11. Path Pattern과 Wildcard
+## 10. Path Pattern과 Wildcard
 
 ### 기본 매칭 규칙
 
@@ -397,7 +386,7 @@ inline env 없이 작성할 수도 있다.
 
 ---
 
-## 12. 확장 패턴
+## 11. 확장 패턴
 
 특정 path segment에서 여러 확장자 후보를 한 번에 선언할 수 있다.
 
@@ -432,9 +421,19 @@ inline env 없이 작성할 수도 있다.
 
 ---
 
-## 13. Path Rewrite
+## 12. Path Rewrite
 
 실제 파일 경로 또는 대상 경로 계산에는 `PathPattern::rewrite_path()`가 사용된다.
+
+### 기본 분기
+
+`rewrite_path()`는 config 왼쪽 PATH와 실제 request path를 비교해 아래 방식 중 하나로 target path를 계산한다.
+
+| 조건 | 처리 |
+|---|---|
+| 왼쪽 PATH에 wildcard가 있음 | wildcard rewrite |
+| 왼쪽 PATH에 wildcard가 없고 `/` 로 끝남 | prefix route resolve |
+| 왼쪽 PATH에 wildcard가 없고 `/` 로 끝나지 않음 | exact path rewrite |
 
 ### 예시 1: 확장자 패턴과 하위 경로 보존
 
@@ -454,15 +453,31 @@ result:  /static/a/b/c.png
 
 위 예시에서 `*` 는 단일 파일명만 의미하지 않는다. `*` 는 `/` 를 포함한 하위 경로까지 매칭할 수 있으며, rewrite 결과에서도 해당 relative path가 오른쪽 TARGET의 독립된 `*` segment 위치에 들어간다.
 
-### 예시 2: directory prefix mapping
+### 예시 2: prefix route resolve
 
 ```conf
 	GET /docs/ <- /var/www/docs/
 ```
 
 ```text
+request: /docs/
+result:  /var/www/docs/
+```
+
+```text
 request: /docs/a/b.html
 result:  /var/www/docs/a/b.html
+```
+
+prefix route resolve는 request path에서 왼쪽 PATH와 매칭된 prefix 부분을 제거하고, 남은 suffix를 오른쪽 TARGET 뒤에 이어붙인다.
+
+```text
+route_pattern  = /docs/
+request_path   = /docs/a/b.html
+rewrite_target = /var/www/docs/
+
+suffix = a/b.html
+result = /var/www/docs/a/b.html
 ```
 
 ### 규칙
@@ -486,26 +501,27 @@ result:  /var/www/docs/a/b.html
 
 ---
 
-## 14. 파일 시스템 경로 해석 정책
+## 13. 파일 시스템 경로 해석 정책
 
-이 문서는 config 문법과 검증 규칙을 정리한다. 파일 시스템 경로를 어떤 기준 디렉토리에서 해석할지는 추후 `base_root` 방식으로 별도 정리할 예정이다.
+이 문서는 config 문법과 검증 규칙을 정리한다. 파일 시스템 경로 기준은 문법 규칙과 분리하여 별도 정책으로 다룬다.
 
 따라서 이 문서에서는 아래 항목을 확정하지 않는다.
 
 - 일반 Route Rule의 TARGET 경로 기준
 - `@` auth file 경로 기준
-- error page 경로 기준
+- route error page 경로 기준
 - Route CGI executable 경로 기준
 - 전역 CGI executable 경로와 일반 route 경로의 기준 차이
 
-현재 문법상 경로는 config에 작성된 문자열을 기준으로 검증되며, 실제 기준 디렉토리 정책은 별도 결정 후 문서에 반영한다.
+현재 문법상 경로는 config에 작성된 문자열을 기준으로 검증되며, 실제 기준 디렉토리 정책은 별도 정책에 따른다.
 
-## 15. Route 매칭 정책
+---
+
+## 14. Route 매칭 정책
 
 ### 일반 Route Rule
 
 - method가 일치해야 한다.
-- 단, 요청 method가 `HEAD` 이고 route method가 `GET` 이면 일반 route에서 매칭된다.
 - `route.path.matches(request_path)` 가 true인 첫 번째 route를 반환한다.
 - longest match를 자동으로 계산하지 않는다.
 - 더 구체적인 route를 우선하고 싶다면 config 파일에서 더 위에 작성해야 한다.
@@ -513,14 +529,13 @@ result:  /var/www/docs/a/b.html
 
 ### Route CGI
 
-- method가 정확히 일치해야 한다.
-- 일반 route와 달리 `HEAD` 를 `GET` 으로 대체 매칭하지 않는다.
+- method가 일치해야 한다.
 - `RouteRule_CGI.path.matches(request_path)` 가 true인 첫 번째 CGI route를 반환한다.
 - Route CGI도 작성 순서가 우선순위이다.
 
 ---
 
-## 16. AUTOINDEX와 REDIRECT
+## 15. AUTOINDEX와 REDIRECT
 
 ### AUTOINDEX
 
@@ -529,10 +544,11 @@ result:  /var/www/docs/a/b.html
 ```
 
 - AUTOINDEX는 `<i-` operator를 사용한다.
-- AUTOINDEX path는 wildcard 없이 directory prefix 형태로 작성하는 것을 기준으로 한다.
+- AUTOINDEX path는 wildcard 없이 prefix route 형태로 작성하는 것을 기준으로 한다.
 - path가 `/` 로 끝나면 prefix match로 처리된다.
 - `/download/` 는 `/download/a.txt`, `/download/dir/a.txt` 와 매칭될 수 있다.
 - `/download` 처럼 trailing slash가 없는 요청은 `/download/` 와 매칭되지 않는다.
+- AUTOINDEX는 prefix route resolve로 계산된 실제 directory path를 기준으로 directory listing을 생성한다.
 
 ### REDIRECT
 
@@ -548,7 +564,7 @@ result:  /var/www/docs/a/b.html
 
 ---
 
-## 17. 전체 예시
+## 16. 전체 예시
 
 아래 예시처럼 server 블록 내부에서 일반 Route Rule과 Route CGI 묶음은 빈 줄 하나로 구분해야 한다.
 빈 줄 두 개가 연속되면 server 블록 종료로 해석될 수 있다.
@@ -563,8 +579,6 @@ types =
 
 cgi =
 	py -> /usr/bin/python3
-
-! 404:/errors/404.html
 
 :8080 =
 	[] +<= Server: webserv
@@ -590,15 +604,19 @@ cgi =
 
 ---
 
-## 18. 핵심 주의사항
+## 17. 핵심 주의사항
 
 - Route Rule과 Route CGI는 반드시 빈 줄 하나로 구분한다.
 - 빈 줄 두 개는 server block 종료로 처리될 수 있다.
 - route 선택은 longest match가 아니라 작성 순서 우선이다.
 - 더 구체적인 route를 먼저 작성해야 한다.
+- 최상위 level 0에서는 전역 기본 에러 페이지를 파싱하지 않는다.
+- route error page는 route 하위 설정에서만 작성한다.
 - 오른쪽 TARGET의 wildcard는 반드시 독립된 `*` segment여야 한다.
 - `*` 는 빈 문자열과 매칭되지 않고 최소 1글자 이상과 매칭된다.
 - `*` 는 `/` 를 포함한 하위 경로까지 매칭할 수 있다.
 - rewrite 시 TARGET의 `*` 에는 단일 파일명뿐 아니라 relative path가 들어갈 수 있다.
-- 파일 시스템 경로 기준 디렉토리 정책은 추후 `base_root` 방식으로 별도 정리한다.
+- wildcard가 없고 `/` 로 끝나는 왼쪽 PATH는 prefix route로 처리된다.
+- prefix route는 request path에서 매칭된 prefix를 제거한 suffix를 TARGET 뒤에 붙인다.
+- 파일 시스템 경로 기준 정책은 문법 규칙과 분리하여 별도 정책으로 다룬다.
 - HTML 파일 검사는 `.html` 만 허용한다.

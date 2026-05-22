@@ -573,9 +573,7 @@ Result<RouteRule> ServerConfig::find_route(Request::Method method,
   std::string err = "[DEBUG] find_route: NO ROUTE for ";
 
   for (size_t i = 0; i < routes.size(); ++i) {
-    if (((method == Request::HEAD && routes[i].method == Request::GET) ||
-         routes[i].method == method) &&
-        routes[i].path.matches(pathPattern))
+    if (routes[i].method == method && routes[i].path.matches(pathPattern))
       return OK(RouteRule, routes[i]);
   }
   return ERR(RouteRule, err + path);
@@ -588,9 +586,7 @@ ServerConfig::find_route_cgi(Request::Method method,
   std::string err = "[DEBUG] find_route_cgi: NO ROUTE for ";
 
   for (size_t i = 0; i < R_CGI.size(); ++i) {
-    if (((method == Request::HEAD && R_CGI[i].get_method() == Request::GET) ||
-         R_CGI[i].get_method() == method) &&
-        R_CGI[i].get_path().matches(pathPattern))
+    if (R_CGI[i].get_method() == method && R_CGI[i].get_path().matches(pathPattern))
       return OK(RouteRule_CGI, R_CGI[i]);
   }
   return ERR(RouteRule_CGI, err + path);
