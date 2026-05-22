@@ -149,6 +149,28 @@ Result<Void> WebserverConfig::is_valid_mime_type(const std::string& value) {
     return OKV;
 }
 
+bool WebserverConfig::is_server_config_header(const std::string &line) {
+  std::size_t i = 1;
+
+  if (line.empty())
+    return false;
+  if (line[0] != ':')
+    return false;
+  if (i >= line.size() || !std::isdigit(static_cast<unsigned char>(line[i])))
+    return false;
+  while (i < line.size() && std::isdigit(static_cast<unsigned char>(line[i])))
+    ++i;
+  if (i < line.size() && line[i] == ' ') {
+    ++i;
+    if (i < line.size() && line[i] == ' ')
+      return false;
+  }
+  if (i >= line.size() || line[i] != '=')
+    return false;
+  ++i;
+  return (i == line.size());
+}
+
 Result<Void>
 WebserverConfig::parse_type_mapping(const std::string&        line,
                                     std::vector<std::string>& keys_out,

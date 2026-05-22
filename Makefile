@@ -15,9 +15,9 @@ SERVER		:= Server.cpp Server_connections.cpp Server_io.cpp Server_dispatch.cpp \
 CONFIG		:= WebserverConfig.cpp ServerConfig.cpp RouteRule_CGI.cpp PathPattern.cpp ConfigError.cpp
 CGI         := CgiAuthType.cpp CgiMetaVar.cpp EtcMetaVar.cpp ServerName.cpp ContentType.cpp \
 				CgiDelegate.cpp CgiInput.cpp
-CORE		:= Errors.cpp EPoll.cpp FileDescriptor.cpp utils.cpp 
+CORE		:= core/Errors.cpp core/EPoll.cpp core/FileDescriptor.cpp core/utils.cpp 
 
-SRC_DIRS	:= server config cgi_1_1 core
+SRC_DIRS	:= server config cgi_1_1
 SRCS		:= $(MAIN) $(CONFIG) $(SERVER) $(CGI) $(CORE)
 
 OBJS		:= $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.o))
@@ -36,6 +36,7 @@ $(NAME): $(OBJS)
 
 $(BUILD_DIR)/%.o: %.cpp
 	mkdir -p $(BUILD_DIR)
+	mkdir -p $(BUILD_DIR)/core
 	$(CXX) $(CXXFLAGS_COMMON) $(DEBUG_CXXFLAGS) -I$(SRC_DIR) -MMD -MP -c $< -o $@
 
 clean:
