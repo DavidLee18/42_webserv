@@ -48,9 +48,8 @@ class FileDescriptor {
 
     Result<std::string>    try_read_to_end() const;
 
-
-  // Sets the file descriptor to non-blocking mode.
-  Result<Void> set_nonblocking();
+    // Sets the file descriptor to non-blocking mode.
+    Result<Void>           set_nonblocking();
 
     Result<Void>           set_socket_option(int, int, const void*, socklen_t);
 

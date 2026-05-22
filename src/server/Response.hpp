@@ -23,8 +23,8 @@ class EPoll;
 class CgiDelegate;
 
 struct Target {
-  std::string path; ///< The absolute path to the target resource.
-  int type;         ///< The type or status of the target.
+    std::string path; ///< The absolute path to the target resource.
+    int         type; ///< The type or status of the target.
 };
 
 struct StatusInfo {
@@ -33,35 +33,35 @@ struct StatusInfo {
 };
 
 struct Response {
-  enum StatusCode {
-    OK = 200,
-    NO_CONTENT = 204,
-    NOT_MODIFIED = 304,
-    MOVED_PERMANENTLY = 301,
-    FOUND = 302,
-    BAD_REQUEST = 400,
-    UNAUTHORIZED = 401,
-    FORBIDDEN = 403,
-    NOT_FOUND = 404,
-    METHOD_NOT_ALLOWED = 405,
-    REQUEST_TIMEOUT = 408,
-    CONFLICT = 409,
-    PAYLOAD_TOO_LARGE = 413,
-    INTERNAL_SERVER_ERR = 500,
-    NOT_IMPLEMENTED = 501,
-    BAD_GATEWAY = 502,
-    GATEWAY_TIMEOUT = 504,
-  };
-  std::string version;      ///< HTTP version (e.g., "HTTP/1.1").
-  StatusCode status_code;   ///< HTTP status code and reason (e.g., "200 OK").
-  size_t content_length;    ///< Content-Length header value.
-  std::string content_type; ///< Content-Type header.
-  std::string cookie;       ///< Cookies.
-  std::string body;         ///< The response body payload.
-  std::string file_path;    ///< If set, stream body from this file path.
-  std::string redir;        ///< Redirect location, if applicable.
-  bool keep_alive;          ///< Connection keep-alive status.
-  std::map<std::string, std::string> headers;
+    enum StatusCode {
+        OK                  = 200,
+        NO_CONTENT          = 204,
+        NOT_MODIFIED        = 304,
+        MOVED_PERMANENTLY   = 301,
+        FOUND               = 302,
+        BAD_REQUEST         = 400,
+        UNAUTHORIZED        = 401,
+        FORBIDDEN           = 403,
+        NOT_FOUND           = 404,
+        METHOD_NOT_ALLOWED  = 405,
+        REQUEST_TIMEOUT     = 408,
+        CONFLICT            = 409,
+        PAYLOAD_TOO_LARGE   = 413,
+        INTERNAL_SERVER_ERR = 500,
+        NOT_IMPLEMENTED     = 501,
+        BAD_GATEWAY         = 502,
+        GATEWAY_TIMEOUT     = 504,
+    };
+    std::string version;     ///< HTTP version (e.g., "HTTP/1.1").
+    StatusCode  status_code; ///< HTTP status code and reason (e.g., "200 OK").
+    size_t      content_length; ///< Content-Length header value.
+    std::string content_type;   ///< Content-Type header.
+    std::string cookie;         ///< Cookies.
+    std::string body;           ///< The response body payload.
+    std::string file_path;      ///< If set, stream body from this file path.
+    std::string redir;          ///< Redirect location, if applicable.
+    bool        keep_alive;     ///< Connection keep-alive status.
+    std::map<std::string, std::string> headers;
 
     Response()
         : version("HTTP/1.1"), status_code(INTERNAL_SERVER_ERR),

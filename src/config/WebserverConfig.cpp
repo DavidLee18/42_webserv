@@ -22,14 +22,14 @@ Result<Void> WebserverConfig::file_parsing(FileDescriptor& file, char** envp) {
     bool        is_cgi_parse    = false;
     bool        is_server_parse = false;
 
-  while (true) {
-    count_line++;
-    TRY(Void, std::string, line, file.read_file_line())
-    if (line == "")
-      break;
-    else if (line == "\n")
-      continue;
-    TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 0))
+    while (true) {
+        count_line++;
+        TRY(Void, std::string, line, file.read_file_line())
+        if (line == "")
+            break;
+        else if (line == "\n")
+            continue;
+        TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 0))
 
         if (line == "types =" || line == "types=") {
             if (is_type_parse == true)
@@ -149,26 +149,22 @@ Result<Void> WebserverConfig::is_valid_mime_type(const std::string& value) {
     return OKV;
 }
 
-bool WebserverConfig::is_server_config_header(const std::string &line) {
-  std::size_t i = 1;
+bool WebserverConfig::is_server_config_header(const std::string& line) {
+    std::size_t i = 1;
 
-  if (line.empty())
-    return false;
-  if (line[0] != ':')
-    return false;
-  if (i >= line.size() || !std::isdigit(static_cast<unsigned char>(line[i])))
-    return false;
-  while (i < line.size() && std::isdigit(static_cast<unsigned char>(line[i])))
+    if (line.empty()) return false;
+    if (line[0] != ':') return false;
+    if (i >= line.size() || !std::isdigit(static_cast<unsigned char>(line[i])))
+        return false;
+    while (i < line.size() && std::isdigit(static_cast<unsigned char>(line[i])))
+        ++i;
+    if (i < line.size() && line[i] == ' ') {
+        ++i;
+        if (i < line.size() && line[i] == ' ') return false;
+    }
+    if (i >= line.size() || line[i] != '=') return false;
     ++i;
-  if (i < line.size() && line[i] == ' ') {
-    ++i;
-    if (i < line.size() && line[i] == ' ')
-      return false;
-  }
-  if (i >= line.size() || line[i] != '=')
-    return false;
-  ++i;
-  return (i == line.size());
+    return (i == line.size());
 }
 
 Result<Void>
@@ -204,12 +200,11 @@ Result<Void> WebserverConfig::parse_types_block(FileDescriptor& file) {
     std::string              value;
     std::vector<std::string> keys;
 
-  while (true) {
-    count_line++;
-    TRY(Void, std::string, line, file.read_file_line())
-    if (line == "\n" || line == "")
-      break;
-    TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 1))
+    while (true) {
+        count_line++;
+        TRY(Void, std::string, line, file.read_file_line())
+        if (line == "\n" || line == "") break;
+        TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 1))
 
         TRY_(Void, Void, parse_type_mapping(line, keys, value))
 

@@ -7,46 +7,45 @@
 #include <sstream>
 
 Result<std::string> Session::generate_session_id() {
-  unsigned char random_bytes[16];
+    unsigned char random_bytes[16];
 
-  std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
-  if (!urandom.is_open()) {
-    return ERR(std::string,
-               "cannot open /dev/urandom for session ID generation");
-  }
-  urandom.read(reinterpret_cast<char *>(random_bytes), 16);
-  if (urandom.fail() || urandom.gcount() != 16) {
-    return ERR(std::string, "cannot read from /dev/urandom");
-  }
-  urandom.close();
+    std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
+    if (!urandom.is_open()) {
+        return ERR(std::string,
+                   "cannot open /dev/urandom for session ID generation");
+    }
+    urandom.read(reinterpret_cast<char*>(random_bytes), 16);
+    if (urandom.fail() || urandom.gcount() != 16) {
+        return ERR(std::string, "cannot read from /dev/urandom");
+    }
+    urandom.close();
 
-  random_bytes[6] = (random_bytes[6] & 0x0f) | 0x40;
-  random_bytes[8] = (random_bytes[8] & 0x3f) | 0x80;
+    random_bytes[6] = (random_bytes[6] & 0x0f) | 0x40;
+    random_bytes[8] = (random_bytes[8] & 0x3f) | 0x80;
 
-  std::ostringstream ss;
-  ss << std::hex << std::setfill('0');
-  for (int i = 0; i < 16; ++i) {
-    if (i == 4 || i == 6 || i == 8 || i == 10)
-      ss << "-";
-    ss << std::setw(2) << static_cast<int>(random_bytes[i]);
-  }
+    std::ostringstream ss;
+    ss << std::hex << std::setfill('0');
+    for (int i = 0; i < 16; ++i) {
+        if (i == 4 || i == 6 || i == 8 || i == 10) ss << "-";
+        ss << std::setw(2) << static_cast<int>(random_bytes[i]);
+    }
 
-  return OK(std::string, ss.str());
+    return OK(std::string, ss.str());
 }
 
-Result<std::string> Session::create_session(const std::string &user_id,
-                                            const std::string &client_ip) {
-  std::string session_id;
-  TRY(std::string, std::string, session_id, generate_session_id())
+Result<std::string> Session::create_session(const std::string& user_id,
+                                            const std::string& client_ip) {
+    std::string session_id;
+    TRY(std::string, std::string, session_id, generate_session_id())
 
-  SessionData new_session;
-  new_session.user_id = user_id;
-  new_session.client_ip = client_ip;
-  new_session.created_at = std::time(NULL);
-  new_session.last_access = new_session.created_at;
+    SessionData new_session;
+    new_session.user_id     = user_id;
+    new_session.client_ip   = client_ip;
+    new_session.created_at  = std::time(NULL);
+    new_session.last_access = new_session.created_at;
 
-  data[session_id] = new_session;
-  return OK(std::string, session_id);
+    data[session_id]        = new_session;
+    return OK(std::string, session_id);
 }
 
 SessionData* Session::get_session(const std::string& session_id) {

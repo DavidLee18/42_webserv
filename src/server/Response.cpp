@@ -5,42 +5,41 @@
 #include <iostream>
 #include <sstream>
 
-static std::ostream &identity_stream(std::ostream &os) { return os; }
+static std::ostream& identity_stream(std::ostream& os) { return os; }
 
-static void write_response_head(std::ostream &os, const Response &resp,
-                                std::ostream &(*prefix)(std::ostream &)) {
-  os << prefix << "HTTP/1.1 "
-     << DefaultError::status_code_to_string(resp.status_code) << utils::crlf;
-  os << prefix << "Date: " << ResponseUtils::get_http_date() << utils::crlf;
-  os << prefix << "Server: webserv" << utils::crlf;
-  if ((resp.status_code == Response::MOVED_PERMANENTLY ||
-       resp.status_code == Response::FOUND) &&
-      !resp.redir.empty())
-    os << prefix << "Location: " << resp.redir << utils::crlf;
-  os << prefix << "Content-Type: " << resp.content_type << utils::crlf;
-  if (!resp.cookie.empty())
-    os << prefix << "Set-Cookie: " << resp.cookie << utils::crlf;
-  for (std::map<std::string, std::string>::const_iterator it =
-           resp.headers.begin();
-       it != resp.headers.end(); ++it)
-    os << prefix << it->first << ": " << it->second << utils::crlf;
-  os << prefix << "Content-Length: " << resp.content_length << utils::crlf;
-  if (resp.keep_alive)
-    os << prefix << "Connection: keep-alive" << utils::crlf;
-  else
-    os << prefix << "Connection: close" << utils::crlf;
-  os << utils::crlf;
+static void          write_response_head(std::ostream& os, const Response& resp,
+                                         std::ostream& (*prefix)(std::ostream&)) {
+    os << prefix << "HTTP/1.1 "
+       << DefaultError::status_code_to_string(resp.status_code) << utils::crlf;
+    os << prefix << "Date: " << ResponseUtils::get_http_date() << utils::crlf;
+    os << prefix << "Server: webserv" << utils::crlf;
+    if ((resp.status_code == Response::MOVED_PERMANENTLY ||
+         resp.status_code == Response::FOUND) &&
+        !resp.redir.empty())
+        os << prefix << "Location: " << resp.redir << utils::crlf;
+    os << prefix << "Content-Type: " << resp.content_type << utils::crlf;
+    if (!resp.cookie.empty())
+        os << prefix << "Set-Cookie: " << resp.cookie << utils::crlf;
+    for (std::map<std::string, std::string>::const_iterator it =
+             resp.headers.begin();
+         it != resp.headers.end(); ++it)
+        os << prefix << it->first << ": " << it->second << utils::crlf;
+    os << prefix << "Content-Length: " << resp.content_length << utils::crlf;
+    if (resp.keep_alive)
+        os << prefix << "Connection: keep-alive" << utils::crlf;
+    else
+        os << prefix << "Connection: close" << utils::crlf;
+    os << utils::crlf;
 }
 
-std::ostream &operator<<(std::ostream &os, Response const &resp) {
-  write_response_head(os, resp, identity_stream);
-  if (!resp.body.empty())
-    os << resp.body;
-  return os;
+std::ostream& operator<<(std::ostream& os, Response const& resp) {
+    write_response_head(os, resp, identity_stream);
+    if (!resp.body.empty()) os << resp.body;
+    return os;
 }
 
-void Response::print_simple(std::ostream &os) const {
-  write_response_head(os, *this, utils::info);
+void Response::print_simple(std::ostream& os) const {
+    write_response_head(os, *this, utils::info);
 }
 
 Result<Response>

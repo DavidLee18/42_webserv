@@ -1,8 +1,8 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
-#include "FileDescriptor.hpp"
 #include "../server/Client.hpp"
+#include "FileDescriptor.hpp"
 #include <cstdlib>
 #include <sys/stat.h>
 #include <unistd.h>

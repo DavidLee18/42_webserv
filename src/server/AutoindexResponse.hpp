@@ -6,9 +6,9 @@
 #include <dirent.h>
 
 class AutoindexResponse {
-public:
-  static Result<std::string> generate(const std::string &real_path,
-                                      const std::string &req_uri, DIR *dir);
+  public:
+    static Result<std::string> generate(const std::string& real_path,
+                                        const std::string& req_uri, DIR* dir);
 };
 
 #endif

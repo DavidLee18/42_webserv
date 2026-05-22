@@ -1,9 +1,9 @@
 #ifndef CGIDELEGATE_HPP
 #define CGIDELEGATE_HPP
 
+#include "../config/RouteRule_CGI.hpp"
 #include "../core/EPoll.hpp"
 #include "../core/FileDescriptor.hpp"
-#include "../config/RouteRule_CGI.hpp"
 #include "CgiInput.hpp"
 #include <map>
 #include <string>

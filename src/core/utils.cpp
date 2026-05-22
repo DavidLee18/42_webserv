@@ -154,105 +154,104 @@ std::string   utils::get_env(std::string const& name, char** envp) {
     return std::string();
 }
 
-std::string configutils::get_indent_whitespace_error(const std::string &line,
-                                                     size_t level) {
-  std::size_t indent_level = utils::return_indent_level(line);
-  std::string prefix = "on [" + line + "]: ";
-  std::string err_line;
+std::string configutils::get_indent_whitespace_error(const std::string& line,
+                                                     size_t             level) {
+    std::size_t indent_level = utils::return_indent_level(line);
+    std::string prefix       = "on [" + line + "]: ";
+    std::string err_line;
 
-  if (line.empty()) {
-    if (level == 0)
-      return "";
-    std::ostringstream l_oss;
-    l_oss << level;
-    return "on []: It is not a valid indentation level(expected indentation "
-           "level: " +
-           l_oss.str() + ", found: 0)";
-  }
-  if (level != 0 && line[0] != '\t') {
-    err_line = prefix + "It is not a valid indentation character (expected "
-                "indentation character: ['\\t'], found: [" +
-                line[0] + "])";
-  } else if ((level == 0 && std::isspace(line[0])) || indent_level != level) {
-    std::ostringstream i_oss;
-    std::ostringstream l_oss;
-
-    l_oss << level;
-    if (level == 0) {
-      for (std::size_t i = 0; i < line.size(); i++) {
-        indent_level = i;
-        if (!std::isspace(line[i]))
-          break;
-      }
+    if (line.empty()) {
+        if (level == 0) return "";
+        std::ostringstream l_oss;
+        l_oss << level;
+        return "on []: It is not a valid indentation level(expected "
+               "indentation "
+               "level: " +
+               l_oss.str() + ", found: 0)";
     }
-    i_oss << indent_level;
+    if (level != 0 && line[0] != '\t') {
+        err_line = prefix +
+                   "It is not a valid indentation character (expected "
+                   "indentation character: ['\\t'], found: [" +
+                   line[0] + "])";
+    } else if ((level == 0 && std::isspace(line[0])) || indent_level != level) {
+        std::ostringstream i_oss;
+        std::ostringstream l_oss;
 
-    err_line =
-        prefix + "It is not a valid indentation level(expected indentation level: " +
-        l_oss.str() + ", found: " + i_oss.str() + ")";
+        l_oss << level;
+        if (level == 0) {
+            for (std::size_t i = 0; i < line.size(); i++) {
+                indent_level = i;
+                if (!std::isspace(line[i])) break;
+            }
+        }
+        i_oss << indent_level;
+
+        err_line =
+            prefix +
+            "It is not a valid indentation level(expected indentation level: " +
+            l_oss.str() + ", found: " + i_oss.str() + ")";
+        return err_line;
+    } else if (utils::has_leading_space(line.substr(level))) {
+        err_line = prefix + "Leading whitespace exists.";
+        return err_line;
+    } else if (utils::has_trailing_space(line)) {
+        err_line = prefix + "Trailing whitespace exists.";
+        return err_line;
+    }
     return err_line;
-  } else if (utils::has_leading_space(line.substr(level))) {
-    err_line = prefix + "Leading whitespace exists.";
-    return err_line;
-  } else if (utils::has_trailing_space(line)) {
-    err_line = prefix + "Trailing whitespace exists.";
-    return err_line;
-  }
-  return err_line;
 }
 
-std::string configutils::string_to_unsigned_int(const std::string &str,
-                                                unsigned int &num) {
-  errno = 0;
-  char *end;
-  unsigned long temp = std::strtoul(str.c_str(), &end, 10);
-  std::string prefix = "Invalid unsigned integer ";
+std::string configutils::string_to_unsigned_int(const std::string& str,
+                                                unsigned int&      num) {
+    errno = 0;
+    char*         end;
+    unsigned long temp   = std::strtoul(str.c_str(), &end, 10);
+    std::string   prefix = "Invalid unsigned integer ";
 
-  if (str.empty())
-    return  prefix + "(value is empty.)";
+    if (str.empty()) return prefix + "(value is empty.)";
 
-  if (str[0] == '0') {
-    if (str.size() != 1)
-      return "(leading zeros are not allowed).";;
-  } else if (*end != '\0')
-    return prefix + "(value contains non-digit characters).";
-  else if (errno == ERANGE || temp > std::numeric_limits<unsigned int>::max())
-    return prefix + "(value is out of unsigned int range).";
-  num = static_cast<unsigned int>(temp);
-  return "";
+    if (str[0] == '0') {
+        if (str.size() != 1) return "(leading zeros are not allowed).";
+        ;
+    } else if (*end != '\0')
+        return prefix + "(value contains non-digit characters).";
+    else if (errno == ERANGE || temp > std::numeric_limits<unsigned int>::max())
+        return prefix + "(value is out of unsigned int range).";
+    num = static_cast<unsigned int>(temp);
+    return "";
 }
 
-std::string configutils::check_html_file(const std::string &path, char **envp) {
+std::string configutils::check_html_file(const std::string& path, char** envp) {
 
-  std::string real_path = utils::get_env("PWD", envp) + "/" + path;
-  std::string prefix = "Invalid HTML file ";
-  struct stat st;
-  if (stat(real_path.c_str(), &st) != 0)
-    return prefix + "(file does not exist or cannot be accessed).";
+    std::string real_path = utils::get_env("PWD", envp) + "/" + path;
+    std::string prefix    = "Invalid HTML file ";
+    struct stat st;
+    if (stat(real_path.c_str(), &st) != 0)
+        return prefix + "(file does not exist or cannot be accessed).";
 
-  if (!S_ISREG(st.st_mode))
-    return prefix + "(path is not a regular file).";
+    if (!S_ISREG(st.st_mode)) return prefix + "(path is not a regular file).";
 
-  if (real_path.length() < 5 ||
-      real_path.substr(real_path.length() - 5) != ".html")
-    return prefix + "(file extension must be .html).";
+    if (real_path.length() < 5 ||
+        real_path.substr(real_path.length() - 5) != ".html")
+        return prefix + "(file extension must be .html).";
 
-  if (access(real_path.c_str(), R_OK) != 0)
-    return prefix + "(no read permission).";
+    if (access(real_path.c_str(), R_OK) != 0)
+        return prefix + "(no read permission).";
 
-  return "";
+    return "";
 }
 
-Result<Void> configutils::prepare_config_line(std::string &origin_line, std::string &line, size_t level) {
-  origin_line = utils::remove_char(line, '\n');
-  std::string err_meg = configutils::get_indent_whitespace_error(origin_line, level);
-  if (err_meg != "")
-    return ERR(Void, err_meg);
-  line = utils::trim_whitespace(origin_line);
-  return OKV;
+Result<Void> configutils::prepare_config_line(std::string& origin_line,
+                                              std::string& line, size_t level) {
+    origin_line = utils::remove_char(line, '\n');
+    std::string err_meg =
+        configutils::get_indent_whitespace_error(origin_line, level);
+    if (err_meg != "") return ERR(Void, err_meg);
+    line = utils::trim_whitespace(origin_line);
+    return OKV;
 }
-
 
 unsigned char utils::to_upper(const unsigned char c) {
-  return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
+    return static_cast<unsigned char>(std::toupper(static_cast<int>(c)));
 }

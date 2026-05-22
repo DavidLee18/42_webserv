@@ -354,7 +354,7 @@ PathPattern::rewrite_path(const PathPattern& request_pattern,
     return OK(std::string, new_path);
 }
 
-std::ostream &operator<<(std::ostream &os, const PathPattern &data) {
-  os << data.to_string();
-  return (os);
+std::ostream& operator<<(std::ostream& os, const PathPattern& data) {
+    os << data.to_string();
+    return (os);
 }

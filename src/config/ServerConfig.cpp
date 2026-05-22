@@ -23,18 +23,17 @@ Result<Void> ServerConfig::parse_server_block(FileDescriptor& fd, char** envp) {
     bool        is_header_parse  = false;
     bool        is_timeout_parse = false;
 
-  while (true) {
-    count_line++;
-    TRY(Void, std::string, line, fd.read_file_line())
-    if (line == "\n") {
-      end_flag += 1;
-      if (end_flag == 2)
-        break;
-      continue;
-    } else if (line == "")
-      break;
-    end_flag = 0;
-    TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 1))
+    while (true) {
+        count_line++;
+        TRY(Void, std::string, line, fd.read_file_line())
+        if (line == "\n") {
+            end_flag += 1;
+            if (end_flag == 2) break;
+            continue;
+        } else if (line == "")
+            break;
+        end_flag = 0;
+        TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 1))
 
         if (is_header_block(line)) {
             if (is_route_parse == true)
@@ -132,15 +131,16 @@ Result<Void> ServerConfig::parse_header_entry(FileDescriptor&    fd,
         return ERR(Void, ConfigError::make(origin_line, value,
                                            ERR_INVALID_HEADER_VALUE));
 
-  std::string file_line = "";
-  while (temp[temp.length() - 1] == ';') {
-    count_line++;
-    TRY(Void, std::string, file_line, fd.read_file_line())
-    if (file_line == "\n" || file_line == "") {
-      end_flag += 1;
-      break;
-    }
-    TRY_(Void, Void, configutils::prepare_config_line(origin_line, file_line, 2))
+    std::string file_line = "";
+    while (temp[temp.length() - 1] == ';') {
+        count_line++;
+        TRY(Void, std::string, file_line, fd.read_file_line())
+        if (file_line == "\n" || file_line == "") {
+            end_flag += 1;
+            break;
+        }
+        TRY_(Void, Void,
+             configutils::prepare_config_line(origin_line, file_line, 2))
 
         if (!utils::is_header_value(temp))
             return ERR(Void, ConfigError::make(origin_line, temp,
@@ -551,15 +551,15 @@ Result<Void> ServerConfig::parse_route_rule_block(const std::string& route_line,
 
     TRY_(Void, Void, create_route_rules(route_line_data, mets, createdIndexes))
 
-  std::string line = "";
-  while (true) {
-    count_line++;
-    TRY(Void, std::string, line, fd.read_file_line())
-    if (line == "\n" || line == "") {
-      end_flag += 1;
-      break;
-    }
-    TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 2))
+    std::string line = "";
+    while (true) {
+        count_line++;
+        TRY(Void, std::string, line, fd.read_file_line())
+        if (line == "\n" || line == "") {
+            end_flag += 1;
+            break;
+        }
+        TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 2))
 
         TRY_(Void, Void, apply_route_rule_entry(line, createdIndexes, envp))
     }
@@ -571,11 +571,11 @@ Result<RouteRule> ServerConfig::find_route(Request::Method    method,
     PathPattern pathPattern(path);
     std::string err = "[DEBUG] find_route: NO ROUTE for ";
 
-  for (size_t i = 0; i < routes.size(); ++i) {
-    if (routes[i].method == method && routes[i].path.matches(pathPattern))
-      return OK(RouteRule, routes[i]);
-  }
-  return ERR(RouteRule, err + path);
+    for (size_t i = 0; i < routes.size(); ++i) {
+        if (routes[i].method == method && routes[i].path.matches(pathPattern))
+            return OK(RouteRule, routes[i]);
+    }
+    return ERR(RouteRule, err + path);
 }
 
 Result<RouteRule_CGI>
@@ -584,11 +584,12 @@ ServerConfig::find_route_cgi(Request::Method    method,
     PathPattern pathPattern(path);
     std::string err = "[DEBUG] find_route_cgi: NO ROUTE for ";
 
-  for (size_t i = 0; i < R_CGI.size(); ++i) {
-    if (R_CGI[i].get_method() == method && R_CGI[i].get_path().matches(pathPattern))
-      return OK(RouteRule_CGI, R_CGI[i]);
-  }
-  return ERR(RouteRule_CGI, err + path);
+    for (size_t i = 0; i < R_CGI.size(); ++i) {
+        if (R_CGI[i].get_method() == method &&
+            R_CGI[i].get_path().matches(pathPattern))
+            return OK(RouteRule_CGI, R_CGI[i]);
+    }
+    return ERR(RouteRule_CGI, err + path);
 }
 
 std::string normalize_slashes(const std::string& path) {

@@ -1,16 +1,16 @@
 #include "DefaultError.hpp"
 
-static std::string generate_error_page(const std::string &heading) {
-  return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta "
-         "charset=\"UTF-8\">\n<title>Webserv</title>\n<style>\nbody { "
-         "font-family: Arial, sans-serif; text-align: center; margin-top: "
-         "50px; }\na { display: inline-block; margin: 15px; padding: 10px "
-         "20px; background-color: #007bff; color: white; text-decoration: "
-         "none; border-radius: 5px; }\na:hover { background-color: #0056b3; "
-         "}\n</style>\n</head>\n<body>\n<h1>" +
-         heading +
-         "</h1>\n<p> </p>\n<a href=\"/\">Back to "
-         "main</a>\n<br>\n</body>\n</html>";
+static std::string generate_error_page(const std::string& heading) {
+    return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta "
+           "charset=\"UTF-8\">\n<title>Webserv</title>\n<style>\nbody { "
+           "font-family: Arial, sans-serif; text-align: center; margin-top: "
+           "50px; }\na { display: inline-block; margin: 15px; padding: 10px "
+           "20px; background-color: #007bff; color: white; text-decoration: "
+           "none; border-radius: 5px; }\na:hover { background-color: #0056b3; "
+           "}\n</style>\n</head>\n<body>\n<h1>" +
+           heading +
+           "</h1>\n<p> </p>\n<a href=\"/\">Back to "
+           "main</a>\n<br>\n</body>\n</html>";
 }
 
 Response::StatusCode
@@ -61,12 +61,12 @@ Response
 DefaultError::default_err_response(const Response::StatusCode err_code) {
     Response response;
 
-  response.version = "HTTP/1.1";
-  response.content_type = "text/html";
-  response.status_code = err_code;
-  response.keep_alive = false;
-  response.body =
-      generate_error_page(status_code_to_string(err_code) + " Error");
-  response.content_length = response.body.length();
-  return response;
+    response.version      = "HTTP/1.1";
+    response.content_type = "text/html";
+    response.status_code  = err_code;
+    response.keep_alive   = false;
+    response.body =
+        generate_error_page(status_code_to_string(err_code) + " Error");
+    response.content_length = response.body.length();
+    return response;
 }

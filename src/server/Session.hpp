@@ -20,18 +20,18 @@ struct SessionData {
 };
 
 class Session {
-  std::map<std::string, SessionData> data;
-  static Result<std::string> generate_session_id();
+    std::map<std::string, SessionData> data;
+    static Result<std::string>         generate_session_id();
 
-public:
-  Result<std::string> create_session(const std::string &user_id,
-                                     const std::string &client_ip);
-  SessionData *get_session(const std::string &session_id);
-  void delete_session(const std::string &session_id);
-  void clean_expired_sessions(int timeout_seconds);
-  bool get_session_info(const std::string &session_id, int timeout_seconds,
-                        std::string &user_id, int &elapsed_seconds,
-                        int &remaining_seconds);
+  public:
+    Result<std::string> create_session(const std::string& user_id,
+                                       const std::string& client_ip);
+    SessionData*        get_session(const std::string& session_id);
+    void                delete_session(const std::string& session_id);
+    void                clean_expired_sessions(int timeout_seconds);
+    bool get_session_info(const std::string& session_id, int timeout_seconds,
+                          std::string& user_id, int& elapsed_seconds,
+                          int& remaining_seconds);
 };
 
 #endif
