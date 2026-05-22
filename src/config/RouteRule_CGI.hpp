@@ -7,18 +7,18 @@
 #define CGI_MIN_TIMEOUT 1
 
 class RouteRule_CGI {
-  private:
-    Request::Method                    met;
-    PathPattern                        path;
-    std::string                        executable;
-    std::map<std::string, std::string> env;
-    unsigned int                       timeout_ms;
-
-  private:
-    std::string              err_meg;
-    std::string              origin_line;
-    std::size_t              count_line;
-    std::vector<std::string> file_extension;
+private:
+  // Final parsed values for this CGI route rule.
+  Request::Method met;
+  PathPattern path;
+  std::string executable;
+  std::map<std::string, std::string> env;
+  unsigned int timeout_ms;
+  // Temporary state used only while parsing and validating this CGI route rule.
+  std::string err_meg;
+  std::string origin_line;
+  std::size_t count_line;
+  std::vector<std::string> file_extension;
 
     static bool              is_valid_timeout(const std::string& line);
     Result<Void> parse_cgi_block(FileDescriptor& fd, std::string line,

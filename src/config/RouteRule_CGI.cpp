@@ -43,15 +43,12 @@ Result<Void> RouteRule_CGI::parse_cgi_block(FileDescriptor& fd,
 Result<Void> RouteRule_CGI::parse_cgi_params(FileDescriptor& fd) {
     std::string file_line = "";
 
-    while (true) {
-        count_line++;
-        TRY(Void, std::string, file_line, fd.read_file_line())
-        if (file_line == "\n" || file_line == "") return OKV;
-
-        origin_line = utils::remove_char(file_line, '\n');
-        err_meg     = configutils::get_indent_whitespace_error(origin_line, 2);
-        if (err_meg != "") return ERR(Void, err_meg);
-        file_line = utils::trim_whitespace(origin_line);
+  while (true) {
+    count_line++;
+    TRY(Void, std::string, file_line, fd.read_file_line())
+    if (file_line == "\n" || file_line == "")
+      return OKV;
+    TRY_(Void, Void, configutils::prepare_config_line(origin_line, file_line, 2))
 
         if (utils::has_space(file_line))
             return ERR(Void, ConfigError::make(origin_line, file_line,
@@ -219,15 +216,12 @@ Result<Void> RouteRule_CGI::parse_global_cgi_block(
     std::string err         = "";
     std::string origin_line = "";
 
-    while (true) {
-        count_line++;
-        TRY(Void, std::string, line, fd.read_file_line())
-        if (line == "\n" || line == "") break;
-
-        origin_line = utils::remove_char(line, '\n');
-        err         = configutils::get_indent_whitespace_error(origin_line, 1);
-        if (err != "") return ERR(Void, err);
-        line            = utils::trim_whitespace(origin_line);
+  while (true) {
+    count_line++;
+    TRY(Void, std::string, line, fd.read_file_line())
+    if (line == "\n" || line == "")
+      break;
+    TRY_(Void, Void, configutils::prepare_config_line(origin_line, line, 1))
 
         std::size_t pos = line.find("->");
         if (pos == std::string::npos)

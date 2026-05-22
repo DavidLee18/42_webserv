@@ -7,16 +7,16 @@
 #define MIN_PORT_VALUE 1024
 
 class WebserverConfig {
-  private:
-    std::string                          origin_line;
-    std::string                          default_mime;
-    std::map<std::string, std::string>   global_cgi;
-    std::map<std::string, std::string>   type_map;
-    std::map<unsigned int, ServerConfig> serverconfig_map;
-
-  private:
-    std::string  err_meg;
-    std::size_t  count_line;
+private:
+  // Final parsed configuration values.
+  std::string default_mime;
+  std::map<std::string, std::string> global_cgi;
+  std::map<std::string, std::string> type_map;
+  std::map<unsigned int, ServerConfig> serverconfig_map;
+  // Temporary state used only during config parsing.
+  std::string origin_line;
+  std::string err_meg;
+  std::size_t count_line;
 
     Result<Void> file_parsing(FileDescriptor& file, char** envp);
     Result<Void> parse_types_block(FileDescriptor& file);

@@ -133,4 +133,6 @@ class PathPattern {
                  const PathPattern& rewrite_target_pattern) const;
 };
 
+std::ostream &operator<<(std::ostream &os, const PathPattern &data);
+
 #endif

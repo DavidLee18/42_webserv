@@ -37,18 +37,18 @@ struct RouteRule {
 };
 
 class ServerConfig {
-  private:
-    std::map<std::string, std::string> header;
-    unsigned int                       server_response_time_ms;
-    std::vector<RouteRule>             routes;
-    std::vector<RouteRule_CGI>         R_CGI;
-    std::vector<std::string>           file_extension;
-
-  private:
-    int          end_flag;
-    std::string  err_meg;
-    std::string  origin_line;
-    std::size_t  count_line;
+private:
+  // Final parsed values for this server block.
+  std::map<std::string, std::string> header;
+  unsigned int server_response_time_ms;
+  std::vector<RouteRule> routes;
+  std::vector<RouteRule_CGI> R_CGI;
+  std::vector<std::string> file_extension;
+  // Temporary state used only while parsing this server block.
+  int end_flag;
+  std::string err_meg;
+  std::string origin_line;
+  std::size_t count_line;
 
     Result<Void> parse_server_block(FileDescriptor& fd, char** envp);
     Result<Void> parse_header_entry(FileDescriptor&    fd,
@@ -111,7 +111,6 @@ class ServerConfig {
                                              const std::string& path) const;
 };
 
-std::ostream& operator<<(std::ostream& os, const ServerConfig& data);
-std::ostream& operator<<(std::ostream& os, const PathPattern& data);
+std::ostream &operator<<(std::ostream &os, const ServerConfig &data);
 
 #endif
