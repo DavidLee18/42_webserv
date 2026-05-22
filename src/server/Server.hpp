@@ -25,7 +25,7 @@
 
 #include "../core/Result.hpp"
 
-#define IDLE_TIMEOUT            300
+#define IDLE_TIMEOUT            30
 #define NETWORK_BUFFER_SIZE     4096
 #define CHUNKED_PENDING_TIMEOUT 3
 
